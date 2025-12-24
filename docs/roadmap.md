@@ -6,6 +6,11 @@
 
 ## Выполнено недавно
 
+- [x] **Background permission poller** — независимый polling с debounce
+  - Дизайн: `designs/2025-12-24-background-permission-poller.md`
+  - План: `plans/2025-12-24-background-permission-poller.md`
+  - Коммиты: e2b5dbe..804321a
+
 - [x] **Permission content display** — показ полного контента permission + удаление после ответа
   - План: `plans/2025-12-24-permission-content-display.md`
   - Коммиты: d36bb9a..d841c4b
@@ -40,6 +45,10 @@
   - План: `plans/2025-12-23-telegram-bridge.md` (Release 4)
 
 ## Идеи / PoC
+
+- [ ] **Markdown to Telegram converter** — библиотека для конвертации обычного MD в TG-совместимый
+  - Таблицы, headers не рендерятся в Telegram
+  - Поискать готовые решения (telegramify-markdown, etc.)
 
 - [ ] **tmux-only архитектура** — парсить только tmux вместо jsonl + tmux
   - Дизайн: `designs/telegram-bridge-tmux-only.md`
