@@ -10,7 +10,8 @@ from .chunker import chunk_message
 
 def find_jsonl_path() -> Path | None:
     """Find latest jsonl for project."""
-    project_hash = settings.project_dir.replace("/", "-").lstrip("-")
+    # Claude uses path with leading dash: /home/user/project -> -home-user-project
+    project_hash = settings.project_dir.replace("/", "-")
     projects_dir = Path.home() / ".claude" / "projects" / project_hash
     if not projects_dir.exists():
         return None

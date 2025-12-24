@@ -7,13 +7,13 @@ class TmuxSession:
     name: str
     cwd: str
 
-    def _build_send_command(self, text: str) -> str:
-        escaped = text.replace("'", "'\\''")
-        return f"tmux send-keys -t {shlex.quote(self.name)} '{escaped}' Enter"
-
     def send(self, text: str) -> None:
-        cmd = self._build_send_command(text)
-        subprocess.run(cmd, shell=True, check=True)
+        """Send text to tmux session and press Enter."""
+        session = shlex.quote(self.name)
+        escaped = text.replace("'", "'\\''")
+        # Send text with -l (literal) flag, then Enter separately
+        subprocess.run(f"tmux send-keys -t {session} -l '{escaped}'", shell=True, check=True)
+        subprocess.run(f"tmux send-keys -t {session} Enter", shell=True, check=True)
 
     def exists(self) -> bool:
         result = subprocess.run(
