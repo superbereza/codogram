@@ -102,3 +102,36 @@ async def test_restore_sessions_deduplicates_by_tmux(mock_config):
     # Should keep the newer session (new-session comes after old-session alphabetically,
     # but we want most recent by jsonl mtime - for simplicity, keep last in iteration)
     assert "new-session" in poller_starts or "old-session" in poller_starts
+
+@pytest.mark.asyncio
+async def test_restore_sessions_cleans_dead_tmux(mock_config):
+    """restore_sessions should remove sessions for non-existent tmux."""
+    mock_config["load"].return_value = {
+        "projects": {"test-project": 12345},
+        "sessions": {
+            "dead-session": {
+                "tmux_session": "dead-tmux",
+                "cwd": "/tmp",
+                "project_name": "test-project",
+                "jsonl_path": None,
+            },
+        },
+    }
+
+    from telegram_bridge.session_manager import SessionManager
+    manager = SessionManager()
+
+    async def mock_start_poller(session):
+        return AsyncMock()
+
+    async def mock_start_watcher(session):
+        return AsyncMock()
+
+    with patch("telegram_bridge.session_manager.TmuxSession") as mock_tmux:
+        mock_tmux.return_value.exists.return_value = False  # tmux doesn't exist
+        await manager.restore_sessions(mock_start_poller, mock_start_watcher)
+
+    # Session should not be in memory
+    assert len(manager.sessions) == 0
+    # Config should be saved (cleaned)
+    assert mock_config["save"].called

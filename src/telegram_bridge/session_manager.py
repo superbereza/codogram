@@ -139,14 +139,17 @@ class SessionManager:
         saved_sessions = self._config.get("sessions", {})
 
         # Deduplicate by tmux_session - keep only one session per tmux
-        # Group by tmux_session, keep the last one (most recently added to config)
         tmux_to_session: dict[str, tuple[str, dict]] = {}
         for session_id, data in saved_sessions.items():
             tmux_name = data["tmux_session"]
             tmux_to_session[tmux_name] = (session_id, data)
 
-        # Only restore deduplicated sessions
+        # Only restore deduplicated sessions with live tmux
         for session_id, data in tmux_to_session.values():
+            tmux = TmuxSession(data["tmux_session"], data["cwd"])
+            if not tmux.exists():
+                continue  # Skip dead tmux sessions
+
             chat_id = self.get_chat_id(data["project_name"])
             session = SessionState(
                 session_id=session_id,
@@ -159,11 +162,11 @@ class SessionManager:
             self.sessions[session_id] = session
 
             if chat_id:
-                # Verify tmux session still exists
-                tmux = TmuxSession(session.tmux_session, session.cwd)
-                if tmux.exists():
-                    session.poller_task = await start_poller(session)
-                    if session.jsonl_path:
-                        session.watcher_task = await start_watcher(session)
+                session.poller_task = await start_poller(session)
+                if session.jsonl_path:
+                    session.watcher_task = await start_watcher(session)
+
+        # Save cleaned config
+        self._save()
 
 manager = SessionManager()
