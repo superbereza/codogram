@@ -37,6 +37,12 @@
 - Другие internal тулы
 - Нужно исследовать какие именно скрыты
 
+### /shift_tab command
+Команда для переключения режима approval:
+- Отправляет Shift+Tab в tmux
+- Репортит изменение режима: "Allow once → Allow for session"
+- Парсит текущий выбор из tmux capture-pane
+
 ### Self-hosting: default chat = bot project
 Дефолтный личный чат с ботом связан с папкой telegram-bridge:
 - Позволяет управлять ботом через самого себя
