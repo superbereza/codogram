@@ -8,6 +8,51 @@ from .bot import router, get_session
 from .watcher import watch_jsonl, ContentType
 from .chunker import chunk_message
 
+
+def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
+    """Format tool use for Telegram display."""
+    if not tool_input:
+        return f"◐ *{tool_name}*"
+
+    if tool_name == "Bash":
+        cmd = tool_input.get("command", "")[:500]
+        desc = tool_input.get("description", "")
+        if desc:
+            return f"◐ *Bash*: {desc}\n`{cmd}`"
+        return f"◐ *Bash*\n`{cmd}`"
+
+    elif tool_name == "Read":
+        path = tool_input.get("file_path", "")
+        return f"◐ *Read* `{path}`"
+
+    elif tool_name == "Write":
+        path = tool_input.get("file_path", "")
+        return f"◐ *Write* `{path}`"
+
+    elif tool_name == "Edit":
+        path = tool_input.get("file_path", "")
+        return f"◐ *Edit* `{path}`"
+
+    elif tool_name == "Glob":
+        pattern = tool_input.get("pattern", "")
+        return f"◐ *Glob* `{pattern}`"
+
+    elif tool_name == "Grep":
+        pattern = tool_input.get("pattern", "")
+        return f"◐ *Grep* `{pattern}`"
+
+    elif tool_name == "Task":
+        desc = tool_input.get("description", "")
+        return f"◐ *Task*: {desc}"
+
+    elif tool_name == "TodoWrite":
+        return f"◐ *TodoWrite*"
+
+    else:
+        # Generic fallback
+        preview = str(tool_input)[:200]
+        return f"◐ *{tool_name}*\n`{preview}`"
+
 def find_jsonl_path() -> Path | None:
     """Find latest jsonl for project."""
     # Claude uses path with leading dash: /home/user/project -> -home-user-project
@@ -30,12 +75,22 @@ async def watcher_task(bot: Bot):
         await asyncio.sleep(2)
 
     async for entry in watch_jsonl(path):
-        if entry.content_type == ContentType.TEXT:
-            symbol = "✓" if entry.is_complete else "◐"
-            for chunk in chunk_message(entry.text):
-                await bot.send_message(settings.chat_id, f"{symbol} {chunk}")
-        elif entry.content_type == ContentType.TOOL_USE:
-            await bot.send_message(settings.chat_id, f"◐ {entry.tool_name}")
+        try:
+            if entry.content_type == ContentType.TEXT:
+                symbol = "✓" if entry.is_complete else "◐"
+                for chunk in chunk_message(entry.text):
+                    await bot.send_message(settings.chat_id, f"{symbol} {chunk}", parse_mode="Markdown")
+            elif entry.content_type == ContentType.TOOL_USE:
+                tool_info = format_tool_use(entry.tool_name, entry.tool_input)
+                await bot.send_message(settings.chat_id, tool_info, parse_mode="Markdown")
+        except Exception as e:
+            # Fallback without markdown if parsing fails
+            if entry.content_type == ContentType.TEXT:
+                symbol = "✓" if entry.is_complete else "◐"
+                for chunk in chunk_message(entry.text):
+                    await bot.send_message(settings.chat_id, f"{symbol} {chunk}")
+            elif entry.content_type == ContentType.TOOL_USE:
+                await bot.send_message(settings.chat_id, f"◐ {entry.tool_name}")
 
 async def main():
     bot = Bot(token=settings.telegram_token)
