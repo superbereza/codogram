@@ -1,12 +1,28 @@
+# src/telegram_bridge/config.py
+import json
+from pathlib import Path
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     telegram_token: str
-    chat_id: int  # Single chat for R1
-    project_dir: str  # e.g. /home/user/dev/my-project
-    tmux_session: str = "claude-bridge"
+    admin_chat_id: int  # Personal chat for alerts (renamed from chat_id)
+    base_dir: str  # e.g. /home/user/dev
+    http_port: int = 8787
 
     class Config:
         env_file = ".env"
 
 settings = Settings()
+
+# Config file path
+CONFIG_PATH = Path(__file__).parent.parent.parent / ".config.json"
+
+def load_config() -> dict:
+    """Load .config.json or return default."""
+    if CONFIG_PATH.exists():
+        return json.loads(CONFIG_PATH.read_text())
+    return {"projects": {}, "sessions": {}}
+
+def save_config(config: dict) -> None:
+    """Save config to .config.json."""
+    CONFIG_PATH.write_text(json.dumps(config, indent=2))
