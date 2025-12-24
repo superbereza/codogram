@@ -31,6 +31,14 @@ async def cmd_attach(message: Message):
     s = get_session()
     await message.answer(f"`{s.attach_command()}`", parse_mode="Markdown")
 
+@router.message(Command("esc"))
+async def cmd_esc(message: Message):
+    """Send Escape key to tmux (not in menu)."""
+    if message.chat.id != settings.chat_id:
+        return
+    s = get_session()
+    s.send_key("Escape")
+
 @router.message()
 async def on_message(message: Message):
     if message.chat.id != settings.chat_id:

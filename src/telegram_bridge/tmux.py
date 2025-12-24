@@ -15,6 +15,11 @@ class TmuxSession:
         subprocess.run(f"tmux send-keys -t {session} -l '{escaped}'", shell=True, check=True)
         subprocess.run(f"tmux send-keys -t {session} Enter", shell=True, check=True)
 
+    def send_key(self, key: str) -> None:
+        """Send a special key (Escape, Enter, C-c, etc.) to tmux session."""
+        session = shlex.quote(self.name)
+        subprocess.run(f"tmux send-keys -t {session} {key}", shell=True, check=True)
+
     def exists(self) -> bool:
         result = subprocess.run(
             f"tmux has-session -t {shlex.quote(self.name)} 2>/dev/null",
