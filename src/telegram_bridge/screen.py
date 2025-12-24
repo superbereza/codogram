@@ -64,6 +64,10 @@ def parse_screen(output: str) -> ScreenState:
 
         # Parse question: line with "?" before options (before ❯)
         for i, line in enumerate(lines):
+            stripped = line.strip()
+            # Skip lines that are part of previous output (start with ●)
+            if stripped.startswith("●"):
+                continue
             if "?" in line and "❯" not in line:
                 # Check if this is before the options section
                 for j in range(i + 1, len(lines)):

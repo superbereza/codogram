@@ -53,3 +53,19 @@ def test_parse_idle():
     idle_screen = "> some prompt\n──────────────"
     result = parse_screen(idle_screen)
     assert isinstance(result, Idle)
+
+def test_parse_screen_ignores_question_with_bullet():
+    """Строки с ● не должны считаться question."""
+    output = """● Ты что-нибудь видел в Telegram?
+────────────────────────────────────────
+Edit file test.txt
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
++ new line
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+Do you want to proceed?
+❯ 1. Yes
+  2. No"""
+    result = parse_screen(output)
+    assert isinstance(result, PermissionPrompt)
+    assert result.question == "Do you want to proceed?"
+    assert "Telegram" not in result.question
