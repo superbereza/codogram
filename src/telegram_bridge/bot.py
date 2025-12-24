@@ -10,6 +10,10 @@ from .state import permission_messages
 
 router = Router()
 
+def is_admin(user_id: int) -> bool:
+    """Check if user is admin."""
+    return user_id == settings.admin_chat_id
+
 def get_session_for_chat(chat_id: int) -> TmuxSession | None:
     """Get TmuxSession for chat_id."""
     session = manager.get_session_by_chat(chat_id)
@@ -19,6 +23,9 @@ def get_session_for_chat(chat_id: int) -> TmuxSession | None:
 
 @router.message(Command("start"))
 async def cmd_start(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
     # Auto-register project by chat title
     if message.chat.title:
         existing = manager.get_chat_id(message.chat.title)
@@ -39,6 +46,9 @@ async def cmd_start(message: Message):
 
 @router.message(Command("status"))
 async def cmd_status(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
     session = manager.get_session_by_chat(message.chat.id)
     if session:
         text = f"Active session: `{session.session_id[:8]}...`\nProject: `{session.project_name}`\ntmux: `{session.tmux_session}`"
@@ -52,6 +62,9 @@ async def cmd_status(message: Message):
 
 @router.message(Command("register_dir"))
 async def cmd_register_dir(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
     if not message.text:
         return
 
@@ -69,6 +82,9 @@ async def cmd_register_dir(message: Message):
 
 @router.message(Command("esc"))
 async def cmd_esc(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
     tmux = get_session_for_chat(message.chat.id)
     if tmux:
         tmux.send_key("Escape")
@@ -76,6 +92,10 @@ async def cmd_esc(message: Message):
 @router.callback_query(F.data.startswith("perm:"))
 async def on_permission_callback(callback: CallbackQuery):
     """Handle permission button press."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
     chat_id = callback.message.chat.id
     kb_msg_id = callback.message.message_id
 
@@ -107,6 +127,9 @@ async def on_permission_callback(callback: CallbackQuery):
 
 @router.message()
 async def on_message(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
     if not message.text:
         return
 
