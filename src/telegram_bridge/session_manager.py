@@ -68,14 +68,25 @@ class SessionManager:
         project_name = get_project_name(Path(cwd))
         chat_id = self.get_chat_id(project_name)
 
-        # Find jsonl path
+        # Remove old sessions for same project (prevents duplicates)
+        old_sessions = [sid for sid, s in self.sessions.items() if s.project_name == project_name]
+        for old_sid in old_sessions:
+            await self.unregister_session(old_sid)
+
+        # Find jsonl path by session_id first, fallback to most recent
         project_hash = cwd.replace("/", "-")
         projects_dir = Path.home() / ".claude" / "projects" / project_hash
         jsonl_path = None
         if projects_dir.exists():
-            jsonl_files = sorted(projects_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
-            if jsonl_files:
-                jsonl_path = str(jsonl_files[-1])
+            # Try exact match first
+            exact_match = projects_dir / f"{session_id}.jsonl"
+            if exact_match.exists():
+                jsonl_path = str(exact_match)
+            else:
+                # Fallback to most recent
+                jsonl_files = sorted(projects_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
+                if jsonl_files:
+                    jsonl_path = str(jsonl_files[-1])
 
         session = SessionState(
             session_id=session_id,

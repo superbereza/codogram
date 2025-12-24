@@ -126,6 +126,12 @@ cat agent-tools/telegram-bridge/.config.json
 3. Проверить что chat_id правильный
 4. Проверить поллер логи: `tail -f poller-debug.log`
 
+### Сообщения из Telegram не доходят до tmux
+
+1. **Бот должен быть админом группы** (Privacy Mode в Telegram)
+2. Проверить что сессия зарегистрирована с правильным chat_id
+3. После компакта session_id меняется — нужна перерегистрация
+
 ### Hook не срабатывает
 
 1. Проверить что hook исполняемый: `ls -la hooks/`
