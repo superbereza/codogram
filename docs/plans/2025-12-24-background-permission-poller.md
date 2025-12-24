@@ -470,3 +470,115 @@ Expected: No errors, should see "Permission poller: started"
 ```bash
 git push
 ```
+
+---
+
+### Task 8: Fix question parsing (captures wrong text)
+
+**Problem:** `parse_screen` ищет строку с "?" как question, но подхватывает текст из предыдущих сообщений в tmux буфере.
+
+**Files:**
+- Modify: `src/telegram_bridge/screen.py:65-74`
+- Test: `tests/test_screen.py`
+
+**Step 1: Write failing test**
+
+```python
+# tests/test_screen.py (добавить)
+def test_parse_screen_ignores_question_with_bullet():
+    """Строки с ● не должны считаться question."""
+    output = """● Ты что-нибудь видел в Telegram?
+────────────────────────────────────────
+Edit file test.txt
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
++ new line
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+Do you want to proceed?
+❯ 1. Yes
+  2. No"""
+    result = parse_screen(output)
+    assert isinstance(result, PermissionPrompt)
+    assert result.question == "Do you want to proceed?"
+    assert "Telegram" not in result.question
+```
+
+**Step 2: Run test to verify it fails**
+
+Run: `pytest tests/test_screen.py::test_parse_screen_ignores_question_with_bullet -v`
+
+**Step 3: Fix implementation**
+
+В `screen.py` строка ~66, добавить проверку что строка не начинается с ●:
+
+```python
+# Parse question: line with "?" before options (before ❯)
+for i, line in enumerate(lines):
+    stripped = line.strip()
+    # Skip lines that are part of previous output (start with ●)
+    if stripped.startswith("●"):
+        continue
+    if "?" in line and "❯" not in line:
+```
+
+**Step 4: Run test to verify it passes**
+
+**Step 5: Commit**
+
+```bash
+git commit -m "fix(telegram-bridge): ignore bullet lines when parsing question"
+```
+
+---
+
+### Task 9: Show options text separately from buttons
+
+**Problem:** Inline кнопки в Telegram имеют лимит ~64 символа, длинные варианты обрезаются.
+
+**Files:**
+- Modify: `src/telegram_bridge/permission_poller.py`
+
+**Step 1: Update send logic**
+
+В permission_poller.py, в DEBOUNCING → SHOWING transition, после отправки content добавить отправку options как текст:
+
+```python
+# После content_msg_ids, перед keyboard:
+
+# Send options as text (buttons have character limit)
+options_text = "\n".join(parsed.options)
+try:
+    opts_msg = await bot.send_message(settings.chat_id, options_text)
+    content_msg_ids.append(opts_msg.message_id)
+except Exception:
+    pass
+
+kb = permission_keyboard(parsed.options)
+```
+
+**Step 2: Verify syntax**
+
+Run: `python -m py_compile src/telegram_bridge/permission_poller.py`
+
+**Step 3: Commit**
+
+```bash
+git commit -m "feat(telegram-bridge): show options text before buttons"
+```
+
+---
+
+### Task 10: Final integration test
+
+**Step 1: Restart bot**
+
+**Step 2: Trigger permission and verify:**
+- Контент отображается корректно (без лишнего текста)
+- Варианты показываются текстом
+- Кнопки работают
+- Сообщения удаляются после клика
+
+**Step 3: Push all**
+
+```bash
+git push
+```
