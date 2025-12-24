@@ -41,7 +41,7 @@ class TmuxSession:
         """Capture current pane content."""
         session = shlex.quote(self.name)
         result = subprocess.run(
-            f"tmux capture-pane -t {session} -p",
+            f"tmux capture-pane -t {session} -p -S -",
             shell=True,
             capture_output=True,
             text=True

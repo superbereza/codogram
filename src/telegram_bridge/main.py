@@ -88,10 +88,13 @@ async def watcher_task(bot: Bot):
 
             elif entry.content_type == ContentType.TOOL_USE:
                 # Just send tool info, permissions handled by background poller
+                print(f"Watcher: TOOL_USE {entry.tool_name}", flush=True)
                 text = format_tool_use(entry.tool_name, entry.tool_input)
                 try:
                     await bot.send_message(settings.chat_id, text, parse_mode="Markdown")
-                except Exception:
+                    print(f"Watcher: sent {entry.tool_name}", flush=True)
+                except Exception as e:
+                    print(f"Watcher: error sending {entry.tool_name}: {e}", flush=True)
                     await bot.send_message(settings.chat_id, f"● {entry.tool_name}")
 
         except Exception as e:
