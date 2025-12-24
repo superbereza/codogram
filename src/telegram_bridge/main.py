@@ -114,17 +114,12 @@ async def watcher_task(bot: Bot):
                         await bot.send_message(settings.chat_id, f"● {chunk}")
 
             elif entry.content_type == ContentType.TOOL_USE:
-                # Send tool info
-                tool_info = format_tool_use(entry.tool_name, entry.tool_input)
-                try:
-                    msg = await bot.send_message(settings.chat_id, tool_info, parse_mode="Markdown")
-                except Exception:
-                    msg = await bot.send_message(settings.chat_id, tool_info)
-
                 # Start polling for permission/progress
                 s = get_session()
                 last_state = None
-                permission_msg = None  # Track message with keyboard
+                sent_content = False
+                content_msg_ids: list[int] = []
+                kb_msg = None
 
                 while True:
                     await asyncio.sleep(0.5)
@@ -134,13 +129,34 @@ async def watcher_task(bot: Bot):
 
                     if isinstance(state, PermissionPrompt):
                         if last_state != state.options:
+                            # Format and send content (only once)
+                            if not sent_content:
+                                content_text = format_permission_content(state)
+                                if content_text.strip():
+                                    for chunk in chunk_message(content_text):
+                                        try:
+                                            msg = await bot.send_message(
+                                                settings.chat_id, chunk, parse_mode="Markdown"
+                                            )
+                                        except Exception:
+                                            msg = await bot.send_message(settings.chat_id, chunk)
+                                        content_msg_ids.append(msg.message_id)
+                                sent_content = True
+
+                            # Send keyboard (new message or update existing)
                             kb = permission_keyboard(state.options)
-                            if permission_msg:
-                                await permission_msg.edit_reply_markup(reply_markup=kb)
+                            if kb_msg:
+                                try:
+                                    await kb_msg.edit_reply_markup(reply_markup=kb)
+                                except Exception:
+                                    pass
                             else:
-                                # Edit the tool message to add keyboard
-                                await msg.edit_reply_markup(reply_markup=kb)
-                                permission_msg = msg
+                                kb_msg = await bot.send_message(
+                                    settings.chat_id, "👆", reply_markup=kb
+                                )
+                                # Track for deletion
+                                permission_messages[kb_msg.message_id] = content_msg_ids
+
                             last_state = state.options
 
                     elif isinstance(state, ToolProgress):
@@ -149,12 +165,6 @@ async def watcher_task(bot: Bot):
 
                     else:
                         # Idle - permission was handled or tool finished
-                        if permission_msg:
-                            # Remove keyboard if still there
-                            try:
-                                await permission_msg.edit_reply_markup(reply_markup=None)
-                            except Exception:
-                                pass
                         break
 
         except Exception as e:
