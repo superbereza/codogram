@@ -31,6 +31,8 @@ from .screen import parse_screen, PermissionPrompt
 from .keyboards import permission_keyboard
 from .chunker import chunk_message
 from .state import permission_messages
+from .session_manager import SessionState
+from .tmux import TmuxSession
 
 
 class PollerState(Enum):
@@ -43,7 +45,12 @@ class PollerState(Enum):
 SEPARATOR_SOLID = "─────────────────────"
 
 
-async def permission_poller_task(bot: Bot, get_session_fn):
+async def create_poller_task(bot: Bot, session: SessionState) -> asyncio.Task:
+    """Create permission poller task for session."""
+    return asyncio.create_task(permission_poller_for_session(bot, session))
+
+
+async def permission_poller_for_session(bot: Bot, session: SessionState):
     """
     Background poller for permission prompts.
 
@@ -51,6 +58,10 @@ async def permission_poller_task(bot: Bot, get_session_fn):
     State machine: IDLE → DEBOUNCING → SHOWING → IDLE
     """
     log("Poller started")
+
+    # Create TmuxSession from session data
+    tmux = TmuxSession(session.tmux_session, session.cwd)
+    chat_id = session.chat_id
 
     state = PollerState.IDLE
     debounce_start = 0.0
@@ -66,8 +77,7 @@ async def permission_poller_task(bot: Bot, get_session_fn):
         await asyncio.sleep(POLL_INTERVAL)
 
         try:
-            session = get_session_fn()
-            screen = session.capture_pane()
+            screen = tmux.capture_pane()
             parsed = parse_screen(screen)
         except Exception as e:
             print(f"Permission poller: capture error: {e}")
@@ -119,23 +129,23 @@ async def permission_poller_task(bot: Bot, get_session_fn):
                             for chunk in chunk_message(body_text):
                                 try:
                                     msg = await bot.send_message(
-                                        settings.chat_id, chunk, parse_mode="Markdown"
+                                        chat_id, chunk, parse_mode="Markdown"
                                     )
                                 except Exception:
-                                    msg = await bot.send_message(settings.chat_id, chunk)
+                                    msg = await bot.send_message(chat_id, chunk)
                                 content_msg_ids.append(msg.message_id)
 
                         # Send options as text (buttons have character limit)
                         options_text = "\n".join(parsed.options)
                         try:
-                            opts_msg = await bot.send_message(settings.chat_id, options_text)
+                            opts_msg = await bot.send_message(chat_id, options_text)
                             content_msg_ids.append(opts_msg.message_id)
                         except Exception:
                             pass
 
                         kb = permission_keyboard(parsed.options)
                         kb_msg = await bot.send_message(
-                            settings.chat_id, "👆", reply_markup=kb
+                            chat_id, "👆", reply_markup=kb
                         )
                         permission_messages[kb_msg.message_id] = content_msg_ids
 
@@ -155,11 +165,11 @@ async def permission_poller_task(bot: Bot, get_session_fn):
                 if kb_msg and kb_msg.message_id in permission_messages:
                     for msg_id in content_msg_ids:
                         try:
-                            await bot.delete_message(settings.chat_id, msg_id)
+                            await bot.delete_message(chat_id, msg_id)
                         except Exception:
                             pass
                     try:
-                        await bot.delete_message(settings.chat_id, kb_msg.message_id)
+                        await bot.delete_message(chat_id, kb_msg.message_id)
                     except Exception:
                         pass
                     permission_messages.pop(kb_msg.message_id, None)
@@ -176,12 +186,12 @@ async def permission_poller_task(bot: Bot, get_session_fn):
                     # Delete old messages
                     for msg_id in content_msg_ids:
                         try:
-                            await bot.delete_message(settings.chat_id, msg_id)
+                            await bot.delete_message(chat_id, msg_id)
                         except Exception:
                             pass
                     if kb_msg:
                         try:
-                            await bot.delete_message(settings.chat_id, kb_msg.message_id)
+                            await bot.delete_message(chat_id, kb_msg.message_id)
                         except Exception:
                             pass
                         permission_messages.pop(kb_msg.message_id, None)
@@ -193,23 +203,23 @@ async def permission_poller_task(bot: Bot, get_session_fn):
                         for chunk in chunk_message(body_text):
                             try:
                                 msg = await bot.send_message(
-                                    settings.chat_id, chunk, parse_mode="Markdown"
+                                    chat_id, chunk, parse_mode="Markdown"
                                 )
                             except Exception:
-                                msg = await bot.send_message(settings.chat_id, chunk)
+                                msg = await bot.send_message(chat_id, chunk)
                             content_msg_ids.append(msg.message_id)
 
                     # Send options + keyboard
                     options_text = "\n".join(parsed.options)
                     try:
-                        opts_msg = await bot.send_message(settings.chat_id, options_text)
+                        opts_msg = await bot.send_message(chat_id, options_text)
                         content_msg_ids.append(opts_msg.message_id)
                     except Exception:
                         pass
 
                     kb = permission_keyboard(parsed.options)
                     kb_msg = await bot.send_message(
-                        settings.chat_id, "👆", reply_markup=kb
+                        chat_id, "👆", reply_markup=kb
                     )
                     permission_messages[kb_msg.message_id] = content_msg_ids
 
