@@ -1,6 +1,6 @@
 # src/telegram_bridge/bot.py
-from aiogram import Bot, Dispatcher, Router
-from aiogram.types import Message
+from aiogram import Bot, Dispatcher, Router, F
+from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
 from .config import settings
@@ -41,6 +41,26 @@ async def cmd_esc(message: Message):
         return
     s = get_session()
     s.send_key("Escape")
+
+@router.callback_query(F.data.startswith("perm:"))
+async def on_permission_callback(callback: CallbackQuery):
+    """Handle permission button press."""
+    if callback.message.chat.id != settings.chat_id:
+        return
+
+    action = callback.data.split(":")[1]
+    s = get_session()
+
+    if action == "esc":
+        s.send_key("Escape")
+        await callback.answer("Cancelled")
+    else:
+        # Send the number key
+        s.send_key(action)
+        await callback.answer(f"Sent: {action}")
+
+    # Remove keyboard after action
+    await callback.message.edit_reply_markup(reply_markup=None)
 
 @router.message()
 async def on_message(message: Message):
