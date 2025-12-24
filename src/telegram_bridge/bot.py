@@ -40,4 +40,4 @@ async def on_message(message: Message):
 
     s = get_session()
     s.send(message.text)
-    await message.answer("◐ sent to claude")
+    # Don't send confirmation - watcher will show output
