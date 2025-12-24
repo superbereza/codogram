@@ -6,6 +6,11 @@
 
 ## Выполнено недавно
 
+- [x] **Fix poller duplication** — исправлено дублирование поллеров при /new и рестарте
+  - План: `plans/done/2025-12-24-fix-poller-duplication.md`
+  - Коммиты: 5ca1e10..90dff32
+  - Debug endpoint `/debug` для диагностики
+
 - [x] **Background permission poller** — независимый polling с debounce
   - Дизайн: `designs/2025-12-24-background-permission-poller.md`
   - План: `plans/2025-12-24-background-permission-poller.md`
