@@ -7,6 +7,7 @@ from .config import settings
 from .bot import router, get_session
 from .watcher import watch_jsonl, ContentType
 from .chunker import chunk_message
+from .streamer import EditMessageStreamer
 
 
 def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
@@ -74,21 +75,30 @@ async def watcher_task(bot: Bot):
             break
         await asyncio.sleep(2)
 
+    streamer = EditMessageStreamer(bot, settings.chat_id, min_edit_interval=1.0)
+
     async for entry in watch_jsonl(path):
         try:
             if entry.content_type == ContentType.TEXT:
-                symbol = "✓" if entry.is_complete else "◐"
-                for chunk in chunk_message(entry.text):
-                    await bot.send_message(settings.chat_id, f"{symbol} {chunk}", parse_mode="Markdown")
+                if entry.is_complete:
+                    # Final text - complete the stream
+                    await streamer.append(entry.text, force=True)
+                    await streamer.complete()
+                else:
+                    # Streaming text - update in place
+                    await streamer.append(entry.text)
+
             elif entry.content_type == ContentType.TOOL_USE:
+                # Tool use - reset streamer and send separately
+                streamer.reset()
                 tool_info = format_tool_use(entry.tool_name, entry.tool_input)
                 await bot.send_message(settings.chat_id, tool_info, parse_mode="Markdown")
+
         except Exception as e:
-            # Fallback without markdown if parsing fails
+            # Fallback without markdown
             if entry.content_type == ContentType.TEXT:
                 symbol = "✓" if entry.is_complete else "◐"
-                for chunk in chunk_message(entry.text):
-                    await bot.send_message(settings.chat_id, f"{symbol} {chunk}")
+                await bot.send_message(settings.chat_id, f"{symbol} {entry.text[:4000]}")
             elif entry.content_type == ContentType.TOOL_USE:
                 await bot.send_message(settings.chat_id, f"● {entry.tool_name}")
 
