@@ -19,7 +19,6 @@ class ParsedEntry:
     text: str = ""
     tool_name: str = ""
     tool_input: dict | None = None
-    is_complete: bool = False
 
 def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
     if entry.get("type") != "assistant":
@@ -27,7 +26,6 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
 
     message = entry.get("message", {})
     content = message.get("content", [])
-    stop_reason = message.get("stop_reason")
 
     for item in content:
         item_type = item.get("type")
@@ -35,15 +33,13 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
         if item_type == "text":
             return ParsedEntry(
                 content_type=ContentType.TEXT,
-                text=item.get("text", ""),
-                is_complete=stop_reason == "end_turn"
+                text=item.get("text", "")
             )
         elif item_type == "tool_use":
             return ParsedEntry(
                 content_type=ContentType.TOOL_USE,
                 tool_name=item.get("name", ""),
-                tool_input=item.get("input"),
-                is_complete=False
+                tool_input=item.get("input")
             )
         elif item_type == "thinking":
             return ParsedEntry(
