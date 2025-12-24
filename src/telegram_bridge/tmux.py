@@ -12,7 +12,7 @@ class TmuxSession:
         session = shlex.quote(self.name)
         escaped = text.replace("'", "'\\''")
         # Send text with -l (literal) flag, then Enter separately
-        subprocess.run(f"tmux send-keys -t {session} -l '{escaped}'", shell=True, check=True)
+        subprocess.run(f"tmux send-keys -t {session} -l -- '{escaped}'", shell=True, check=True)
         subprocess.run(f"tmux send-keys -t {session} Enter", shell=True, check=True)
 
     def send_key(self, key: str) -> None:
