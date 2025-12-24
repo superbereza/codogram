@@ -7,33 +7,7 @@ from .config import settings
 from .bot import router, get_session
 from .watcher import watch_jsonl, ContentType
 from .chunker import chunk_message
-from .screen import parse_screen, PermissionPrompt, ToolProgress
-from .keyboards import permission_keyboard
-
-# Separators for Telegram display (adjustable length)
-SEPARATOR_SOLID = "─" * 20
-SEPARATOR_DASHED = "╌" * 20
-
-from .state import permission_messages
-
-
-def format_permission_content(perm: PermissionPrompt) -> str:
-    """Format permission prompt content for Telegram display."""
-    parts = []
-
-    if perm.description:
-        parts.append(SEPARATOR_SOLID)
-        parts.append(perm.description)
-
-    if perm.content:
-        parts.append(SEPARATOR_DASHED)
-        parts.append(perm.content)
-        parts.append(SEPARATOR_DASHED)
-
-    if perm.question:
-        parts.append(perm.question)
-
-    return "\n".join(parts)
+from .permission_poller import permission_poller_task
 
 
 def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
@@ -113,58 +87,12 @@ async def watcher_task(bot: Bot):
                         await bot.send_message(settings.chat_id, f"● {chunk}")
 
             elif entry.content_type == ContentType.TOOL_USE:
-                # Start polling for permission/progress
-                s = get_session()
-                last_state = None
-                sent_content = False
-                content_msg_ids: list[int] = []
-                kb_msg = None
-
-                while True:
-                    await asyncio.sleep(0.5)
-
-                    screen = s.capture_pane()
-                    state = parse_screen(screen)
-
-                    if isinstance(state, PermissionPrompt):
-                        if last_state != state.options:
-                            # Format and send content (only once)
-                            if not sent_content:
-                                content_text = format_permission_content(state)
-                                if content_text.strip():
-                                    for chunk in chunk_message(content_text):
-                                        try:
-                                            msg = await bot.send_message(
-                                                settings.chat_id, chunk, parse_mode="Markdown"
-                                            )
-                                        except Exception:
-                                            msg = await bot.send_message(settings.chat_id, chunk)
-                                        content_msg_ids.append(msg.message_id)
-                                sent_content = True
-
-                            # Send keyboard (new message or update existing)
-                            kb = permission_keyboard(state.options)
-                            if kb_msg:
-                                try:
-                                    await kb_msg.edit_reply_markup(reply_markup=kb)
-                                except Exception:
-                                    pass
-                            else:
-                                kb_msg = await bot.send_message(
-                                    settings.chat_id, "👆", reply_markup=kb
-                                )
-                                # Track for deletion
-                                permission_messages[kb_msg.message_id] = content_msg_ids
-
-                            last_state = state.options
-
-                    elif isinstance(state, ToolProgress):
-                        # Could update message with progress here
-                        pass
-
-                    else:
-                        # Idle - permission was handled or tool finished
-                        break
+                # Just send tool info, permissions handled by background poller
+                text = format_tool_use(entry.tool_name, entry.tool_input)
+                try:
+                    await bot.send_message(settings.chat_id, text, parse_mode="Markdown")
+                except Exception:
+                    await bot.send_message(settings.chat_id, f"● {entry.tool_name}")
 
         except Exception as e:
             # Fallback without markdown
@@ -182,6 +110,7 @@ async def main():
     print(f"Project: {settings.project_dir}")
 
     asyncio.create_task(watcher_task(bot))
+    asyncio.create_task(permission_poller_task(bot, get_session))
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
