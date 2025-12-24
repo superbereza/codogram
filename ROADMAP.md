@@ -2,8 +2,31 @@
 
 ## Done
 
-### Bot command menu ✓
-Команды в Telegram menu через setMyCommands.
+### Core
+- tmux send-keys для input
+- jsonl watch для output
+- Chunking (4000 символов)
+- Статус символы (●◐✓)
+
+### Multi-session architecture
+- Один процесс бота на несколько Claude сессий
+- Регистрация через Claude Code hooks (SessionStart/SessionEnd)
+- HTTP API для регистрации сессий
+- Project → Chat mapping
+- Git worktree support (резолвит project name)
+
+### Permission handling
+- Background poller для permission prompts
+- Парсинг контента из tmux capture-pane
+- Inline keyboard с опциями
+- Удаление сообщений после ответа
+
+### Multi-admin support
+- ADMIN_IDS через запятую в .env
+- /my_chat_id команда для всех
+
+### Bot command menu
+- /start, /my_chat_id, /register_dir, /esc в меню Telegram
 
 ## Backlog
 
