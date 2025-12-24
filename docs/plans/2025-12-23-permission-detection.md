@@ -248,6 +248,12 @@ git commit -m "feat(telegram-bridge): callback handler for permission buttons"
 **Files:**
 - Modify: `agent-tools/telegram-bridge/src/telegram_bridge/main.py`
 
+**⚠️ Архитектурное замечание:**
+- Контент permission НЕ попадает в jsonl
+- После выбора permission он пропадает из истории Claude
+- Нужно: удалять сообщение(я) из Telegram после выбора
+- Permission может быть длинным (несколько чанков) — трекать все message_id и удалять
+
 **Step 1: Add permission polling to watcher_task**
 
 ```python

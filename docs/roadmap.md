@@ -11,9 +11,21 @@
   - Сейчас добавляются в tmux с двумя слэшами, не отправляются
   - Нужен fallback в `on_message` или отдельный хэндлер
 
+- [ ] **Thinking indicator** — показывать когда Claude думает
+  - В jsonl есть `type: "thinking"` entries
+  - Отправлять "🤔 Thinking..." или подобное
+
 - [ ] **Tool progress display** — показывать прогресс выполнения инструментов
   - Расширить Task 5 в плане permission-detection
   - Сейчас `ToolProgress` парсится, но не отображается (pass)
+  - **Инсайт:** В Claude первая строка статична (Task/Tool name), остальные бегут
+    ```
+    Task(Implement Task 1: Screen Parser)
+      ⎿  Read 46 lines
+         Read 30 lines
+         Waiting…
+    ```
+  - Из jsonl приходит первая строка — на ней можно якориться
 
 - [ ] **R4: Voice + Multi-project** — голосовые сообщения через Whisper, несколько проектов
   - План: `plans/2025-12-23-telegram-bridge.md` (Release 4)
