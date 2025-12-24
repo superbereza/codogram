@@ -1,4 +1,10 @@
 # tests/test_session_manager.py
+import os
+# Set env vars BEFORE importing telegram_bridge modules
+os.environ.setdefault("TELEGRAM_TOKEN", "test-token")
+os.environ.setdefault("ADMIN_IDS", "123")
+os.environ.setdefault("BASE_DIR", "/tmp")
+
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
