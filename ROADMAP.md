@@ -93,6 +93,12 @@
 - Позволяет управлять ботом через самого себя
 - Не нужно создавать отдельную группу для разработки бота
 
+### Security audit
+Проанализировать код на уязвимости:
+- Input validation
+- Command injection
+- Права доступа
+
 ## PoC / Research
 
 ### telegram-bridge-tmux-only
