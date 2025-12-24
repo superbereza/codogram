@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.11+, aiogram 3.x (InlineKeyboardMarkup, CallbackQuery), tmux
 
-**Design Doc:** `docs/design/telegram-bridge-draft.md` — секция "Permission & Progress Detection"
+**Design Doc:** `docs/designs/telegram-bridge.md` — секция "Permission & Progress Detection"
 
 ---
 

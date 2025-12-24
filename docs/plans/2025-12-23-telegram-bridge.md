@@ -8,11 +8,11 @@
 
 **Tech Stack:** Python 3.11+, aiogram 3.x, aiofiles, pydantic-settings
 
-**Design Doc:** `docs/design/telegram-bridge-draft.md`
+**Design Doc:** `docs/designs/telegram-bridge.md`
 
 ---
 
-## Release 1: Echo Bot + tmux
+## Release 1: Echo Bot + tmux ✅ DONE
 
 **Цель:** Отправить сообщение в Telegram → появится в tmux сессии Claude.
 
@@ -262,7 +262,7 @@ git add -A && git commit -m "feat(telegram-bridge): basic telegram bot with tmux
 
 ---
 
-## Release 2: jsonl Watcher + Output
+## Release 2: jsonl Watcher + Output ✅ DONE
 
 **Цель:** Ответы Claude из jsonl → появляются в Telegram.
 
@@ -609,11 +609,15 @@ git add -A && git commit -m "feat(telegram-bridge): message chunking"
 
 ---
 
-## Release 3: Streaming + Permissions
+## Release 3: Streaming + Permissions ⚠️ REVISED
 
 **Цель:** Edit-in-place streaming, показ permissions без auto-approve.
 
-### Task 3.1: Edit Message Streaming
+**Статус:**
+- Task 3.1 (Edit Message Streaming) — ❌ CANCELLED (текст приходит целиком, streaming не нужен)
+- Task 3.2 (Permission Display) — ➡️ Moved to `2025-12-23-permissions-and-tool-progress.md`
+
+### Task 3.1: Edit Message Streaming ❌ CANCELLED
 
 **Files:**
 - Create: `agent-tools/telegram-bridge/src/telegram_bridge/streamer.py`
