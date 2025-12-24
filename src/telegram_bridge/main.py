@@ -10,48 +10,48 @@ from .chunker import chunk_message
 
 
 def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
-    """Format tool use for Telegram display."""
+    """Format tool use for Telegram display. Uses ● for permission requests."""
     if not tool_input:
-        return f"◐ *{tool_name}*"
+        return f"● *{tool_name}*"
 
     if tool_name == "Bash":
         cmd = tool_input.get("command", "")[:500]
         desc = tool_input.get("description", "")
         if desc:
-            return f"◐ *Bash*: {desc}\n`{cmd}`"
-        return f"◐ *Bash*\n`{cmd}`"
+            return f"● *Bash*: {desc}\n`{cmd}`"
+        return f"● *Bash*\n`{cmd}`"
 
     elif tool_name == "Read":
         path = tool_input.get("file_path", "")
-        return f"◐ *Read* `{path}`"
+        return f"● *Read* `{path}`"
 
     elif tool_name == "Write":
         path = tool_input.get("file_path", "")
-        return f"◐ *Write* `{path}`"
+        return f"● *Write* `{path}`"
 
     elif tool_name == "Edit":
         path = tool_input.get("file_path", "")
-        return f"◐ *Edit* `{path}`"
+        return f"● *Edit* `{path}`"
 
     elif tool_name == "Glob":
         pattern = tool_input.get("pattern", "")
-        return f"◐ *Glob* `{pattern}`"
+        return f"● *Glob* `{pattern}`"
 
     elif tool_name == "Grep":
         pattern = tool_input.get("pattern", "")
-        return f"◐ *Grep* `{pattern}`"
+        return f"● *Grep* `{pattern}`"
 
     elif tool_name == "Task":
         desc = tool_input.get("description", "")
-        return f"◐ *Task*: {desc}"
+        return f"● *Task*: {desc}"
 
     elif tool_name == "TodoWrite":
-        return f"◐ *TodoWrite*"
+        return f"● *TodoWrite*"
 
     else:
         # Generic fallback
         preview = str(tool_input)[:200]
-        return f"◐ *{tool_name}*\n`{preview}`"
+        return f"● *{tool_name}*\n`{preview}`"
 
 def find_jsonl_path() -> Path | None:
     """Find latest jsonl for project."""
@@ -90,7 +90,7 @@ async def watcher_task(bot: Bot):
                 for chunk in chunk_message(entry.text):
                     await bot.send_message(settings.chat_id, f"{symbol} {chunk}")
             elif entry.content_type == ContentType.TOOL_USE:
-                await bot.send_message(settings.chat_id, f"◐ {entry.tool_name}")
+                await bot.send_message(settings.chat_id, f"● {entry.tool_name}")
 
 async def main():
     bot = Bot(token=settings.telegram_token)
