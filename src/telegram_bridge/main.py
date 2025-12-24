@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher
 from .config import settings
 from .bot import router, get_session
 from .watcher import watch_jsonl, ContentType
+from .chunker import chunk_message
 
 def find_jsonl_path() -> Path | None:
     """Find latest jsonl for project."""
@@ -30,7 +31,8 @@ async def watcher_task(bot: Bot):
     async for entry in watch_jsonl(path):
         if entry.content_type == ContentType.TEXT:
             symbol = "✓" if entry.is_complete else "◐"
-            await bot.send_message(settings.chat_id, f"{symbol} {entry.text[:4000]}")
+            for chunk in chunk_message(entry.text):
+                await bot.send_message(settings.chat_id, f"{symbol} {chunk}")
         elif entry.content_type == ContentType.TOOL_USE:
             await bot.send_message(settings.chat_id, f"◐ {entry.tool_name}")
 
