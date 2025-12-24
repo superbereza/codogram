@@ -1,119 +1,97 @@
 # src/telegram_bridge/main.py
 import asyncio
 from pathlib import Path
+from aiohttp import web
 from aiogram import Bot, Dispatcher
 
 from .config import settings
-from .bot import router, get_session
-from .watcher import watch_jsonl, ContentType
-from .chunker import chunk_message
-from .permission_poller import permission_poller_task
+from .bot import router
+from .session_manager import manager, SessionState
+from .tmux import TmuxSession
 
+# HTTP handlers
+async def handle_register(request: web.Request) -> web.Response:
+    """Handle session registration from Claude hook."""
+    data = await request.json()
+    session_id = data.get("session_id")
+    cwd = data.get("cwd")
+    tmux_session = data.get("tmux_session")
 
-def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
-    """Format tool use for Telegram display. Uses ● for permission requests."""
-    if not tool_input:
-        return f"● *{tool_name}*"
+    if not session_id or not cwd:
+        return web.json_response({"error": "missing fields"}, status=400)
 
-    if tool_name == "Bash":
-        cmd = tool_input.get("command", "")[:500]
-        desc = tool_input.get("description", "")
-        if desc:
-            return f"● *Bash*: {desc}\n`{cmd}`"
-        return f"● *Bash*\n`{cmd}`"
+    bot = request.app["bot"]
 
-    elif tool_name == "Read":
-        path = tool_input.get("file_path", "")
-        return f"● *Read* `{path}`"
+    async def start_poller(session: SessionState) -> asyncio.Task:
+        from .permission_poller import create_poller_task
+        return asyncio.create_task(create_poller_task(bot, session))
 
-    elif tool_name == "Write":
-        path = tool_input.get("file_path", "")
-        return f"● *Write* `{path}`"
+    async def start_watcher(session: SessionState) -> asyncio.Task:
+        from .watcher import create_watcher_task
+        return asyncio.create_task(create_watcher_task(bot, session))
 
-    elif tool_name == "Edit":
-        path = tool_input.get("file_path", "")
-        return f"● *Edit* `{path}`"
+    session = await manager.register_session(
+        session_id=session_id,
+        cwd=cwd,
+        tmux_session=tmux_session or "unknown",
+        start_poller=start_poller,
+        start_watcher=start_watcher,
+    )
 
-    elif tool_name == "Glob":
-        pattern = tool_input.get("pattern", "")
-        return f"● *Glob* `{pattern}`"
+    return web.json_response({
+        "status": "registered",
+        "project": session.project_name,
+        "has_chat": session.chat_id is not None,
+    })
 
-    elif tool_name == "Grep":
-        pattern = tool_input.get("pattern", "")
-        return f"● *Grep* `{pattern}`"
+async def handle_unregister(request: web.Request) -> web.Response:
+    """Handle session unregistration from Claude hook."""
+    data = await request.json()
+    session_id = data.get("session_id")
 
-    elif tool_name == "Task":
-        desc = tool_input.get("description", "")
-        return f"● *Task*: {desc}"
+    if not session_id:
+        return web.json_response({"error": "missing session_id"}, status=400)
 
-    elif tool_name == "TodoWrite":
-        return f"● *TodoWrite*"
+    await manager.unregister_session(session_id)
+    return web.json_response({"status": "unregistered"})
 
-    else:
-        # Generic fallback
-        preview = str(tool_input)[:200]
-        return f"● *{tool_name}*\n`{preview}`"
+async def run_http_server(bot: Bot) -> None:
+    """Run HTTP server for session registration."""
+    app = web.Application()
+    app["bot"] = bot
+    app.router.add_post("/session/register", handle_register)
+    app.router.add_post("/session/unregister", handle_unregister)
 
-def find_jsonl_path() -> Path | None:
-    """Find latest jsonl for project."""
-    # Claude uses path with leading dash: /home/user/project -> -home-user-project
-    project_hash = settings.project_dir.replace("/", "-")
-    projects_dir = Path.home() / ".claude" / "projects" / project_hash
-    if not projects_dir.exists():
-        return None
-    jsonl_files = sorted(projects_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
-    return jsonl_files[-1] if jsonl_files else None
-
-async def watcher_task(bot: Bot):
-    """Watch jsonl and send updates to Telegram."""
-    print("Watcher: waiting for jsonl...")
-
-    while True:
-        path = find_jsonl_path()
-        if path:
-            print(f"Watcher: found {path}")
-            break
-        await asyncio.sleep(2)
-
-    async for entry in watch_jsonl(path):
-        try:
-            if entry.content_type == ContentType.TEXT:
-                # Send each text as new message (no streaming)
-                for chunk in chunk_message(entry.text):
-                    try:
-                        await bot.send_message(settings.chat_id, f"● {chunk}", parse_mode="Markdown")
-                    except Exception:
-                        # Fallback if markdown breaks
-                        await bot.send_message(settings.chat_id, f"● {chunk}")
-
-            elif entry.content_type == ContentType.TOOL_USE:
-                # Just send tool info, permissions handled by background poller
-                print(f"Watcher: TOOL_USE {entry.tool_name}", flush=True)
-                text = format_tool_use(entry.tool_name, entry.tool_input)
-                try:
-                    await bot.send_message(settings.chat_id, text, parse_mode="Markdown")
-                    print(f"Watcher: sent {entry.tool_name}", flush=True)
-                except Exception as e:
-                    print(f"Watcher: error sending {entry.tool_name}: {e}", flush=True)
-                    await bot.send_message(settings.chat_id, f"● {entry.tool_name}")
-
-        except Exception as e:
-            # Fallback without markdown
-            if entry.content_type == ContentType.TEXT:
-                await bot.send_message(settings.chat_id, f"● {entry.text[:4000]}")
-            elif entry.content_type == ContentType.TOOL_USE:
-                await bot.send_message(settings.chat_id, f"● {entry.tool_name}")
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "localhost", settings.http_port)
+    await site.start()
+    print(f"HTTP server running on http://localhost:{settings.http_port}")
 
 async def main():
     bot = Bot(token=settings.telegram_token)
     dp = Dispatcher()
     dp.include_router(router)
 
-    print(f"Starting bridge for chat {settings.chat_id}")
-    print(f"Project: {settings.project_dir}")
+    print(f"Starting bridge")
+    print(f"Admin chat: {settings.admin_chat_id}")
+    print(f"Base dir: {settings.base_dir}")
 
-    asyncio.create_task(watcher_task(bot))
-    asyncio.create_task(permission_poller_task(bot, get_session))
+    # Start HTTP server
+    await run_http_server(bot)
+
+    # Restore sessions from config
+    async def start_poller(session: SessionState) -> asyncio.Task:
+        from .permission_poller import create_poller_task
+        return asyncio.create_task(create_poller_task(bot, session))
+
+    async def start_watcher(session: SessionState) -> asyncio.Task:
+        from .watcher import create_watcher_task
+        return asyncio.create_task(create_watcher_task(bot, session))
+
+    await manager.restore_sessions(start_poller, start_watcher)
+
+    # Start Telegram polling
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
