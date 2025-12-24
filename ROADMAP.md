@@ -35,7 +35,7 @@
 - Используем существующий код из bz-merch-assistant
 - `ai_bot_core/services/whisper.py`
 
-### Session management
+### One chat — multi sessions management
 Управление несколькими сессиями в одном проекте:
 - Spawn: запустить дополнительную сессию (worktree)
 - Change: переключиться на другую сессию
