@@ -6,6 +6,10 @@
 
 ## Выполнено недавно
 
+- [x] **Permission content display** — показ полного контента permission + удаление после ответа
+  - План: `plans/2025-12-24-permission-content-display.md`
+  - Коммиты: d36bb9a..d841c4b
+
 - [x] **Permission detection** — показ permissions с inline кнопками
   - План: `plans/2025-12-23-permission-detection.md`
   - Коммиты: 18eadcf..0b720b3
