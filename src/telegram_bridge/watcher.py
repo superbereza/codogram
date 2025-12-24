@@ -21,7 +21,22 @@ class ParsedEntry:
     tool_input: dict | None = None
 
 def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
-    if entry.get("type") != "assistant":
+    entry_type = entry.get("type")
+
+    # Tool results come in "user" entries
+    if entry_type == "user":
+        message = entry.get("message", {})
+        content = message.get("content", [])
+        for item in content:
+            if item.get("type") == "tool_result":
+                return ParsedEntry(
+                    content_type=ContentType.TOOL_RESULT,
+                    text=str(item.get("content", ""))[:500]
+                )
+        return None
+
+    # Handle assistant entries
+    if entry_type != "assistant":
         return None
 
     message = entry.get("message", {})
