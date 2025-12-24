@@ -104,6 +104,14 @@ async def permission_poller_task(bot: Bot, get_session_fn):
                                     msg = await bot.send_message(settings.chat_id, chunk)
                                 content_msg_ids.append(msg.message_id)
 
+                        # Send options as text (buttons have character limit)
+                        options_text = "\n".join(parsed.options)
+                        try:
+                            opts_msg = await bot.send_message(settings.chat_id, options_text)
+                            content_msg_ids.append(opts_msg.message_id)
+                        except Exception:
+                            pass
+
                         kb = permission_keyboard(parsed.options)
                         kb_msg = await bot.send_message(
                             settings.chat_id, "👆", reply_markup=kb
