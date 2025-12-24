@@ -24,11 +24,11 @@ async def handle_register(request: web.Request) -> web.Response:
 
     async def start_poller(session: SessionState) -> asyncio.Task:
         from .permission_poller import create_poller_task
-        return asyncio.create_task(create_poller_task(bot, session))
+        return await create_poller_task(bot, session)
 
     async def start_watcher(session: SessionState) -> asyncio.Task:
         from .watcher import create_watcher_task
-        return asyncio.create_task(create_watcher_task(bot, session))
+        return await create_watcher_task(bot, session)
 
     session = await manager.register_session(
         session_id=session_id,
@@ -55,12 +55,28 @@ async def handle_unregister(request: web.Request) -> web.Response:
     await manager.unregister_session(session_id)
     return web.json_response({"status": "unregistered"})
 
+async def handle_debug(request: web.Request) -> web.Response:
+    """Debug endpoint to inspect bot state."""
+    sessions_info = {}
+    for sid, s in manager.sessions.items():
+        sessions_info[sid] = {
+            "tmux": s.tmux_session,
+            "project": s.project_name,
+            "poller_running": s.poller_task is not None and not s.poller_task.done(),
+            "watcher_running": s.watcher_task is not None and not s.watcher_task.done(),
+        }
+    return web.json_response({
+        "sessions": sessions_info,
+        "session_count": len(manager.sessions),
+    })
+
 async def run_http_server(bot: Bot) -> None:
     """Run HTTP server for session registration."""
     app = web.Application()
     app["bot"] = bot
     app.router.add_post("/session/register", handle_register)
     app.router.add_post("/session/unregister", handle_unregister)
+    app.router.add_get("/debug", handle_debug)
 
     runner = web.AppRunner(app)
     await runner.setup()
@@ -92,11 +108,11 @@ async def main():
     # Restore sessions from config
     async def start_poller(session: SessionState) -> asyncio.Task:
         from .permission_poller import create_poller_task
-        return asyncio.create_task(create_poller_task(bot, session))
+        return await create_poller_task(bot, session)
 
     async def start_watcher(session: SessionState) -> asyncio.Task:
         from .watcher import create_watcher_task
-        return asyncio.create_task(create_watcher_task(bot, session))
+        return await create_watcher_task(bot, session)
 
     await manager.restore_sessions(start_poller, start_watcher)
 
