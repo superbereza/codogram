@@ -19,17 +19,20 @@ def get_session() -> TmuxSession:
 @router.message(Command("start"))
 async def cmd_start(message: Message):
     s = get_session()
-    await message.answer(
-        f"Bridge ready.\n"
-        f"Project: `{settings.project_dir}`\n"
-        f"Attach: `{s.attach_command()}`",
-        parse_mode="Markdown"
-    )
+    text = f"Bridge ready.\nProject: `{settings.project_dir}`\nAttach: `{s.attach_command()}`"
+    try:
+        await message.answer(text, parse_mode="Markdown")
+    except Exception:
+        await message.answer(text)
 
 @router.message(Command("attach"))
 async def cmd_attach(message: Message):
     s = get_session()
-    await message.answer(f"`{s.attach_command()}`", parse_mode="Markdown")
+    text = f"`{s.attach_command()}`"
+    try:
+        await message.answer(text, parse_mode="Markdown")
+    except Exception:
+        await message.answer(s.attach_command())
 
 @router.message(Command("esc"))
 async def cmd_esc(message: Message):

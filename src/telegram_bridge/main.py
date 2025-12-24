@@ -87,7 +87,10 @@ async def watcher_task(bot: Bot):
 
             elif entry.content_type == ContentType.TOOL_USE:
                 tool_info = format_tool_use(entry.tool_name, entry.tool_input)
-                await bot.send_message(settings.chat_id, tool_info, parse_mode="Markdown")
+                try:
+                    await bot.send_message(settings.chat_id, tool_info, parse_mode="Markdown")
+                except Exception:
+                    await bot.send_message(settings.chat_id, tool_info)
 
         except Exception as e:
             # Fallback without markdown
