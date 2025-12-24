@@ -71,6 +71,12 @@
 - Репортит изменение режима: "Allow once → Allow for session"
 - Парсит текущий выбор из tmux capture-pane
 
+### Markdown rendering fix
+Разобраться почему Markdown не рендерится в Telegram:
+- Иногда сообщения приходят plain text вместо formatted
+- Проверить escape символов
+- Возможно проблема с parse_mode
+
 ### Self-hosting: default chat = bot project
 Дефолтный личный чат с ботом связан с папкой telegram-bridge:
 - Позволяет управлять ботом через самого себя
