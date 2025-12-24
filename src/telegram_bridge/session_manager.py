@@ -65,6 +65,10 @@ class SessionManager:
         start_watcher: Callable[[SessionState], Awaitable[asyncio.Task]],
     ) -> SessionState | None:
         """Register new Claude session."""
+        # If session already exists, just return it (avoid duplicates)
+        if session_id in self.sessions:
+            return self.sessions[session_id]
+
         project_name = get_project_name(Path(cwd))
         chat_id = self.get_chat_id(project_name)
 
