@@ -9,7 +9,7 @@ class TmuxSession:
 
     def _build_send_command(self, text: str) -> str:
         escaped = text.replace("'", "'\\''")
-        return f"tmux send-keys -t {self.name} '{escaped}' Enter"
+        return f"tmux send-keys -t {shlex.quote(self.name)} '{escaped}' Enter"
 
     def send(self, text: str) -> None:
         cmd = self._build_send_command(text)
@@ -17,7 +17,7 @@ class TmuxSession:
 
     def exists(self) -> bool:
         result = subprocess.run(
-            f"tmux has-session -t {self.name} 2>/dev/null",
+            f"tmux has-session -t {shlex.quote(self.name)} 2>/dev/null",
             shell=True
         )
         return result.returncode == 0
@@ -25,9 +25,9 @@ class TmuxSession:
     def create(self) -> None:
         if not self.exists():
             subprocess.run(
-                f"tmux new-session -d -s {self.name} -c {shlex.quote(self.cwd)}",
+                f"tmux new-session -d -s {shlex.quote(self.name)} -c {shlex.quote(self.cwd)}",
                 shell=True, check=True
             )
 
     def attach_command(self) -> str:
-        return f"tmux attach -t {self.name}"
+        return f"tmux attach -t {shlex.quote(self.name)}"
