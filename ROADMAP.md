@@ -25,6 +25,11 @@
 - Throbber/typing indicator
 - Слова типа "Hmm", "Let me think"
 
+### Compacting indicator
+Отображение процесса компактинга контекста:
+- Детектить compacting из tmux capture-pane
+- Показывать прогресс в Telegram
+
 ### Tool results formatting
 Красивое форматирование результатов тулов:
 - Syntax highlighting для кода
