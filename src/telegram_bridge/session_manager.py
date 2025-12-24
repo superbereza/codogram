@@ -118,8 +118,16 @@ class SessionManager:
         if session:
             if session.poller_task:
                 session.poller_task.cancel()
+                try:
+                    await session.poller_task
+                except asyncio.CancelledError:
+                    pass
             if session.watcher_task:
                 session.watcher_task.cancel()
+                try:
+                    await session.watcher_task
+                except asyncio.CancelledError:
+                    pass
         self._save()
 
     async def restore_sessions(
