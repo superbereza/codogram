@@ -7,6 +7,8 @@ from .config import settings
 from .bot import router, get_session
 from .watcher import watch_jsonl, ContentType
 from .chunker import chunk_message
+from .screen import parse_screen, PermissionPrompt, ToolProgress
+from .keyboards import permission_keyboard
 
 
 def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
@@ -86,11 +88,48 @@ async def watcher_task(bot: Bot):
                         await bot.send_message(settings.chat_id, f"● {chunk}")
 
             elif entry.content_type == ContentType.TOOL_USE:
+                # Send tool info
                 tool_info = format_tool_use(entry.tool_name, entry.tool_input)
                 try:
-                    await bot.send_message(settings.chat_id, tool_info, parse_mode="Markdown")
+                    msg = await bot.send_message(settings.chat_id, tool_info, parse_mode="Markdown")
                 except Exception:
-                    await bot.send_message(settings.chat_id, tool_info)
+                    msg = await bot.send_message(settings.chat_id, tool_info)
+
+                # Start polling for permission/progress
+                s = get_session()
+                last_state = None
+                permission_msg = None  # Track message with keyboard
+
+                while True:
+                    await asyncio.sleep(0.5)
+
+                    screen = s.capture_pane()
+                    state = parse_screen(screen)
+
+                    if isinstance(state, PermissionPrompt):
+                        if last_state != state.options:
+                            kb = permission_keyboard(state.options)
+                            if permission_msg:
+                                await permission_msg.edit_reply_markup(reply_markup=kb)
+                            else:
+                                # Edit the tool message to add keyboard
+                                await msg.edit_reply_markup(reply_markup=kb)
+                                permission_msg = msg
+                            last_state = state.options
+
+                    elif isinstance(state, ToolProgress):
+                        # Could update message with progress here
+                        pass
+
+                    else:
+                        # Idle - permission was handled or tool finished
+                        if permission_msg:
+                            # Remove keyboard if still there
+                            try:
+                                await permission_msg.edit_reply_markup(reply_markup=None)
+                            except Exception:
+                                pass
+                        break
 
         except Exception as e:
             # Fallback without markdown
