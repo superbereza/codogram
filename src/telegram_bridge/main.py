@@ -80,10 +80,10 @@ async def watcher_task(bot: Bot):
                 # Send each text as new message (no streaming)
                 for chunk in chunk_message(entry.text):
                     try:
-                        await bot.send_message(settings.chat_id, f"• {chunk}", parse_mode="Markdown")
+                        await bot.send_message(settings.chat_id, f"● {chunk}", parse_mode="Markdown")
                     except Exception:
                         # Fallback if markdown breaks
-                        await bot.send_message(settings.chat_id, f"• {chunk}")
+                        await bot.send_message(settings.chat_id, f"● {chunk}")
 
             elif entry.content_type == ContentType.TOOL_USE:
                 tool_info = format_tool_use(entry.tool_name, entry.tool_input)
@@ -95,7 +95,7 @@ async def watcher_task(bot: Bot):
         except Exception as e:
             # Fallback without markdown
             if entry.content_type == ContentType.TEXT:
-                await bot.send_message(settings.chat_id, f"• {entry.text[:4000]}")
+                await bot.send_message(settings.chat_id, f"● {entry.text[:4000]}")
             elif entry.content_type == ContentType.TOOL_USE:
                 await bot.send_message(settings.chat_id, f"● {entry.tool_name}")
 
