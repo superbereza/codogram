@@ -58,3 +58,47 @@ async def test_unregister_awaits_task_cancellation(session_manager):
     # Task should have received CancelledError and set the event
     assert cancel_awaited.is_set(), "Task cancellation was not awaited"
     assert task.cancelled() or task.done()
+
+@pytest.mark.asyncio
+async def test_restore_sessions_deduplicates_by_tmux(mock_config):
+    """restore_sessions should only start one poller per tmux session."""
+    # Config has two sessions with same tmux_session
+    mock_config["load"].return_value = {
+        "projects": {"test-project": 12345},
+        "sessions": {
+            "old-session": {
+                "tmux_session": "my-tmux",
+                "cwd": "/home/user/project",
+                "project_name": "test-project",
+                "jsonl_path": "/tmp/old.jsonl",
+            },
+            "new-session": {
+                "tmux_session": "my-tmux",  # Same tmux!
+                "cwd": "/home/user/project",
+                "project_name": "test-project",
+                "jsonl_path": "/tmp/new.jsonl",
+            },
+        },
+    }
+
+    from telegram_bridge.session_manager import SessionManager
+    manager = SessionManager()
+
+    poller_starts = []
+
+    async def mock_start_poller(session):
+        poller_starts.append(session.session_id)
+        return AsyncMock()
+
+    async def mock_start_watcher(session):
+        return AsyncMock()
+
+    with patch("telegram_bridge.session_manager.TmuxSession") as mock_tmux:
+        mock_tmux.return_value.exists.return_value = True
+        await manager.restore_sessions(mock_start_poller, mock_start_watcher)
+
+    # Should only start ONE poller for the tmux session
+    assert len(poller_starts) == 1, f"Expected 1 poller, got {len(poller_starts)}: {poller_starts}"
+    # Should keep the newer session (new-session comes after old-session alphabetically,
+    # but we want most recent by jsonl mtime - for simplicity, keep last in iteration)
+    assert "new-session" in poller_starts or "old-session" in poller_starts

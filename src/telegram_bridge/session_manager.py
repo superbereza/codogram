@@ -137,7 +137,16 @@ class SessionManager:
     ) -> None:
         """Restore sessions from config after bot restart."""
         saved_sessions = self._config.get("sessions", {})
+
+        # Deduplicate by tmux_session - keep only one session per tmux
+        # Group by tmux_session, keep the last one (most recently added to config)
+        tmux_to_session: dict[str, tuple[str, dict]] = {}
         for session_id, data in saved_sessions.items():
+            tmux_name = data["tmux_session"]
+            tmux_to_session[tmux_name] = (session_id, data)
+
+        # Only restore deduplicated sessions
+        for session_id, data in tmux_to_session.values():
             chat_id = self.get_chat_id(data["project_name"])
             session = SessionState(
                 session_id=session_id,
