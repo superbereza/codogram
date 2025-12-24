@@ -10,6 +10,32 @@ from .chunker import chunk_message
 from .screen import parse_screen, PermissionPrompt, ToolProgress
 from .keyboards import permission_keyboard
 
+# Separators for Telegram display (adjustable length)
+SEPARATOR_SOLID = "─" * 20
+SEPARATOR_DASHED = "╌" * 20
+
+# Track permission messages for deletion: {keyboard_msg_id: [content_msg_ids]}
+permission_messages: dict[int, list[int]] = {}
+
+
+def format_permission_content(perm: PermissionPrompt) -> str:
+    """Format permission prompt content for Telegram display."""
+    parts = []
+
+    if perm.description:
+        parts.append(SEPARATOR_SOLID)
+        parts.append(perm.description)
+
+    if perm.content:
+        parts.append(SEPARATOR_DASHED)
+        parts.append(perm.content)
+        parts.append(SEPARATOR_DASHED)
+
+    if perm.question:
+        parts.append(perm.question)
+
+    return "\n".join(parts)
+
 
 def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
     """Format tool use for Telegram display. Uses ● for permission requests."""
