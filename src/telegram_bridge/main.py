@@ -14,8 +14,7 @@ from .keyboards import permission_keyboard
 SEPARATOR_SOLID = "─" * 20
 SEPARATOR_DASHED = "╌" * 20
 
-# Track permission messages for deletion: {keyboard_msg_id: [content_msg_ids]}
-permission_messages: dict[int, list[int]] = {}
+from .state import permission_messages
 
 
 def format_permission_content(perm: PermissionPrompt) -> str:

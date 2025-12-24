@@ -5,6 +5,7 @@ from aiogram.filters import Command
 
 from .config import settings
 from .tmux import TmuxSession
+from .state import permission_messages
 
 router = Router()
 session: TmuxSession | None = None
@@ -48,19 +49,32 @@ async def on_permission_callback(callback: CallbackQuery):
     if callback.message.chat.id != settings.chat_id:
         return
 
+    kb_msg_id = callback.message.message_id
+
+    # Delete content messages
+    content_ids = permission_messages.pop(kb_msg_id, [])
+    for msg_id in content_ids:
+        try:
+            await callback.bot.delete_message(settings.chat_id, msg_id)
+        except Exception:
+            pass
+
+    # Delete keyboard message
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    # Send key to tmux
     action = callback.data.split(":")[1]
     s = get_session()
 
     if action == "esc":
         s.send_key("Escape")
-        await callback.answer("Cancelled")
     else:
-        # Send the number key
         s.send_key(action)
-        await callback.answer(f"Sent: {action}")
 
-    # Remove keyboard after action
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.answer()
 
 @router.message()
 async def on_message(message: Message):
