@@ -36,3 +36,14 @@ class TmuxSession:
 
     def attach_command(self) -> str:
         return f"tmux attach -t {shlex.quote(self.name)}"
+
+    def capture_pane(self) -> str:
+        """Capture current pane content."""
+        session = shlex.quote(self.name)
+        result = subprocess.run(
+            f"tmux capture-pane -t {session} -p",
+            shell=True,
+            capture_output=True,
+            text=True
+        )
+        return result.stdout if result.returncode == 0 else ""
