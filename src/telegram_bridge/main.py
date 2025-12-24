@@ -74,8 +74,17 @@ async def main():
     dp.include_router(router)
 
     print(f"Starting bridge")
-    print(f"Admin chat: {settings.admin_chat_id}")
+    print(f"Admin IDs: {settings.get_admin_ids()}")
     print(f"Base dir: {settings.base_dir}")
+
+    # Register bot commands menu
+    from aiogram.types import BotCommand
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Start bot / show status"),
+        BotCommand(command="my_chat_id", description="Show your user ID"),
+        BotCommand(command="register_dir", description="Register project for this chat"),
+        BotCommand(command="esc", description="Send Escape to Claude"),
+    ])
 
     # Start HTTP server
     await run_http_server(bot)

@@ -10,9 +10,19 @@ from .state import permission_messages
 
 router = Router()
 
+# Cache admin IDs
+_admin_ids: set[int] | None = None
+
+def get_admin_ids() -> set[int]:
+    """Get admin IDs (cached)."""
+    global _admin_ids
+    if _admin_ids is None:
+        _admin_ids = settings.get_admin_ids()
+    return _admin_ids
+
 def is_admin(user_id: int) -> bool:
     """Check if user is admin."""
-    return user_id == settings.admin_chat_id
+    return user_id in get_admin_ids()
 
 def get_session_for_chat(chat_id: int) -> TmuxSession | None:
     """Get TmuxSession for chat_id."""
@@ -44,22 +54,6 @@ async def cmd_start(message: Message):
     except Exception:
         await message.answer(text)
 
-@router.message(Command("status"))
-async def cmd_status(message: Message):
-    if not is_admin(message.from_user.id):
-        return
-
-    session = manager.get_session_by_chat(message.chat.id)
-    if session:
-        text = f"Active session: `{session.session_id[:8]}...`\nProject: `{session.project_name}`\ntmux: `{session.tmux_session}`"
-    else:
-        text = "No active session for this chat."
-
-    try:
-        await message.answer(text, parse_mode="Markdown")
-    except Exception:
-        await message.answer(text)
-
 @router.message(Command("register_dir"))
 async def cmd_register_dir(message: Message):
     if not is_admin(message.from_user.id):
@@ -79,6 +73,11 @@ async def cmd_register_dir(message: Message):
 
     manager.register_project(project_name, message.chat.id)
     await message.answer(f"Registered `{project_name}` for this chat.", parse_mode="Markdown")
+
+@router.message(Command("my_chat_id"))
+async def cmd_my_chat_id(message: Message):
+    """Show user's chat ID - available to everyone."""
+    await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`", parse_mode="Markdown")
 
 @router.message(Command("esc"))
 async def cmd_esc(message: Message):
@@ -137,6 +136,6 @@ async def on_message(message: Message):
     if tmux:
         tmux.send(message.text)
     else:
-        # No active session
-        if message.chat.id != settings.admin_chat_id:
+        # No active session - only respond in group chats
+        if message.chat.id < 0:  # Negative IDs are groups/channels
             await message.answer("No active Claude session. Start Claude in this project first.")

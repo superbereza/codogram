@@ -5,12 +5,16 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     telegram_token: str
-    admin_chat_id: int  # Personal chat for alerts (renamed from chat_id)
+    admin_ids: str  # Comma-separated list of admin user IDs
     base_dir: str  # e.g. /home/user/dev
     http_port: int = 8787
 
     class Config:
         env_file = ".env"
+
+    def get_admin_ids(self) -> set[int]:
+        """Parse admin_ids string into set of ints."""
+        return {int(x.strip()) for x in self.admin_ids.split(",") if x.strip()}
 
 settings = Settings()
 
