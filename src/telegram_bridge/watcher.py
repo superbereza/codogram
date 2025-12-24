@@ -28,6 +28,8 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
         message = entry.get("message", {})
         content = message.get("content", [])
         for item in content:
+            if not isinstance(item, dict):
+                continue
             if item.get("type") == "tool_result":
                 return ParsedEntry(
                     content_type=ContentType.TOOL_RESULT,
@@ -43,6 +45,8 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
     content = message.get("content", [])
 
     for item in content:
+        if not isinstance(item, dict):
+            continue
         item_type = item.get("type")
 
         if item_type == "text":
