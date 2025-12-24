@@ -18,8 +18,8 @@ class PollerState(Enum):
 
 
 # Separators for Telegram display
-SEPARATOR_SOLID = "─" * 20
-SEPARATOR_DASHED = "╌" * 20
+SEPARATOR_SOLID = "─────────────────────"
+SEPARATOR_DASHED = "- " * 15
 
 
 def format_permission_content(perm) -> str:
