@@ -3,7 +3,7 @@
 ## В работе
 
 - [ ] **Start Claude from Telegram** — запуск Claude по /start вместо ручного запуска
-  - Дизайн: `designs/2025-12-25-start-claude-from-telegram.md`
+  - [Дизайн](designs/2025-12-25-start-claude-from-telegram.md)
   - Конвенция `~/dev/{project}` + fallback на /register_dir
   - tmux сессии `claude-{project}`
 
