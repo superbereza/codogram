@@ -9,7 +9,13 @@ os.environ.setdefault("TELEGRAM_TOKEN", "test")
 os.environ.setdefault("ADMIN_IDS", "123")
 os.environ.setdefault("BASE_DIR", "/tmp")
 
-from telegram_bridge.project_launcher import resolve_project_path, ProjectPathResult
+from telegram_bridge.project_launcher import (
+    resolve_project_path,
+    ProjectPathResult,
+    is_tmux_session_exists,
+    create_tmux_with_claude,
+    LaunchResult,
+)
 
 
 def test_resolve_path_convention_exists(tmp_path):
@@ -44,3 +50,26 @@ def test_resolve_path_not_exists(tmp_path):
 
     assert not result.exists
     assert result.path == str(tmp_path / "nonexistent")
+
+
+def test_is_tmux_session_exists_false():
+    """Return False for non-existent session."""
+    result = is_tmux_session_exists("nonexistent-session-12345")
+    assert result is False
+
+
+def test_create_tmux_with_claude(tmp_path):
+    """Create tmux session and run claude command."""
+    import subprocess
+
+    session_name = f"test-claude-{os.getpid()}"
+    project_path = str(tmp_path)
+
+    try:
+        result = create_tmux_with_claude(session_name, project_path)
+        assert result.success
+        assert is_tmux_session_exists(session_name)
+    finally:
+        # Cleanup
+        subprocess.run(["tmux", "kill-session", "-t", session_name],
+                      capture_output=True)
