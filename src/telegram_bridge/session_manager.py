@@ -39,6 +39,75 @@ class ProjectState:
     jsonl_path: str | None = None
     watcher_task: asyncio.Task | None = field(default=None, repr=False)
 
+class ProjectManager:
+    """Manages ProjectState instances."""
+
+    def __init__(self):
+        self.projects: dict[str, ProjectState] = {}  # by project_name
+        self._config = load_config()
+        self._load_projects()
+
+    def _load_projects(self) -> None:
+        """Load projects from config."""
+        saved_projects = self._config.get("projects", {})
+        for project_name, data in saved_projects.items():
+            project = ProjectState(project_name=project_name)
+            if isinstance(data, int):
+                # Old format: just chat_id
+                project.chat_id = data
+            else:
+                # New format: dict with chat_id and cwd
+                project.chat_id = data.get("chat_id")
+                project.cwd = data.get("cwd")
+            self.projects[project_name] = project
+
+    def _save(self) -> None:
+        """Persist to disk."""
+        # Projects (permanent)
+        self._config["projects"] = {
+            name: {"chat_id": p.chat_id, "cwd": p.cwd}
+            for name, p in self.projects.items()
+            if p.chat_id is not None
+        }
+        # Sessions (temporary)
+        self._config["sessions"] = {
+            name: {
+                "tmux_session": p.tmux_session,
+                "claude_session_id": p.claude_session_id,
+                "jsonl_path": p.jsonl_path,
+            }
+            for name, p in self.projects.items()
+            if p.claude_session_id is not None
+        }
+        save_config(self._config)
+
+    def get_or_create(self, project_name: str) -> ProjectState:
+        """Get existing project or create new one."""
+        if project_name not in self.projects:
+            self.projects[project_name] = ProjectState(project_name=project_name)
+        return self.projects[project_name]
+
+    def get_by_chat(self, chat_id: int) -> ProjectState | None:
+        """Find project by chat_id."""
+        for project in self.projects.values():
+            if project.chat_id == chat_id:
+                return project
+        return None
+
+    def get_by_session(self, session_id: str) -> ProjectState | None:
+        """Find project by claude_session_id."""
+        for project in self.projects.values():
+            if project.claude_session_id == session_id:
+                return project
+        return None
+
+    def get_by_tmux(self, tmux_session: str) -> ProjectState | None:
+        """Find project by tmux_session."""
+        for project in self.projects.values():
+            if project.tmux_session == tmux_session:
+                return project
+        return None
+
 class SessionManager:
     def __init__(self):
         self.sessions: dict[str, SessionState] = {}
