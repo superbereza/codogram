@@ -2,13 +2,16 @@
 
 ## В работе
 
-- [ ] **ProjectState Refactoring** — разделение tmux binding и Claude session
-  - [Дизайн](designs/2025-12-25-project-state-refactoring.md)
-  - Порядок создания chat/Claude не важен
-  - Поллер стартует сразу при создании tmux
-  - Trust dialog показывается в Telegram
+(нет активных задач)
 
 ## Выполнено недавно
+
+- [x] **ProjectState Refactoring** — разделение tmux binding и Claude session
+  - [Дизайн](designs/2025-12-25-project-state-refactoring.md)
+  - [План](plans/2025-12-25-project-state-refactoring.md)
+  - Порядок создания chat/Claude не важен
+  - Поллер стартует сразу при наличии tmux
+  - Добавлена команда /restart_session
 
 - [x] **Start Claude from Telegram** — запуск Claude по /start вместо ручного запуска
   - [Дизайн](designs/2025-12-25-start-claude-from-telegram.md)
