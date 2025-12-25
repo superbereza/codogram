@@ -2,7 +2,11 @@
 
 ## В работе
 
-(нет активных задач)
+- [ ] **history.jsonl refactoring** — убираем hooks, используем history.jsonl для session discovery
+  - [Дизайн](designs/2025-12-25-history-jsonl-discovery.md)
+  - Zero config для новых пользователей
+  - Periodic polling вместо hooks
+  - Ветка `with-hooks` сохраняет старую архитектуру
 
 ## Выполнено недавно
 
@@ -65,6 +69,11 @@
   - План: `plans/2025-12-23-telegram-bridge.md` (Release 4)
 
 ## Идеи / PoC
+
+- [ ] **Extract to separate repository** — вынести telegram-bridge в отдельный репозиторий
+  - `git subtree split -P agent-tools/telegram-bridge -b telegram-bridge-only`
+  - Сохранит историю коммитов только для этой папки
+  - Ветки main и with-hooks можно вынести отдельно
 
 - [ ] **Markdown to Telegram converter** — библиотека для конвертации обычного MD в TG-совместимый
   - Таблицы, headers не рендерятся в Telegram
