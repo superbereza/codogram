@@ -56,7 +56,7 @@ def find_all_tmux_by_cwd(cwd: str) -> list[str]:
     """
     try:
         result = subprocess.run(
-            ["tmux", "list-panes", "-a", "-F", "#{session_name} #{pane_current_path}"],
+            ["tmux", "list-panes", "-a", "-F", "#{session_name}\t#{pane_current_path}"],
             capture_output=True,
             text=True,
         )
@@ -65,7 +65,7 @@ def find_all_tmux_by_cwd(cwd: str) -> list[str]:
 
         sessions = set()
         for line in result.stdout.splitlines():
-            parts = line.split(" ", 1)
+            parts = line.split("\t", 1)
             if len(parts) == 2:
                 session_name, pane_path = parts
                 if pane_path == cwd:

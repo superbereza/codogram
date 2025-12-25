@@ -7,7 +7,7 @@ def test_find_all_tmux_by_cwd_single():
     with patch('subprocess.run') as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout="claude-project /home/user/project\n"
+            stdout="claude-project\t/home/user/project\n"
         )
 
         result = find_all_tmux_by_cwd("/home/user/project")
@@ -18,7 +18,7 @@ def test_find_all_tmux_by_cwd_multiple():
     with patch('subprocess.run') as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout="claude-1 /home/user/project\nother /other/path\nclaude-2 /home/user/project\n"
+            stdout="claude-1\t/home/user/project\nother\t/other/path\nclaude-2\t/home/user/project\n"
         )
 
         result = find_all_tmux_by_cwd("/home/user/project")
@@ -29,11 +29,22 @@ def test_find_all_tmux_by_cwd_not_found():
     with patch('subprocess.run') as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout="other /other/path\n"
+            stdout="other\t/other/path\n"
         )
 
         result = find_all_tmux_by_cwd("/home/user/project")
         assert result == []
+
+def test_find_all_tmux_by_cwd_with_spaces():
+    # Mock subprocess to return session with space in name
+    with patch('subprocess.run') as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="test session\t/home/user/project\n"
+        )
+
+        result = find_all_tmux_by_cwd("/home/user/project")
+        assert result == ["test session"]
 
 def test_find_tmux_by_convention_found():
     # Mock TmuxSession.exists() to return True
