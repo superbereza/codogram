@@ -909,6 +909,8 @@ EOF
 
 ## Task 7: Update /start command with two-phase discovery
 
+**Depends on:** Task 20 (tmux_selector.py must exist)
+
 **Files:**
 - Modify: `src/telegram_bridge/bot.py` (or wherever /start handler is)
 
@@ -952,13 +954,16 @@ async def handle_start(message: Message):
         project.tmux_session = tmux_list[0]
         await message.answer(f"Connected to tmux: {tmux_list[0]}")
     else:
-        # Multiple tmux - show selection UI (future work)
+        # Multiple tmux - show selection keyboard (implemented in Task 20)
+        from .tmux_selector import create_tmux_selection_keyboard
+        keyboard = create_tmux_selection_keyboard(tmux_list, project_name)
         await message.answer(
-            f"Multiple tmux sessions found:\n" +
-            "\n".join(f"- {t}" for t in tmux_list) +
-            f"\n\nUsing first: {tmux_list[0]}"
+            f"Multiple tmux sessions found for {cwd}:\n\n"
+            "Select which one to connect:",
+            reply_markup=keyboard
         )
-        project.tmux_session = tmux_list[0]
+        project_manager._save()
+        return  # Wait for callback, don't start tasks yet
 
     # Phase 2: Discover session_id (for watcher)
     changed = project_manager.refresh_project_session(project)
@@ -1011,14 +1016,20 @@ async def restore_projects(self, bot, start_poller, start_watcher) -> None:
     from .tmux import find_all_tmux_by_cwd, find_tmux_by_convention
     from .tmux_selector import create_tmux_selection_keyboard
 
-    for project in self.projects.values():
+    for project in list(self.projects.values()):  # Copy to allow removal
         if not project.chat_id or not project.cwd:
             continue
 
         # 1. Find session_id from history.jsonl
         self.refresh_project_session(project)
 
-        # 2. Find tmux by cwd or convention
+        # 2. Check if should cleanup (inactive > 30 days)
+        if should_cleanup_project(project):
+            logger.info(f"Cleaning up inactive project: {project.project_name}")
+            del self.projects[project.project_name]
+            continue
+
+        # 3. Find tmux by cwd or convention
         if not project.tmux_session:
             tmux_list = find_all_tmux_by_cwd(project.cwd)
             if len(tmux_list) == 1:
@@ -1039,13 +1050,13 @@ async def restore_projects(self, bot, start_poller, start_watcher) -> None:
                 )
                 continue  # Don't start tasks, wait for selection
 
-        # 3. Start tasks if ready
+        # 4. Start tasks if ready
         await self._maybe_start_tasks(project, start_poller, start_watcher)
 
     self._save()
 ```
 
-**Note:** Signature changed to include `bot` parameter for sending messages.
+**Note:** Signature changed to include `bot` parameter. Uses `should_cleanup_project` from Task 12.
 
 **Step 2: Run existing tests**
 
@@ -1327,43 +1338,9 @@ def should_cleanup_project(project: ProjectState) -> bool:
         return True  # Error = cleanup
 ```
 
-**Step 2: Apply cleanup in restore_projects**
+**Step 2: Commit**
 
-```python
-async def restore_projects(self, start_poller, start_watcher) -> None:
-    """Restore sessions from history.jsonl after bot restart."""
-    from .tmux import find_all_tmux_by_cwd, find_tmux_by_convention
-
-    for project in list(self.projects.values()):  # Copy to allow removal
-        if not project.chat_id or not project.cwd:
-            continue
-
-        # 1. Find session_id from history.jsonl
-        self.refresh_project_session(project)
-
-        # Check if should cleanup
-        if should_cleanup_project(project):
-            print(f"Cleaning up inactive project: {project.project_name}")
-            del self.projects[project.project_name]
-            continue
-
-        # 2. Find tmux by cwd or convention
-        if not project.tmux_session:
-            tmux_list = find_all_tmux_by_cwd(project.cwd)
-            if len(tmux_list) == 1:
-                project.tmux_session = tmux_list[0]
-            elif len(tmux_list) == 0:
-                tmux_by_convention = find_tmux_by_convention(project.project_name)
-                if tmux_by_convention:
-                    project.tmux_session = tmux_by_convention
-
-        # 3. Start tasks if ready
-        await self._maybe_start_tasks(project, start_poller, start_watcher)
-
-    self._save()
-```
-
-**Step 3: Commit**
+**Note:** `restore_projects` in Task 8 already uses `should_cleanup_project`. This task only adds the helper.
 
 ```bash
 git add src/telegram_bridge/session_manager.py
@@ -1862,9 +1839,24 @@ callback_data = f"approve:{project.tmux_session}"
 async def handle_permission_callback(callback: CallbackQuery):
     action, tmux_session = callback.data.split(":", 1)
     project = project_manager.get_by_tmux(tmux_session)
+
+    # Protection: project not found
     if not project:
         await callback.answer("Session not found")
         return
+
+    # Protection: tmux changed since callback was created
+    if project.tmux_session != tmux_session:
+        await callback.answer("Session changed, please try again")
+        return
+
+    # Protection: tmux no longer exists
+    from .tmux import TmuxSession
+    tmux = TmuxSession(tmux_session, project.cwd)
+    if not tmux.exists():
+        await callback.answer("Tmux session closed")
+        return
+
     # ... handle action ...
 ```
 
@@ -1877,7 +1869,7 @@ fix(telegram-bridge): use tmux_session in permission callbacks
 
 - Callback format: {action}:{tmux_session} instead of {action}:{session_id}
 - tmux_session is stable across /new, /resume, /compact
-- Prevents callback failures when session changes
+- Added protections: project not found, tmux changed, tmux closed
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
