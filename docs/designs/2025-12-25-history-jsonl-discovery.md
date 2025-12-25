@@ -78,6 +78,8 @@
 | **tmux_session** | tmux сессия (`claude-personal-agent`) | Долго (дни, недели) |
 | **session_id** | UUID сессии Claude | Меняется при /new, /compact, /resume |
 
+**Примечание:** В коде используется `session_id` (не `claude_session_id`) для единообразия.
+
 **Связь:** Один tmux содержит много session_id за время жизни, но активный — всегда один.
 
 ```
@@ -206,8 +208,10 @@ periodic (каждые 15s):
   Для каждого активного project:
     - new_session_id ← find_latest_session(cwd)
     - Если new_session_id != project.session_id:
-        - Останавливаем старый watcher
+        # Start before stop — избегаем потери сообщений
+        - old_watcher ← project.watcher_task
         - Запускаем новый watcher
+        - Останавливаем old_watcher (если был)
         - Обновляем project.session_id
 ```
 
@@ -296,7 +300,8 @@ def should_cleanup(jsonl_path: Path) -> bool:
 
 1. **Один Claude на tmux сессию** — split panes с несколькими Claude не поддерживаются
 2. **cwd фиксируется при /start** — команда `cd` внутри Claude не отслеживается
-3. **Session end не детектируется явно** — cleanup по mtime (30 дней)
+3. **Session end не детектируется явно** — Claude не удаляет jsonl при закрытии, cleanup по mtime (30 дней)
+4. **Zombie watcher после закрытия Claude** — watcher продолжает tail мёртвого файла, не страшно (легковесно)
 
 ## Риски
 
