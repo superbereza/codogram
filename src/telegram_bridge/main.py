@@ -6,7 +6,7 @@ from aiogram import Bot, Dispatcher
 
 from .config import settings
 from .bot import router
-from .session_manager import manager, SessionState
+from .session_manager import manager, SessionState, project_manager, ProjectState
 from .tmux import TmuxSession
 
 # HTTP handlers
@@ -22,15 +22,15 @@ async def handle_register(request: web.Request) -> web.Response:
 
     bot = request.app["bot"]
 
-    async def start_poller(session: SessionState) -> asyncio.Task:
+    async def start_poller(project: ProjectState) -> asyncio.Task:
         from .permission_poller import create_poller_task
-        return await create_poller_task(bot, session)
+        return await create_poller_task(bot, project)
 
-    async def start_watcher(session: SessionState) -> asyncio.Task:
+    async def start_watcher(project: ProjectState) -> asyncio.Task:
         from .watcher import create_watcher_task
-        return await create_watcher_task(bot, session)
+        return await create_watcher_task(bot, project)
 
-    session = await manager.register_session(
+    project = await project_manager.update_from_hook(
         session_id=session_id,
         cwd=cwd,
         tmux_session=tmux_session or "unknown",
@@ -40,8 +40,8 @@ async def handle_register(request: web.Request) -> web.Response:
 
     return web.json_response({
         "status": "registered",
-        "project": session.project_name,
-        "has_chat": session.chat_id is not None,
+        "project": project.project_name,
+        "has_chat": project.chat_id is not None,
     })
 
 async def handle_unregister(request: web.Request) -> web.Response:
@@ -52,7 +52,7 @@ async def handle_unregister(request: web.Request) -> web.Response:
     if not session_id:
         return web.json_response({"error": "missing session_id"}, status=400)
 
-    await manager.unregister_session(session_id)
+    await project_manager.handle_session_end(session_id)
     return web.json_response({"status": "unregistered"})
 
 async def handle_debug(request: web.Request) -> web.Response:
@@ -104,16 +104,16 @@ async def main():
     # Start HTTP server
     await run_http_server(bot)
 
-    # Restore sessions from config
-    async def start_poller(session: SessionState) -> asyncio.Task:
+    # Restore sessions
+    async def start_poller(project: ProjectState) -> asyncio.Task:
         from .permission_poller import create_poller_task
-        return await create_poller_task(bot, session)
+        return await create_poller_task(bot, project)
 
-    async def start_watcher(session: SessionState) -> asyncio.Task:
+    async def start_watcher(project: ProjectState) -> asyncio.Task:
         from .watcher import create_watcher_task
-        return await create_watcher_task(bot, session)
+        return await create_watcher_task(bot, project)
 
-    await manager.restore_sessions(start_poller, start_watcher)
+    await project_manager.restore_projects(start_poller, start_watcher)
 
     # Start Telegram polling
     await dp.start_polling(bot)
