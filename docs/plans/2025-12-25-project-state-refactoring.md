@@ -1070,3 +1070,33 @@ git add docs/
 git commit -m "docs: update after ProjectState refactoring"
 git push
 ```
+
+---
+
+## Post-Implementation Fixes
+
+### Ошибка 1: Case 3 в launch_claude_new
+
+**Проблема в плане:** Task 11 описывал Case 3 как "Foreign tmux - create new alongside". Но "foreign" интерпретировалось как "не по конвенции `claude-{name}`", хотя на самом деле это мог быть наш tmux с другим именем (например `personal-agent` вместо `claude-personal-agent`).
+
+**Последствие:** При /start в чате создавался новый tmux вместо подключения к существующему.
+
+**Фикс:** Добавлен Case 2 в cmd_start который проверяет существующий tmux ДО вызова launch_claude_new.
+
+### Ошибка 2: project.session_id в watcher.py
+
+**Проблема:** Subagent при рефакторинге Task 10 заменил `session.session_id` на `project.session_id`, но в ProjectState поле называется `claude_session_id`.
+
+**Фикс:** Заменено на `project.project_name`.
+
+### Ошибка 3: jsonl_path не находился при restore
+
+**Проблема:** `_find_jsonl` вызывается в update_from_hook, но если файл ещё не существует в момент hook (Claude создаёт jsonl не сразу), jsonl_path остаётся null. При restore он не пытался найти jsonl заново.
+
+**Фикс:** Добавлена попытка найти jsonl при restore если его нет в конфиге.
+
+### Урок
+
+При subagent-driven development нужно ревьюить:
+1. План — особенно edge cases и интерпретацию терминов
+2. Реализацию — полнота замены ссылок при рефакторинге
