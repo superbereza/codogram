@@ -4,9 +4,15 @@
 
 **Goal:** Replace hook-based session discovery with history.jsonl polling for zero-config experience.
 
-**Architecture:** Read session_id from ~/.claude/history.jsonl by project cwd. Periodic refresh (10s) detects session changes. Remove HTTP endpoints and hooks.
+**Architecture:** Read session_id from ~/.claude/history.jsonl by project cwd. Periodic refresh (15s) detects session changes. Remove HTTP server and hooks completely.
 
-**Tech Stack:** Python asyncio, aiofiles (optional), pathlib
+**Tech Stack:** Python asyncio, pathlib
+
+**Key changes from review:**
+- REFRESH_INTERVAL = 15s (not 10s)
+- Remove HTTP server completely (no /debug endpoint)
+- Optimized incremental reading of history.jsonl
+- Extended test coverage for HistoryWatcher
 
 ---
 
@@ -23,9 +29,11 @@
 import json
 import tempfile
 from pathlib import Path
-from telegram_bridge.history_reader import find_session_for_project
+from telegram_bridge.history_reader import find_session_for_project, reset_history_cache
 
 def test_find_session_for_project():
+    reset_history_cache()  # Clean state
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
         f.write(json.dumps({"project": "/home/user/project-a", "sessionId": "aaa-111"}) + "\n")
         f.write(json.dumps({"project": "/home/user/project-b", "sessionId": "bbb-222"}) + "\n")
@@ -47,11 +55,36 @@ def test_find_session_for_project():
     history_path.unlink()
 
 def test_find_session_empty_file():
+    reset_history_cache()
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
         history_path = Path(f.name)
 
     result = find_session_for_project("/any/path", history_path)
     assert result is None
+
+    history_path.unlink()
+
+def test_incremental_reading():
+    """Test that incremental reading works correctly."""
+    reset_history_cache()
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+        history_path = Path(f.name)
+        f.write(json.dumps({"project": "/test", "sessionId": "first"}) + "\n")
+        f.flush()
+
+        # First read
+        result = find_session_for_project("/test", history_path)
+        assert result == "first"
+
+        # Append new entry
+        f.write(json.dumps({"project": "/test", "sessionId": "second"}) + "\n")
+        f.flush()
+
+        # Should pick up new entry
+        result = find_session_for_project("/test", history_path)
+        assert result == "second"
 
     history_path.unlink()
 ```
@@ -65,37 +98,60 @@ Expected: FAIL with "No module named 'telegram_bridge.history_reader'"
 
 ```python
 # src/telegram_bridge/history_reader.py
-"""Read session info from Claude's history.jsonl."""
+"""Read session info from Claude's history.jsonl with incremental reading."""
 import json
 from pathlib import Path
 
 HISTORY_PATH = Path.home() / ".claude" / "history.jsonl"
 
+# State for incremental reading
+_last_size = 0
+_session_cache: dict[str, str] = {}  # cwd -> session_id
+
 def find_session_for_project(cwd: str, history_path: Path = HISTORY_PATH) -> str | None:
     """Find the most recent session_id for a project by cwd.
 
-    Reads history.jsonl from end to find last entry matching project.
+    Uses incremental reading - only reads new lines since last check.
     """
+    global _last_size, _session_cache
+
     if not history_path.exists():
-        return None
+        return _session_cache.get(cwd)
 
     try:
-        lines = history_path.read_text().splitlines()
+        current_size = history_path.stat().st_size
+
+        # Read only new content
+        if current_size > _last_size:
+            with open(history_path, 'r') as f:
+                f.seek(_last_size)
+                new_content = f.read()
+            _last_size = current_size
+
+            # Parse new lines and update cache
+            for line in new_content.splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                    project = entry.get("project")
+                    session_id = entry.get("sessionId")
+                    if project and session_id:
+                        _session_cache[project] = session_id
+                except json.JSONDecodeError:
+                    continue
+
+        return _session_cache.get(cwd)
+
     except Exception:
-        return None
+        return _session_cache.get(cwd)
 
-    # Read from end to find most recent
-    for line in reversed(lines):
-        if not line.strip():
-            continue
-        try:
-            entry = json.loads(line)
-            if entry.get("project") == cwd:
-                return entry.get("sessionId")
-        except json.JSONDecodeError:
-            continue
 
-    return None
+def reset_history_cache() -> None:
+    """Reset cache (for testing)."""
+    global _last_size, _session_cache
+    _last_size = 0
+    _session_cache = {}
 ```
 
 **Step 4: Run test to verify it passes**
@@ -327,8 +383,73 @@ git commit -m "feat(telegram-bridge): add refresh_project_session method"
 
 **Files:**
 - Create: `src/telegram_bridge/history_watcher.py`
+- Test: `tests/test_history_watcher.py`
 
-**Step 1: Write implementation**
+**Step 1: Write the failing test**
+
+```python
+# tests/test_history_watcher.py
+import pytest
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
+@pytest.mark.asyncio
+async def test_history_watcher_detects_session_change():
+    """Test that HistoryWatcher detects session changes."""
+    from telegram_bridge.history_watcher import HistoryWatcher
+
+    bot = MagicMock()
+    start_poller = AsyncMock(return_value=MagicMock())
+    start_watcher = AsyncMock(return_value=MagicMock())
+
+    watcher = HistoryWatcher(bot, start_poller, start_watcher)
+
+    # Mock project_manager with a test project
+    with patch('telegram_bridge.history_watcher.project_manager') as mock_pm:
+        mock_project = MagicMock()
+        mock_project.chat_id = 123
+        mock_project.cwd = "/test/path"
+        mock_project.claude_session_id = "old-session"
+        mock_project.watcher_task = None
+        mock_pm.projects = {"test": mock_project}
+        mock_pm.refresh_project_session.return_value = True  # Session changed
+
+        with patch('telegram_bridge.history_watcher.HISTORY_PATH') as mock_path:
+            mock_path.exists.return_value = True
+            mock_path.stat.return_value.st_mtime = 12345
+
+            await watcher._check_for_changes()
+
+            # Should have called refresh and maybe_start_tasks
+            mock_pm.refresh_project_session.assert_called_once_with(mock_project)
+            mock_pm._maybe_start_tasks.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_history_watcher_skips_when_no_change():
+    """Test that HistoryWatcher skips when mtime unchanged."""
+    from telegram_bridge.history_watcher import HistoryWatcher
+
+    bot = MagicMock()
+    watcher = HistoryWatcher(bot, AsyncMock(), AsyncMock())
+    watcher._last_mtime = 12345  # Same as we'll return
+
+    with patch('telegram_bridge.history_watcher.HISTORY_PATH') as mock_path:
+        mock_path.exists.return_value = True
+        mock_path.stat.return_value.st_mtime = 12345
+
+        with patch('telegram_bridge.history_watcher.project_manager') as mock_pm:
+            await watcher._check_for_changes()
+
+            # Should not have called refresh
+            mock_pm.refresh_project_session.assert_not_called()
+```
+
+**Step 2: Run test to verify it fails**
+
+Run: `pytest tests/test_history_watcher.py -v`
+Expected: FAIL with "No module named 'telegram_bridge.history_watcher'"
+
+**Step 3: Write implementation**
 
 ```python
 # src/telegram_bridge/history_watcher.py
@@ -340,7 +461,7 @@ from aiogram import Bot
 from .session_manager import project_manager, ProjectState
 from .history_reader import HISTORY_PATH
 
-REFRESH_INTERVAL = 10  # seconds
+REFRESH_INTERVAL = 15  # seconds
 
 class HistoryWatcher:
     """Watches history.jsonl for session changes."""
@@ -527,38 +648,35 @@ git commit -m "refactor(telegram-bridge): remove hook-related methods from sessi
 
 ---
 
-## Task 8: Remove hook HTTP endpoints from main.py
+## Task 8: Remove HTTP server completely from main.py
 
 **Files:**
 - Modify: `src/telegram_bridge/main.py`
 
-**Step 1: Remove handlers**
+**Step 1: Remove all HTTP-related code**
 
 Delete:
-- `handle_register` function (lines 13-45)
-- `handle_unregister` function (lines 47-56)
+- `handle_register` function
+- `handle_unregister` function
+- `handle_debug` function
+- `run_http_server` function
+- `from aiohttp import web` import
 
-**Step 2: Update run_http_server**
+**Step 2: Remove http_port from config**
 
-```python
-async def run_http_server(bot: Bot) -> None:
-    """Run HTTP server for debug endpoint."""
-    app = web.Application()
-    app["bot"] = bot
-    app.router.add_get("/debug", handle_debug)
+In `src/telegram_bridge/config.py`, remove `http_port` field from Settings class.
 
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "localhost", settings.http_port)
-    await site.start()
-    print(f"HTTP server running on http://localhost:{settings.http_port}")
-```
-
-**Step 3: Add HistoryWatcher to main**
-
-Update `main()` function:
+**Step 3: Update main() function**
 
 ```python
+# src/telegram_bridge/main.py
+import asyncio
+from aiogram import Bot, Dispatcher
+
+from .config import settings
+from .bot import router
+from .session_manager import project_manager, ProjectState
+
 async def main():
     bot = Bot(token=settings.telegram_token)
     dp = Dispatcher()
@@ -575,9 +693,6 @@ async def main():
         BotCommand(command="my_chat_id", description="Show your user ID"),
         BotCommand(command="esc", description="Send Escape to Claude"),
     ])
-
-    # Start HTTP server (debug only)
-    await run_http_server(bot)
 
     # Define task starters
     async def start_poller(project: ProjectState) -> asyncio.Task:
@@ -597,6 +712,9 @@ async def main():
 
     # Start Telegram polling
     await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 **Step 4: Run syntax check**
@@ -607,8 +725,8 @@ Expected: No output (success)
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/main.py
-git commit -m "refactor(telegram-bridge): remove hook endpoints, add HistoryWatcher"
+git add src/telegram_bridge/main.py src/telegram_bridge/config.py
+git commit -m "refactor(telegram-bridge): remove HTTP server completely"
 ```
 
 ---
@@ -674,13 +792,13 @@ git commit -m "deprecate(telegram-bridge): mark hooks as deprecated"
 /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge/restart.sh
 ```
 
-**Step 2: Check debug endpoint**
+**Step 2: Check bot logs**
 
 ```bash
-curl http://localhost:8765/debug | jq
+tail -50 /home/superbereza/dev/personal-agent/tmp/telegram-bridge-logs/bot.log
 ```
 
-Expected: Projects with session_id populated from history.jsonl
+Expected: "Starting bridge" without HTTP server message, no errors.
 
 **Step 3: Test /start in Telegram**
 
@@ -693,8 +811,8 @@ Send a message in Claude, verify it appears in Telegram.
 
 **Step 5: Test session change**
 
-Run `/resume` in Claude, wait 10 seconds.
-Expected: Watcher reconnects to new session automatically.
+Run `/resume` in Claude, wait 15 seconds.
+Expected: Watcher reconnects to new session automatically (check logs for "session changed").
 
 ---
 
@@ -723,17 +841,23 @@ git commit -m "docs(telegram-bridge): update for history.jsonl architecture"
 
 ## Summary
 
-| Task | Description | Files |
-|------|-------------|-------|
-| 1 | HistoryReader utility | history_reader.py |
-| 2 | tmux discovery by cwd | tmux.py |
-| 3 | compute_jsonl_path | history_reader.py |
-| 4 | refresh_project_session | session_manager.py |
-| 5 | HistoryWatcher task | history_watcher.py |
-| 6 | Simplify restore_projects | session_manager.py |
-| 7 | Remove hook methods | session_manager.py |
-| 8 | Remove hook endpoints | main.py |
-| 9 | Update config default | config.py |
-| 10 | Deprecate hooks | hooks/*.sh |
-| 11 | Integration test | - |
-| 12 | Update docs | docs/, CLAUDE.md |
+| Task | Description | Files | Tests |
+|------|-------------|-------|-------|
+| 1 | HistoryReader with incremental reading | history_reader.py | test_history_reader.py |
+| 2 | tmux discovery by cwd | tmux.py | test_tmux.py |
+| 3 | compute_jsonl_path | history_reader.py | test_history_reader.py |
+| 4 | refresh_project_session | session_manager.py | test_session_manager.py |
+| 5 | HistoryWatcher task (15s interval) | history_watcher.py | test_history_watcher.py |
+| 6 | Simplify restore_projects | session_manager.py | - |
+| 7 | Remove hook methods | session_manager.py | - |
+| 8 | Remove HTTP server completely | main.py, config.py | - |
+| 9 | Update config default | config.py | - |
+| 10 | Deprecate hooks | hooks/*.sh | - |
+| 11 | Integration test | - | manual |
+| 12 | Update docs | docs/, CLAUDE.md | - |
+
+**Key improvements from review:**
+- Incremental reading of history.jsonl (Task 1)
+- REFRESH_INTERVAL = 15s (Task 5)
+- HTTP server removed completely (Task 8)
+- Extended test coverage (Tasks 1, 5)
