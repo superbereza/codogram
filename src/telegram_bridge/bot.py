@@ -121,6 +121,170 @@ async def launch_claude(message: Message, project_name: str, path: str):
     else:
         await message.answer(f"Ошибка запуска: {result.error}")
 
+
+@router.callback_query(F.data == "start:create_dir")
+async def on_start_create_dir(callback: CallbackQuery):
+    """Handle create directory button."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    chat_id = callback.message.chat.id
+    state = _start_state.get(chat_id)
+    if not state:
+        await callback.answer("Сессия истекла, начни заново с /start")
+        return
+
+    # Create directory
+    result = create_project_directory(state["path"])
+    if not result.success:
+        await callback.message.edit_text(f"Ошибка создания директории: {result.error}")
+        await callback.answer()
+        return
+
+    # Ask about git
+    state["state"] = "awaiting_git_choice"
+    await callback.message.edit_text(
+        f"Директория `{state['path']}` создана.\n\nНастроить гит?",
+        reply_markup=git_setup_keyboard(),
+        parse_mode="Markdown",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "start:custom_path")
+async def on_start_custom_path(callback: CallbackQuery):
+    """Handle custom path button."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    chat_id = callback.message.chat.id
+    state = _start_state.get(chat_id)
+    if not state:
+        await callback.answer("Сессия истекла")
+        return
+
+    state["state"] = "awaiting_custom_path"
+    await callback.message.edit_text("Отправь путь к директории проекта:")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "start:git_init")
+async def on_start_git_init(callback: CallbackQuery):
+    """Handle git init button."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    chat_id = callback.message.chat.id
+    state = _start_state.get(chat_id)
+    if not state:
+        await callback.answer("Сессия истекла")
+        return
+
+    result = git_init(state["path"])
+    if not result.success:
+        await callback.message.edit_text(f"Ошибка git init: {result.error}")
+    else:
+        await callback.message.edit_text("Git инициализирован. Запускаю Claude...")
+        await launch_claude(callback.message, state["project"], state["path"])
+
+    _start_state.pop(chat_id, None)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "start:git_gh")
+async def on_start_git_gh(callback: CallbackQuery):
+    """Handle git + gh button."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    chat_id = callback.message.chat.id
+    state = _start_state.get(chat_id)
+    if not state:
+        await callback.answer("Сессия истекла")
+        return
+
+    state["state"] = "awaiting_gh_visibility"
+    await callback.message.edit_text(
+        "Видимость репозитория?",
+        reply_markup=git_visibility_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.in_({"start:gh_private", "start:gh_public"}))
+async def on_start_gh_visibility(callback: CallbackQuery):
+    """Handle GitHub visibility choice."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    chat_id = callback.message.chat.id
+    state = _start_state.get(chat_id)
+    if not state:
+        await callback.answer("Сессия истекла")
+        return
+
+    private = callback.data == "start:gh_private"
+    await callback.message.edit_text("Создаю репозиторий на GitHub...")
+
+    result = git_init_with_github(state["path"], private=private)
+    if not result.success:
+        await callback.message.edit_text(f"Ошибка: {result.error}")
+    else:
+        await callback.message.edit_text("Репозиторий создан. Запускаю Claude...")
+        await launch_claude(callback.message, state["project"], state["path"])
+
+    _start_state.pop(chat_id, None)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "start:git_clone")
+async def on_start_git_clone(callback: CallbackQuery):
+    """Handle git clone button."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    chat_id = callback.message.chat.id
+    state = _start_state.get(chat_id)
+    if not state:
+        await callback.answer("Сессия истекла")
+        return
+
+    state["state"] = "awaiting_clone_url"
+    await callback.message.edit_text(
+        "Отправь ссылку на репозиторий:\n"
+        "• SSH: `git@github.com:user/repo.git`\n"
+        "• HTTPS: `https://github.com/user/repo.git`",
+        parse_mode="Markdown",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "start:no_git")
+async def on_start_no_git(callback: CallbackQuery):
+    """Handle no git button."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    chat_id = callback.message.chat.id
+    state = _start_state.get(chat_id)
+    if not state:
+        await callback.answer("Сессия истекла")
+        return
+
+    await callback.message.edit_text("Запускаю Claude...")
+    await launch_claude(callback.message, state["project"], state["path"])
+
+    _start_state.pop(chat_id, None)
+    await callback.answer()
+
+
 @router.message(Command("register_dir"))
 async def cmd_register_dir(message: Message):
     if not is_admin(message.from_user.id):
