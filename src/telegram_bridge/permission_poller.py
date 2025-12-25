@@ -31,7 +31,7 @@ from .screen import parse_screen, PermissionPrompt
 from .keyboards import permission_keyboard
 from .chunker import chunk_message
 from .state import permission_messages
-from .session_manager import SessionState
+from .session_manager import ProjectState
 from .tmux import TmuxSession
 
 
@@ -45,12 +45,12 @@ class PollerState(Enum):
 SEPARATOR_SOLID = "─────────────────────"
 
 
-async def create_poller_task(bot: Bot, session: SessionState) -> asyncio.Task:
-    """Create permission poller task for session."""
-    return asyncio.create_task(permission_poller_for_session(bot, session))
+async def create_poller_task(bot: Bot, project: ProjectState) -> asyncio.Task:
+    """Create permission poller task for project."""
+    return asyncio.create_task(permission_poller_for_project(bot, project))
 
 
-async def permission_poller_for_session(bot: Bot, session: SessionState):
+async def permission_poller_for_project(bot: Bot, project: ProjectState):
     """
     Background poller for permission prompts.
 
@@ -59,9 +59,9 @@ async def permission_poller_for_session(bot: Bot, session: SessionState):
     """
     log("Poller started")
 
-    # Create TmuxSession from session data
-    tmux = TmuxSession(session.tmux_session, session.cwd)
-    chat_id = session.chat_id
+    # Create TmuxSession from project data
+    tmux = TmuxSession(project.tmux_session, project.cwd)
+    chat_id = project.chat_id
 
     state = PollerState.IDLE
     debounce_start = 0.0
