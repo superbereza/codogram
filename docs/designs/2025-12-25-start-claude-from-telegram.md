@@ -1,6 +1,6 @@
 # Start Claude from Telegram - Design
 
-**Status:** Ready for implementation
+**Status:** Implemented
 
 ## Цель
 

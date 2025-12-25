@@ -2,12 +2,17 @@
 
 ## В работе
 
-- [ ] **Start Claude from Telegram** — запуск Claude по /start вместо ручного запуска
-  - [Дизайн](designs/2025-12-25-start-claude-from-telegram.md)
-  - Конвенция `~/dev/{project}` + fallback на /register_dir
-  - tmux сессии `claude-{project}`
+(нет активных задач)
 
 ## Выполнено недавно
+
+- [x] **Start Claude from Telegram** — запуск Claude по /start вместо ручного запуска
+  - [Дизайн](designs/2025-12-25-start-claude-from-telegram.md)
+  - [План](plans/2025-12-25-start-claude-from-telegram.md)
+  - Коммиты: d32f3a4..6646c3b
+  - Авто-регистрация проекта по названию чата
+  - Создание директории + git setup flow
+  - Удалена команда /register_dir
 
 - [x] **Fix poller duplication** — исправлено дублирование поллеров при /new и рестарте
   - План: `plans/done/2025-12-24-fix-poller-duplication.md`
