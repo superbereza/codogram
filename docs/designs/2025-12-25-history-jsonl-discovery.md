@@ -71,12 +71,24 @@
 
 ## Новая архитектура
 
-### Мультисессии (заложено на будущее)
+### Мультисессии (структура готова, реализация на будущее)
 
 Один project (cwd) может иметь **несколько активных Claude сессий**:
 - Основной Claude в `claude-personal-agent`
 - Второй Claude в `personal-agent`
 - Subagents (пишут в `agent-*.jsonl`)
+
+**MVP:** работаем с одной сессией. Структура данных (dict) готова к мультисессиям.
+
+**При обнаружении нескольких tmux:**
+```
+Найдено несколько tmux сессий с Claude:
+[claude-personal-agent] — active 5m ago
+[personal-agent] — active 2h ago
+
+Какую подключить?
+```
+Пользователь выбирает одну → подключаем только её.
 
 **Ключевой инсайт: независимость watcher и poller**
 
@@ -146,26 +158,40 @@ tmux list-panes -a -F "#{pane_current_path} #{session_name}" | grep "^$cwd "
 /start chat_id project_name cwd:
   1. Сохраняем в config
   2. session_ids[] ← find_all_sessions(cwd)
-  3. Для каждого session_id:
+  3. tmux_sessions[] ← find_all_tmux_by_cwd(cwd)
+
+  4. Если tmux_sessions.length > 1:
+     - Показываем список с кнопками выбора
+     - Ждём выбора пользователя
+     - Продолжаем с выбранным tmux
+
+  5. Для выбранного session_id (последний по timestamp):
      - jsonl_path ← compute(cwd, session_id)
      - Запускаем watcher если jsonl существует
-  4. tmux_sessions[] ← find_all_tmux_by_cwd(cwd)
-  5. Для каждого tmux_session:
+
+  6. Для выбранного tmux_session:
      - Запускаем poller
 
 restore (при старте бота):
-  Для каждого project в config → тот же алгоритм
+  Для каждого project в config:
+    - tmux ← find_tmux_by_convention(project_name)
+    - session_id ← find_latest_session(cwd)
+    - Запускаем watcher + poller
 
 periodic (каждые 15s):
   Для каждого активного project:
-    - Ищем новые session_id в history.jsonl → запускаем watcher
-    - Ищем новые tmux по cwd → запускаем poller
+    - Проверяем session_id в history.jsonl (изменился?)
+    - Если да → перезапускаем watcher
     - Cleanup сессий старше 30 дней
 ```
 
+**Примечание:** При restore не показываем выбор — берём по конвенции `claude-{project}` или первый найденный.
+
 ### Permission routing
 
-Если несколько Claude просят permission одновременно, добавляем префикс:
+**MVP:** один poller → один источник permissions. Callback содержит `tmux_session`.
+
+**Мультисессии (будущее):** если несколько Claude просят permission одновременно, добавляем префикс:
 
 ```
 [claude-personal-agent] Permission request:
@@ -176,8 +202,6 @@ Bash: rm -rf /tmp/test
 Bash: git push
 [Allow] [Deny]
 ```
-
-Callback кнопки содержит `tmux_session` → отправляем keys в правильный tmux.
 
 ### Оптимизация polling
 
@@ -217,23 +241,21 @@ def check_history():
 ## Что добавляем
 
 1. `SessionInfo` dataclass — информация об одной сессии (session_id, watcher_task, last_activity)
-2. `ProjectState.sessions` — dict для хранения нескольких watcher'ов
-3. `ProjectState.pollers` — dict для хранения нескольких poller'ов
-4. `HistoryWatcher` — читает history.jsonl, отслеживает изменения, запускает watcher'ы
+2. `ProjectState.sessions` — dict (готов к мультисессиям, MVP использует одну)
+3. `ProjectState.pollers` — dict (готов к мультисессиям, MVP использует один)
+4. `HistoryReader` — читает history.jsonl инкрементально, кэширует session_id по cwd
 5. `find_all_sessions_for_project(cwd)` — поиск ВСЕХ session_id по cwd
 6. `find_all_tmux_by_cwd(cwd)` — поиск ВСЕХ tmux сессий по cwd
-7. Periodic refresh task с cleanup старых сессий (30 дней)
-8. Префикс `[tmux_name]` в permission messages
+7. UI выбора tmux при /start (если найдено > 1)
+8. Periodic refresh task с cleanup старых сессий (30 дней)
 
 ## Риски
 
 1. **history.jsonl формат изменится** — маловероятно, internal API
 2. **tmux list-panes формат изменится** — маловероятно, стабильный API
 3. **Большой history.jsonl** — читаем только новые строки (инкрементально)
-4. **Много watcher'ов** — каждая сессия = отдельный watcher, но они легковесные (просто tail файла)
-5. **Много poller'ов** — каждый tmux = отдельный poller, но они легковесные (capture раз в секунду)
-6. **Сообщения от разных Claude перемешиваются** — добавляем префикс `[tmux_name]` к permissions
-7. **Несколько permissions одновременно** — каждый показывается отдельно с префиксом tmux
+4. **Несколько tmux с одним cwd** — показываем UI выбора, пользователь решает
+5. **Session сменилась (/resume)** — periodic refresh подхватит через 15s
 
 ## Миграция
 
