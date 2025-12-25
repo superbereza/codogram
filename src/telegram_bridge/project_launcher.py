@@ -42,6 +42,73 @@ def is_tmux_session_exists(session_name: str) -> bool:
     return result.returncode == 0
 
 
+def create_project_directory(path: str) -> LaunchResult:
+    """Create project directory."""
+    try:
+        Path(path).mkdir(parents=True, exist_ok=True)
+        return LaunchResult(success=True)
+    except Exception as e:
+        return LaunchResult(success=False, error=str(e))
+
+
+def git_init(path: str) -> LaunchResult:
+    """Initialize git repository."""
+    try:
+        result = subprocess.run(
+            ["git", "init"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return LaunchResult(success=False, error=result.stderr)
+        return LaunchResult(success=True)
+    except Exception as e:
+        return LaunchResult(success=False, error=str(e))
+
+
+def git_init_with_github(path: str, private: bool = True) -> LaunchResult:
+    """Initialize git and create GitHub repo."""
+    try:
+        # git init
+        init_result = git_init(path)
+        if not init_result.success:
+            return init_result
+
+        # gh repo create
+        visibility = "--private" if private else "--public"
+        result = subprocess.run(
+            ["gh", "repo", "create", visibility, "--source", ".", "--push"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return LaunchResult(success=False, error=f"gh error: {result.stderr}")
+        return LaunchResult(success=True)
+    except Exception as e:
+        return LaunchResult(success=False, error=str(e))
+
+
+def git_clone(path: str, repo_url: str) -> LaunchResult:
+    """Clone repository into path."""
+    try:
+        # Clone into current directory (path should be empty or not exist)
+        parent = str(Path(path).parent)
+        name = Path(path).name
+        result = subprocess.run(
+            ["git", "clone", repo_url, name],
+            cwd=parent,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return LaunchResult(success=False, error=f"git clone error: {result.stderr}")
+        return LaunchResult(success=True)
+    except Exception as e:
+        return LaunchResult(success=False, error=str(e))
+
+
 def create_tmux_with_claude(session_name: str, project_path: str) -> LaunchResult:
     """Create new tmux session and start Claude."""
     try:
