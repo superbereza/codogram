@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator
 from aiogram import Bot
-from .session_manager import SessionState
+from .session_manager import ProjectState
 from .chunker import chunk_message
 
 class ContentType(Enum):
@@ -134,18 +134,18 @@ async def watch_jsonl(path: Path, poll_interval: float = 0.5) -> AsyncIterator[P
 
         await asyncio.sleep(poll_interval)
 
-async def create_watcher_task(bot: Bot, session: SessionState) -> asyncio.Task:
-    """Create watcher task for session."""
-    return asyncio.create_task(watcher_for_session(bot, session))
+async def create_watcher_task(bot: Bot, project: ProjectState) -> asyncio.Task:
+    """Create watcher task for project."""
+    return asyncio.create_task(watcher_for_session(bot, project))
 
-async def watcher_for_session(bot: Bot, session: SessionState):
-    """Watch jsonl for specific session."""
-    if not session.jsonl_path:
-        print(f"Watcher: no jsonl_path for session {session.session_id[:8]}")
+async def watcher_for_session(bot: Bot, project: ProjectState):
+    """Watch jsonl for specific project."""
+    if not project.jsonl_path:
+        print(f"Watcher: no jsonl_path for project {project.session_id[:8]}")
         return
 
-    path = Path(session.jsonl_path)
-    chat_id = session.chat_id
+    path = Path(project.jsonl_path)
+    chat_id = project.chat_id
 
     print(f"Watcher: watching {path} for chat {chat_id}")
 
