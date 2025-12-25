@@ -4,7 +4,17 @@ from pathlib import Path
 
 HISTORY_PATH = Path.home() / ".claude" / "history.jsonl"
 
-# State for incremental reading
+# State for incremental reading.
+#
+# Caching strategy:
+# - _last_size: File size at last read. Used to seek and read only new content.
+# - _last_mtime: File modification time. Quick check for "no changes" case.
+# - _session_cache: Maps cwd -> session_id. Updated incrementally as new entries appear.
+#
+# Truncation detection:
+# When current_size < _last_size, file was truncated/recreated. We reset _last_size to 0
+# and clear the cache. On the next check, current_size > _last_size (0) will be true,
+# so we read from the beginning and rebuild the cache from scratch.
 _last_size = 0
 _last_mtime = 0
 _session_cache: dict[str, str] = {}  # cwd -> session_id
