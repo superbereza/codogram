@@ -211,6 +211,7 @@ class ProjectManager:
 
     async def restore_projects(self, start_poller, start_watcher) -> None:
         """Restore sessions from config after bot restart."""
+        # First: restore from saved sessions
         saved_sessions = self._config.get("sessions", {})
 
         for project_name, data in saved_sessions.items():
@@ -235,6 +236,21 @@ class ProjectManager:
                 project.jsonl_path = None
 
             await self._maybe_start_tasks(project, start_poller, start_watcher)
+
+        # Second: check tmux by convention for projects with chat_id
+        for project in self.projects.values():
+            if not project.chat_id:
+                continue
+            if project.poller_task and not project.poller_task.done():
+                continue  # Already running
+
+            # Check tmux by convention (try both patterns)
+            for pattern in [f"claude-{project.project_name}", project.project_name]:
+                tmux = TmuxSession(pattern, project.cwd or "/tmp")
+                if tmux.exists():
+                    project.tmux_session = pattern
+                    await self._maybe_start_tasks(project, start_poller, start_watcher)
+                    break
 
         self._save()
 

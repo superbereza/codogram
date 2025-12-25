@@ -6,7 +6,7 @@ from aiogram import Bot, Dispatcher
 
 from .config import settings
 from .bot import router
-from .session_manager import manager, SessionState, project_manager, ProjectState
+from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 
 # HTTP handlers
@@ -57,17 +57,19 @@ async def handle_unregister(request: web.Request) -> web.Response:
 
 async def handle_debug(request: web.Request) -> web.Response:
     """Debug endpoint to inspect bot state."""
-    sessions_info = {}
-    for sid, s in manager.sessions.items():
-        sessions_info[sid] = {
-            "tmux": s.tmux_session,
-            "project": s.project_name,
-            "poller_running": s.poller_task is not None and not s.poller_task.done(),
-            "watcher_running": s.watcher_task is not None and not s.watcher_task.done(),
+    projects_info = {}
+    for name, p in project_manager.projects.items():
+        projects_info[name] = {
+            "chat_id": p.chat_id,
+            "tmux": p.tmux_session,
+            "claude_session": p.claude_session_id,
+            "cwd": p.cwd,
+            "poller_running": p.poller_task is not None and not p.poller_task.done(),
+            "watcher_running": p.watcher_task is not None and not p.watcher_task.done(),
         }
     return web.json_response({
-        "sessions": sessions_info,
-        "session_count": len(manager.sessions),
+        "projects": projects_info,
+        "project_count": len(project_manager.projects),
     })
 
 async def run_http_server(bot: Bot) -> None:
