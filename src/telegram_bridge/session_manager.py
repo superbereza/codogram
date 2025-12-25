@@ -201,6 +201,26 @@ class ProjectManager:
                 pass
             project.watcher_task = None
 
+    async def handle_session_end(self, session_id: str) -> None:
+        """Handle Claude session end."""
+        project = self.get_by_session(session_id)
+        if not project:
+            return
+
+        # Race condition protection: ignore if session_id changed
+        if project.claude_session_id != session_id:
+            return
+
+        # Clear Claude-related fields
+        project.claude_session_id = None
+        project.jsonl_path = None
+
+        # Stop tasks
+        await self._stop_tasks(project)
+
+        # Keep: chat_id, cwd, tmux_session
+        self._save()
+
 class SessionManager:
     def __init__(self):
         self.sessions: dict[str, SessionState] = {}

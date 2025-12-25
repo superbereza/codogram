@@ -140,3 +140,32 @@ def test_update_from_hook():
         assert project.cwd == "/home/user/dev/test-project"
 
     asyncio.run(run())
+
+
+def test_session_end_race_protection():
+    """SessionEnd with old session_id is ignored."""
+    pm = ProjectManager()
+
+    async def run():
+        mock_poller = AsyncMock(return_value=asyncio.current_task())
+        mock_watcher = AsyncMock(return_value=asyncio.current_task())
+
+        # Create project with session abc
+        project = await pm.update_from_hook(
+            session_id="abc",
+            cwd="/tmp/test",
+            tmux_session="test",
+            start_poller=mock_poller,
+            start_watcher=mock_watcher,
+        )
+
+        # Update to session xyz
+        project.claude_session_id = "xyz"
+
+        # SessionEnd for old "abc" should be ignored
+        await pm.handle_session_end("abc")
+
+        # Session still has xyz
+        assert project.claude_session_id == "xyz"
+
+    asyncio.run(run())
