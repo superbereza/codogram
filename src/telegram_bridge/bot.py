@@ -22,6 +22,7 @@ from .start_flow import (
     dir_not_found_keyboard,
     git_setup_keyboard,
     git_visibility_keyboard,
+    restart_confirm_keyboard,
 )
 
 # Conversation state: chat_id -> {"state": str, "project": str, "path": str, ...}
@@ -356,6 +357,58 @@ async def cmd_esc(message: Message):
     tmux = get_session_for_chat(message.chat.id)
     if tmux:
         tmux.send_key("Escape")
+
+@router.message(Command("restart_session"))
+async def cmd_restart_session(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    project = project_manager.get_by_chat(message.chat.id)
+    if not project or not project.tmux_session:
+        await message.answer("Нет активной сессии для перезапуска.")
+        return
+
+    await message.answer(
+        f"Перезапустить сессию `{project.tmux_session}`?",
+        reply_markup=restart_confirm_keyboard(),
+        parse_mode="Markdown",
+    )
+
+
+@router.callback_query(F.data == "restart:confirm")
+async def on_restart_confirm(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Сессия не найдена")
+        return
+
+    # Stop tasks
+    await project_manager._stop_tasks(project)
+
+    # Kill tmux if exists
+    if project.tmux_session and is_tmux_session_exists(project.tmux_session):
+        import subprocess
+        subprocess.run(["tmux", "kill-session", "-t", project.tmux_session], capture_output=True)
+
+    # Clear session data
+    project.claude_session_id = None
+    project.jsonl_path = None
+    project.tmux_session = None
+    project_manager._save()
+
+    await callback.message.edit_text("Сессия остановлена. Используй /start для запуска.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "restart:cancel")
+async def on_restart_cancel(callback: CallbackQuery):
+    await callback.message.edit_text("Отменено.")
+    await callback.answer()
+
 
 @router.callback_query(F.data.startswith("perm:"))
 async def on_permission_callback(callback: CallbackQuery):

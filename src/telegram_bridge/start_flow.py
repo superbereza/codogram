@@ -34,3 +34,13 @@ def git_visibility_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="Public", callback_data="start:gh_public"),
         ]
     ])
+
+
+def restart_confirm_keyboard() -> InlineKeyboardMarkup:
+    """Keyboard for restart confirmation."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Да, перезапустить", callback_data="restart:confirm"),
+            InlineKeyboardButton(text="Отмена", callback_data="restart:cancel"),
+        ]
+    ])
