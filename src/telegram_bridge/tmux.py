@@ -47,3 +47,47 @@ class TmuxSession:
             text=True
         )
         return result.stdout if result.returncode == 0 else ""
+
+
+def find_all_tmux_by_cwd(cwd: str) -> list[str]:
+    """Find all tmux sessions with panes in the given cwd.
+
+    Returns list of session names (may be empty).
+    """
+    try:
+        result = subprocess.run(
+            ["tmux", "list-panes", "-a", "-F", "#{session_name} #{pane_current_path}"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return []
+
+        sessions = set()
+        for line in result.stdout.splitlines():
+            parts = line.split(" ", 1)
+            if len(parts) == 2:
+                session_name, pane_path = parts
+                if pane_path == cwd:
+                    sessions.add(session_name)
+
+        return sorted(sessions)
+    except Exception:
+        return []
+
+
+def find_tmux_by_convention(project_name: str) -> str | None:
+    """Find tmux session by naming convention.
+
+    Tries:
+    1. claude-{project_name}
+    2. {project_name}
+
+    Returns session name if found, None otherwise.
+    """
+    for pattern in [f"claude-{project_name}", project_name]:
+        # Check if session exists (any cwd, just need valid session)
+        t = TmuxSession(pattern, "/tmp")
+        if t.exists():
+            return pattern
+    return None
