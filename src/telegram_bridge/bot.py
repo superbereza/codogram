@@ -287,26 +287,6 @@ async def on_start_no_git(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.message(Command("register_dir"))
-async def cmd_register_dir(message: Message):
-    if not is_admin(message.from_user.id):
-        return
-
-    if not message.text:
-        return
-
-    parts = message.text.split(maxsplit=1)
-    if len(parts) < 2:
-        await message.answer("Usage: /register_dir <path>\nExample: /register_dir personal-agent")
-        return
-
-    path = parts[1].strip()
-    # path is relative to base_dir
-    project_name = path.split("/")[-1]
-
-    manager.register_project(project_name, message.chat.id)
-    await message.answer(f"Registered `{project_name}` for this chat.", parse_mode="Markdown")
-
 @router.message(Command("my_chat_id"))
 async def cmd_my_chat_id(message: Message):
     """Show user's chat ID - available to everyone."""
