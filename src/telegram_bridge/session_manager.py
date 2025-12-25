@@ -22,7 +22,7 @@ class SessionState:
 class SessionManager:
     def __init__(self):
         self.sessions: dict[str, SessionState] = {}
-        self.projects: dict[str, int] = {}  # project_name -> chat_id
+        self.projects: dict[str, int | dict] = {}  # project_name -> chat_id or {chat_id, path}
         self._config = load_config()
         self.projects = self._config.get("projects", {})
 
@@ -40,14 +40,40 @@ class SessionManager:
         }
         save_config(self._config)
 
-    def register_project(self, project_name: str, chat_id: int) -> None:
-        """Register project -> chat mapping."""
-        self.projects[project_name] = chat_id
+    def register_project(self, project_name: str, chat_id: int, path: str | None = None) -> None:
+        """Register project -> chat mapping with optional custom path."""
+        self.projects[project_name] = {
+            "chat_id": chat_id,
+            "path": path,  # None means use convention ~/dev/{project_name}
+        }
         self._save()
 
     def get_chat_id(self, project_name: str) -> int | None:
         """Get chat_id for project."""
-        return self.projects.get(project_name)
+        project = self.projects.get(project_name)
+        if project is None:
+            return None
+        # Handle both old format (int) and new format (dict)
+        if isinstance(project, int):
+            return project
+        return project.get("chat_id")
+
+    def get_project_path(self, project_name: str) -> str | None:
+        """Get custom path for project, or None for convention."""
+        project = self.projects.get(project_name)
+        if project is None or isinstance(project, int):
+            return None
+        return project.get("path")
+
+    def get_project_by_chat(self, chat_id: int) -> str | None:
+        """Find project_name by chat_id."""
+        for project_name, data in self.projects.items():
+            if isinstance(data, int):
+                if data == chat_id:
+                    return project_name
+            elif data.get("chat_id") == chat_id:
+                return project_name
+        return None
 
     def get_session_by_chat(self, chat_id: int) -> SessionState | None:
         """Find active session for chat_id."""
