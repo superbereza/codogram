@@ -31,13 +31,13 @@ def test_project_state_with_values():
         chat_id=-123,
         cwd="/home/user/dev/my-project",
         tmux_session="claude-my-project",
-        claude_session_id="abc-123",
+        session_id="abc-123",
         jsonl_path="/path/to/jsonl",
     )
 
     assert project.chat_id == -123
     assert project.tmux_session == "claude-my-project"
-    assert project.claude_session_id == "abc-123"
+    assert project.claude_session_id == "abc-123"  # Test backwards compat property
 
 
 def test_project_manager_get_or_create():
