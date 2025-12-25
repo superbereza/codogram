@@ -79,13 +79,25 @@ async def cmd_start(message: Message):
         from .watcher import create_watcher_task
         return await create_watcher_task(bot, p)
 
-    # Case 1: Claude already running - connect
+    # Case 1: Claude session registered - connect
     if project.claude_session_id:
         await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
         project_manager._save()
         tmux = TmuxSession(project.tmux_session, project.cwd or "/tmp")
         await message.answer(
             f"Claude активен в `{project.tmux_session}`\n"
+            f"Подключиться: `{tmux.attach_command()}`",
+            parse_mode="Markdown",
+        )
+        return
+
+    # Case 2: tmux exists but no session registered - just connect poller
+    if project.tmux_session and is_tmux_session_exists(project.tmux_session):
+        await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
+        project_manager._save()
+        tmux = TmuxSession(project.tmux_session, project.cwd or "/tmp")
+        await message.answer(
+            f"Подключен к `{project.tmux_session}`\n"
             f"Подключиться: `{tmux.attach_command()}`",
             parse_mode="Markdown",
         )
