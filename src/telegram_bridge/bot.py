@@ -7,6 +7,23 @@ from .config import settings
 from .session_manager import manager
 from .tmux import TmuxSession
 from .state import permission_messages
+from .project_launcher import (
+    resolve_project_path,
+    is_tmux_session_exists,
+    create_tmux_with_claude,
+    create_project_directory,
+    git_init,
+    git_init_with_github,
+    git_clone,
+)
+from .start_flow import (
+    dir_not_found_keyboard,
+    git_setup_keyboard,
+    git_visibility_keyboard,
+)
+
+# Conversation state: chat_id -> {"state": str, "project": str, "path": str, ...}
+_start_state: dict[int, dict] = {}
 
 router = Router()
 
@@ -36,23 +53,73 @@ async def cmd_start(message: Message):
     if not is_admin(message.from_user.id):
         return
 
+    chat_id = message.chat.id
+
     # Auto-register project by chat title
-    if message.chat.title:
-        existing = manager.get_chat_id(message.chat.title)
-        if not existing:
-            manager.register_project(message.chat.title, message.chat.id)
+    project_name = message.chat.title
+    if not project_name:
+        await message.answer("Эта команда работает только в групповых чатах с названием проекта.")
+        return
 
-    session = manager.get_session_by_chat(message.chat.id)
-    if session:
+    # Register project if not exists
+    existing_chat = manager.get_chat_id(project_name)
+    if not existing_chat:
+        manager.register_project(project_name, chat_id)
+
+    # Check if Claude already running
+    session = manager.get_session_by_chat(chat_id)
+    if session and session.poller_task and not session.poller_task.done():
         tmux = TmuxSession(session.tmux_session, session.cwd)
-        text = f"Bridge active.\nProject: `{session.project_name}`\nAttach: `{tmux.attach_command()}`"
-    else:
-        text = "Bridge ready. No active Claude session."
+        if is_tmux_session_exists(session.tmux_session):
+            text = f"Claude активен.\nПроект: `{session.project_name}`\nПодключиться: `{tmux.attach_command()}`"
+            try:
+                await message.answer(text, parse_mode="Markdown")
+            except Exception:
+                await message.answer(text)
+            return
 
-    try:
-        await message.answer(text, parse_mode="Markdown")
-    except Exception:
-        await message.answer(text)
+    # Resolve project path
+    custom_path = manager.get_project_path(project_name)
+    path_result = resolve_project_path(project_name, custom_path)
+
+    if not path_result.exists:
+        # Directory doesn't exist - ask what to do
+        _start_state[chat_id] = {
+            "state": "awaiting_dir_choice",
+            "project": project_name,
+            "path": path_result.path,
+        }
+        await message.answer(
+            f"Директория `{path_result.path}` не найдена.",
+            reply_markup=dir_not_found_keyboard(),
+            parse_mode="Markdown",
+        )
+        return
+
+    # Directory exists - launch Claude
+    await launch_claude(message, project_name, path_result.path)
+
+
+async def launch_claude(message: Message, project_name: str, path: str):
+    """Launch Claude in tmux session."""
+    session_name = f"claude-{project_name}"
+
+    # Check if session already exists
+    if is_tmux_session_exists(session_name):
+        # Kill old session
+        import subprocess
+        subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True)
+
+    result = create_tmux_with_claude(session_name, path)
+
+    if result.success:
+        await message.answer(
+            f"Claude запущен в `{session_name}`\n"
+            f"Подключиться: `tmux attach -t {session_name}`",
+            parse_mode="Markdown",
+        )
+    else:
+        await message.answer(f"Ошибка запуска: {result.error}")
 
 @router.message(Command("register_dir"))
 async def cmd_register_dir(message: Message):
