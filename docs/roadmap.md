@@ -70,6 +70,24 @@
 
 ## Идеи / PoC
 
+- [ ] **Silent push notifications** — тихие пуши на обычные сообщения, громкие на permissions и остановку
+  - Обычные сообщения: `disable_notification=True`
+  - Permissions, generation stopped: громкий пуш
+  - Возможно потребуются webhooks для быстрой реакции
+
+- [ ] **Silent mode** — режим без показа tool calls, только финальные генерации
+  - Команда `/silent` для переключения
+  - Фильтровать TOOL_USE, TOOL_RESULT, показывать только TEXT
+
+- [ ] **Thread summarization** — суммаризация длинных тредов (под вопросом)
+  - Команда `/summary` или автоматически при N сообщениях
+  - Использовать Claude API для суммаризации
+  - Вопрос: нужно ли это если есть scroll в Telegram?
+
+- [ ] **Fix bullet point rendering** — заменить большую точку `•` на точку в code block
+  - `•` плохо рендерится в некоторых клиентах
+  - Заменить на `\`•\`` или другой символ
+
 - [ ] **Extract to separate repository** — вынести telegram-bridge в отдельный репозиторий
   - `git subtree split -P agent-tools/telegram-bridge -b telegram-bridge-only`
   - Сохранит историю коммитов только для этой папки
