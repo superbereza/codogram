@@ -78,14 +78,22 @@
 - Второй Claude в `personal-agent`
 - Subagents (пишут в `agent-*.jsonl`)
 
+**Ключевой инсайт: независимость watcher и poller**
+
+| Компонент | Использует | Для чего |
+|-----------|------------|----------|
+| Watcher | session_id → jsonl | Читает output Claude |
+| Poller | tmux_session | Capture screen, send keys |
+
+Им **не нужно знать друг о друге**. Связь session_id ↔ tmux_session не требуется!
+
 **Модель данных:**
 
 ```python
 @dataclass
 class SessionInfo:
-    """Информация об одной Claude сессии."""
+    """Информация об одной Claude сессии (для watcher)."""
     session_id: str
-    tmux_session: str | None = None
     jsonl_path: str | None = None
     watcher_task: asyncio.Task | None = None
     last_activity: float = 0  # timestamp последней активности
@@ -97,14 +105,17 @@ class ProjectState:
     chat_id: int | None = None
     cwd: str | None = None
 
-    # Несколько сессий (session_id → SessionInfo)
+    # Watchers: session_id → SessionInfo (из history.jsonl)
     sessions: dict[str, SessionInfo] = field(default_factory=dict)
 
-    # Poller один на project (читает tmux)
-    poller_task: asyncio.Task | None = None
+    # Pollers: tmux_session → Task (найдены по cwd)
+    pollers: dict[str, asyncio.Task] = field(default_factory=dict)
 ```
 
-**Принцип:** watcher'ы работают параллельно, каждый следит за своим jsonl.
+**Принципы:**
+- Watcher'ы работают параллельно, каждый следит за своим jsonl
+- Poller'ы работают параллельно, каждый следит за своим tmux
+- Связь между ними не нужна
 
 **Cleanup:** сессии без активности > 30 дней удаляются автоматически.
 
@@ -117,9 +128,17 @@ Persistent (config.json):
 
 Dynamic (computed):
   - cwd → session_ids[]     ← history.jsonl (несколько!)
-  - cwd → tmux_session      ← tmux list-panes или конвенция
+  - cwd → tmux_sessions[]   ← tmux list-panes (несколько!)
   - session_id → jsonl_path ← вычисляем
 ```
+
+### Поиск tmux по cwd
+
+```bash
+tmux list-panes -a -F "#{pane_current_path} #{session_name}" | grep "^$cwd "
+```
+
+Возвращает все tmux сессии, где хотя бы один pane в нужной директории.
 
 ### Логика
 
@@ -130,19 +149,35 @@ Dynamic (computed):
   3. Для каждого session_id:
      - jsonl_path ← compute(cwd, session_id)
      - Запускаем watcher если jsonl существует
-  4. tmux ← find_tmux_by_cwd(cwd) или конвенция
-  5. Запускаем poller
+  4. tmux_sessions[] ← find_all_tmux_by_cwd(cwd)
+  5. Для каждого tmux_session:
+     - Запускаем poller
 
 restore (при старте бота):
   Для каждого project в config → тот же алгоритм
 
 periodic (каждые 15s):
   Для каждого активного project:
-    - Ищем новые session_id в history.jsonl
-    - Для новых → запускаем watcher
-    - Обновляем last_activity для активных
+    - Ищем новые session_id в history.jsonl → запускаем watcher
+    - Ищем новые tmux по cwd → запускаем poller
     - Cleanup сессий старше 30 дней
 ```
+
+### Permission routing
+
+Если несколько Claude просят permission одновременно, добавляем префикс:
+
+```
+[claude-personal-agent] Permission request:
+Bash: rm -rf /tmp/test
+[Allow] [Deny]
+
+[personal-agent] Permission request:
+Bash: git push
+[Allow] [Deny]
+```
+
+Callback кнопки содержит `tmux_session` → отправляем keys в правильный tmux.
 
 ### Оптимизация polling
 
@@ -182,19 +217,23 @@ def check_history():
 ## Что добавляем
 
 1. `SessionInfo` dataclass — информация об одной сессии (session_id, watcher_task, last_activity)
-2. `ProjectState.sessions` — dict для хранения нескольких сессий
-3. `HistoryWatcher` — читает history.jsonl, отслеживает изменения, запускает watcher'ы
-4. `find_all_sessions_for_project(cwd)` — поиск ВСЕХ session_id по cwd
-5. `find_tmux_by_cwd(cwd)` — поиск tmux сессии по cwd
-6. Periodic refresh task с cleanup старых сессий (30 дней)
+2. `ProjectState.sessions` — dict для хранения нескольких watcher'ов
+3. `ProjectState.pollers` — dict для хранения нескольких poller'ов
+4. `HistoryWatcher` — читает history.jsonl, отслеживает изменения, запускает watcher'ы
+5. `find_all_sessions_for_project(cwd)` — поиск ВСЕХ session_id по cwd
+6. `find_all_tmux_by_cwd(cwd)` — поиск ВСЕХ tmux сессий по cwd
+7. Periodic refresh task с cleanup старых сессий (30 дней)
+8. Префикс `[tmux_name]` в permission messages
 
 ## Риски
 
 1. **history.jsonl формат изменится** — маловероятно, internal API
-2. **tmux поиск ненадёжен** — fallback на конвенцию имён
+2. **tmux list-panes формат изменится** — маловероятно, стабильный API
 3. **Большой history.jsonl** — читаем только новые строки (инкрементально)
 4. **Много watcher'ов** — каждая сессия = отдельный watcher, но они легковесные (просто tail файла)
-5. **Сообщения от разных Claude перемешиваются** — в будущем можно добавить префикс с именем сессии
+5. **Много poller'ов** — каждый tmux = отдельный poller, но они легковесные (capture раз в секунду)
+6. **Сообщения от разных Claude перемешиваются** — добавляем префикс `[tmux_name]` к permissions
+7. **Несколько permissions одновременно** — каждый показывается отдельно с префиксом tmux
 
 ## Миграция
 
