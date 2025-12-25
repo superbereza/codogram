@@ -63,6 +63,7 @@ async def handle_debug(request: web.Request) -> web.Response:
             "chat_id": p.chat_id,
             "tmux": p.tmux_session,
             "claude_session": p.claude_session_id,
+            "jsonl_path": p.jsonl_path,
             "cwd": p.cwd,
             "poller_running": p.poller_task is not None and not p.poller_task.done(),
             "watcher_running": p.watcher_task is not None and not p.watcher_task.done(),

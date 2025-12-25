@@ -231,9 +231,11 @@ class ProjectManager:
             project.claude_session_id = data.get("claude_session_id")
             project.jsonl_path = data.get("jsonl_path")
 
-            # Verify jsonl exists
+            # Verify jsonl exists, try to find if missing
             if project.jsonl_path and not Path(project.jsonl_path).exists():
                 project.jsonl_path = None
+            if not project.jsonl_path and project.cwd and project.claude_session_id:
+                project.jsonl_path = self._find_jsonl(project.cwd, project.claude_session_id)
 
             await self._maybe_start_tasks(project, start_poller, start_watcher)
 

@@ -141,7 +141,7 @@ async def create_watcher_task(bot: Bot, project: ProjectState) -> asyncio.Task:
 async def watcher_for_session(bot: Bot, project: ProjectState):
     """Watch jsonl for specific project."""
     if not project.jsonl_path:
-        print(f"Watcher: no jsonl_path for project {project.session_id[:8]}")
+        print(f"Watcher: no jsonl_path for project {project.project_name}")
         return
 
     path = Path(project.jsonl_path)
