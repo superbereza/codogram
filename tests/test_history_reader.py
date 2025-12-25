@@ -2,7 +2,7 @@
 import json
 import tempfile
 from pathlib import Path
-from telegram_bridge.history_reader import find_session_for_project, reset_history_cache
+from telegram_bridge.history_reader import find_session_for_project, reset_history_cache, compute_jsonl_path
 
 def test_find_session_for_project():
     reset_history_cache()  # Clean state
@@ -107,3 +107,13 @@ def test_malformed_json_handling():
             assert result == "second"
         finally:
             history_path.unlink()
+
+def test_compute_jsonl_path():
+    result = compute_jsonl_path("/home/user/dev/my-project", "abc-123-def")
+    expected = Path.home() / ".claude" / "projects" / "-home-user-dev-my-project" / "abc-123-def.jsonl"
+    assert result == expected
+
+def test_compute_jsonl_path_root():
+    result = compute_jsonl_path("/", "test-session")
+    expected = Path.home() / ".claude" / "projects" / "-" / "test-session.jsonl"
+    assert result == expected

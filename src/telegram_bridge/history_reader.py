@@ -78,3 +78,12 @@ def reset_history_cache() -> None:
     _last_size = 0
     _last_mtime = 0
     _session_cache = {}
+
+
+def compute_jsonl_path(cwd: str, session_id: str) -> Path:
+    """Compute jsonl path from cwd and session_id.
+
+    Formula: ~/.claude/projects/{cwd.replace("/", "-")}/{session_id}.jsonl
+    """
+    project_hash = cwd.replace("/", "-")
+    return Path.home() / ".claude" / "projects" / project_hash / f"{session_id}.jsonl"
