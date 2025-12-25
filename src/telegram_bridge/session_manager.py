@@ -221,6 +221,35 @@ class ProjectManager:
         # Keep: chat_id, cwd, tmux_session
         self._save()
 
+    async def restore_projects(self, start_poller, start_watcher) -> None:
+        """Restore sessions from config after bot restart."""
+        saved_sessions = self._config.get("sessions", {})
+
+        for project_name, data in saved_sessions.items():
+            project = self.get_or_create(project_name)
+
+            tmux_session = data.get("tmux_session")
+            if not tmux_session:
+                continue
+
+            # Check if tmux is alive
+            tmux = TmuxSession(tmux_session, project.cwd or "/tmp")
+            if not tmux.exists():
+                continue
+
+            # Restore session data
+            project.tmux_session = tmux_session
+            project.claude_session_id = data.get("claude_session_id")
+            project.jsonl_path = data.get("jsonl_path")
+
+            # Verify jsonl exists
+            if project.jsonl_path and not Path(project.jsonl_path).exists():
+                project.jsonl_path = None
+
+            await self._maybe_start_tasks(project, start_poller, start_watcher)
+
+        self._save()
+
 class SessionManager:
     def __init__(self):
         self.sessions: dict[str, SessionState] = {}
