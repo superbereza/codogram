@@ -998,7 +998,7 @@ EOF
 
 ---
 
-## Task 8: Simplify restore_projects
+## Task 8: Simplify restore_projects with multi-tmux selection
 
 **Files:**
 - Modify: `src/telegram_bridge/session_manager.py`
@@ -1006,9 +1006,10 @@ EOF
 **Step 1: Rewrite restore_projects**
 
 ```python
-async def restore_projects(self, start_poller, start_watcher) -> None:
+async def restore_projects(self, bot, start_poller, start_watcher) -> None:
     """Restore sessions from history.jsonl after bot restart."""
     from .tmux import find_all_tmux_by_cwd, find_tmux_by_convention
+    from .tmux_selector import create_tmux_selection_keyboard
 
     for project in self.projects.values():
         if not project.chat_id or not project.cwd:
@@ -1027,12 +1028,24 @@ async def restore_projects(self, start_poller, start_watcher) -> None:
                 tmux_by_convention = find_tmux_by_convention(project.project_name)
                 if tmux_by_convention:
                     project.tmux_session = tmux_by_convention
+            else:
+                # Multiple tmux - send selection keyboard to chat
+                keyboard = create_tmux_selection_keyboard(tmux_list, project.project_name)
+                await bot.send_message(
+                    project.chat_id,
+                    f"🔄 Bot restarted. Multiple tmux sessions found for {project.project_name}:\n\n"
+                    "Select which one to connect:",
+                    reply_markup=keyboard
+                )
+                continue  # Don't start tasks, wait for selection
 
         # 3. Start tasks if ready
         await self._maybe_start_tasks(project, start_poller, start_watcher)
 
     self._save()
 ```
+
+**Note:** Signature changed to include `bot` parameter for sending messages.
 
 **Step 2: Run existing tests**
 
@@ -1062,7 +1075,7 @@ EOF
 
 ---
 
-## Task 9: Remove hook-related code
+## Task 9: Remove hook-related code, add get_by_tmux
 
 **Files:**
 - Modify: `src/telegram_bridge/session_manager.py`
@@ -1074,7 +1087,18 @@ Delete:
 - `handle_session_end`
 - `get_by_session`
 
-**Step 2: Update _save to remove sessions**
+**Step 2: Add get_by_tmux method (needed for Task 19)**
+
+```python
+def get_by_tmux(self, tmux_session: str) -> ProjectState | None:
+    """Find project by tmux_session."""
+    for project in self.projects.values():
+        if project.tmux_session == tmux_session:
+            return project
+    return None
+```
+
+**Step 3: Update _save to remove sessions**
 
 ```python
 def _save(self) -> None:
@@ -1089,7 +1113,7 @@ def _save(self) -> None:
     save_config(self._config)
 ```
 
-**Step 3: Run syntax check**
+**Step 4: Run syntax check**
 
 ```bash
 python -m py_compile src/telegram_bridge/session_manager.py
@@ -1097,18 +1121,21 @@ python -m py_compile src/telegram_bridge/session_manager.py
 
 Expected: No output
 
-**Step 4: Commit**
+**Step 5: Commit**
 
 ```bash
 git add src/telegram_bridge/session_manager.py
 git commit -m "$(cat <<'EOF'
-refactor(telegram-bridge): remove hook-related code
+refactor(telegram-bridge): remove hook-related code, add get_by_tmux
 
 Deleted:
 - update_from_hook
 - handle_session_end
 - get_by_session
 - sessions from config
+
+Added:
+- get_by_tmux (for permission callback routing)
 
 All session discovery now via history.jsonl.
 
@@ -1174,7 +1201,7 @@ async def main():
         return await create_watcher_task(bot, project)
 
     # Restore sessions from history.jsonl
-    await project_manager.restore_projects(start_poller, start_watcher)
+    await project_manager.restore_projects(bot, start_poller, start_watcher)
 
     # Start history watcher for session changes
     from .history_watcher import create_history_watcher
@@ -1612,24 +1639,25 @@ EOF
 
 ```python
 # In history_watcher.py, _check_for_changes method
+# NOTE: Runs every 15s. Tmux check runs always, session check only on mtime change.
 
 async def _check_for_changes(self):
-    """Check if history.jsonl changed and refresh sessions."""
-    if not HISTORY_PATH.exists():
-        return
+    """Check tmux health (always) and session changes (on mtime change)."""
 
-    # Quick mtime check
-    mtime = HISTORY_PATH.stat().st_mtime
-    if mtime == self._last_mtime:
-        return
-    self._last_mtime = mtime
+    # Check mtime for session changes (optimized)
+    history_changed = False
+    if HISTORY_PATH.exists():
+        mtime = HISTORY_PATH.stat().st_mtime
+        if mtime != self._last_mtime:
+            self._last_mtime = mtime
+            history_changed = True
 
     # Check each project
     for project in list(project_manager.projects.values()):
         if not project.chat_id or not project.cwd:
             continue
 
-        # 1. Check if should cleanup (inactive > 30 days)
+        # 1. Check if should cleanup (inactive > 30 days) — ALWAYS
         if should_cleanup_project(project):
             logger.info(f"Cleaning up inactive project: {project.project_name}")
             if project.watcher_task:
@@ -1639,7 +1667,7 @@ async def _check_for_changes(self):
             del project_manager.projects[project.project_name]
             continue
 
-        # 2. Check if tmux died
+        # 2. Check if tmux died — ALWAYS (every 15s)
         if project.tmux_session:
             from .tmux import TmuxSession
             tmux = TmuxSession(project.tmux_session, project.cwd)
@@ -1660,7 +1688,10 @@ async def _check_for_changes(self):
                 project.session_id = None
                 continue
 
-        # 3. Check if session changed
+        # 3. Check if session changed — ONLY if history.jsonl changed
+        if not history_changed:
+            continue
+
         old_session = project.session_id
         changed = project_manager.refresh_project_session(project)
 
@@ -1957,6 +1988,76 @@ EOF
 
 ---
 
+## Task 21: Add migration guide for existing users
+
+**Files:**
+- Modify: `docs/setup.md`
+
+**Step 1: Add migration section**
+
+```markdown
+## Migrating from Hooks (v1) to history.jsonl (v2)
+
+If you were using the previous version with hooks, follow these steps:
+
+### 1. Remove hooks from Claude settings
+
+Edit `~/.claude/settings.json` and remove the hooks section:
+
+```json
+{
+  "hooks": {
+    "session_start": "...",   // ← DELETE
+    "session_end": "..."      // ← DELETE
+  }
+}
+```
+
+### 2. Update bot
+
+```bash
+cd agent-tools/telegram-bridge
+git pull origin main
+./restart.sh
+```
+
+### 3. Reconnect projects
+
+Send `/start <project_name> <cwd>` in each Telegram chat to reconnect.
+The bot will auto-discover sessions from `~/.claude/history.jsonl`.
+
+### Rollback
+
+If you need to go back to hooks-based version:
+
+```bash
+git checkout with-hooks
+./restart.sh
+```
+
+Then restore the hooks in `~/.claude/settings.json`.
+```
+
+**Step 2: Commit**
+
+```bash
+git add docs/setup.md
+git commit -m "$(cat <<'EOF'
+docs(telegram-bridge): add migration guide for existing users
+
+- How to remove hooks from settings.json
+- How to update and reconnect
+- Rollback procedure to with-hooks branch
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
 ## Summary
 
 | Task | Description | Key Changes |
@@ -1968,8 +2069,8 @@ EOF
 | 5 | refresh_project_session | Read session_id from history.jsonl, compute jsonl_path |
 | 6 | HistoryWatcher | 15s polling, mtime optimization, auto-restart watcher |
 | 7 | /start command | Two-phase discovery: tmux (cwd/convention) + session (history.jsonl) |
-| 8 | restore_projects | Simplified, no hooks, uses refresh_project_session |
-| 9 | Remove hooks code | Deleted update_from_hook, handle_session_end, get_by_session |
+| 8 | restore_projects | Multi-tmux selection, sends keyboard to chat if >1 tmux |
+| 9 | Remove hooks code, add get_by_tmux | Delete old methods, add get_by_tmux for callbacks |
 | 10 | Remove HTTP server | No endpoints, no http_port, clean main() |
 | 11 | Deprecate hooks | Add notice, exit 0 |
 | 12 | Cleanup logic | By jsonl mtime (30 days), no last_activity tracking |
@@ -1981,6 +2082,7 @@ EOF
 | 18 | Error handling policy | Define error levels, graceful degradation |
 | 19 | Permission callback routing | Use tmux_session instead of session_id in callbacks |
 | 20 | Multiple tmux selection UI | Inline keyboard for user to choose tmux session |
+| 21 | Migration guide | How to migrate from hooks, rollback procedure |
 
 **Verification commands:**
 
