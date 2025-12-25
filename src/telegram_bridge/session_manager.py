@@ -426,4 +426,8 @@ class SessionManager:
         # Save cleaned config
         self._save()
 
+# Keep old manager for backwards compatibility during migration
 manager = SessionManager()
+
+# New project manager
+project_manager = ProjectManager()
