@@ -1,0 +1,70 @@
+"""Read session info from Claude's history.jsonl with incremental reading."""
+import json
+from pathlib import Path
+
+HISTORY_PATH = Path.home() / ".claude" / "history.jsonl"
+
+# State for incremental reading
+_last_size = 0
+_last_mtime = 0
+_session_cache: dict[str, str] = {}  # cwd -> session_id
+
+
+def find_session_for_project(cwd: str, history_path: Path = HISTORY_PATH) -> str | None:
+    """Find the most recent session_id for a project by cwd.
+
+    Uses incremental reading - only reads new lines since last check.
+    Detects file truncation and resets cache when needed.
+    """
+    global _last_size, _last_mtime, _session_cache
+
+    if not history_path.exists():
+        return _session_cache.get(cwd)
+
+    try:
+        stat = history_path.stat()
+        current_size = stat.st_size
+        current_mtime = stat.st_mtime
+
+        # Quick mtime check - no changes
+        if current_mtime == _last_mtime and current_size == _last_size:
+            return _session_cache.get(cwd)
+
+        # File truncated/recreated - reset cache and re-read from start
+        if current_size < _last_size:
+            _last_size = 0
+            _session_cache.clear()
+
+        # Read only new content
+        if current_size > _last_size:
+            with open(history_path, 'r') as f:
+                f.seek(_last_size)
+                new_content = f.read()
+            _last_size = current_size
+
+            # Parse new lines and update cache
+            for line in new_content.splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                    project = entry.get("project")
+                    session_id = entry.get("sessionId")
+                    if project and session_id:
+                        _session_cache[project] = session_id
+                except json.JSONDecodeError:
+                    continue  # Skip malformed lines
+
+        _last_mtime = current_mtime
+        return _session_cache.get(cwd)
+
+    except Exception:
+        return _session_cache.get(cwd)
+
+
+def reset_history_cache() -> None:
+    """Reset cache (for testing)."""
+    global _last_size, _last_mtime, _session_cache
+    _last_size = 0
+    _last_mtime = 0
+    _session_cache = {}
