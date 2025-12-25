@@ -119,3 +119,24 @@ def test_maybe_start_tasks_needs_both():
         mock_poller.assert_called_once()
 
     asyncio.run(run())
+
+
+def test_update_from_hook():
+    """update_from_hook sets Claude-related fields."""
+    pm = ProjectManager()
+
+    async def run():
+        project = await pm.update_from_hook(
+            session_id="abc-123",
+            cwd="/home/user/dev/test-project",
+            tmux_session="claude-test-project",
+            start_poller=AsyncMock(return_value=asyncio.current_task()),
+            start_watcher=AsyncMock(return_value=asyncio.current_task()),
+        )
+
+        assert project.project_name == "test-project"
+        assert project.claude_session_id == "abc-123"
+        assert project.tmux_session == "claude-test-project"
+        assert project.cwd == "/home/user/dev/test-project"
+
+    asyncio.run(run())

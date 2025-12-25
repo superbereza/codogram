@@ -138,6 +138,69 @@ class ProjectManager:
             if not project.watcher_task or project.watcher_task.done():
                 project.watcher_task = await start_watcher(project)
 
+    async def update_from_hook(
+        self,
+        session_id: str,
+        cwd: str,
+        tmux_session: str,
+        start_poller,
+        start_watcher,
+    ) -> ProjectState:
+        """Update project from Claude hook."""
+        project_name = get_project_name(Path(cwd))
+        project = self.get_or_create(project_name)
+
+        # Clear old session if different (prevents race with /new)
+        if project.claude_session_id and project.claude_session_id != session_id:
+            await self._stop_tasks(project)
+
+        project.cwd = cwd
+        project.tmux_session = tmux_session
+        project.claude_session_id = session_id
+        project.jsonl_path = self._find_jsonl(cwd, session_id)
+
+        await self._maybe_start_tasks(project, start_poller, start_watcher)
+        self._save()
+        return project
+
+    def _find_jsonl(self, cwd: str, session_id: str) -> str | None:
+        """Find jsonl file for session."""
+        project_hash = cwd.replace("/", "-")
+        projects_dir = Path.home() / ".claude" / "projects" / project_hash
+
+        if not projects_dir.exists():
+            return None
+
+        # Try exact match first
+        exact = projects_dir / f"{session_id}.jsonl"
+        if exact.exists():
+            return str(exact)
+
+        # Fallback to most recent
+        jsonl_files = sorted(projects_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
+        if jsonl_files:
+            return str(jsonl_files[-1])
+
+        return None
+
+    async def _stop_tasks(self, project: ProjectState) -> None:
+        """Stop running tasks."""
+        if project.poller_task:
+            project.poller_task.cancel()
+            try:
+                await project.poller_task
+            except asyncio.CancelledError:
+                pass
+            project.poller_task = None
+
+        if project.watcher_task:
+            project.watcher_task.cancel()
+            try:
+                await project.watcher_task
+            except asyncio.CancelledError:
+                pass
+            project.watcher_task = None
+
 class SessionManager:
     def __init__(self):
         self.sessions: dict[str, SessionState] = {}
