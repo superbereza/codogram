@@ -70,6 +70,23 @@
 
 ## Идеи / PoC
 
+- [ ] **Ultrathink mode** — `/ultrathink_mode` toggle, добавляет " ultrathink" к каждому сообщению
+  - Хранить в per-project settings
+  - Показывать статус при /start
+
+- [ ] **Settings command** — `/settings` показывает текущие настройки проекта
+  - ultrathink_mode: on/off
+  - silent_mode: on/off
+  - Остаток контекстного окна до compact (парсить из jsonl или tmux)
+  - Inline кнопки для toggle
+
+- [ ] **Context window indicator** — показывать сколько осталось до compact
+  - Парсить из jsonl (если есть) или tmux screen
+  - Показывать в /settings и/или в статусной строке
+
+- [ ] **Ctrl+B command** — `/ctrl_b` отправляет Ctrl+B в tmux
+  - Полезно для vim-mode или tmux prefix
+
 - [ ] **Silent push notifications** — тихие пуши на обычные сообщения, громкие на permissions и остановку
   - Обычные сообщения: `disable_notification=True`
   - Permissions, generation stopped: громкий пуш
