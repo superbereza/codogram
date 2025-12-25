@@ -9,23 +9,31 @@ from .tmux import TmuxSession
 
 @dataclass
 class ProjectState:
-    """Всё что знаем о проекте. Поля заполняются постепенно."""
+    """State for a single project."""
     project_name: str
-
-    # Telegram (появляется при /start)
     chat_id: int | None = None
-
-    # Filesystem
     cwd: str | None = None
 
-    # Tmux (появляется при /start или hook)
+    # Watcher (one active session_id)
+    session_id: str | None = None
+    jsonl_path: str | None = None
+    watcher_task: asyncio.Task | None = field(default=None, repr=False)
+
+    # Poller (one selected tmux)
     tmux_session: str | None = None
     poller_task: asyncio.Task | None = field(default=None, repr=False)
 
-    # Claude (появляется при hook)
-    claude_session_id: str | None = None
-    jsonl_path: str | None = None
-    watcher_task: asyncio.Task | None = field(default=None, repr=False)
+    # DEPRECATED fields (for backwards compat during migration)
+    # TODO: Remove after migration complete
+    @property
+    def claude_session_id(self) -> str | None:
+        """Alias for session_id (backwards compat)."""
+        return self.session_id
+
+    @claude_session_id.setter
+    def claude_session_id(self, value: str | None):
+        """Alias for session_id (backwards compat)."""
+        self.session_id = value
 
 class ProjectManager:
     """Manages ProjectState instances."""
