@@ -1,4 +1,6 @@
 # src/telegram_bridge/bot.py
+from pathlib import Path
+
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
@@ -363,10 +365,43 @@ async def on_message(message: Message):
     if not message.text:
         return
 
-    tmux = get_session_for_chat(message.chat.id)
+    chat_id = message.chat.id
+
+    # Check if we're in conversation flow
+    state = _start_state.get(chat_id)
+    if state:
+        if state["state"] == "awaiting_custom_path":
+            # User sent custom path
+            path = message.text.strip()
+            if not Path(path).expanduser().is_dir():
+                await message.answer(f"Директория `{path}` не существует.", parse_mode="Markdown")
+                return
+
+            # Save path and launch
+            manager.register_project(state["project"], chat_id, path=path)
+            _start_state.pop(chat_id, None)
+            await launch_claude(message, state["project"], str(Path(path).expanduser()))
+            return
+
+        elif state["state"] == "awaiting_clone_url":
+            # User sent clone URL
+            url = message.text.strip()
+            await message.answer("Клонирую репозиторий...")
+
+            result = git_clone(state["path"], url)
+            if not result.success:
+                await message.answer(f"Ошибка клонирования: {result.error}")
+                return
+
+            _start_state.pop(chat_id, None)
+            await launch_claude(message, state["project"], state["path"])
+            return
+
+    # Normal message - send to tmux
+    tmux = get_session_for_chat(chat_id)
     if tmux:
         tmux.send(message.text)
     else:
         # No active session - only respond in group chats
         if message.chat.id < 0:  # Negative IDs are groups/channels
-            await message.answer("No active Claude session. Start Claude in this project first.")
+            await message.answer("Нет активной сессии Claude. Используй /start для запуска.")
