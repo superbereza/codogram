@@ -71,14 +71,26 @@
 
 ## Новая архитектура
 
-### Мультисессии (структура готова, реализация на будущее)
+### Терминология
 
-Один project (cwd) может иметь **несколько активных Claude сессий**:
-- Основной Claude в `claude-personal-agent`
-- Второй Claude в `personal-agent`
-- Subagents (пишут в `agent-*.jsonl`)
+| Термин | Что это | Время жизни |
+|--------|---------|-------------|
+| **tmux_session** | tmux сессия (`claude-personal-agent`) | Долго (дни, недели) |
+| **session_id** | UUID сессии Claude | Меняется при /new, /compact, /resume |
 
-**MVP:** работаем с одной сессией. Структура данных (dict) готова к мультисессиям.
+**Связь:** Один tmux содержит много session_id за время жизни, но активный — всегда один.
+
+```
+tmux: claude-personal-agent
+  └── 10:00 — session_id: aaa (/new)
+  └── 11:00 — session_id: bbb (/compact)
+  └── 12:00 — session_id: ccc (/resume)
+  └── сейчас — ccc (активный)
+```
+
+### Мультисессии (future work)
+
+Один cwd может иметь несколько tmux сессий (разные контексты работы).
 
 **При обнаружении нескольких tmux:**
 ```
@@ -90,7 +102,9 @@
 ```
 Пользователь выбирает одну → подключаем только её.
 
-**Ключевой инсайт: независимость watcher и poller**
+**Несколько tmux одновременно — future work**, пока не понятен UX.
+
+### Независимость watcher и poller
 
 | Компонент | Использует | Для чего |
 |-----------|------------|----------|
@@ -99,37 +113,30 @@
 
 Им **не нужно знать друг о друге**. Связь session_id ↔ tmux_session не требуется!
 
-**Модель данных:**
+### Модель данных
 
 ```python
 @dataclass
-class SessionInfo:
-    """Информация об одной Claude сессии (для watcher)."""
-    session_id: str
-    jsonl_path: str | None = None
-    watcher_task: asyncio.Task | None = None
-    last_activity: float = 0  # timestamp последней активности
-
-@dataclass
 class ProjectState:
-    """Состояние проекта с поддержкой нескольких сессий."""
+    """Состояние проекта."""
     project_name: str
     chat_id: int | None = None
     cwd: str | None = None
 
-    # Watchers: session_id → SessionInfo (из history.jsonl)
-    sessions: dict[str, SessionInfo] = field(default_factory=dict)
+    # Watcher (один активный session_id)
+    session_id: str | None = None
+    jsonl_path: str | None = None
+    watcher_task: asyncio.Task | None = None
 
-    # Pollers: tmux_session → Task (найдены по cwd)
-    pollers: dict[str, asyncio.Task] = field(default_factory=dict)
+    # Poller (один выбранный tmux)
+    tmux_session: str | None = None
+    poller_task: asyncio.Task | None = None
 ```
 
 **Принципы:**
-- Watcher'ы работают параллельно, каждый следит за своим jsonl
-- Poller'ы работают параллельно, каждый следит за своим tmux
-- Связь между ними не нужна
-
-**Cleanup:** сессии без активности > 30 дней удаляются автоматически.
+- Один watcher на проект (следит за активным session_id)
+- Один poller на проект (следит за выбранным tmux)
+- При смене session_id (через periodic refresh) — перезапускаем watcher
 
 ### Источники данных
 
@@ -139,9 +146,26 @@ Persistent (config.json):
   - project_name → cwd
 
 Dynamic (computed):
-  - cwd → session_ids[]     ← history.jsonl (несколько!)
-  - cwd → tmux_sessions[]   ← tmux list-panes (несколько!)
-  - session_id → jsonl_path ← вычисляем
+  - cwd → session_id      ← history.jsonl (последний по timestamp)
+  - cwd → tmux_session    ← tmux list-panes (выбор если > 1)
+  - session_id → jsonl_path ← вычисляем по формуле
+```
+
+### Формат путей
+
+```
+~/.claude/
+├── history.jsonl                              # все сессии всех проектов
+└── projects/
+    └── {cwd.replace("/", "-")}/               # например: -home-user-dev-project
+        └── {session_id}.jsonl                 # например: c2698774-d17d-487a-bd78-29dc93adadd6.jsonl
+```
+
+**Формула jsonl_path:**
+```python
+def compute_jsonl_path(cwd: str, session_id: str) -> Path:
+    project_hash = cwd.replace("/", "-")
+    return Path.home() / ".claude" / "projects" / project_hash / f"{session_id}.jsonl"
 ```
 
 ### Поиск tmux по cwd
@@ -157,64 +181,58 @@ tmux list-panes -a -F "#{pane_current_path} #{session_name}" | grep "^$cwd "
 ```
 /start chat_id project_name cwd:
   1. Сохраняем в config
-  2. session_ids[] ← find_all_sessions(cwd)
-  3. tmux_sessions[] ← find_all_tmux_by_cwd(cwd)
 
-  4. Если tmux_sessions.length > 1:
-     - Показываем список с кнопками выбора
-     - Ждём выбора пользователя
-     - Продолжаем с выбранным tmux
+  # Discovery tmux (для poller)
+  2. tmux_list ← find_all_tmux_by_cwd(cwd)
+  3. Если len(tmux_list) == 0 → "Claude не найден в tmux"
+  4. Если len(tmux_list) == 1 → tmux_session = tmux_list[0]
+  5. Если len(tmux_list) > 1 → показываем выбор, ждём ответа
 
-  5. Для выбранного session_id (последний по timestamp):
-     - jsonl_path ← compute(cwd, session_id)
-     - Запускаем watcher если jsonl существует
+  # Discovery session (для watcher)
+  6. session_id ← find_latest_session(cwd)  # последний по timestamp
+  7. jsonl_path ← compute_jsonl_path(cwd, session_id)
 
-  6. Для выбранного tmux_session:
-     - Запускаем poller
+  # Start tasks
+  8. Запускаем poller(tmux_session)
+  9. Запускаем watcher(jsonl_path) если файл существует
 
 restore (при старте бота):
   Для каждого project в config:
-    - tmux ← find_tmux_by_convention(project_name)
+    - tmux_session ← find_tmux_by_convention(project_name) или первый найденный
     - session_id ← find_latest_session(cwd)
-    - Запускаем watcher + poller
+    - Запускаем watcher + poller (без UI выбора)
 
 periodic (каждые 15s):
   Для каждого активного project:
-    - Проверяем session_id в history.jsonl (изменился?)
-    - Если да → перезапускаем watcher
-    - Cleanup сессий старше 30 дней
+    - new_session_id ← find_latest_session(cwd)
+    - Если new_session_id != project.session_id:
+        - Останавливаем старый watcher
+        - Запускаем новый watcher
+        - Обновляем project.session_id
 ```
-
-**Примечание:** При restore не показываем выбор — берём по конвенции `claude-{project}` или первый найденный.
 
 ### Permission routing
 
-**MVP:** один poller → один источник permissions. Callback содержит `tmux_session`.
-
-**Мультисессии (будущее):** если несколько Claude просят permission одновременно, добавляем префикс:
-
-```
-[claude-personal-agent] Permission request:
-Bash: rm -rf /tmp/test
-[Allow] [Deny]
-
-[personal-agent] Permission request:
-Bash: git push
-[Allow] [Deny]
-```
+Один poller → один источник permissions. Callback содержит `tmux_session`.
 
 ### Оптимизация polling
 
 ```python
 last_mtime = 0
 last_size = 0
+session_cache: dict[str, str] = {}  # cwd → session_id
 
 def check_history():
     stat = history_path.stat()
 
     # Быстрая проверка — файл не изменился
     if stat.st_mtime == last_mtime:
-        return None
+        return session_cache
+
+    # Файл уменьшился (truncated/recreated) → сбрасываем
+    if stat.st_size < last_size:
+        last_size = 0
+        session_cache.clear()
 
     # Читаем только новые строки
     if stat.st_size > last_size:
@@ -222,9 +240,20 @@ def check_history():
             f.seek(last_size)
             new_lines = f.readlines()
         last_size = stat.st_size
-        # Парсим только новое
+
+        # Парсим с защитой от битого JSON
+        for line in new_lines:
+            try:
+                entry = json.loads(line)
+                cwd = entry.get("project")
+                session_id = entry.get("sessionId")
+                if cwd and session_id:
+                    session_cache[cwd] = session_id
+            except json.JSONDecodeError:
+                continue  # пропускаем битые строки
 
     last_mtime = stat.st_mtime
+    return session_cache
 ```
 
 Нагрузка: ~1 stat() каждые 15s на проект = ничто.
@@ -240,14 +269,34 @@ def check_history():
 
 ## Что добавляем
 
-1. `SessionInfo` dataclass — информация об одной сессии (session_id, watcher_task, last_activity)
-2. `ProjectState.sessions` — dict (готов к мультисессиям, MVP использует одну)
-3. `ProjectState.pollers` — dict (готов к мультисессиям, MVP использует один)
-4. `HistoryReader` — читает history.jsonl инкрементально, кэширует session_id по cwd
-5. `find_all_sessions_for_project(cwd)` — поиск ВСЕХ session_id по cwd
-6. `find_all_tmux_by_cwd(cwd)` — поиск ВСЕХ tmux сессий по cwd
-7. UI выбора tmux при /start (если найдено > 1)
-8. Periodic refresh task с cleanup старых сессий (30 дней)
+1. `ProjectState` упрощённый — session_id, jsonl_path, tmux_session, tasks
+2. `HistoryReader` — читает history.jsonl инкрементально, кэширует session_id по cwd
+3. `find_latest_session(cwd)` — последний session_id для cwd из history.jsonl
+4. `find_all_tmux_by_cwd(cwd)` — поиск tmux сессий по cwd
+5. `compute_jsonl_path(cwd, session_id)` — формула пути к jsonl
+6. UI выбора tmux при /start (если найдено > 1)
+7. Periodic refresh task (15s) — обновление session_id при смене
+
+### Cleanup
+
+Cleanup по mtime jsonl файла (не храним last_activity):
+
+```python
+def should_cleanup(jsonl_path: Path) -> bool:
+    if not jsonl_path.exists():
+        return True  # файл удалён
+    mtime = jsonl_path.stat().st_mtime
+    age_days = (time.time() - mtime) / 86400
+    return age_days > 30
+```
+
+При restore/periodic: если `should_cleanup(jsonl_path)` → не восстанавливаем/удаляем session_id.
+
+## Ограничения
+
+1. **Один Claude на tmux сессию** — split panes с несколькими Claude не поддерживаются
+2. **cwd фиксируется при /start** — команда `cd` внутри Claude не отслеживается
+3. **Session end не детектируется явно** — cleanup по mtime (30 дней)
 
 ## Риски
 
@@ -255,7 +304,9 @@ def check_history():
 2. **tmux list-panes формат изменится** — маловероятно, стабильный API
 3. **Большой history.jsonl** — читаем только новые строки (инкрементально)
 4. **Несколько tmux с одним cwd** — показываем UI выбора, пользователь решает
-5. **Session сменилась (/resume)** — periodic refresh подхватит через 15s
+5. **Session сменилась (/new, /resume)** — periodic refresh подхватит через 15s
+6. **history.jsonl truncated** — сбрасываем кэш и читаем заново
+7. **Битый JSON в history.jsonl** — пропускаем строку, продолжаем
 
 ## Миграция
 
