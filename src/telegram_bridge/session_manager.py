@@ -19,6 +19,26 @@ class SessionState:
     poller_task: asyncio.Task | None = field(default=None, repr=False)
     watcher_task: asyncio.Task | None = field(default=None, repr=False)
 
+@dataclass
+class ProjectState:
+    """Всё что знаем о проекте. Поля заполняются постепенно."""
+    project_name: str
+
+    # Telegram (появляется при /start)
+    chat_id: int | None = None
+
+    # Filesystem
+    cwd: str | None = None
+
+    # Tmux (появляется при /start или hook)
+    tmux_session: str | None = None
+    poller_task: asyncio.Task | None = field(default=None, repr=False)
+
+    # Claude (появляется при hook)
+    claude_session_id: str | None = None
+    jsonl_path: str | None = None
+    watcher_task: asyncio.Task | None = field(default=None, repr=False)
+
 class SessionManager:
     def __init__(self):
         self.sessions: dict[str, SessionState] = {}
