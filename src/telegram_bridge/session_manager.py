@@ -108,6 +108,36 @@ class ProjectManager:
                 return project
         return None
 
+    async def update_from_telegram(
+        self,
+        project_name: str,
+        chat_id: int,
+        cwd: str | None,
+        start_poller,
+        start_watcher,
+    ) -> ProjectState:
+        """Update project from /start command."""
+        project = self.get_or_create(project_name)
+        project.chat_id = chat_id
+        if cwd:
+            project.cwd = cwd
+
+        await self._maybe_start_tasks(project, start_poller, start_watcher)
+        self._save()
+        return project
+
+    async def _maybe_start_tasks(self, project: ProjectState, start_poller, start_watcher) -> None:
+        """Start tasks if all required data is present."""
+        # Poller: needs tmux_session + chat_id
+        if project.tmux_session and project.chat_id:
+            if not project.poller_task or project.poller_task.done():
+                project.poller_task = await start_poller(project)
+
+        # Watcher: needs jsonl_path + chat_id
+        if project.jsonl_path and project.chat_id:
+            if not project.watcher_task or project.watcher_task.done():
+                project.watcher_task = await start_watcher(project)
+
 class SessionManager:
     def __init__(self):
         self.sessions: dict[str, SessionState] = {}
