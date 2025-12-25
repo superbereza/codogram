@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
 from .config import settings
-from .session_manager import manager, project_manager, ProjectState
+from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 from .state import permission_messages
 from .project_launcher import (
@@ -144,43 +144,6 @@ async def launch_claude_new(message: Message, project: ProjectState, start_polle
     )
 
 
-async def launch_claude(message: Message, project_name: str, path: str):
-    """Launch Claude in tmux session."""
-    import asyncio
-    import subprocess
-
-    session_name = f"claude-{project_name}"
-    chat_id = message.chat.id
-
-    # Check if session already exists
-    if is_tmux_session_exists(session_name):
-        # Kill old session
-        subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True)
-
-    result = create_tmux_with_claude(session_name, path)
-
-    if not result.success:
-        await message.answer(f"Ошибка запуска: {result.error}")
-        return
-
-    await message.answer(
-        f"Claude запущен в `{session_name}`\n"
-        f"Подключиться: `tmux attach -t {session_name}`\n\n"
-        f"⏳ Ожидаю регистрацию сессии...",
-        parse_mode="Markdown",
-    )
-
-    # Wait for session to register (Claude's hook will call our HTTP endpoint)
-    for _ in range(30):  # 30 seconds timeout
-        await asyncio.sleep(1)
-        session = manager.get_session_by_chat(chat_id)
-        if session and session.poller_task and not session.poller_task.done():
-            await message.answer("✅ Сессия готова! Можешь писать.")
-            return
-
-    await message.answer("⚠️ Сессия не зарегистрировалась за 30 сек. Проверь tmux.")
-
-
 @router.callback_query(F.data == "start:create_dir")
 async def on_start_create_dir(callback: CallbackQuery):
     """Handle create directory button."""
@@ -247,7 +210,22 @@ async def on_start_git_init(callback: CallbackQuery):
         await callback.message.edit_text(f"Ошибка git init: {result.error}")
     else:
         await callback.message.edit_text("Git инициализирован. Запускаю Claude...")
-        await launch_claude(callback.message, state["project"], state["path"])
+
+        # Get or create project
+        project = project_manager.get_or_create(state["project"])
+        project.cwd = state["path"]
+
+        # Define task starters
+        bot = callback.bot
+        async def start_poller(p: ProjectState):
+            from .permission_poller import create_poller_task
+            return await create_poller_task(bot, p)
+
+        async def start_watcher(p: ProjectState):
+            from .watcher import create_watcher_task
+            return await create_watcher_task(bot, p)
+
+        await launch_claude_new(callback.message, project, start_poller, start_watcher)
 
     _start_state.pop(chat_id, None)
     await callback.answer()
@@ -295,7 +273,22 @@ async def on_start_gh_visibility(callback: CallbackQuery):
         await callback.message.edit_text(f"Ошибка: {result.error}")
     else:
         await callback.message.edit_text("Репозиторий создан. Запускаю Claude...")
-        await launch_claude(callback.message, state["project"], state["path"])
+
+        # Get or create project
+        project = project_manager.get_or_create(state["project"])
+        project.cwd = state["path"]
+
+        # Define task starters
+        bot = callback.bot
+        async def start_poller(p: ProjectState):
+            from .permission_poller import create_poller_task
+            return await create_poller_task(bot, p)
+
+        async def start_watcher(p: ProjectState):
+            from .watcher import create_watcher_task
+            return await create_watcher_task(bot, p)
+
+        await launch_claude_new(callback.message, project, start_poller, start_watcher)
 
     _start_state.pop(chat_id, None)
     await callback.answer()
@@ -338,7 +331,22 @@ async def on_start_no_git(callback: CallbackQuery):
         return
 
     await callback.message.edit_text("Запускаю Claude...")
-    await launch_claude(callback.message, state["project"], state["path"])
+
+    # Get or create project
+    project = project_manager.get_or_create(state["project"])
+    project.cwd = state["path"]
+
+    # Define task starters
+    bot = callback.bot
+    async def start_poller(p: ProjectState):
+        from .permission_poller import create_poller_task
+        return await create_poller_task(bot, p)
+
+    async def start_watcher(p: ProjectState):
+        from .watcher import create_watcher_task
+        return await create_watcher_task(bot, p)
+
+    await launch_claude_new(callback.message, project, start_poller, start_watcher)
 
     _start_state.pop(chat_id, None)
     await callback.answer()
@@ -466,10 +474,24 @@ async def on_message(message: Message):
                 await message.answer(f"Директория `{path}` не существует.", parse_mode="Markdown")
                 return
 
-            # Save path and launch
-            manager.register_project(state["project"], chat_id, path=path)
+            # Get or create project and save path
+            project = project_manager.get_or_create(state["project"])
+            project.chat_id = chat_id
+            project.cwd = str(Path(path).expanduser())
+            project_manager._save()
+
+            # Define task starters
+            bot = message.bot
+            async def start_poller(p: ProjectState):
+                from .permission_poller import create_poller_task
+                return await create_poller_task(bot, p)
+
+            async def start_watcher(p: ProjectState):
+                from .watcher import create_watcher_task
+                return await create_watcher_task(bot, p)
+
             _start_state.pop(chat_id, None)
-            await launch_claude(message, state["project"], str(Path(path).expanduser()))
+            await launch_claude_new(message, project, start_poller, start_watcher)
             return
 
         elif state["state"] == "awaiting_clone_url":
@@ -482,8 +504,22 @@ async def on_message(message: Message):
                 await message.answer(f"Ошибка клонирования: {result.error}")
                 return
 
+            # Get or create project
+            project = project_manager.get_or_create(state["project"])
+            project.cwd = state["path"]
+
+            # Define task starters
+            bot = message.bot
+            async def start_poller(p: ProjectState):
+                from .permission_poller import create_poller_task
+                return await create_poller_task(bot, p)
+
+            async def start_watcher(p: ProjectState):
+                from .watcher import create_watcher_task
+                return await create_watcher_task(bot, p)
+
             _start_state.pop(chat_id, None)
-            await launch_claude(message, state["project"], state["path"])
+            await launch_claude_new(message, project, start_poller, start_watcher)
             return
 
     # Normal message - send to tmux
