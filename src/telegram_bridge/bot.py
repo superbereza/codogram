@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
 from .config import settings
-from .session_manager import manager
+from .session_manager import manager, project_manager, ProjectState
 from .tmux import TmuxSession
 from .state import permission_messages
 from .project_launcher import (
@@ -45,43 +45,53 @@ def is_admin(user_id: int) -> bool:
 
 def get_session_for_chat(chat_id: int) -> TmuxSession | None:
     """Get TmuxSession for chat_id."""
-    session = manager.get_session_by_chat(chat_id)
-    if session:
-        return TmuxSession(session.tmux_session, session.cwd)
+    project = project_manager.get_by_chat(chat_id)
+    if project and project.tmux_session:
+        return TmuxSession(project.tmux_session, project.cwd or "/tmp")
     return None
 
 @router.message(Command("start"))
 async def cmd_start(message: Message):
+    import asyncio
+
     if not is_admin(message.from_user.id):
         return
 
     chat_id = message.chat.id
-
-    # Auto-register project by chat title
     project_name = message.chat.title
+
     if not project_name:
         await message.answer("Эта команда работает только в групповых чатах с названием проекта.")
         return
 
-    # Register project if not exists
-    existing_chat = manager.get_chat_id(project_name)
-    if not existing_chat:
-        manager.register_project(project_name, chat_id)
+    # Get or create project
+    project = project_manager.get_or_create(project_name)
+    project.chat_id = chat_id
 
-    # Check if Claude already running
-    session = manager.get_session_by_chat(chat_id)
-    if session and session.poller_task and not session.poller_task.done():
-        tmux = TmuxSession(session.tmux_session, session.cwd)
-        if is_tmux_session_exists(session.tmux_session):
-            text = f"Claude активен.\nПроект: `{session.project_name}`\nПодключиться: `{tmux.attach_command()}`"
-            try:
-                await message.answer(text, parse_mode="Markdown")
-            except Exception:
-                await message.answer(text)
-            return
+    # Define task starters
+    bot = message.bot
+    async def start_poller(p: ProjectState) -> asyncio.Task:
+        from .permission_poller import create_poller_task
+        return await create_poller_task(bot, p)
 
-    # Resolve project path
-    custom_path = manager.get_project_path(project_name)
+    async def start_watcher(p: ProjectState) -> asyncio.Task:
+        from .watcher import create_watcher_task
+        return await create_watcher_task(bot, p)
+
+    # Case 1: Claude already running - connect
+    if project.claude_session_id:
+        await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
+        project_manager._save()
+        tmux = TmuxSession(project.tmux_session, project.cwd or "/tmp")
+        await message.answer(
+            f"Claude активен в `{project.tmux_session}`\n"
+            f"Подключиться: `{tmux.attach_command()}`",
+            parse_mode="Markdown",
+        )
+        return
+
+    # Resolve path
+    custom_path = project.cwd
     path_result = resolve_project_path(project_name, custom_path)
 
     if not path_result.exists:
@@ -99,7 +109,38 @@ async def cmd_start(message: Message):
         return
 
     # Directory exists - launch Claude
-    await launch_claude(message, project_name, path_result.path)
+    project.cwd = path_result.path
+    await launch_claude_new(message, project, start_poller, start_watcher)
+
+
+async def launch_claude_new(message: Message, project: ProjectState, start_poller, start_watcher):
+    """Launch Claude in tmux session using new ProjectState."""
+    import asyncio
+    import subprocess
+
+    convention = f"claude-{project.project_name}"
+
+    # Case 2: Our tmux exists - reuse
+    if project.tmux_session == convention and is_tmux_session_exists(convention):
+        subprocess.run(["tmux", "send-keys", "-t", convention, "claude", "Enter"], capture_output=True)
+    # Case 3: Foreign tmux - create new alongside
+    elif project.tmux_session and project.tmux_session != convention and is_tmux_session_exists(project.tmux_session):
+        create_tmux_with_claude(convention, project.cwd)
+        project.tmux_session = convention
+    # Case 4: No tmux - create
+    else:
+        create_tmux_with_claude(convention, project.cwd)
+        project.tmux_session = convention
+
+    await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
+    project_manager._save()
+
+    await message.answer(
+        f"Claude запущен в `{project.tmux_session}`\n"
+        f"Подключиться: `tmux attach -t {project.tmux_session}`\n\n"
+        f"⏳ Ожидаю регистрацию...",
+        parse_mode="Markdown",
+    )
 
 
 async def launch_claude(message: Message, project_name: str, path: str):
