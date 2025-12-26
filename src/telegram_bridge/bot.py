@@ -210,92 +210,37 @@ async def _connect_or_launch(message: Message, project: ProjectState):
         await message.answer("✅ Подключено! Ожидаю Claude сессию...")
 
 
-async def _start_with_explicit_args(message: Message, project_name: str, cwd: str):
-    """Handle /start with explicit project_name and cwd (backwards compat)."""
-    import asyncio
-
-    chat_id = message.chat.id
-    project = project_manager.get_or_create(project_name)
-    project.chat_id = chat_id
-    project.cwd = cwd
-
-    # Discover tmux
-    from .tmux import find_all_tmux_by_cwd, find_tmux_by_convention
-    tmux_list = find_all_tmux_by_cwd(cwd)
-
-    if len(tmux_list) == 0:
-        tmux_by_convention = find_tmux_by_convention(project_name)
-        if tmux_by_convention:
-            project.tmux_session = tmux_by_convention
-            await message.answer(f"Found tmux by convention: {tmux_by_convention}")
-        else:
-            await message.answer(f"⚠️ No tmux session found for {cwd}")
-    elif len(tmux_list) == 1:
-        project.tmux_session = tmux_list[0]
-        await message.answer(f"Connected to tmux: {tmux_list[0]}")
-    else:
-        keyboard = create_tmux_selection_keyboard(tmux_list, project_name)
-        await message.answer(
-            f"Multiple tmux sessions found for {cwd}:\n\nSelect:",
-            reply_markup=keyboard
-        )
-        project_manager._save()
-        return
-
-    # Discover session
-    project_manager.refresh_project_session(project)
-    if project.session_id:
-        await message.answer(f"Found session: {project.session_id[:8]}...")
-    else:
-        await message.answer("No active Claude session (will auto-discover)")
-
-    # Start tasks
-    bot = message.bot
-    async def start_poller(p: ProjectState) -> asyncio.Task:
-        from .permission_poller import create_poller_task
-        return await create_poller_task(bot, p)
-
-    async def start_watcher(p: ProjectState) -> asyncio.Task:
-        from .watcher import create_watcher_task
-        return await create_watcher_task(bot, p)
-
-    await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
-    project_manager._save()
-
-
 @router.message(Command("start"))
 async def cmd_start(message: Message):
-    """Start command - auto-detect project or show status."""
+    """Start command - auto-detect project or show status.
+
+    Usage:
+        /start              - auto-detect from chat or ask for project name
+        /start <project>    - start with specific project
+    """
     if not is_admin(message.from_user.id):
         return
 
     chat_id = message.chat.id
     args = message.text.split()[1:]  # Skip /start
 
-    # Case 1: Explicit args provided (backwards compat)
-    if len(args) >= 2:
-        await _start_with_explicit_args(message, args[0], args[1])
-        return
-
-    # Case 2: Single arg = project name
-    if len(args) == 1:
+    # Case 1: Project name provided
+    if args:
         project_name = args[0]
         project = project_manager.get_or_create(project_name)
         project.chat_id = chat_id
         await _start_project_flow(message, project)
         return
 
-    # Case 3: No args - auto-detect from chat
+    # Case 2: No args - auto-detect from chat
     project_name, project = get_project_for_chat(chat_id)
 
     if project and is_claude_running(project):
-        # Active session - show status
         await show_status(message, project)
         return
 
-    if project_name:
-        # Known project - continue flow
-        await _start_project_flow(message, project or project_manager.get_or_create(project_name))
+    if project:
+        await _start_project_flow(message, project)
         return
 
     # Unknown chat - ask for project name
