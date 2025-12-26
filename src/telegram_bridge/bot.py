@@ -221,10 +221,11 @@ async def _connect_or_launch(message: Message, project: ProjectState):
     await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
     project_manager._save()
 
-    if project.session_id:
-        await message.answer(f"Подключено. Сессия: `{project.session_id[:8]}...`", parse_mode="Markdown")
-    else:
-        await message.answer("Подключено. Ожидание сессии Claude.")
+    await message.answer(
+        f"Claude запущен в `{project.tmux_session}`\n"
+        f"Подключиться: `tmux attach -t {project.tmux_session}`",
+        parse_mode="Markdown",
+    )
 
 
 @router.message(Command("start"))
@@ -315,8 +316,7 @@ async def launch_claude_new(message: Message, project: ProjectState, start_polle
 
     await message.answer(
         f"Claude запущен в `{project.tmux_session}`\n"
-        f"Подключиться: `tmux attach -t {project.tmux_session}`\n\n"
-        f"Ожидание регистрации сессии.",
+        f"Подключиться: `tmux attach -t {project.tmux_session}`",
         parse_mode="Markdown",
     )
 
@@ -673,10 +673,11 @@ async def on_tmux_selected(callback: CallbackQuery):
     await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
     project_manager._save()
 
-    if project.session_id:
-        await callback.message.answer(f"Сессия: `{project.session_id[:8]}...`", parse_mode="Markdown")
-    else:
-        await callback.message.answer("Сессия Claude не найдена. Автоматическое обнаружение активно.")
+    await callback.message.answer(
+        f"Claude запущен в `{project.tmux_session}`\n"
+        f"Подключиться: `tmux attach -t {project.tmux_session}`",
+        parse_mode="Markdown",
+    )
 
 
 @router.callback_query(F.data == "start:launch_claude")
