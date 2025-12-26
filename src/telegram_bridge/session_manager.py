@@ -60,22 +60,13 @@ class ProjectManager:
 
     def _save(self) -> None:
         """Persist to disk."""
-        # Projects (permanent)
         self._config["projects"] = {
             name: {"chat_id": p.chat_id, "cwd": p.cwd}
             for name, p in self.projects.items()
             if p.chat_id is not None
         }
-        # Sessions (temporary)
-        self._config["sessions"] = {
-            name: {
-                "tmux_session": p.tmux_session,
-                "claude_session_id": p.claude_session_id,
-                "jsonl_path": p.jsonl_path,
-            }
-            for name, p in self.projects.items()
-            if p.claude_session_id is not None
-        }
+        # Remove sessions - no longer needed
+        self._config.pop("sessions", None)
         save_config(self._config)
 
     def get_or_create(self, project_name: str) -> ProjectState:
@@ -88,13 +79,6 @@ class ProjectManager:
         """Find project by chat_id."""
         for project in self.projects.values():
             if project.chat_id == chat_id:
-                return project
-        return None
-
-    def get_by_session(self, session_id: str) -> ProjectState | None:
-        """Find project by claude_session_id."""
-        for project in self.projects.values():
-            if project.claude_session_id == session_id:
                 return project
         return None
 
@@ -162,31 +146,6 @@ class ProjectManager:
             if not project.watcher_task or project.watcher_task.done():
                 project.watcher_task = await start_watcher(project)
 
-    async def update_from_hook(
-        self,
-        session_id: str,
-        cwd: str,
-        tmux_session: str,
-        start_poller,
-        start_watcher,
-    ) -> ProjectState:
-        """Update project from Claude hook."""
-        project_name = get_project_name(Path(cwd))
-        project = self.get_or_create(project_name)
-
-        # Clear old session if different (prevents race with /new)
-        if project.claude_session_id and project.claude_session_id != session_id:
-            await self._stop_tasks(project)
-
-        project.cwd = cwd
-        project.tmux_session = tmux_session
-        project.claude_session_id = session_id
-        project.jsonl_path = self._find_jsonl(cwd, session_id)
-
-        await self._maybe_start_tasks(project, start_poller, start_watcher)
-        self._save()
-        return project
-
     def _find_jsonl(self, cwd: str, session_id: str) -> str | None:
         """Find jsonl file for session."""
         project_hash = cwd.replace("/", "-")
@@ -224,26 +183,6 @@ class ProjectManager:
             except asyncio.CancelledError:
                 pass
             project.watcher_task = None
-
-    async def handle_session_end(self, session_id: str) -> None:
-        """Handle Claude session end."""
-        project = self.get_by_session(session_id)
-        if not project:
-            return
-
-        # Race condition protection: ignore if session_id changed
-        if project.claude_session_id != session_id:
-            return
-
-        # Clear Claude-related fields
-        project.claude_session_id = None
-        project.jsonl_path = None
-
-        # Stop tasks
-        await self._stop_tasks(project)
-
-        # Keep: chat_id, cwd, tmux_session
-        self._save()
 
     async def restore_projects(self, bot, start_poller, start_watcher) -> None:
         """Restore sessions from history.jsonl after bot restart."""
