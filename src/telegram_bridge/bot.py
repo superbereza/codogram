@@ -763,7 +763,14 @@ async def on_message(message: Message):
             await launch_claude_new(message, project, start_poller, start_watcher)
             return
 
-    # Normal message - send to tmux
+    # Normal message - check session and send to tmux
+    project = project_manager.get_by_chat(chat_id)
+    if project:
+        # Check if session changed (user might have done /new in tmux)
+        from .history_watcher import check_session_for_project
+        start_poller, start_watcher = _make_task_starters(message.bot)
+        await check_session_for_project(project, message.bot, start_poller, start_watcher)
+
     tmux = get_session_for_chat(chat_id)
     if tmux:
         tmux.send(message.text)

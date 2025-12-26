@@ -45,26 +45,15 @@ class HistoryWatcher:
 
             await asyncio.sleep(REFRESH_INTERVAL)
 
-    # NOTE: Runs every 15s. Tmux check runs always, session check only on mtime change.
-
     async def _check_for_changes(self):
-        """Check tmux health (always) and session changes (on mtime change)."""
+        """Check tmux health for all projects."""
         from .session_manager import should_cleanup_project
 
-        # Check mtime for session changes (optimized)
-        history_changed = False
-        if HISTORY_PATH.exists():
-            mtime = HISTORY_PATH.stat().st_mtime
-            if mtime != self._last_mtime:
-                self._last_mtime = mtime
-                history_changed = True
-
-        # Check each project
         for project in list(self.project_manager.projects.values()):
             if not project.chat_id or not project.cwd:
                 continue
 
-            # 1. Check if should cleanup (inactive > 30 days) — ALWAYS
+            # 1. Check if should cleanup (inactive > 30 days)
             if should_cleanup_project(project):
                 logger.info("project_cleanup", extra={"project": project.project_name, "reason": "inactive_30_days"})
                 if project.watcher_task:
@@ -74,12 +63,11 @@ class HistoryWatcher:
                 del self.project_manager.projects[project.project_name]
                 continue
 
-            # 2. Check if tmux died — ALWAYS (every 15s)
+            # 2. Check if tmux died
             if project.tmux_session:
                 tmux = TmuxSession(project.tmux_session, project.cwd)
                 if not tmux.exists():
                     logger.warning("tmux_died", extra={"project": project.project_name, "tmux": project.tmux_session})
-                    # Notify user
                     try:
                         await self.bot.send_message(
                             project.chat_id,
@@ -95,29 +83,35 @@ class HistoryWatcher:
                         project.poller_task = None
                     project.tmux_session = None
                     project.session_id = None
-                    continue
 
-            # 3. Check if session changed — ONLY if history.jsonl changed
-            if not history_changed:
-                continue
 
-            old_session = project.session_id
-            changed = self.project_manager.refresh_project_session(project)
+async def check_session_for_project(project: ProjectState, bot: Bot, start_poller, start_watcher) -> None:
+    """Check if session changed for a project and restart watcher if needed.
 
-            if changed:
-                logger.info("session_changed", extra={
-                    "project": project.project_name,
-                    "old_session": old_session[:8] if old_session else None,
-                    "new_session": project.session_id[:8] if project.session_id else None,
-                })
+    Call this when user sends a message to ensure watcher tracks current session.
+    """
+    from .session_manager import project_manager
 
-                # Cancel old watcher FIRST (before starting new)
-                if project.watcher_task:
-                    project.watcher_task.cancel()
-                    project.watcher_task = None
+    if not project.chat_id or not project.cwd:
+        return
 
-                # Now start new tasks
-                await self.project_manager._maybe_start_tasks(project, self.start_poller, self.start_watcher)
+    old_session = project.session_id
+    changed = project_manager.refresh_project_session(project)
+
+    if changed:
+        logger.info("session_changed", extra={
+            "project": project.project_name,
+            "old_session": old_session[:8] if old_session else None,
+            "new_session": project.session_id[:8] if project.session_id else None,
+        })
+
+        # Cancel old watcher FIRST
+        if project.watcher_task:
+            project.watcher_task.cancel()
+            project.watcher_task = None
+
+        # Start new tasks
+        await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
 
 
 async def create_history_watcher(bot: Bot, start_poller, start_watcher) -> HistoryWatcher:
