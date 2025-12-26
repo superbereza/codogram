@@ -40,7 +40,7 @@ class HistoryWatcher:
             try:
                 await self._check_for_changes()
             except Exception as e:
-                print(f"HistoryWatcher error: {e}")
+                logger.error("watch_loop_error", extra={"error": str(e)})
 
             await asyncio.sleep(REFRESH_INTERVAL)
 

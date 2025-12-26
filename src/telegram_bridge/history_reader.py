@@ -78,7 +78,8 @@ def find_session_for_project(cwd: str, history_path: Path = HISTORY_PATH) -> str
         _last_mtime = current_mtime
         return _session_cache.get(cwd)
 
-    except Exception:
+    except Exception as e:
+        logger.warning("history_read_error", extra={"error": str(e)})
         return _session_cache.get(cwd)
 
 
