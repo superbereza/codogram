@@ -7,7 +7,6 @@ class Settings(BaseSettings):
     telegram_token: str
     admin_ids: str  # Comma-separated list of admin user IDs
     base_dir: str  # e.g. /home/user/dev
-    http_port: int = 8787
 
     class Config:
         env_file = ".env"
@@ -25,7 +24,7 @@ def load_config() -> dict:
     """Load .config.json or return default."""
     if CONFIG_PATH.exists():
         return json.loads(CONFIG_PATH.read_text())
-    return {"projects": {}, "sessions": {}}
+    return {"projects": {}}
 
 def save_config(config: dict) -> None:
     """Save config to .config.json."""
