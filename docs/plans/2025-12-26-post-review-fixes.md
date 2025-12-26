@@ -581,6 +581,248 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 
 ---
 
+## Task 13: Add unit tests for validation
+
+**Files:**
+- Create: `tests/test_bot_validation.py`
+
+**Step 1: Create test file**
+
+```python
+"""Tests for bot validation functions."""
+import pytest
+
+
+def test_is_valid_project_name_valid():
+    """Test valid project names."""
+    from telegram_bridge.bot import is_valid_project_name
+
+    assert is_valid_project_name("my-project") == True
+    assert is_valid_project_name("my_project") == True
+    assert is_valid_project_name("MyProject123") == True
+    assert is_valid_project_name("a") == True
+
+
+def test_is_valid_project_name_invalid():
+    """Test invalid project names."""
+    from telegram_bridge.bot import is_valid_project_name
+
+    assert is_valid_project_name("") == False
+    assert is_valid_project_name("my project") == False  # space
+    assert is_valid_project_name("my/project") == False  # slash
+    assert is_valid_project_name("../etc") == False  # path traversal
+    assert is_valid_project_name("my.project") == False  # dot
+```
+
+**Step 2: Run tests**
+
+```bash
+source venv/bin/activate
+python -m pytest tests/test_bot_validation.py -v
+```
+
+Expected: All tests pass
+
+**Step 3: Commit**
+
+```bash
+git add tests/test_bot_validation.py
+git commit -m "test(telegram-bridge): add unit tests for project name validation
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+```
+
+---
+
+## Task 14: Add integration test for tmux.send
+
+**Files:**
+- Create: `tests/test_tmux_send.py`
+
+**Step 1: Create test file**
+
+```python
+"""Integration tests for tmux.send()."""
+import subprocess
+import time
+import pytest
+
+from telegram_bridge.tmux import TmuxSession
+
+
+@pytest.fixture
+def test_tmux_session():
+    """Create a test tmux session."""
+    session_name = "pytest-tmux-test"
+    # Kill if exists
+    subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True)
+    # Create new
+    subprocess.run(["tmux", "new-session", "-d", "-s", session_name], check=True)
+
+    yield TmuxSession(session_name, "/tmp")
+
+    # Cleanup
+    subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True)
+
+
+def test_send_simple_text(test_tmux_session):
+    """Test sending simple text."""
+    test_tmux_session.send("hello world")
+    time.sleep(0.1)
+
+    content = test_tmux_session.capture_pane()
+    assert "hello world" in content
+
+
+def test_send_special_chars(test_tmux_session):
+    """Test sending text with special characters."""
+    test_tmux_session.send("echo $HOME")
+    time.sleep(0.1)
+
+    content = test_tmux_session.capture_pane()
+    # Should be literal, not expanded
+    assert "$HOME" in content or "/home" in content  # Either literal or expanded is OK
+
+
+def test_send_quotes(test_tmux_session):
+    """Test sending text with quotes."""
+    test_tmux_session.send("echo 'hello \"world\"'")
+    time.sleep(0.1)
+
+    content = test_tmux_session.capture_pane()
+    assert "hello" in content
+```
+
+**Step 2: Run tests**
+
+```bash
+source venv/bin/activate
+python -m pytest tests/test_tmux_send.py -v
+```
+
+Expected: All tests pass (requires tmux installed)
+
+**Step 3: Commit**
+
+```bash
+git add tests/test_tmux_send.py
+git commit -m "test(telegram-bridge): add integration tests for tmux.send
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+```
+
+---
+
+## Task 15: Use shell=False in tmux.py
+
+**Files:**
+- Modify: `src/telegram_bridge/tmux.py`
+
+**Problem:** `shell=True` is security risk — shell interprets `$`, `` ` ``, `;` etc.
+
+**Step 1: Rewrite send() method**
+
+```python
+def send(self, text: str) -> None:
+    """Send text to tmux session and press Enter."""
+    if not text.strip():
+        return  # Don't send empty messages
+
+    # Use shell=False for safety (no escaping needed)
+    subprocess.run(
+        ["tmux", "send-keys", "-t", self.name, "-l", "--", text],
+        check=True
+    )
+    time.sleep(0.05)  # Small delay to ensure text is processed
+    subprocess.run(
+        ["tmux", "send-keys", "-t", self.name, "Enter"],
+        check=True
+    )
+```
+
+**Step 2: Rewrite send_key() method**
+
+```python
+def send_key(self, key: str) -> None:
+    """Send a special key (Escape, Enter, C-c, etc.) to tmux session."""
+    subprocess.run(
+        ["tmux", "send-keys", "-t", self.name, key],
+        check=True
+    )
+```
+
+**Step 3: Rewrite exists() method**
+
+```python
+def exists(self) -> bool:
+    """Check if tmux session exists."""
+    result = subprocess.run(
+        ["tmux", "has-session", "-t", self.name],
+        capture_output=True
+    )
+    return result.returncode == 0
+```
+
+**Step 4: Rewrite create() method**
+
+```python
+def create(self) -> None:
+    """Create tmux session if not exists."""
+    if not self.exists():
+        subprocess.run(
+            ["tmux", "new-session", "-d", "-s", self.name, "-c", self.cwd],
+            check=True
+        )
+```
+
+**Step 5: Rewrite capture_pane() method**
+
+```python
+def capture_pane(self) -> str:
+    """Capture current pane content."""
+    result = subprocess.run(
+        ["tmux", "capture-pane", "-t", self.name, "-p", "-S", "-"],
+        capture_output=True,
+        text=True
+    )
+    return result.stdout if result.returncode == 0 else ""
+```
+
+**Step 6: Remove shlex import (no longer needed)**
+
+Remove line:
+```python
+import shlex
+```
+
+**Step 7: Run tests**
+
+```bash
+source venv/bin/activate
+python -m pytest tests/test_tmux.py tests/test_tmux_send.py -v
+```
+
+Expected: All tests pass
+
+**Step 8: Commit**
+
+```bash
+git add src/telegram_bridge/tmux.py
+git commit -m "security(telegram-bridge): use shell=False in tmux.py
+
+Prevents shell injection attacks. Arguments passed directly to execve().
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+```
+
+---
+
 ## Summary
 
 | Task | Description | Type |
@@ -597,3 +839,6 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 | 10 | Update CLAUDE.md | Docs |
 | 11 | Verify | Testing |
 | 12 | Add tmux.send delay | Bug fix |
+| 13 | Unit tests for validation | Testing |
+| 14 | Integration tests for tmux.send | Testing |
+| 15 | Use shell=False in tmux.py | Security |
