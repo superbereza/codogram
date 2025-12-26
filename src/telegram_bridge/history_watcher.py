@@ -4,6 +4,8 @@ from aiogram import Bot
 
 from .session_manager import project_manager, ProjectState
 from .history_reader import HISTORY_PATH
+from .logging_config import logger
+from .tmux import TmuxSession
 
 REFRESH_INTERVAL = 15  # seconds
 
@@ -58,11 +60,30 @@ class HistoryWatcher:
             if not project.chat_id or not project.cwd:
                 continue
 
+            # Check if tmux session still exists
+            if project.tmux_session and isinstance(project.tmux_session, str):
+                tmux = TmuxSession(project.tmux_session, project.cwd)
+                if not tmux.exists():
+                    logger.warning(
+                        "tmux_died",
+                        extra={
+                            "project": project.project_name,
+                            "tmux": project.tmux_session
+                        }
+                    )
+
             old_session = project.session_id
             changed = project_manager.refresh_project_session(project)
 
             if changed:
-                print(f"HistoryWatcher: session changed for {project.project_name}: {old_session} -> {project.session_id}")
+                logger.info(
+                    "session_changed",
+                    extra={
+                        "project": project.project_name,
+                        "old_session": old_session[:8] if old_session else None,
+                        "new_session": project.session_id[:8] if project.session_id else None,
+                    }
+                )
 
                 # Save reference to old watcher
                 old_watcher = project.watcher_task

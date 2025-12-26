@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+from .logging_config import logger
+
 HISTORY_PATH = Path.home() / ".claude" / "history.jsonl"
 
 # State for incremental reading.
@@ -53,9 +55,8 @@ def find_session_for_project(cwd: str, history_path: Path = HISTORY_PATH) -> str
             _last_size = current_size
 
             # Parse new lines and update cache
-            for line in new_content.splitlines():
-                if not line.strip():
-                    continue
+            new_lines = [line for line in new_content.splitlines() if line.strip()]
+            for line in new_lines:
                 try:
                     entry = json.loads(line)
                     project = entry.get("project")
@@ -63,7 +64,16 @@ def find_session_for_project(cwd: str, history_path: Path = HISTORY_PATH) -> str
                     if project and session_id:
                         _session_cache[project] = session_id
                 except json.JSONDecodeError:
+                    logger.warning("json_decode_error", extra={"line": line[:50]})
                     continue  # Skip malformed lines
+
+            logger.debug(
+                "history_read",
+                extra={
+                    "new_lines": len(new_lines),
+                    "cache_size": len(_session_cache)
+                }
+            )
 
         _last_mtime = current_mtime
         return _session_cache.get(cwd)

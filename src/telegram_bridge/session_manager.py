@@ -8,6 +8,7 @@ from .config import settings, load_config, save_config
 from .project_resolver import get_project_name
 from .tmux import TmuxSession
 from .history_reader import find_session_for_project, compute_jsonl_path
+from .logging_config import logger
 
 def should_cleanup_project(project: 'ProjectState') -> bool:
     """Check if project should be cleaned up (inactive > 30 days).
@@ -175,8 +176,23 @@ class ProjectManager:
             if not project.chat_id or not project.cwd:
                 continue
 
+            # Check if project should be cleaned up
+            if should_cleanup_project(project):
+                logger.info(
+                    "project_cleanup",
+                    extra={
+                        "project": project.project_name,
+                        "reason": "inactive_30_days"
+                    }
+                )
+                # Remove from projects dict
+                self.projects.pop(project.project_name, None)
+                continue
+
             # 1. Find session_id from history.jsonl
             self.refresh_project_session(project)
+
+            logger.info("project_restored", extra={"project": project.project_name})
 
             # 2. Find tmux by cwd or convention
             if not project.tmux_session:
