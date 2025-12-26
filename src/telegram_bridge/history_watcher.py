@@ -111,11 +111,13 @@ class HistoryWatcher:
                     "new_session": project.session_id[:8] if project.session_id else None,
                 })
 
-                # Start new before stop old (avoid message loss)
-                old_watcher = project.watcher_task
+                # Cancel old watcher FIRST (before starting new)
+                if project.watcher_task:
+                    project.watcher_task.cancel()
+                    project.watcher_task = None
+
+                # Now start new tasks
                 await self.project_manager._maybe_start_tasks(project, self.start_poller, self.start_watcher)
-                if old_watcher:
-                    old_watcher.cancel()
 
 
 async def create_history_watcher(bot: Bot, start_poller, start_watcher) -> HistoryWatcher:
