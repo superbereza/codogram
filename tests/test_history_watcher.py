@@ -21,25 +21,37 @@ async def test_history_watcher_detects_session_change():
     watcher = HistoryWatcher(bot, start_poller, start_watcher)
 
     # Mock project_manager with a test project
-    with patch('telegram_bridge.history_watcher.project_manager') as mock_pm:
-        mock_project = MagicMock()
-        mock_project.chat_id = 123
-        mock_project.cwd = "/test/path"
-        mock_project.session_id = "old-session"
-        mock_project.watcher_task = None
-        mock_pm.projects = {"test": mock_project}
-        mock_pm.refresh_project_session.return_value = True  # Session changed
-        mock_pm._maybe_start_tasks = AsyncMock()  # Mock as async
+    mock_project = MagicMock()
+    mock_project.chat_id = 123
+    mock_project.cwd = "/test/path"
+    mock_project.session_id = "old-session"
+    mock_project.tmux_session = "test-tmux"
+    mock_project.watcher_task = None
+    mock_project.poller_task = None
 
-        with patch('telegram_bridge.history_watcher.HISTORY_PATH') as mock_path:
-            mock_path.exists.return_value = True
-            mock_path.stat.return_value.st_mtime = 12345
+    # Create a mock project_manager
+    mock_pm = MagicMock()
+    mock_pm.projects = {"test": mock_project}
+    mock_pm.refresh_project_session.return_value = True  # Session changed
+    mock_pm._maybe_start_tasks = AsyncMock()  # Mock as async
 
-            await watcher._check_for_changes()
+    # Replace watcher's project_manager
+    watcher.project_manager = mock_pm
 
-            # Should have called refresh and _maybe_start_tasks
-            mock_pm.refresh_project_session.assert_called_once_with(mock_project)
-            mock_pm._maybe_start_tasks.assert_called_once()
+    with patch('telegram_bridge.history_watcher.HISTORY_PATH') as mock_path:
+        mock_path.exists.return_value = True
+        mock_path.stat.return_value.st_mtime = 12345
+
+        # Mock should_cleanup_project (imported inside the method) and TmuxSession
+        with patch('telegram_bridge.session_manager.should_cleanup_project', return_value=False):
+            with patch('telegram_bridge.history_watcher.TmuxSession') as mock_tmux:
+                mock_tmux.return_value.exists.return_value = True
+
+                await watcher._check_for_changes()
+
+                # Should have called refresh and _maybe_start_tasks
+                mock_pm.refresh_project_session.assert_called_once_with(mock_project)
+                mock_pm._maybe_start_tasks.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_history_watcher_skips_when_no_change():
