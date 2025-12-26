@@ -94,7 +94,17 @@ def reset_history_cache() -> None:
 def compute_jsonl_path(cwd: str, session_id: str) -> Path:
     """Compute jsonl path from cwd and session_id.
 
-    Formula: ~/.claude/projects/{cwd.replace("/", "-")}/{session_id}.jsonl
+    Formula: ~/.claude/projects/{normalized_cwd.replace("/", "-")}/{session_id}.jsonl
+
+    Normalization:
+    - Remove trailing slashes (except for root "/")
+    - Collapse double slashes
+    - Do NOT resolve symlinks (match Claude behavior)
     """
-    project_hash = cwd.replace("/", "-")
+    # Normalize path
+    normalized = cwd.rstrip("/") or "/"  # Preserve "/" for root
+    while "//" in normalized:
+        normalized = normalized.replace("//", "/")
+
+    project_hash = normalized.replace("/", "-")
     return Path.home() / ".claude" / "projects" / project_hash / f"{session_id}.jsonl"

@@ -117,3 +117,21 @@ def test_compute_jsonl_path_root():
     result = compute_jsonl_path("/", "test-session")
     expected = Path.home() / ".claude" / "projects" / "-" / "test-session.jsonl"
     assert result == expected
+
+def test_compute_jsonl_path_trailing_slash():
+    """Trailing slash should be normalized."""
+    result1 = compute_jsonl_path("/home/user/project", "abc")
+    result2 = compute_jsonl_path("/home/user/project/", "abc")
+    assert result1 == result2
+
+def test_compute_jsonl_path_double_slash():
+    """Double slashes should be normalized."""
+    result1 = compute_jsonl_path("/home/user/project", "abc")
+    result2 = compute_jsonl_path("/home//user//project", "abc")
+    assert result1 == result2
+
+def test_compute_jsonl_path_symlink_not_resolved():
+    """Symlinks should NOT be resolved (match Claude behavior)."""
+    # Claude uses raw cwd, not resolved path
+    result = compute_jsonl_path("/home/user/link-to-project", "abc")
+    assert "-home-user-link-to-project" in str(result)
