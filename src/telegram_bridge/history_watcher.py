@@ -101,8 +101,10 @@ class HistoryWatcher:
                     project.watcher_task.cancel()
                     project.watcher_task = None
 
+                # Only send missed if this is a REAL session change
+                send_missed = old_session is not None
                 await self.project_manager._maybe_start_tasks(
-                    project, self.start_poller, self.start_watcher, send_missed=True
+                    project, self.start_poller, self.start_watcher, send_missed=send_missed
                 )
 
 
@@ -131,8 +133,10 @@ async def check_session_for_project(project: ProjectState, bot: Bot, start_polle
             project.watcher_task.cancel()
             project.watcher_task = None
 
-        # Start new tasks with send_missed=True
-        await project_manager._maybe_start_tasks(project, start_poller, start_watcher, send_missed=True)
+        # Only send missed if this is a REAL session change (old_session was not None)
+        # If old_session is None, this is just initial discovery after bot restart
+        send_missed = old_session is not None
+        await project_manager._maybe_start_tasks(project, start_poller, start_watcher, send_missed=send_missed)
 
 
 async def create_history_watcher(bot: Bot, start_poller, start_watcher) -> HistoryWatcher:
