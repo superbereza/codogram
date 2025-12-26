@@ -270,12 +270,16 @@ class ProjectManager:
                 else:
                     # Multiple tmux - send selection keyboard to chat
                     keyboard = create_tmux_selection_keyboard(tmux_list, project.project_name)
-                    await bot.send_message(
-                        project.chat_id,
-                        f"🔄 Bot restarted. Multiple tmux sessions found for {project.project_name}:\n\n"
-                        "Select which one to connect:",
-                        reply_markup=keyboard
-                    )
+                    try:
+                        await bot.send_message(
+                            project.chat_id,
+                            f"🔄 Bot restarted. Multiple tmux sessions found for {project.project_name}:\n\n"
+                            "Select which one to connect:",
+                            reply_markup=keyboard
+                        )
+                    except Exception:
+                        # If message fails, skip this project (user can reconnect manually)
+                        pass
                     continue  # Don't start tasks, wait for selection
 
             # 3. Start tasks if ready
