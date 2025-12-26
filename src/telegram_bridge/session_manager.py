@@ -245,50 +245,41 @@ class ProjectManager:
         # Keep: chat_id, cwd, tmux_session
         self._save()
 
-    async def restore_projects(self, start_poller, start_watcher) -> None:
-        """Restore sessions from config after bot restart."""
-        # First: restore from saved sessions
-        saved_sessions = self._config.get("sessions", {})
+    async def restore_projects(self, bot, start_poller, start_watcher) -> None:
+        """Restore sessions from history.jsonl after bot restart."""
+        from .tmux import find_all_tmux_by_cwd, find_tmux_by_convention
+        from .tmux_selector import create_tmux_selection_keyboard
 
-        for project_name, data in saved_sessions.items():
-            project = self.get_or_create(project_name)
-
-            tmux_session = data.get("tmux_session")
-            if not tmux_session:
+        for project in list(self.projects.values()):  # Copy to allow removal
+            if not project.chat_id or not project.cwd:
                 continue
 
-            # Check if tmux is alive
-            tmux = TmuxSession(tmux_session, project.cwd or "/tmp")
-            if not tmux.exists():
-                continue
+            # 1. Find session_id from history.jsonl
+            self.refresh_project_session(project)
 
-            # Restore session data
-            project.tmux_session = tmux_session
-            project.claude_session_id = data.get("claude_session_id")
-            project.jsonl_path = data.get("jsonl_path")
+            # 2. Find tmux by cwd or convention
+            if not project.tmux_session:
+                tmux_list = find_all_tmux_by_cwd(project.cwd)
+                if len(tmux_list) == 1:
+                    project.tmux_session = tmux_list[0]
+                elif len(tmux_list) == 0:
+                    # Fallback to convention
+                    tmux_by_convention = find_tmux_by_convention(project.project_name)
+                    if tmux_by_convention:
+                        project.tmux_session = tmux_by_convention
+                else:
+                    # Multiple tmux - send selection keyboard to chat
+                    keyboard = create_tmux_selection_keyboard(tmux_list, project.project_name)
+                    await bot.send_message(
+                        project.chat_id,
+                        f"🔄 Bot restarted. Multiple tmux sessions found for {project.project_name}:\n\n"
+                        "Select which one to connect:",
+                        reply_markup=keyboard
+                    )
+                    continue  # Don't start tasks, wait for selection
 
-            # Verify jsonl exists, try to find if missing
-            if project.jsonl_path and not Path(project.jsonl_path).exists():
-                project.jsonl_path = None
-            if not project.jsonl_path and project.cwd and project.claude_session_id:
-                project.jsonl_path = self._find_jsonl(project.cwd, project.claude_session_id)
-
+            # 3. Start tasks if ready
             await self._maybe_start_tasks(project, start_poller, start_watcher)
-
-        # Second: check tmux by convention for projects with chat_id
-        for project in self.projects.values():
-            if not project.chat_id:
-                continue
-            if project.poller_task and not project.poller_task.done():
-                continue  # Already running
-
-            # Check tmux by convention (try both patterns)
-            for pattern in [f"claude-{project.project_name}", project.project_name]:
-                tmux = TmuxSession(pattern, project.cwd or "/tmp")
-                if tmux.exists():
-                    project.tmux_session = pattern
-                    await self._maybe_start_tasks(project, start_poller, start_watcher)
-                    break
 
         self._save()
 
