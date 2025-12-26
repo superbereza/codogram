@@ -86,6 +86,26 @@ def is_claude_running(project: ProjectState) -> bool:
 
     return True
 
+async def show_status(message: Message, project: ProjectState):
+    """Show status of active Claude session."""
+    status_lines = [
+        f"**Claude активен**",
+        f"",
+        f"Проект: `{project.project_name}`",
+        f"Путь: `{project.cwd}`",
+        f"Tmux: `{project.tmux_session}`",
+    ]
+
+    if project.session_id:
+        status_lines.append(f"Session: `{project.session_id[:8]}...`")
+
+    status_lines.extend([
+        "",
+        f"Подключиться: `tmux attach -t {project.tmux_session}`",
+    ])
+
+    await message.answer("\n".join(status_lines), parse_mode="Markdown")
+
 @router.message(Command("start"))
 async def cmd_start(message: Message):
     """Start command - setup project and discover tmux + session."""
