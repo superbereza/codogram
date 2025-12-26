@@ -3,18 +3,19 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
-def permission_keyboard(options: list[str]) -> InlineKeyboardMarkup:
+def permission_keyboard(options: list[str], tmux_session: str) -> InlineKeyboardMarkup:
     """Build inline keyboard from permission options.
 
     Args:
         options: List of permission options in format ["1. Yes", "2. No", ...]
+        tmux_session: Tmux session name for stable routing
 
     Returns:
         InlineKeyboardMarkup with buttons for each option (max 3) plus Cancel
 
     Example:
         >>> options = ["1. Yes", "2. Yes, allow all", "3. No"]
-        >>> keyboard = permission_keyboard(options)
+        >>> keyboard = permission_keyboard(options, "claude-myproject")
         >>> # Creates buttons: "Yes", "Yes, allow all", "No", "❌ Cancel"
     """
     buttons = []
@@ -25,13 +26,13 @@ def permission_keyboard(options: list[str]) -> InlineKeyboardMarkup:
         label = opt.split(".", 1)[1].strip()[:20]  # Truncate label
         buttons.append([InlineKeyboardButton(
             text=label,
-            callback_data=f"perm:{num}"
+            callback_data=f"perm:{num}:{tmux_session}"
         )])
 
     # Always add Esc button
     buttons.append([InlineKeyboardButton(
         text="❌ Cancel",
-        callback_data="perm:esc"
+        callback_data=f"perm:esc:{tmux_session}"
     )])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)

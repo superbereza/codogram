@@ -143,7 +143,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
                         except Exception:
                             pass
 
-                        kb = permission_keyboard(parsed.options)
+                        kb = permission_keyboard(parsed.options, project.tmux_session)
                         kb_msg = await bot.send_message(
                             chat_id, "👆", reply_markup=kb
                         )
@@ -217,7 +217,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
                     except Exception:
                         pass
 
-                    kb = permission_keyboard(parsed.options)
+                    kb = permission_keyboard(parsed.options, project.tmux_session)
                     kb_msg = await bot.send_message(
                         chat_id, "👆", reply_markup=kb
                     )

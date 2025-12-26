@@ -434,6 +434,27 @@ async def on_permission_callback(callback: CallbackQuery):
         await callback.answer("Not authorized")
         return
 
+    # Parse callback data: perm:{action}:{tmux_session}
+    parts = callback.data.split(":", 2)
+    if len(parts) < 3:
+        await callback.answer("Invalid callback format")
+        return
+
+    action = parts[1]
+    tmux_session = parts[2]
+
+    # Protection: project not found
+    project = project_manager.get_by_tmux(tmux_session)
+    if not project:
+        await callback.answer("Session not found")
+        return
+
+    # Protection: tmux no longer exists
+    tmux = TmuxSession(tmux_session, project.cwd or "/tmp")
+    if not tmux.exists():
+        await callback.answer("Tmux session closed")
+        return
+
     chat_id = callback.message.chat.id
     kb_msg_id = callback.message.message_id
 
@@ -452,14 +473,10 @@ async def on_permission_callback(callback: CallbackQuery):
         pass
 
     # Send key to tmux
-    action = callback.data.split(":")[1]
-    tmux = get_session_for_chat(chat_id)
-
-    if tmux:
-        if action == "esc":
-            tmux.send_key("Escape")
-        else:
-            tmux.send_key(action)
+    if action == "esc":
+        tmux.send_key("Escape")
+    else:
+        tmux.send_key(action)
 
     await callback.answer()
 
