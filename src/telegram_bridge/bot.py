@@ -107,8 +107,107 @@ async def show_status(message: Message, project: ProjectState):
     await message.answer("\n".join(status_lines), parse_mode="Markdown")
 
 async def _start_project_flow(message: Message, project: ProjectState):
-    """Main flow: resolve path → check exists → launch or ask. TODO: implement in Task 6"""
-    await message.answer(f"Starting project flow for {project.project_name}... (not yet implemented)")
+    """Main flow: resolve path → check exists → launch or ask."""
+    chat_id = message.chat.id
+    project.chat_id = chat_id
+
+    # Resolve path: saved cwd or convention ~/dev/{project_name}
+    if project.cwd:
+        path = project.cwd
+        exists = Path(path).is_dir()
+    else:
+        path_result = resolve_project_path(project.project_name, None)
+        path = path_result.path
+        exists = path_result.exists
+
+    if exists:
+        # Directory exists - discover tmux and launch/connect
+        project.cwd = path
+        await _connect_or_launch(message, project)
+    else:
+        # Directory doesn't exist - ask what to do
+        _start_state[chat_id] = {
+            "state": "awaiting_dir_choice",
+            "project": project.project_name,
+            "path": path,
+        }
+        await message.answer(
+            f"Директория `{path}` не найдена.\n\nЧто делать?",
+            reply_markup=dir_not_found_keyboard(),
+            parse_mode="Markdown",
+        )
+
+    project_manager._save()
+
+
+async def _connect_or_launch(message: Message, project: ProjectState):
+    """Connect to existing tmux or offer to launch new Claude session."""
+    import asyncio
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    chat_id = message.chat.id
+    cwd = project.cwd
+
+    # Discover tmux
+    from .tmux import find_all_tmux_by_cwd, find_tmux_by_convention
+    tmux_list = find_all_tmux_by_cwd(cwd)
+
+    if len(tmux_list) == 0:
+        # No tmux found - check by convention
+        tmux_by_convention = find_tmux_by_convention(project.project_name)
+        if tmux_by_convention:
+            project.tmux_session = tmux_by_convention
+            await message.answer(f"Connected to tmux: {tmux_by_convention}")
+        else:
+            # No tmux at all - offer to create
+            _start_state[chat_id] = {
+                "state": "awaiting_launch_confirm",
+                "project": project.project_name,
+                "path": cwd,
+            }
+            await message.answer(
+                f"Claude не запущен в `{cwd}`.\n\nЗапустить?",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [
+                        InlineKeyboardButton(text="Да, запустить", callback_data="start:launch_claude"),
+                        InlineKeyboardButton(text="Нет", callback_data="start:cancel"),
+                    ]
+                ]),
+                parse_mode="Markdown",
+            )
+            return
+    elif len(tmux_list) == 1:
+        project.tmux_session = tmux_list[0]
+        await message.answer(f"Connected to tmux: {tmux_list[0]}")
+    else:
+        # Multiple - let user choose
+        keyboard = create_tmux_selection_keyboard(tmux_list, project.project_name)
+        await message.answer(
+            f"Multiple tmux sessions found:\n\nSelect:",
+            reply_markup=keyboard
+        )
+        project_manager._save()
+        return
+
+    # Discover session and start tasks
+    project_manager.refresh_project_session(project)
+
+    bot = message.bot
+    async def start_poller(p: ProjectState) -> asyncio.Task:
+        from .permission_poller import create_poller_task
+        return await create_poller_task(bot, p)
+
+    async def start_watcher(p: ProjectState) -> asyncio.Task:
+        from .watcher import create_watcher_task
+        return await create_watcher_task(bot, p)
+
+    await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
+    project_manager._save()
+
+    if project.session_id:
+        await message.answer(f"✅ Подключено! Session: {project.session_id[:8]}...")
+    else:
+        await message.answer("✅ Подключено! Ожидаю Claude сессию...")
 
 
 async def _start_with_explicit_args(message: Message, project_name: str, cwd: str):
