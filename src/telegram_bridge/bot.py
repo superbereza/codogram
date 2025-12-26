@@ -66,6 +66,26 @@ def get_project_for_chat(chat_id: int) -> tuple[str | None, ProjectState | None]
     # No project found for this chat
     return None, None
 
+def is_claude_running(project: ProjectState) -> bool:
+    """Check if Claude is running for project.
+
+    Returns True if:
+    - tmux session exists
+    - poller_task is running (not None and not done)
+    """
+    if not project or not project.tmux_session:
+        return False
+
+    # Check tmux exists
+    if not is_tmux_session_exists(project.tmux_session):
+        return False
+
+    # Check poller is running
+    if not project.poller_task or project.poller_task.done():
+        return False
+
+    return True
+
 @router.message(Command("start"))
 async def cmd_start(message: Message):
     """Start command - setup project and discover tmux + session."""
