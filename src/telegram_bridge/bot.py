@@ -709,6 +709,50 @@ async def on_tmux_selected(callback: CallbackQuery):
         await callback.message.answer("No active Claude session found (will auto-discover)")
 
 
+@router.callback_query(F.data == "start:launch_claude")
+async def on_start_launch_claude(callback: CallbackQuery):
+    """Handle launch Claude button."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    chat_id = callback.message.chat.id
+    state = _start_state.get(chat_id)
+    if not state:
+        await callback.answer("Сессия истекла, начни заново с /start")
+        return
+
+    await callback.message.edit_text("Запускаю Claude...")
+
+    project = project_manager.get_or_create(state["project"])
+    project.chat_id = chat_id
+    project.cwd = state["path"]
+
+    # Define task starters
+    bot = callback.bot
+    async def start_poller(p: ProjectState):
+        from .permission_poller import create_poller_task
+        return await create_poller_task(bot, p)
+
+    async def start_watcher(p: ProjectState):
+        from .watcher import create_watcher_task
+        return await create_watcher_task(bot, p)
+
+    await launch_claude_new(callback.message, project, start_poller, start_watcher)
+
+    _start_state.pop(chat_id, None)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "start:cancel")
+async def on_start_cancel(callback: CallbackQuery):
+    """Handle cancel button."""
+    chat_id = callback.message.chat.id
+    _start_state.pop(chat_id, None)
+    await callback.message.edit_text("Отменено.")
+    await callback.answer()
+
+
 @router.message()
 async def on_message(message: Message):
     if not is_admin(message.from_user.id):
