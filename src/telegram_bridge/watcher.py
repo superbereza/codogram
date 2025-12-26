@@ -160,11 +160,13 @@ async def watch_jsonl(path: Path, poll_interval: float = 0.5) -> AsyncIterator[P
 
         await asyncio.sleep(poll_interval)
 
-async def create_watcher_task(bot: Bot, project: ProjectState) -> asyncio.Task:
+async def create_watcher_task(bot: Bot, project: ProjectState,
+                              send_missed: bool = False) -> asyncio.Task:
     """Create watcher task for project."""
-    return asyncio.create_task(watcher_for_session(bot, project))
+    return asyncio.create_task(watcher_for_session(bot, project, send_missed))
 
-async def watcher_for_session(bot: Bot, project: ProjectState):
+async def watcher_for_session(bot: Bot, project: ProjectState,
+                              send_missed: bool = False):
     """Watch jsonl for specific project."""
     if not project.jsonl_path:
         logger.warning(f"Watcher: no jsonl_path for project {project.project_name}")
@@ -174,6 +176,29 @@ async def watcher_for_session(bot: Bot, project: ProjectState):
     chat_id = project.chat_id
 
     logger.info(f"Watcher started: watching {path} for chat {chat_id}")
+
+    # Send missed entries if requested
+    if send_missed and path.exists():
+        missed = find_missed_entries(path)
+        if missed:
+            logger.info(f"Sending {len(missed)} missed entries for {project.project_name}")
+            for entry in missed:
+                try:
+                    if entry.content_type == ContentType.TEXT:
+                        for chunk in chunk_message(entry.text):
+                            try:
+                                await bot.send_message(chat_id, f"● {chunk}", parse_mode="Markdown")
+                            except Exception:
+                                await bot.send_message(chat_id, f"● {chunk}")
+
+                    elif entry.content_type == ContentType.TOOL_USE:
+                        text = format_tool_use(entry.tool_name, entry.tool_input)
+                        try:
+                            await bot.send_message(chat_id, text, parse_mode="Markdown")
+                        except Exception:
+                            await bot.send_message(chat_id, f"● {entry.tool_name}")
+                except Exception as e:
+                    logger.warning(f"Error sending missed entry: {e}")
 
     async for entry in watch_jsonl(path):
         try:
