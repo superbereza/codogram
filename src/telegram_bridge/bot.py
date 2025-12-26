@@ -52,6 +52,20 @@ def get_session_for_chat(chat_id: int) -> TmuxSession | None:
         return TmuxSession(project.tmux_session, project.cwd or "/tmp")
     return None
 
+def get_project_for_chat(chat_id: int) -> tuple[str | None, ProjectState | None]:
+    """Get project name and state for chat.
+
+    Returns:
+        (project_name, project_state) - project_state may be None if not yet created
+    """
+    # Check if chat already has a project
+    project = project_manager.get_by_chat(chat_id)
+    if project:
+        return project.project_name, project
+
+    # No project found for this chat
+    return None, None
+
 @router.message(Command("start"))
 async def cmd_start(message: Message):
     """Start command - setup project and discover tmux + session."""
