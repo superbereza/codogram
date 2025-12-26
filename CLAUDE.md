@@ -15,7 +15,7 @@ Telegram bot for managing Claude Code sessions through Telegram:
 
 ### How sessions are discovered
 
-1. User sends `/start <project_name> <cwd>` in Telegram
+1. User sends `/start` or `/start <project_name>` in Telegram
 2. Bot discovers tmux session by scanning all tmux panes for matching cwd
 3. Bot polls `~/.claude/history.jsonl` every 15s to find session_id for that project
 4. Bot monitors both tmux (for permission prompts) and jsonl (for tool calls)
@@ -57,7 +57,8 @@ agent-tools/telegram-bridge/
 
 ```bash
 # In Telegram:
-/start myproject /path/to/project
+/start              # Auto-detect or ask for project name
+/start myproject    # Start with specific project
 ```
 
 ### Debugging
