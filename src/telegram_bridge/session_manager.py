@@ -146,26 +146,6 @@ class ProjectManager:
             if not project.watcher_task or project.watcher_task.done():
                 project.watcher_task = await start_watcher(project)
 
-    def _find_jsonl(self, cwd: str, session_id: str) -> str | None:
-        """Find jsonl file for session."""
-        project_hash = cwd.replace("/", "-")
-        projects_dir = Path.home() / ".claude" / "projects" / project_hash
-
-        if not projects_dir.exists():
-            return None
-
-        # Try exact match first
-        exact = projects_dir / f"{session_id}.jsonl"
-        if exact.exists():
-            return str(exact)
-
-        # Fallback to most recent
-        jsonl_files = sorted(projects_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
-        if jsonl_files:
-            return str(jsonl_files[-1])
-
-        return None
-
     async def _stop_tasks(self, project: ProjectState) -> None:
         """Stop running tasks."""
         if project.poller_task:
