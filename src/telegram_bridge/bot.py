@@ -587,7 +587,24 @@ async def on_restart_confirm(callback: CallbackQuery):
         return
 
     # Stop tasks
-    await project_manager._stop_tasks(project)
+    import asyncio
+    # Stop poller task
+    if project.poller_task and not project.poller_task.done():
+        project.poller_task.cancel()
+        try:
+            await project.poller_task
+        except asyncio.CancelledError:
+            pass
+        project.poller_task = None
+
+    # Stop watcher task
+    if project.watcher_task and not project.watcher_task.done():
+        project.watcher_task.cancel()
+        try:
+            await project.watcher_task
+        except asyncio.CancelledError:
+            pass
+        project.watcher_task = None
 
     # Kill tmux if exists
     if project.tmux_session and is_tmux_session_exists(project.tmux_session):
