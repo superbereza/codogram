@@ -30,6 +30,18 @@
 
 ## Backlog
 
+### Auto-accept mode
+Автоматическое разрешение всех permission prompts:
+- `/auto_accept_mode on|off` команда для включения/выключения
+- Поле `auto_accept` в ProjectState (per-project setting)
+- Когда включено: автоматически отвечает "y" на все permission prompts
+- **Обязательно:** вести лог авто-разрешенных запросов
+  - Логировать только запросы на действие (не ответы на вопросы)
+  - Формат: timestamp, project, tool_name, arguments summary
+  - Уровень: INFO в общий лог
+- UI: показывать статус в /status
+- Безопасность: только для доверенных проектов
+
 ### Voice → Whisper
 Голосовые сообщения через Whisper transcription:
 - Используем существующий код из bz-merch-assistant

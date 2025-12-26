@@ -266,7 +266,19 @@ async def cmd_start(message: Message):
         await _start_project_flow(message, project)
         return
 
-    # Unknown chat - ask for project name
+    # Case 3: New chat - use chat title as project name
+    chat_title = message.chat.title
+    if chat_title:
+        # Sanitize title to valid project name (replace spaces with -, remove invalid chars)
+        sanitized = re.sub(r'[^a-zA-Z0-9_-]', '-', chat_title)
+        sanitized = re.sub(r'-+', '-', sanitized).strip('-')  # Collapse multiple dashes
+        if sanitized and is_valid_project_name(sanitized):
+            project = project_manager.get_or_create(sanitized)
+            project.chat_id = chat_id
+            await _start_project_flow(message, project)
+            return
+
+    # Fallback: ask for project name (private chat or invalid title)
     _start_state[chat_id] = {"state": "awaiting_project_name"}
     await message.answer(
         "Отправь имя проекта (например: `my-project`):",
