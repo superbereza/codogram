@@ -54,23 +54,62 @@ def get_session_for_chat(chat_id: int) -> TmuxSession | None:
 
 @router.message(Command("start"))
 async def cmd_start(message: Message):
+    """Start command - setup project and discover tmux + session."""
     import asyncio
 
     if not is_admin(message.from_user.id):
         return
 
-    chat_id = message.chat.id
-    project_name = message.chat.title
-
-    if not project_name:
-        await message.answer("Эта команда работает только в групповых чатах с названием проекта.")
+    # Parse args
+    args = message.text.split()[1:]  # Skip /start
+    if len(args) < 2:
+        await message.answer("Usage: /start <project_name> <cwd>")
         return
 
-    # Get or create project
-    project = project_manager.get_or_create(project_name)
-    project.chat_id = chat_id
+    project_name = args[0]
+    cwd = args[1]
 
-    # Define task starters
+    # Save to config
+    project = project_manager.get_or_create(project_name)
+    project.chat_id = message.chat.id
+    project.cwd = cwd
+
+    # Phase 1: Discover tmux (for poller)
+    from .tmux import find_all_tmux_by_cwd, find_tmux_by_convention
+    tmux_list = find_all_tmux_by_cwd(cwd)
+
+    if len(tmux_list) == 0:
+        # Fallback to convention
+        tmux_by_convention = find_tmux_by_convention(project_name)
+        if tmux_by_convention:
+            project.tmux_session = tmux_by_convention
+            await message.answer(f"Found tmux by convention: {tmux_by_convention}")
+        else:
+            await message.answer(f"⚠️ No tmux session found for {cwd}")
+            # Still save and continue - user might start tmux later
+    elif len(tmux_list) == 1:
+        project.tmux_session = tmux_list[0]
+        await message.answer(f"Connected to tmux: {tmux_list[0]}")
+    else:
+        # Multiple tmux - show selection keyboard
+        keyboard = create_tmux_selection_keyboard(tmux_list, project_name)
+        await message.answer(
+            f"Multiple tmux sessions found for {cwd}:\n\n"
+            "Select which one to connect:",
+            reply_markup=keyboard
+        )
+        project_manager._save()
+        return  # Wait for callback, don't start tasks yet
+
+    # Phase 2: Discover session_id (for watcher)
+    project_manager.refresh_project_session(project)
+    if project.session_id:
+        await message.answer(f"Found session: {project.session_id[:8]}...")
+    else:
+        await message.answer("No active Claude session found (will auto-discover)")
+
+    # Start tasks
+    # Define task starters (same pattern as existing code)
     bot = message.bot
     async def start_poller(p: ProjectState) -> asyncio.Task:
         from .permission_poller import create_poller_task
@@ -80,51 +119,8 @@ async def cmd_start(message: Message):
         from .watcher import create_watcher_task
         return await create_watcher_task(bot, p)
 
-    # Case 1: Claude session registered - connect
-    if project.claude_session_id:
-        await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
-        project_manager._save()
-        tmux = TmuxSession(project.tmux_session, project.cwd or "/tmp")
-        await message.answer(
-            f"Claude активен в `{project.tmux_session}`\n"
-            f"Подключиться: `{tmux.attach_command()}`",
-            parse_mode="Markdown",
-        )
-        return
-
-    # Case 2: tmux exists but no session registered - just connect poller
-    if project.tmux_session and is_tmux_session_exists(project.tmux_session):
-        await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
-        project_manager._save()
-        tmux = TmuxSession(project.tmux_session, project.cwd or "/tmp")
-        await message.answer(
-            f"Подключен к `{project.tmux_session}`\n"
-            f"Подключиться: `{tmux.attach_command()}`",
-            parse_mode="Markdown",
-        )
-        return
-
-    # Resolve path
-    custom_path = project.cwd
-    path_result = resolve_project_path(project_name, custom_path)
-
-    if not path_result.exists:
-        # Directory doesn't exist - ask what to do
-        _start_state[chat_id] = {
-            "state": "awaiting_dir_choice",
-            "project": project_name,
-            "path": path_result.path,
-        }
-        await message.answer(
-            f"Директория `{path_result.path}` не найдена.",
-            reply_markup=dir_not_found_keyboard(),
-            parse_mode="Markdown",
-        )
-        return
-
-    # Directory exists - launch Claude
-    project.cwd = path_result.path
-    await launch_claude_new(message, project, start_poller, start_watcher)
+    await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
+    project_manager._save()
 
 
 async def launch_claude_new(message: Message, project: ProjectState, start_poller, start_watcher):
