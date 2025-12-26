@@ -24,6 +24,7 @@ from .start_flow import (
     git_visibility_keyboard,
     restart_confirm_keyboard,
 )
+from .tmux_selector import create_tmux_selection_keyboard
 
 # Conversation state: chat_id -> {"state": str, "project": str, "path": str, ...}
 _start_state: dict[int, dict] = {}
@@ -465,6 +466,43 @@ async def on_permission_callback(callback: CallbackQuery):
             tmux.send_key(action)
 
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("select_tmux:"))
+async def on_tmux_selected(callback: CallbackQuery):
+    """Handle tmux selection callback."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    _, project_name, tmux_session = callback.data.split(":", 2)
+
+    project = project_manager.get_or_create(project_name)
+    project.tmux_session = tmux_session
+
+    await callback.message.edit_text(f"✅ Connected to tmux: {tmux_session}")
+    await callback.answer()
+
+    # Define task starters
+    bot = callback.bot
+    async def start_poller(p: ProjectState):
+        from .permission_poller import create_poller_task
+        return await create_poller_task(bot, p)
+
+    async def start_watcher(p: ProjectState):
+        from .watcher import create_watcher_task
+        return await create_watcher_task(bot, p)
+
+    # Refresh session and start tasks
+    project_manager.refresh_project_session(project)
+    await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
+    project_manager._save()
+
+    if project.session_id:
+        await callback.message.answer(f"Found session: {project.session_id[:8]}...")
+    else:
+        await callback.message.answer("No active Claude session found (will auto-discover)")
+
 
 @router.message()
 async def on_message(message: Message):
