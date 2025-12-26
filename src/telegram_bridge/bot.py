@@ -279,16 +279,22 @@ async def launch_claude_new(message: Message, project: ProjectState, start_polle
 
     convention = f"claude-{project.project_name}"
 
-    # Case 2: Our tmux exists - reuse
+    # Case 1: Our tmux exists - reuse
     if project.tmux_session == convention and is_tmux_session_exists(convention):
         subprocess.run(["tmux", "send-keys", "-t", convention, "claude", "Enter"], capture_output=True)
-    # Case 3: Foreign tmux - create new alongside
+    # Case 2: Foreign tmux - create new alongside
     elif project.tmux_session and project.tmux_session != convention and is_tmux_session_exists(project.tmux_session):
-        create_tmux_with_claude(convention, project.cwd)
+        result = create_tmux_with_claude(convention, project.cwd)
+        if not result.success:
+            await message.answer(f"Ошибка запуска: {result.error}")
+            return
         project.tmux_session = convention
-    # Case 4: No tmux - create
+    # Case 3: No tmux - create
     else:
-        create_tmux_with_claude(convention, project.cwd)
+        result = create_tmux_with_claude(convention, project.cwd)
+        if not result.success:
+            await message.answer(f"Ошибка запуска: {result.error}")
+            return
         project.tmux_session = convention
 
     await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
