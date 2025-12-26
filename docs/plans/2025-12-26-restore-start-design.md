@@ -512,25 +512,30 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 
 **Step 1: Add handling in on_message**
 
-In the `on_message` function, add handling for `awaiting_project_name` state:
+In `on_message()` function (line 530), inside the `if state:` block (line 541), add a new `elif` case **before** the `awaiting_custom_path` handler (line 542). The new code goes at line 542:
 
 ```python
-# In on_message(), after checking state, add this case:
+    if state:
+        # NEW: Add this block as the first state check (before awaiting_custom_path)
+        if state["state"] == "awaiting_project_name":
+            # User sent project name
+            project_name = message.text.strip()
+            if not project_name or " " in project_name:
+                await message.answer("Имя проекта не может содержать пробелы.")
+                return
 
-if state["state"] == "awaiting_project_name":
-    # User sent project name
-    project_name = message.text.strip()
-    if not project_name or " " in project_name:
-        await message.answer("Имя проекта не может содержать пробелы.")
-        return
+            project = project_manager.get_or_create(project_name)
+            project.chat_id = chat_id
 
-    project = project_manager.get_or_create(project_name)
-    project.chat_id = chat_id
+            _start_state.pop(chat_id, None)
+            await _start_project_flow(message, project)
+            return
 
-    _start_state.pop(chat_id, None)
-    await _start_project_flow(message, project)
-    return
+        elif state["state"] == "awaiting_custom_path":
+            # ... existing code continues
 ```
+
+The existing `if state["state"] == "awaiting_custom_path":` becomes `elif`.
 
 **Step 2: Commit**
 
