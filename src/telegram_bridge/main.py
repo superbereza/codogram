@@ -32,9 +32,9 @@ async def main():
         from .permission_poller import create_poller_task
         return await create_poller_task(bot, project)
 
-    async def start_watcher(project: ProjectState) -> asyncio.Task:
+    async def start_watcher(project: ProjectState, send_missed: bool = False) -> asyncio.Task:
         from .watcher import create_watcher_task
-        return await create_watcher_task(bot, project)
+        return await create_watcher_task(bot, project, send_missed)
 
     # Restore sessions from history.jsonl
     await project_manager.restore_projects(bot, start_poller, start_watcher)

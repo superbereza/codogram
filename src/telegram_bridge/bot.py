@@ -128,9 +128,9 @@ def _make_task_starters(bot):
         from .permission_poller import create_poller_task
         return await create_poller_task(bot, p)
 
-    async def start_watcher(p: ProjectState) -> asyncio.Task:
+    async def start_watcher(p: ProjectState, send_missed: bool = False) -> asyncio.Task:
         from .watcher import create_watcher_task
-        return await create_watcher_task(bot, p)
+        return await create_watcher_task(bot, p, send_missed)
 
     return start_poller, start_watcher
 
@@ -222,9 +222,9 @@ async def _connect_or_launch(message: Message, project: ProjectState):
     project_manager._save()
 
     if project.session_id:
-        await message.answer(f"✅ Подключено! Session: {project.session_id[:8]}...")
+        await message.answer(f"Подключено. Сессия: `{project.session_id[:8]}...`", parse_mode="Markdown")
     else:
-        await message.answer("✅ Подключено! Ожидаю Claude сессию...")
+        await message.answer("Подключено. Ожидание сессии Claude.")
 
 
 @router.message(Command("start"))
@@ -316,7 +316,7 @@ async def launch_claude_new(message: Message, project: ProjectState, start_polle
     await message.answer(
         f"Claude запущен в `{project.tmux_session}`\n"
         f"Подключиться: `tmux attach -t {project.tmux_session}`\n\n"
-        f"⏳ Ожидаю регистрацию...",
+        f"Ожидание регистрации сессии.",
         parse_mode="Markdown",
     )
 
@@ -344,7 +344,12 @@ async def on_start_create_dir(callback: CallbackQuery):
     # Ask about git
     state["state"] = "awaiting_git_choice"
     await callback.message.edit_text(
-        f"Директория `{state['path']}` создана.\n\nНастроить гит?",
+        f"Директория `{state['path']}` создана.\n\n"
+        f"**Настроить гит?**\n\n"
+        f"• `git init` — локальный репозиторий\n"
+        f"• `git init + gh repo create` — создать и на GitHub\n"
+        f"• `git clone` — клонировать существующий\n"
+        f"• Без гита — пустая папка",
         reply_markup=git_setup_keyboard(),
         parse_mode="Markdown",
     )
@@ -659,7 +664,7 @@ async def on_tmux_selected(callback: CallbackQuery):
     project = project_manager.get_or_create(project_name)
     project.tmux_session = tmux_session
 
-    await callback.message.edit_text(f"✅ Connected to tmux: {tmux_session}")
+    await callback.message.edit_text(f"Подключено к tmux: `{tmux_session}`", parse_mode="Markdown")
     await callback.answer()
 
     # Refresh session and start tasks
@@ -669,9 +674,9 @@ async def on_tmux_selected(callback: CallbackQuery):
     project_manager._save()
 
     if project.session_id:
-        await callback.message.answer(f"Found session: {project.session_id[:8]}...")
+        await callback.message.answer(f"Сессия: `{project.session_id[:8]}...`", parse_mode="Markdown")
     else:
-        await callback.message.answer("No active Claude session found (will auto-discover)")
+        await callback.message.answer("Сессия Claude не найдена. Автоматическое обнаружение активно.")
 
 
 @router.callback_query(F.data == "start:launch_claude")
