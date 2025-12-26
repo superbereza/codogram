@@ -14,9 +14,21 @@ def should_cleanup_project(project: 'ProjectState') -> bool:
     """Check if project should be cleaned up (inactive > 30 days).
 
     Uses jsonl file mtime, not last_activity tracking.
+    Does NOT cleanup if tmux session is still running (new project not yet registered).
     """
+    import subprocess
+
+    # If tmux session is running, don't cleanup (even if no jsonl yet)
+    if project.tmux_session:
+        result = subprocess.run(
+            ["tmux", "has-session", "-t", project.tmux_session],
+            capture_output=True
+        )
+        if result.returncode == 0:
+            return False  # Tmux exists, don't cleanup
+
     if not project.jsonl_path:
-        return True  # No jsonl = cleanup
+        return True  # No jsonl and no tmux = cleanup
 
     jsonl_path = Path(project.jsonl_path)
     if not jsonl_path.exists():
@@ -143,7 +155,8 @@ class ProjectManager:
         self._save()
         return project
 
-    async def _maybe_start_tasks(self, project: ProjectState, start_poller, start_watcher) -> None:
+    async def _maybe_start_tasks(self, project: ProjectState, start_poller, start_watcher,
+                                 send_missed: bool = False) -> None:
         """Start tasks if all required data is present."""
         # Poller: needs tmux_session + chat_id
         if project.tmux_session and project.chat_id:
@@ -153,7 +166,7 @@ class ProjectManager:
         # Watcher: needs jsonl_path + chat_id
         if project.jsonl_path and project.chat_id:
             if not project.watcher_task or project.watcher_task.done():
-                project.watcher_task = await start_watcher(project)
+                project.watcher_task = await start_watcher(project, send_missed)
 
     async def restore_projects(self, bot, start_poller, start_watcher) -> None:
         """Restore sessions from history.jsonl after bot restart."""
@@ -164,10 +177,22 @@ class ProjectManager:
             if not project.chat_id or not project.cwd:
                 continue
 
-            # 1. Find session_id from history.jsonl FIRST (sets jsonl_path)
+            # 1. Find tmux by cwd or convention FIRST (needed for cleanup check)
+            if not project.tmux_session:
+                tmux_list = find_all_tmux_by_cwd(project.cwd)
+                if len(tmux_list) == 1:
+                    project.tmux_session = tmux_list[0]
+                elif len(tmux_list) == 0:
+                    # Fallback to convention
+                    tmux_by_convention = find_tmux_by_convention(project.project_name)
+                    if tmux_by_convention:
+                        project.tmux_session = tmux_by_convention
+                # Multiple tmux handled after cleanup check
+
+            # 2. Find session_id from history.jsonl (sets jsonl_path)
             self.refresh_project_session(project)
 
-            # 2. NOW check if project should be cleaned up
+            # 3. Check if project should be cleaned up
             if should_cleanup_project(project):
                 logger.info(
                     "project_cleanup",
@@ -181,18 +206,10 @@ class ProjectManager:
 
             logger.info("project_restored", extra={"project": project.project_name})
 
-            # 2. Find tmux by cwd or convention
+            # 4. Handle multiple tmux sessions (ask user to select)
             if not project.tmux_session:
                 tmux_list = find_all_tmux_by_cwd(project.cwd)
-                if len(tmux_list) == 1:
-                    project.tmux_session = tmux_list[0]
-                elif len(tmux_list) == 0:
-                    # Fallback to convention
-                    tmux_by_convention = find_tmux_by_convention(project.project_name)
-                    if tmux_by_convention:
-                        project.tmux_session = tmux_by_convention
-                else:
-                    # Multiple tmux - send selection keyboard to chat
+                if len(tmux_list) > 1:
                     keyboard = create_tmux_selection_keyboard(tmux_list, project.project_name)
                     try:
                         await bot.send_message(
@@ -202,11 +219,10 @@ class ProjectManager:
                             reply_markup=keyboard
                         )
                     except Exception:
-                        # If message fails, skip this project (user can reconnect manually)
                         pass
                     continue  # Don't start tasks, wait for selection
 
-            # 3. Start tasks if ready
+            # 5. Start tasks if ready
             await self._maybe_start_tasks(project, start_poller, start_watcher)
 
         self._save()
