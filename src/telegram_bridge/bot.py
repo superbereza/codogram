@@ -76,21 +76,23 @@ def get_project_for_chat(chat_id: int) -> tuple[str | None, ProjectState | None]
     return None, None
 
 def is_claude_running(project: ProjectState) -> bool:
-    """Check if Claude is running for project.
+    """Check if Claude is fully running for project.
 
     Returns True if:
     - tmux session exists
-    - poller_task is running (not None and not done)
+    - poller_task is running
+    - watcher_task is running (session discovered)
     """
     if not project or not project.tmux_session:
         return False
 
-    # Check tmux exists
     if not is_tmux_session_exists(project.tmux_session):
         return False
 
-    # Check poller is running
     if not project.poller_task or project.poller_task.done():
+        return False
+
+    if not project.watcher_task or project.watcher_task.done():
         return False
 
     return True
