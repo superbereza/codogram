@@ -7,15 +7,17 @@ from .config import settings
 from .bot import router
 from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
+from .logging_config import setup_logging, logger
 
 async def main():
+    setup_logging()
+    logger.info("Starting Telegram Bridge (history.jsonl mode)")
+    logger.info(f"Admin IDs: {settings.get_admin_ids()}")
+    logger.info(f"Base dir: {settings.base_dir}")
+
     bot = Bot(token=settings.telegram_token)
     dp = Dispatcher()
     dp.include_router(router)
-
-    print(f"Starting Telegram Bridge (history.jsonl mode)")
-    print(f"Admin IDs: {settings.get_admin_ids()}")
-    print(f"Base dir: {settings.base_dir}")
 
     from aiogram.types import BotCommand
     await bot.set_my_commands([
@@ -41,7 +43,7 @@ async def main():
     from .history_watcher import create_history_watcher
     await create_history_watcher(bot, start_poller, start_watcher)
 
-    print("History watcher started (15s polling)")
+    logger.info("History watcher started (15s polling)")
 
     # Start Telegram polling
     await dp.start_polling(bot)

@@ -11,6 +11,7 @@ from .config import settings
 from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 from .state import permission_messages
+from .logging_config import logger
 from .project_launcher import (
     resolve_project_path,
     is_tmux_session_exists,
@@ -698,7 +699,12 @@ async def on_start_cancel(callback: CallbackQuery):
 
 @router.message()
 async def on_message(message: Message):
+    # Log incoming message
+    text_preview = message.text[:100] if message.text else '<no text>'
+    logger.info(f"Incoming message from user={message.from_user.id} chat={message.chat.id}: {text_preview}")
+
     if not is_admin(message.from_user.id):
+        logger.debug(f"Ignored: not admin (user={message.from_user.id})")
         return
 
     if not message.text:

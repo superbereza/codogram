@@ -8,6 +8,7 @@ from typing import AsyncIterator
 from aiogram import Bot
 from .session_manager import ProjectState
 from .chunker import chunk_message
+from .logging_config import logger
 
 class ContentType(Enum):
     TEXT = "text"
@@ -141,13 +142,13 @@ async def create_watcher_task(bot: Bot, project: ProjectState) -> asyncio.Task:
 async def watcher_for_session(bot: Bot, project: ProjectState):
     """Watch jsonl for specific project."""
     if not project.jsonl_path:
-        print(f"Watcher: no jsonl_path for project {project.project_name}")
+        logger.warning(f"Watcher: no jsonl_path for project {project.project_name}")
         return
 
     path = Path(project.jsonl_path)
     chat_id = project.chat_id
 
-    print(f"Watcher: watching {path} for chat {chat_id}")
+    logger.info(f"Watcher started: watching {path} for chat {chat_id}")
 
     async for entry in watch_jsonl(path):
         try:
@@ -159,13 +160,13 @@ async def watcher_for_session(bot: Bot, project: ProjectState):
                         await bot.send_message(chat_id, f"● {chunk}")
 
             elif entry.content_type == ContentType.TOOL_USE:
-                print(f"Watcher: TOOL_USE {entry.tool_name}", flush=True)
+                logger.debug(f"Watcher: TOOL_USE {entry.tool_name}")
                 text = format_tool_use(entry.tool_name, entry.tool_input)
                 try:
                     await bot.send_message(chat_id, text, parse_mode="Markdown")
-                    print(f"Watcher: sent {entry.tool_name}", flush=True)
+                    logger.debug(f"Watcher: sent {entry.tool_name}")
                 except Exception as e:
-                    print(f"Watcher: error sending {entry.tool_name}: {e}", flush=True)
+                    logger.warning(f"Watcher: error sending {entry.tool_name}: {e}")
                     await bot.send_message(chat_id, f"● {entry.tool_name}")
 
         except Exception as e:

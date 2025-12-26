@@ -6,26 +6,6 @@ from pathlib import Path
 
 from aiogram import Bot
 
-# Log directory
-LOG_DIR = Path("/home/superbereza/dev/personal-agent/tmp/telegram-bridge-logs")
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def log(msg: str):
-    """Write to debug log."""
-    with open(LOG_DIR / "poller-debug.log", "a") as f:
-        f.write(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
-
-
-def log_sent(action: str, body: str = None, options: list = None):
-    """Log what was sent/deleted to Telegram."""
-    with open(LOG_DIR / "poller-sent.log", "a") as f:
-        f.write(f"\n=== {action} at {datetime.now()} ===\n")
-        if body:
-            f.write(f"BODY:\n{body}\n")
-        if options:
-            f.write(f"OPTIONS:\n{chr(10).join(options)}\n")
-
 from .config import settings
 from .screen import parse_screen, PermissionPrompt
 from .keyboards import permission_keyboard
@@ -33,6 +13,7 @@ from .chunker import chunk_message
 from .state import permission_messages
 from .session_manager import ProjectState
 from .tmux import TmuxSession
+from .logging_config import logger
 
 
 class PollerState(Enum):
@@ -57,7 +38,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
     Polls tmux every 0.5s, uses debounce before sending.
     State machine: IDLE → DEBOUNCING → SHOWING → IDLE
     """
-    log("Poller started")
+    logger.info(f"Permission poller started for project {project.project_name}")
 
     # Create TmuxSession from project data
     tmux = TmuxSession(project.tmux_session, project.cwd)
@@ -80,35 +61,27 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
             screen = tmux.capture_pane()
             parsed = parse_screen(screen)
         except Exception as e:
-            print(f"Permission poller: capture error: {e}")
+            logger.warning(f"Permission poller: capture error: {e}")
             continue
 
         is_permission = isinstance(parsed, PermissionPrompt)
 
         # Debug: log if ❯ detected but no permission parsed
         if "❯" in screen and not is_permission:
-            log(f"DEBUG: ❯ found but no permission! parsed={type(parsed).__name__}")
-            # Save screen for debugging
-            with open(LOG_DIR / "poller-debug-screen.txt", "w") as f:
-                f.write(screen)
+            logger.debug(f"Poller: ❯ found but no permission! parsed={type(parsed).__name__}")
 
         # State machine transitions
         if state == PollerState.IDLE:
             if is_permission:
-                log(f"IDLE→DEBOUNCING: detected permission, options={parsed.options}")
-                log(f"  body={parsed.body[:100] if parsed.body else 'none'}...")
-                # Save raw screen for debugging
-                with open(LOG_DIR / "poller-screen-raw.txt", "w") as f:
-                    f.write(f"=== CAPTURE AT {datetime.now()} ===\n")
-                    f.write(screen)
-                    f.write("\n=== END ===\n")
+                logger.debug(f"Poller IDLE→DEBOUNCING: detected permission, options={parsed.options}")
+                logger.debug(f"Poller: body={parsed.body[:100] if parsed.body else 'none'}...")
                 state = PollerState.DEBOUNCING
                 debounce_start = asyncio.get_event_loop().time()
                 last_options = parsed.options
 
         elif state == PollerState.DEBOUNCING:
             if not is_permission:
-                log("DEBOUNCING→IDLE: permission disappeared")
+                logger.debug("Poller DEBOUNCING→IDLE: permission disappeared")
                 state = PollerState.IDLE
                 last_options = None
             elif parsed.options != last_options:
@@ -118,8 +91,8 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
                 elapsed = asyncio.get_event_loop().time() - debounce_start
                 if elapsed >= DEBOUNCE_TIME:
                     # Send to Telegram
-                    log(f"DEBOUNCING→SHOWING: sending to TG")
-                    log(f"  body:\n{parsed.body[:200]}...")
+                    logger.debug(f"Poller DEBOUNCING→SHOWING: sending to Telegram")
+                    logger.debug(f"Poller: body preview: {parsed.body[:200]}...")
                     try:
                         content_msg_ids = []
 
@@ -151,16 +124,14 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
 
                         state = PollerState.SHOWING
                         last_body = parsed.body
-                        log(f"SHOWING: sent {len(parsed.options)} options, kb_msg={kb_msg.message_id}")
-                        log_sent("SEND", body=parsed.body, options=parsed.options)
+                        logger.debug(f"Poller SHOWING: sent {len(parsed.options)} options, kb_msg={kb_msg.message_id}")
                     except Exception as e:
-                        print(f"Permission poller: send error: {e}")
+                        logger.warning(f"Permission poller: send error: {e}")
                         state = PollerState.IDLE
 
         elif state == PollerState.SHOWING:
             if not is_permission:
-                log("SHOWING→IDLE: permission gone, cleaning up")
-                log_sent("DELETE (permission gone)")
+                logger.debug("Poller SHOWING→IDLE: permission gone, cleaning up")
                 # Cleanup if messages still exist
                 if kb_msg and kb_msg.message_id in permission_messages:
                     for msg_id in content_msg_ids:
@@ -181,7 +152,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
                 kb_msg = None
             elif parsed.options != last_options or parsed.body != last_body:
                 # New question or options changed — resend messages
-                log(f"SHOWING: body/options changed, resending")
+                logger.debug(f"Poller SHOWING: body/options changed, resending")
                 try:
                     # Delete old messages
                     for msg_id in content_msg_ids:
@@ -225,6 +196,5 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
 
                     last_options = parsed.options
                     last_body = parsed.body
-                    log_sent("RESEND", body=parsed.body, options=parsed.options)
                 except Exception as e:
-                    log(f"SHOWING: resend error: {e}")
+                    logger.warning(f"Poller SHOWING: resend error: {e}")
