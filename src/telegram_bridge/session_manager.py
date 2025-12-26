@@ -146,24 +146,6 @@ class ProjectManager:
             if not project.watcher_task or project.watcher_task.done():
                 project.watcher_task = await start_watcher(project)
 
-    async def _stop_tasks(self, project: ProjectState) -> None:
-        """Stop running tasks."""
-        if project.poller_task:
-            project.poller_task.cancel()
-            try:
-                await project.poller_task
-            except asyncio.CancelledError:
-                pass
-            project.poller_task = None
-
-        if project.watcher_task:
-            project.watcher_task.cancel()
-            try:
-                await project.watcher_task
-            except asyncio.CancelledError:
-                pass
-            project.watcher_task = None
-
     async def restore_projects(self, bot, start_poller, start_watcher) -> None:
         """Restore sessions from history.jsonl after bot restart."""
         from .tmux import find_all_tmux_by_cwd, find_tmux_by_convention
