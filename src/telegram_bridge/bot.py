@@ -4,7 +4,7 @@ import asyncio
 import re
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
 from .config import settings
@@ -144,8 +144,6 @@ async def _start_project_flow(message: Message, project: ProjectState):
 
 async def _connect_or_launch(message: Message, project: ProjectState):
     """Connect to existing tmux or offer to launch new Claude session."""
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-
     chat_id = message.chat.id
     cwd = project.cwd
 
