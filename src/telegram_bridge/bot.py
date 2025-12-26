@@ -47,6 +47,13 @@ def is_admin(user_id: int) -> bool:
     """Check if user is admin."""
     return user_id in get_admin_ids()
 
+def is_valid_project_name(name: str) -> bool:
+    """Check if project name is valid.
+
+    Valid names contain only: letters, digits, dash, underscore.
+    """
+    return bool(re.match(r'^[a-zA-Z0-9_-]+$', name))
+
 def get_session_for_chat(chat_id: int) -> TmuxSession | None:
     """Get TmuxSession for chat_id."""
     project = project_manager.get_by_chat(chat_id)
@@ -234,6 +241,12 @@ async def cmd_start(message: Message):
     # Case 1: Project name provided
     if args:
         project_name = args[0]
+        if not is_valid_project_name(project_name):
+            await message.answer(
+                "Имя проекта может содержать только буквы, цифры, `-` и `_`.",
+                parse_mode="Markdown",
+            )
+            return
         project = project_manager.get_or_create(project_name)
         project.chat_id = chat_id
         await _start_project_flow(message, project)
@@ -691,8 +704,11 @@ async def on_message(message: Message):
         if state["state"] == "awaiting_project_name":
             # User sent project name
             project_name = message.text.strip()
-            if not project_name or " " in project_name:
-                await message.answer("Имя проекта не может содержать пробелы.")
+            if not project_name or not is_valid_project_name(project_name):
+                await message.answer(
+                    "Имя проекта может содержать только буквы, цифры, `-` и `_`.",
+                    parse_mode="Markdown",
+                )
                 return
 
             project = project_manager.get_or_create(project_name)
