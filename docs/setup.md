@@ -104,3 +104,44 @@ Use this ID in `ADMIN_IDS` environment variable.
 1. Bot must be admin in Telegram group (Privacy Mode)
 2. Check tmux session still running: `tmux ls`
 3. Verify chat_id matches in config
+
+## Migrating from Hooks (v1) to history.jsonl (v2)
+
+If you were using the previous version with hooks, follow these steps:
+
+### 1. Remove hooks from Claude settings
+
+Edit `~/.claude/settings.json` and remove the hooks section:
+
+```json
+{
+  "hooks": {
+    "session_start": "...",   // ← DELETE
+    "session_end": "..."      // ← DELETE
+  }
+}
+```
+
+### 2. Update bot
+
+```bash
+cd agent-tools/telegram-bridge
+git pull origin main
+./restart.sh
+```
+
+### 3. Reconnect projects
+
+Send `/start <project_name> <cwd>` in each Telegram chat to reconnect.
+The bot will auto-discover sessions from `~/.claude/history.jsonl`.
+
+### Rollback
+
+If you need to go back to hooks-based version:
+
+```bash
+git checkout with-hooks
+./restart.sh
+```
+
+Then restore the hooks in `~/.claude/settings.json`.
