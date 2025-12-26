@@ -108,6 +108,22 @@ async def show_status(message: Message, project: ProjectState):
 
     await message.answer("\n".join(status_lines), parse_mode="Markdown")
 
+def _make_task_starters(bot):
+    """Create task starter functions for poller and watcher.
+
+    Returns:
+        (start_poller, start_watcher) - async functions to start tasks
+    """
+    async def start_poller(p: ProjectState) -> asyncio.Task:
+        from .permission_poller import create_poller_task
+        return await create_poller_task(bot, p)
+
+    async def start_watcher(p: ProjectState) -> asyncio.Task:
+        from .watcher import create_watcher_task
+        return await create_watcher_task(bot, p)
+
+    return start_poller, start_watcher
+
 async def _start_project_flow(message: Message, project: ProjectState):
     """Main flow: resolve path → check exists → launch or ask."""
     chat_id = message.chat.id
@@ -191,15 +207,7 @@ async def _connect_or_launch(message: Message, project: ProjectState):
     # Discover session and start tasks
     project_manager.refresh_project_session(project)
 
-    bot = message.bot
-    async def start_poller(p: ProjectState) -> asyncio.Task:
-        from .permission_poller import create_poller_task
-        return await create_poller_task(bot, p)
-
-    async def start_watcher(p: ProjectState) -> asyncio.Task:
-        from .watcher import create_watcher_task
-        return await create_watcher_task(bot, p)
-
+    start_poller, start_watcher = _make_task_starters(message.bot)
     await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
     project_manager._save()
 
@@ -350,16 +358,7 @@ async def on_start_git_init(callback: CallbackQuery):
         project = project_manager.get_or_create(state["project"])
         project.cwd = state["path"]
 
-        # Define task starters
-        bot = callback.bot
-        async def start_poller(p: ProjectState):
-            from .permission_poller import create_poller_task
-            return await create_poller_task(bot, p)
-
-        async def start_watcher(p: ProjectState):
-            from .watcher import create_watcher_task
-            return await create_watcher_task(bot, p)
-
+        start_poller, start_watcher = _make_task_starters(callback.bot)
         await launch_claude_new(callback.message, project, start_poller, start_watcher)
 
     _start_state.pop(chat_id, None)
@@ -413,16 +412,7 @@ async def on_start_gh_visibility(callback: CallbackQuery):
         project = project_manager.get_or_create(state["project"])
         project.cwd = state["path"]
 
-        # Define task starters
-        bot = callback.bot
-        async def start_poller(p: ProjectState):
-            from .permission_poller import create_poller_task
-            return await create_poller_task(bot, p)
-
-        async def start_watcher(p: ProjectState):
-            from .watcher import create_watcher_task
-            return await create_watcher_task(bot, p)
-
+        start_poller, start_watcher = _make_task_starters(callback.bot)
         await launch_claude_new(callback.message, project, start_poller, start_watcher)
 
     _start_state.pop(chat_id, None)
@@ -471,16 +461,7 @@ async def on_start_no_git(callback: CallbackQuery):
     project = project_manager.get_or_create(state["project"])
     project.cwd = state["path"]
 
-    # Define task starters
-    bot = callback.bot
-    async def start_poller(p: ProjectState):
-        from .permission_poller import create_poller_task
-        return await create_poller_task(bot, p)
-
-    async def start_watcher(p: ProjectState):
-        from .watcher import create_watcher_task
-        return await create_watcher_task(bot, p)
-
+    start_poller, start_watcher = _make_task_starters(callback.bot)
     await launch_claude_new(callback.message, project, start_poller, start_watcher)
 
     _start_state.pop(chat_id, None)
@@ -647,17 +628,8 @@ async def on_tmux_selected(callback: CallbackQuery):
     await callback.message.edit_text(f"✅ Connected to tmux: {tmux_session}")
     await callback.answer()
 
-    # Define task starters
-    bot = callback.bot
-    async def start_poller(p: ProjectState):
-        from .permission_poller import create_poller_task
-        return await create_poller_task(bot, p)
-
-    async def start_watcher(p: ProjectState):
-        from .watcher import create_watcher_task
-        return await create_watcher_task(bot, p)
-
     # Refresh session and start tasks
+    start_poller, start_watcher = _make_task_starters(callback.bot)
     project_manager.refresh_project_session(project)
     await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
     project_manager._save()
@@ -687,16 +659,7 @@ async def on_start_launch_claude(callback: CallbackQuery):
     project.chat_id = chat_id
     project.cwd = state["path"]
 
-    # Define task starters
-    bot = callback.bot
-    async def start_poller(p: ProjectState):
-        from .permission_poller import create_poller_task
-        return await create_poller_task(bot, p)
-
-    async def start_watcher(p: ProjectState):
-        from .watcher import create_watcher_task
-        return await create_watcher_task(bot, p)
-
+    start_poller, start_watcher = _make_task_starters(callback.bot)
     await launch_claude_new(callback.message, project, start_poller, start_watcher)
 
     _start_state.pop(chat_id, None)
@@ -752,16 +715,7 @@ async def on_message(message: Message):
             project.cwd = str(Path(path).expanduser())
             project_manager._save()
 
-            # Define task starters
-            bot = message.bot
-            async def start_poller(p: ProjectState):
-                from .permission_poller import create_poller_task
-                return await create_poller_task(bot, p)
-
-            async def start_watcher(p: ProjectState):
-                from .watcher import create_watcher_task
-                return await create_watcher_task(bot, p)
-
+            start_poller, start_watcher = _make_task_starters(message.bot)
             _start_state.pop(chat_id, None)
             await launch_claude_new(message, project, start_poller, start_watcher)
             return
@@ -780,16 +734,7 @@ async def on_message(message: Message):
             project = project_manager.get_or_create(state["project"])
             project.cwd = state["path"]
 
-            # Define task starters
-            bot = message.bot
-            async def start_poller(p: ProjectState):
-                from .permission_poller import create_poller_task
-                return await create_poller_task(bot, p)
-
-            async def start_watcher(p: ProjectState):
-                from .watcher import create_watcher_task
-                return await create_watcher_task(bot, p)
-
+            start_poller, start_watcher = _make_task_starters(message.bot)
             _start_state.pop(chat_id, None)
             await launch_claude_new(message, project, start_poller, start_watcher)
             return
