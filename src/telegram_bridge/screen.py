@@ -32,6 +32,11 @@ def parse_screen(output: str) -> ScreenState:
             last_sep_idx = i
 
     if last_sep_idx == -1:
+        # No separator - but check if there's ❯ with numbered options (trust folder prompt, etc.)
+        if "❯" in output:
+            result = _parse_options_without_separator(lines)
+            if result:
+                return result
         return _check_tool_progress(output)
 
     # Get lines after separator
@@ -73,6 +78,38 @@ def parse_screen(output: str) -> ScreenState:
     body = re.sub(r'╌{10,}', SEPARATOR_DASHED, body)
     body = body.strip()
 
+    return PermissionPrompt(options=options, body=body)
+
+
+def _parse_options_without_separator(lines: list[str]) -> PermissionPrompt | None:
+    """Parse permission prompt without solid separator (e.g., trust folder prompt).
+
+    Looks for ❯ with numbered options even without ──── separator.
+    """
+    options = []
+    body_lines = []
+    in_options = False
+
+    for line in lines:
+        if "❯" in line:
+            in_options = True
+            match = re.match(r'\s*❯\s*(\d+\.\s+.+)', line)
+            if match:
+                options.append(match.group(1).strip())
+        elif in_options:
+            match = re.match(r'\s{2,}(\d+\.\s+.+)', line)
+            if match:
+                options.append(match.group(1).strip())
+            elif line.strip().startswith(("Esc", "Enter")):
+                break
+        else:
+            # Before ❯ - this is body
+            body_lines.append(line)
+
+    if not options:
+        return None
+
+    body = "\n".join(body_lines).strip()
     return PermissionPrompt(options=options, body=body)
 
 
