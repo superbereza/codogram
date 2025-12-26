@@ -1,5 +1,6 @@
 # src/telegram_bridge/session_manager.py
 import asyncio
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -7,6 +8,25 @@ from .config import settings, load_config, save_config
 from .project_resolver import get_project_name
 from .tmux import TmuxSession
 from .history_reader import find_session_for_project, compute_jsonl_path
+
+def should_cleanup_project(project: 'ProjectState') -> bool:
+    """Check if project should be cleaned up (inactive > 30 days).
+
+    Uses jsonl file mtime, not last_activity tracking.
+    """
+    if not project.jsonl_path:
+        return True  # No jsonl = cleanup
+
+    jsonl_path = Path(project.jsonl_path)
+    if not jsonl_path.exists():
+        return True  # File deleted
+
+    try:
+        mtime = jsonl_path.stat().st_mtime
+        age_days = (time.time() - mtime) / 86400
+        return age_days > 30
+    except Exception:
+        return True  # Error = cleanup
 
 @dataclass
 class ProjectState:
