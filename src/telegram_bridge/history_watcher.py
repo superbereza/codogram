@@ -68,6 +68,10 @@ class HistoryWatcher:
                 old_watcher = project.watcher_task
                 if old_watcher:
                     old_watcher.cancel()
+                    try:
+                        await old_watcher
+                    except asyncio.CancelledError:
+                        pass
                     project.watcher_task = None
 
                 # Start new tasks
