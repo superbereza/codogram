@@ -6,6 +6,7 @@ from pathlib import Path
 from .config import settings, load_config, save_config
 from .project_resolver import get_project_name
 from .tmux import TmuxSession
+from .history_reader import find_session_for_project, compute_jsonl_path
 
 @dataclass
 class ProjectState:
@@ -103,6 +104,33 @@ class ProjectManager:
             if project.tmux_session == tmux_session:
                 return project
         return None
+
+    def refresh_project_session(self, project: ProjectState) -> bool:
+        """Refresh session_id from history.jsonl.
+
+        Returns True if session changed, False otherwise.
+        """
+        if not project.cwd:
+            return False
+
+        new_session_id = find_session_for_project(project.cwd)
+        if not new_session_id:
+            return False
+
+        if new_session_id == project.session_id:
+            return False  # No change
+
+        # Session changed
+        project.session_id = new_session_id
+
+        # Compute jsonl path
+        jsonl_path = compute_jsonl_path(project.cwd, new_session_id)
+        if jsonl_path.exists():
+            project.jsonl_path = str(jsonl_path)
+        else:
+            project.jsonl_path = None
+
+        return True
 
     async def update_from_telegram(
         self,

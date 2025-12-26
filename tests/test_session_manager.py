@@ -135,3 +135,66 @@ async def test_restore_sessions_cleans_dead_tmux(mock_config):
     assert len(manager.sessions) == 0
     # Config should be saved (cleaned)
     assert mock_config["save"].called
+
+# Task 5: refresh_project_session tests
+def test_refresh_project_session_changes(tmp_path):
+    """refresh_project_session should detect session changes."""
+    jsonl_file = tmp_path / "test.jsonl"
+    jsonl_file.touch()
+
+    with patch('telegram_bridge.session_manager.find_session_for_project', return_value="new-session-123"), \
+         patch('telegram_bridge.session_manager.compute_jsonl_path', return_value=jsonl_file):
+
+        from telegram_bridge.session_manager import ProjectManager, ProjectState
+        manager = ProjectManager()
+        project = ProjectState(project_name="test", cwd="/test/path", chat_id=123)
+        project.session_id = "old-session"
+        manager.projects["test"] = project
+
+        changed = manager.refresh_project_session(project)
+
+        assert changed is True
+        assert project.session_id == "new-session-123"
+        assert project.jsonl_path == str(jsonl_file)
+
+def test_refresh_project_session_no_change():
+    """refresh_project_session should return False when session unchanged."""
+    with patch('telegram_bridge.session_manager.find_session_for_project', return_value="same-session"):
+
+        from telegram_bridge.session_manager import ProjectManager, ProjectState
+        manager = ProjectManager()
+        project = ProjectState(project_name="test", cwd="/test/path", chat_id=123)
+        project.session_id = "same-session"
+        manager.projects["test"] = project
+
+        changed = manager.refresh_project_session(project)
+
+        assert changed is False
+        assert project.session_id == "same-session"
+
+def test_refresh_project_session_no_cwd():
+    """refresh_project_session should handle missing cwd."""
+    from telegram_bridge.session_manager import ProjectManager, ProjectState
+    manager = ProjectManager()
+    project = ProjectState(project_name="test", cwd=None, chat_id=123)
+    manager.projects["test"] = project
+
+    changed = manager.refresh_project_session(project)
+
+    assert changed is False
+
+def test_refresh_project_session_jsonl_not_exists(tmp_path):
+    """refresh_project_session should handle non-existent jsonl."""
+    with patch('telegram_bridge.session_manager.find_session_for_project', return_value="new-session"), \
+         patch('telegram_bridge.session_manager.compute_jsonl_path', return_value=tmp_path / "nonexistent.jsonl"):
+
+        from telegram_bridge.session_manager import ProjectManager, ProjectState
+        manager = ProjectManager()
+        project = ProjectState(project_name="test", cwd="/test/path", chat_id=123)
+        manager.projects["test"] = project
+
+        changed = manager.refresh_project_session(project)
+
+        assert changed is True
+        assert project.session_id == "new-session"
+        assert project.jsonl_path is None  # File doesn't exist
