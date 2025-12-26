@@ -2,6 +2,8 @@
 import json
 import asyncio
 from enum import Enum
+
+SESSION_TIMEOUT = 300  # 5 minutes
 from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator
@@ -177,8 +179,24 @@ async def watcher_for_session(bot: Bot, project: ProjectState,
 
     logger.info(f"Watcher started: watching {path} for chat {chat_id}")
 
+    # Wait for file to appear with timeout
+    start_time = asyncio.get_event_loop().time()
+    while not path.exists():
+        elapsed = asyncio.get_event_loop().time() - start_time
+        if elapsed > SESSION_TIMEOUT:
+            logger.warning(f"Watcher timeout: {path} not found after {SESSION_TIMEOUT}s")
+            try:
+                await bot.send_message(
+                    chat_id,
+                    "⚠️ Сессия не обнаружена. Проверьте что Claude запущен."
+                )
+            except Exception:
+                pass
+            return
+        await asyncio.sleep(1)
+
     # Send missed entries if requested
-    if send_missed and path.exists():
+    if send_missed:
         missed = find_missed_entries(path)
         if missed:
             logger.info(f"Sending {len(missed)} missed entries for {project.project_name}")
