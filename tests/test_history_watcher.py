@@ -39,8 +39,8 @@ async def test_check_session_for_project_detects_change():
         mock_pm._maybe_start_tasks.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_history_watcher_checks_tmux_health():
-    """Test that HistoryWatcher only checks tmux health."""
+async def test_history_watcher_checks_tmux_and_sessions():
+    """Test that HistoryWatcher checks tmux health and session changes."""
     from telegram_bridge.history_watcher import HistoryWatcher
 
     bot = MagicMock()
@@ -54,11 +54,14 @@ async def test_history_watcher_checks_tmux_health():
     mock_project.chat_id = 123
     mock_project.cwd = "/test/path"
     mock_project.tmux_session = "test-tmux"
+    mock_project.session_id = "old-session"
     mock_project.watcher_task = None
     mock_project.poller_task = None
 
     mock_pm = MagicMock()
     mock_pm.projects = {"test": mock_project}
+    mock_pm._maybe_start_tasks = AsyncMock()
+    mock_pm.refresh_project_session.return_value = False  # No session change
     watcher.project_manager = mock_pm
 
     with patch('telegram_bridge.session_manager.should_cleanup_project', return_value=False):
@@ -67,6 +70,9 @@ async def test_history_watcher_checks_tmux_health():
 
             await watcher._check_for_changes()
 
-            # Should have checked tmux but not called refresh_project_session
+            # Should have checked tmux health
             mock_tmux.assert_called_once_with("test-tmux", "/test/path")
-            mock_pm.refresh_project_session.assert_not_called()
+            # Should have checked for session changes
+            mock_pm.refresh_project_session.assert_called_once_with(mock_project)
+            # Should NOT have called _maybe_start_tasks since no change
+            mock_pm._maybe_start_tasks.assert_not_called()
