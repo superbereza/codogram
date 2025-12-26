@@ -595,7 +595,7 @@ async def on_restart_confirm(callback: CallbackQuery):
         subprocess.run(["tmux", "kill-session", "-t", project.tmux_session], capture_output=True)
 
     # Clear session data
-    project.claude_session_id = None
+    project.session_id = None
     project.jsonl_path = None
     project.tmux_session = None
     project_manager._save()

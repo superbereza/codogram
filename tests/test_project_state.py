@@ -18,7 +18,7 @@ def test_project_state_defaults():
     assert project.chat_id is None
     assert project.cwd is None
     assert project.tmux_session is None
-    assert project.claude_session_id is None
+    assert project.session_id is None
     assert project.jsonl_path is None
     assert project.poller_task is None
     assert project.watcher_task is None
@@ -37,7 +37,7 @@ def test_project_state_with_values():
 
     assert project.chat_id == -123
     assert project.tmux_session == "claude-my-project"
-    assert project.claude_session_id == "abc-123"  # Test backwards compat property
+    assert project.session_id == "abc-123"
 
 
 def test_project_manager_get_or_create():

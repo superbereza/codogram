@@ -45,18 +45,6 @@ class ProjectState:
     tmux_session: str | None = None
     poller_task: asyncio.Task | None = field(default=None, repr=False)
 
-    # DEPRECATED fields (for backwards compat during migration)
-    # TODO: Remove after migration complete
-    @property
-    def claude_session_id(self) -> str | None:
-        """Alias for session_id (backwards compat)."""
-        return self.session_id
-
-    @claude_session_id.setter
-    def claude_session_id(self, value: str | None):
-        """Alias for session_id (backwards compat)."""
-        self.session_id = value
-
 class ProjectManager:
     """Manages ProjectState instances."""
 
