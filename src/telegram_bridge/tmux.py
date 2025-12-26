@@ -1,5 +1,6 @@
 import subprocess
 import shlex
+import time
 from dataclasses import dataclass
 
 @dataclass
@@ -13,6 +14,7 @@ class TmuxSession:
         escaped = text.replace("'", "'\\''")
         # Send text with -l (literal) flag, then Enter separately
         subprocess.run(f"tmux send-keys -t {session} -l -- '{escaped}'", shell=True, check=True)
+        time.sleep(0.05)  # 50ms delay to ensure text is processed
         subprocess.run(f"tmux send-keys -t {session} Enter", shell=True, check=True)
 
     def send_key(self, key: str) -> None:
