@@ -766,7 +766,21 @@ async def on_message(message: Message):
     # Check if we're in conversation flow
     state = _start_state.get(chat_id)
     if state:
-        if state["state"] == "awaiting_custom_path":
+        if state["state"] == "awaiting_project_name":
+            # User sent project name
+            project_name = message.text.strip()
+            if not project_name or " " in project_name:
+                await message.answer("Имя проекта не может содержать пробелы.")
+                return
+
+            project = project_manager.get_or_create(project_name)
+            project.chat_id = chat_id
+
+            _start_state.pop(chat_id, None)
+            await _start_project_flow(message, project)
+            return
+
+        elif state["state"] == "awaiting_custom_path":
             # User sent custom path
             path = message.text.strip()
             if not Path(path).expanduser().is_dir():
