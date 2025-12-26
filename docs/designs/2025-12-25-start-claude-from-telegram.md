@@ -1,6 +1,6 @@
 # Start Claude from Telegram - Design
 
-**Status:** Implemented
+**Status:** Restored (2025-12-26)
 
 ## Цель
 
