@@ -13,16 +13,12 @@ def dir_not_found_keyboard() -> InlineKeyboardMarkup:
 
 
 def git_setup_keyboard() -> InlineKeyboardMarkup:
-    """Keyboard for git setup options."""
+    """Keyboard for git setup options - column layout."""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="init локально", callback_data="start:git_init"),
-            InlineKeyboardButton(text="init + gh create", callback_data="start:git_gh"),
-        ],
-        [
-            InlineKeyboardButton(text="git clone", callback_data="start:git_clone"),
-            InlineKeyboardButton(text="нет", callback_data="start:no_git"),
-        ],
+        [InlineKeyboardButton(text="git init", callback_data="start:git_init")],
+        [InlineKeyboardButton(text="git init + gh repo create", callback_data="start:git_gh")],
+        [InlineKeyboardButton(text="git clone", callback_data="start:git_clone")],
+        [InlineKeyboardButton(text="Без гита", callback_data="start:no_git")],
     ])
 
 
