@@ -1,5 +1,4 @@
 import subprocess
-import shlex
 import time
 from dataclasses import dataclass
 
@@ -10,41 +9,50 @@ class TmuxSession:
 
     def send(self, text: str) -> None:
         """Send text to tmux session and press Enter."""
-        session = shlex.quote(self.name)
-        escaped = text.replace("'", "'\\''")
-        # Send text with -l (literal) flag, then Enter separately
-        subprocess.run(f"tmux send-keys -t {session} -l -- '{escaped}'", shell=True, check=True)
-        time.sleep(0.05)  # 50ms delay to ensure text is processed
-        subprocess.run(f"tmux send-keys -t {session} Enter", shell=True, check=True)
+        if not text.strip():
+            return  # Don't send empty messages
+
+        # Use shell=False for safety (no escaping needed)
+        subprocess.run(
+            ["tmux", "send-keys", "-t", self.name, "-l", "--", text],
+            check=True
+        )
+        time.sleep(0.05)  # Small delay to ensure text is processed
+        subprocess.run(
+            ["tmux", "send-keys", "-t", self.name, "Enter"],
+            check=True
+        )
 
     def send_key(self, key: str) -> None:
         """Send a special key (Escape, Enter, C-c, etc.) to tmux session."""
-        session = shlex.quote(self.name)
-        subprocess.run(f"tmux send-keys -t {session} {key}", shell=True, check=True)
+        subprocess.run(
+            ["tmux", "send-keys", "-t", self.name, key],
+            check=True
+        )
 
     def exists(self) -> bool:
+        """Check if tmux session exists."""
         result = subprocess.run(
-            f"tmux has-session -t {shlex.quote(self.name)} 2>/dev/null",
-            shell=True
+            ["tmux", "has-session", "-t", self.name],
+            capture_output=True
         )
         return result.returncode == 0
 
     def create(self) -> None:
+        """Create tmux session if not exists."""
         if not self.exists():
             subprocess.run(
-                f"tmux new-session -d -s {shlex.quote(self.name)} -c {shlex.quote(self.cwd)}",
-                shell=True, check=True
+                ["tmux", "new-session", "-d", "-s", self.name, "-c", self.cwd],
+                check=True
             )
 
     def attach_command(self) -> str:
-        return f"tmux attach -t {shlex.quote(self.name)}"
+        return f"tmux attach -t {self.name}"
 
     def capture_pane(self) -> str:
         """Capture current pane content."""
-        session = shlex.quote(self.name)
         result = subprocess.run(
-            f"tmux capture-pane -t {session} -p -S -",
-            shell=True,
+            ["tmux", "capture-pane", "-t", self.name, "-p", "-S", "-"],
             capture_output=True,
             text=True
         )
