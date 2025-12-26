@@ -64,20 +64,21 @@ class HistoryWatcher:
             if changed:
                 print(f"HistoryWatcher: session changed for {project.project_name}: {old_session} -> {project.session_id}")
 
-                # Cancel old watcher if exists
+                # Save reference to old watcher
                 old_watcher = project.watcher_task
+
+                # Start new tasks FIRST (avoid message loss)
+                await project_manager._maybe_start_tasks(
+                    project, self.start_poller, self.start_watcher
+                )
+
+                # Then cancel old watcher
                 if old_watcher:
                     old_watcher.cancel()
                     try:
                         await old_watcher
                     except asyncio.CancelledError:
                         pass
-                    project.watcher_task = None
-
-                # Start new tasks
-                await project_manager._maybe_start_tasks(
-                    project, self.start_poller, self.start_watcher
-                )
 
 
 async def create_history_watcher(bot: Bot, start_poller, start_watcher) -> HistoryWatcher:
