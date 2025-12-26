@@ -1,5 +1,7 @@
 # src/telegram_bridge/bot.py
 from pathlib import Path
+import asyncio
+import re
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
@@ -142,7 +144,6 @@ async def _start_project_flow(message: Message, project: ProjectState):
 
 async def _connect_or_launch(message: Message, project: ProjectState):
     """Connect to existing tmux or offer to launch new Claude session."""
-    import asyncio
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
     chat_id = message.chat.id
@@ -253,7 +254,6 @@ async def cmd_start(message: Message):
 
 async def launch_claude_new(message: Message, project: ProjectState, start_poller, start_watcher):
     """Launch Claude in tmux session using new ProjectState."""
-    import asyncio
     import subprocess
 
     convention = f"claude-{project.project_name}"
@@ -532,7 +532,6 @@ async def on_restart_confirm(callback: CallbackQuery):
         return
 
     # Stop tasks
-    import asyncio
     # Stop poller task
     if project.poller_task and not project.poller_task.done():
         project.poller_task.cancel()
