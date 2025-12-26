@@ -10,10 +10,10 @@
 
 ### Multi-session architecture
 - Один процесс бота на несколько Claude сессий
-- Регистрация через Claude Code hooks (SessionStart/SessionEnd)
-- HTTP API для регистрации сессий
+- history.jsonl polling для обнаружения сессий (не hooks)
 - Project → Chat mapping
 - Git worktree support (резолвит project name)
+- Авто-определение project name из заголовка чата
 
 ### Permission handling
 - Background poller для permission prompts
@@ -27,6 +27,11 @@
 
 ### Bot command menu
 - /start, /my_chat_id, /register_dir, /esc в меню Telegram
+
+### Security improvements
+- shell=False во всех subprocess calls (предотвращает shell injection)
+- Валидация project name (только alphanumeric, dash, underscore)
+- Unified logging через python logging module
 
 ## Backlog
 
@@ -111,12 +116,6 @@
 Дефолтный личный чат с ботом связан с папкой telegram-bridge:
 - Позволяет управлять ботом через самого себя
 - Не нужно создавать отдельную группу для разработки бота
-
-### Security audit
-Проанализировать код на уязвимости:
-- Input validation
-- Command injection
-- Права доступа
 
 ## PoC / Research
 
