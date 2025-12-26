@@ -106,64 +106,51 @@ async def show_status(message: Message, project: ProjectState):
 
     await message.answer("\n".join(status_lines), parse_mode="Markdown")
 
-@router.message(Command("start"))
-async def cmd_start(message: Message):
-    """Start command - setup project and discover tmux + session."""
+async def _start_project_flow(message: Message, project: ProjectState):
+    """Main flow: resolve path → check exists → launch or ask. TODO: implement in Task 6"""
+    await message.answer(f"Starting project flow for {project.project_name}... (not yet implemented)")
+
+
+async def _start_with_explicit_args(message: Message, project_name: str, cwd: str):
+    """Handle /start with explicit project_name and cwd (backwards compat)."""
     import asyncio
 
-    if not is_admin(message.from_user.id):
-        return
-
-    # Parse args
-    args = message.text.split()[1:]  # Skip /start
-    if len(args) < 2:
-        await message.answer("Usage: /start <project_name> <cwd>")
-        return
-
-    project_name = args[0]
-    cwd = args[1]
-
-    # Save to config
+    chat_id = message.chat.id
     project = project_manager.get_or_create(project_name)
-    project.chat_id = message.chat.id
+    project.chat_id = chat_id
     project.cwd = cwd
 
-    # Phase 1: Discover tmux (for poller)
+    # Discover tmux
     from .tmux import find_all_tmux_by_cwd, find_tmux_by_convention
     tmux_list = find_all_tmux_by_cwd(cwd)
 
     if len(tmux_list) == 0:
-        # Fallback to convention
         tmux_by_convention = find_tmux_by_convention(project_name)
         if tmux_by_convention:
             project.tmux_session = tmux_by_convention
             await message.answer(f"Found tmux by convention: {tmux_by_convention}")
         else:
             await message.answer(f"⚠️ No tmux session found for {cwd}")
-            # Still save and continue - user might start tmux later
     elif len(tmux_list) == 1:
         project.tmux_session = tmux_list[0]
         await message.answer(f"Connected to tmux: {tmux_list[0]}")
     else:
-        # Multiple tmux - show selection keyboard
         keyboard = create_tmux_selection_keyboard(tmux_list, project_name)
         await message.answer(
-            f"Multiple tmux sessions found for {cwd}:\n\n"
-            "Select which one to connect:",
+            f"Multiple tmux sessions found for {cwd}:\n\nSelect:",
             reply_markup=keyboard
         )
         project_manager._save()
-        return  # Wait for callback, don't start tasks yet
+        return
 
-    # Phase 2: Discover session_id (for watcher)
+    # Discover session
     project_manager.refresh_project_session(project)
     if project.session_id:
         await message.answer(f"Found session: {project.session_id[:8]}...")
     else:
-        await message.answer("No active Claude session found (will auto-discover)")
+        await message.answer("No active Claude session (will auto-discover)")
 
     # Start tasks
-    # Define task starters (same pattern as existing code)
     bot = message.bot
     async def start_poller(p: ProjectState) -> asyncio.Task:
         from .permission_poller import create_poller_task
@@ -175,6 +162,49 @@ async def cmd_start(message: Message):
 
     await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
     project_manager._save()
+
+
+@router.message(Command("start"))
+async def cmd_start(message: Message):
+    """Start command - auto-detect project or show status."""
+    if not is_admin(message.from_user.id):
+        return
+
+    chat_id = message.chat.id
+    args = message.text.split()[1:]  # Skip /start
+
+    # Case 1: Explicit args provided (backwards compat)
+    if len(args) >= 2:
+        await _start_with_explicit_args(message, args[0], args[1])
+        return
+
+    # Case 2: Single arg = project name
+    if len(args) == 1:
+        project_name = args[0]
+        project = project_manager.get_or_create(project_name)
+        project.chat_id = chat_id
+        await _start_project_flow(message, project)
+        return
+
+    # Case 3: No args - auto-detect from chat
+    project_name, project = get_project_for_chat(chat_id)
+
+    if project and is_claude_running(project):
+        # Active session - show status
+        await show_status(message, project)
+        return
+
+    if project_name:
+        # Known project - continue flow
+        await _start_project_flow(message, project or project_manager.get_or_create(project_name))
+        return
+
+    # Unknown chat - ask for project name
+    _start_state[chat_id] = {"state": "awaiting_project_name"}
+    await message.answer(
+        "Отправь имя проекта (например: `my-project`):",
+        parse_mode="Markdown",
+    )
 
 
 async def launch_claude_new(message: Message, project: ProjectState, start_poller, start_watcher):
