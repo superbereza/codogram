@@ -475,7 +475,16 @@ async def on_tmux_selected(callback: CallbackQuery):
         await callback.answer("Not authorized")
         return
 
-    _, project_name, tmux_session = callback.data.split(":", 2)
+    # Parse callback data safely
+    try:
+        parts = callback.data.split(":", 2)
+        if len(parts) != 3:
+            await callback.answer("Invalid selection data")
+            return
+        _, project_name, tmux_session = parts
+    except Exception:
+        await callback.answer("Error processing selection")
+        return
 
     project = project_manager.get_or_create(project_name)
     project.tmux_session = tmux_session
