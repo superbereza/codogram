@@ -46,7 +46,7 @@ class HistoryWatcher:
             await asyncio.sleep(REFRESH_INTERVAL)
 
     async def _check_for_changes(self):
-        """Check tmux health for all projects."""
+        """Check tmux health and session changes for all projects."""
         from .session_manager import should_cleanup_project
 
         for project in list(self.project_manager.projects.values()):
@@ -83,6 +83,27 @@ class HistoryWatcher:
                         project.poller_task = None
                     project.tmux_session = None
                     project.session_id = None
+                    continue
+
+            # 3. Check for new/changed sessions (discover new Claude sessions)
+            old_session = project.session_id
+            changed = self.project_manager.refresh_project_session(project)
+
+            if changed:
+                logger.info("session_changed", extra={
+                    "project": project.project_name,
+                    "old_session": old_session[:8] if old_session else None,
+                    "new_session": project.session_id[:8] if project.session_id else None,
+                })
+
+                # Cancel old watcher and start new one
+                if project.watcher_task:
+                    project.watcher_task.cancel()
+                    project.watcher_task = None
+
+                await self.project_manager._maybe_start_tasks(
+                    project, self.start_poller, self.start_watcher, send_missed=True
+                )
 
 
 async def check_session_for_project(project: ProjectState, bot: Bot, start_poller, start_watcher) -> None:
@@ -110,8 +131,8 @@ async def check_session_for_project(project: ProjectState, bot: Bot, start_polle
             project.watcher_task.cancel()
             project.watcher_task = None
 
-        # Start new tasks
-        await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
+        # Start new tasks with send_missed=True
+        await project_manager._maybe_start_tasks(project, start_poller, start_watcher, send_missed=True)
 
 
 async def create_history_watcher(bot: Bot, start_poller, start_watcher) -> HistoryWatcher:
