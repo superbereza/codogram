@@ -44,3 +44,12 @@ def restart_confirm_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="Отмена", callback_data="restart:cancel"),
         ]
     ])
+
+
+def ask_project_name_keyboard() -> InlineKeyboardMarkup:
+    """Keyboard shown when project name cannot be determined."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Отмена", callback_data="start:cancel"),
+        ]
+    ])
