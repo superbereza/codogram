@@ -65,6 +65,13 @@
 - Другие internal тулы
 - Нужно исследовать какие именно скрыты
 
+### /settings command
+Отображение текущего состояния Claude сессии:
+- Текущий режим approval (accept edits, allow all, etc.)
+- Количество background tasks
+- Парсить из tmux capture-pane статус бар
+- Формат: "Mode: Accept edits | Background: 3 tasks"
+
 ### /shift_tab command
 Команда для переключения режима approval:
 - Отправляет Shift+Tab в tmux

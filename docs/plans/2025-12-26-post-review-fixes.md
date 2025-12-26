@@ -541,7 +541,7 @@ Expected: No output (success)
 **Files:**
 - Modify: `src/telegram_bridge/tmux.py:1-16`
 
-**Problem:** Sometimes text from Telegram is sent to tmux but Enter doesn't register. Race condition between two `subprocess.run` calls.
+**Problem:** Sometimes text from Telegram is sent to tmux but Enter doesn't register. Need small delay between sending text and Enter.
 
 **Step 1: Add time import and delay**
 
@@ -572,7 +572,7 @@ class TmuxSession:
 git add src/telegram_bridge/tmux.py
 git commit -m "fix(telegram-bridge): add delay between text and Enter in tmux.send
 
-Fixes race condition where Enter was sent before text was fully processed.
+Adds small delay to ensure text is processed before Enter.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -823,6 +823,402 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 
 ---
 
+## Task 16: Fix watcher restart wrong order
+
+**Files:**
+- Modify: `src/telegram_bridge/history_watcher.py:104-118`
+
+**Problem:** When session changes, `_maybe_start_tasks` is called before old watcher is cancelled. But `_maybe_start_tasks` checks `if not project.watcher_task or project.watcher_task.done()` — old watcher is still running, so new watcher is NOT created. Then old watcher is cancelled. Result: no watcher running.
+
+**Step 1: Fix the order — cancel old tasks before starting new**
+
+Replace lines 104-118 in `_check_for_changes`:
+
+```python
+            if changed:
+                logger.info("session_changed", extra={
+                    "project": project.project_name,
+                    "old_session": old_session[:8] if old_session else None,
+                    "new_session": project.session_id[:8] if project.session_id else None,
+                })
+
+                # Cancel old watcher FIRST (before starting new)
+                if project.watcher_task:
+                    project.watcher_task.cancel()
+                    project.watcher_task = None
+
+                # Now start new tasks
+                await self.project_manager._maybe_start_tasks(project, self.start_poller, self.start_watcher)
+```
+
+**Step 2: Run tests**
+
+```bash
+source venv/bin/activate
+python -m pytest tests/test_history_watcher.py -v
+```
+
+Expected: All tests pass
+
+**Step 3: Commit**
+
+```bash
+git add src/telegram_bridge/history_watcher.py
+git commit -m "fix(telegram-bridge): fix watcher restart wrong order
+
+Cancel old watcher BEFORE calling _maybe_start_tasks.
+Previously, _maybe_start_tasks saw old task still running and skipped creating new one.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+```
+
+---
+
+## Task 17: Move session check from background polling to on-message
+
+**Files:**
+- Modify: `src/telegram_bridge/history_watcher.py`
+- Modify: `src/telegram_bridge/bot.py`
+
+**Problem:** Background polling every 15s is unnecessary. Session changes only matter when user is active. Check on each user message instead.
+
+**Step 1: Extract session check logic to standalone function**
+
+In `history_watcher.py`, add after class definition:
+
+```python
+async def check_session_for_project(project: ProjectState, bot: Bot, start_poller, start_watcher) -> None:
+    """Check if session changed for a project and restart watcher if needed.
+
+    Call this when user sends a message to ensure watcher tracks current session.
+    """
+    from .session_manager import project_manager
+
+    if not project.chat_id or not project.cwd:
+        return
+
+    old_session = project.session_id
+    changed = project_manager.refresh_project_session(project)
+
+    if changed:
+        logger.info("session_changed", extra={
+            "project": project.project_name,
+            "old_session": old_session[:8] if old_session else None,
+            "new_session": project.session_id[:8] if project.session_id else None,
+        })
+
+        # Cancel old watcher FIRST
+        if project.watcher_task:
+            project.watcher_task.cancel()
+            project.watcher_task = None
+
+        # Start new tasks
+        await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
+```
+
+**Step 2: Simplify HistoryWatcher — only check tmux health**
+
+Replace `_check_for_changes` method:
+
+```python
+async def _check_for_changes(self):
+    """Check tmux health for all projects."""
+    from .session_manager import should_cleanup_project
+
+    for project in list(self.project_manager.projects.values()):
+        if not project.chat_id or not project.cwd:
+            continue
+
+        # 1. Check if should cleanup (inactive > 30 days)
+        if should_cleanup_project(project):
+            logger.info("project_cleanup", extra={"project": project.project_name, "reason": "inactive_30_days"})
+            if project.watcher_task:
+                project.watcher_task.cancel()
+            if project.poller_task:
+                project.poller_task.cancel()
+            del self.project_manager.projects[project.project_name]
+            continue
+
+        # 2. Check if tmux died
+        if project.tmux_session:
+            tmux = TmuxSession(project.tmux_session, project.cwd)
+            if not tmux.exists():
+                logger.warning("tmux_died", extra={"project": project.project_name, "tmux": project.tmux_session})
+                try:
+                    await self.bot.send_message(
+                        project.chat_id,
+                        f"⚠️ Claude session closed (tmux died): {project.project_name}"
+                    )
+                except Exception:
+                    pass
+                if project.watcher_task:
+                    project.watcher_task.cancel()
+                    project.watcher_task = None
+                if project.poller_task:
+                    project.poller_task.cancel()
+                    project.poller_task = None
+                project.tmux_session = None
+                project.session_id = None
+```
+
+**Step 3: Call session check in bot.py on_message**
+
+In `on_message` function, add session check before sending to tmux:
+
+```python
+@router.message()
+async def on_message(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    if not message.text:
+        return
+
+    chat_id = message.chat.id
+
+    # Check if we're in conversation flow
+    state = _start_state.get(chat_id)
+    if state:
+        # ... existing state handling ...
+        pass
+
+    # Normal message - check session and send to tmux
+    project = project_manager.get_by_chat(chat_id)
+    if project:
+        # Check if session changed (user might have done /new in tmux)
+        from .history_watcher import check_session_for_project
+        start_poller, start_watcher = _make_task_starters(message.bot)
+        await check_session_for_project(project, message.bot, start_poller, start_watcher)
+
+    tmux = get_session_for_chat(chat_id)
+    if tmux:
+        tmux.send(message.text)
+    else:
+        if message.chat.id < 0:
+            await message.answer("Нет активной сессии Claude. Используй /start для запуска.")
+```
+
+**Step 4: Run tests**
+
+```bash
+source venv/bin/activate
+python -m pytest tests/ -v
+```
+
+Expected: All tests pass
+
+**Step 5: Commit**
+
+```bash
+git add src/telegram_bridge/history_watcher.py src/telegram_bridge/bot.py
+git commit -m "refactor(telegram-bridge): check session on user message instead of polling
+
+Session changes now detected when user sends message, not via 15s polling.
+Reduces unnecessary background work while still handling /new in tmux.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+```
+
+---
+
+## Task 18: Fix restore_projects cleanup order
+
+**Files:**
+- Modify: `src/telegram_bridge/session_manager.py:158-213`
+
+**Problem:** In `restore_projects`, `should_cleanup_project` is called BEFORE `refresh_project_session`. Since `jsonl_path` is not saved in config, it's None at check time. `should_cleanup_project` returns True for None jsonl_path → project deleted on every restart.
+
+**Step 1: Move refresh_project_session before cleanup check**
+
+Replace the loop in `restore_projects`:
+
+```python
+for project in list(self.projects.values()):  # Copy to allow removal
+    if not project.chat_id or not project.cwd:
+        continue
+
+    # 1. Find session_id from history.jsonl FIRST (sets jsonl_path)
+    self.refresh_project_session(project)
+
+    # 2. NOW check if project should be cleaned up
+    if should_cleanup_project(project):
+        logger.info(
+            "project_cleanup",
+            extra={
+                "project": project.project_name,
+                "reason": "inactive_30_days"
+            }
+        )
+        self.projects.pop(project.project_name, None)
+        continue
+
+    logger.info("project_restored", extra={"project": project.project_name})
+
+    # 3. Find tmux by cwd or convention
+    # ... rest unchanged
+```
+
+**Step 2: Run tests**
+
+```bash
+source venv/bin/activate
+python -m pytest tests/test_session_manager.py -v
+```
+
+Expected: All tests pass
+
+**Step 3: Commit**
+
+```bash
+git add src/telegram_bridge/session_manager.py
+git commit -m "fix(telegram-bridge): fix restore_projects cleanup order
+
+Call refresh_project_session BEFORE should_cleanup_project.
+Previously, jsonl_path was None at check time, causing all projects to be deleted on restart.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+```
+
+---
+
+## Task 19: Унифицировать логирование
+
+**Files:**
+- Modify: `src/telegram_bridge/logging_config.py`
+- Modify: `src/telegram_bridge/main.py`
+- Modify: `src/telegram_bridge/watcher.py`
+- Modify: `src/telegram_bridge/permission_poller.py`
+- Modify: `src/telegram_bridge/bot.py`
+- Delete: `session-hook.log` related code (if any)
+- Modify: `.env.example`
+
+**Problem:** Логи разбросаны: print() в одних местах, logger.* в других, custom файлы в третьих. Входящие сообщения не логируются вообще.
+
+**Step 1: Настроить logging_config.py с уровнем из env**
+
+```python
+"""Structured logging configuration for telegram_bridge."""
+import logging
+import os
+
+def setup_logging():
+    """Configure logging for telegram_bridge.
+
+    Level controlled by LOG_LEVEL env var (default: DEBUG).
+    Set LOG_LEVEL=INFO for less verbose output.
+    """
+    level_name = os.environ.get("LOG_LEVEL", "DEBUG").upper()
+    level = getattr(logging, level_name, logging.INFO)
+
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    # Set level for our logger
+    logger = logging.getLogger("telegram_bridge")
+    logger.setLevel(level)
+
+    return logger
+
+# Module-level logger
+logger = logging.getLogger("telegram_bridge")
+```
+
+**Step 2: Вызвать setup_logging() в main.py**
+
+В начале main():
+```python
+from .logging_config import setup_logging, logger
+
+async def main():
+    setup_logging()
+    logger.info("Starting Telegram Bridge (history.jsonl mode)")
+    # ... rest
+```
+
+**Step 3: Заменить print() на logger в watcher.py**
+
+```python
+from .logging_config import logger
+
+# Заменить:
+# print(f"Watcher: watching {path} for chat {chat_id}")
+logger.info(f"Watcher started: {path} for chat {chat_id}")
+
+# print(f"Watcher: TOOL_USE {entry.tool_name}", flush=True)
+logger.debug(f"Watcher: TOOL_USE {entry.tool_name}")
+
+# print(f"Watcher: sent {entry.tool_name}", flush=True)
+logger.debug(f"Watcher: sent {entry.tool_name}")
+
+# print(f"Watcher: error sending {entry.tool_name}: {e}", flush=True)
+logger.warning(f"Watcher: error sending {entry.tool_name}: {e}")
+```
+
+**Step 4: Заменить print() на logger в permission_poller.py**
+
+Аналогично — все print заменить на logger.debug/info/warning.
+
+**Step 5: Добавить логирование входящих сообщений в bot.py**
+
+В `on_message`:
+```python
+from .logging_config import logger
+
+@router.message()
+async def on_message(message: Message):
+    # Log incoming message
+    logger.info(f"Incoming message from user={message.from_user.id} chat={message.chat.id}: {message.text[:100] if message.text else '<no text>'}")
+
+    if not is_admin(message.from_user.id):
+        logger.debug(f"Ignored: not admin")
+        return
+    # ... rest
+```
+
+**Step 6: Удалить session-hook.log**
+
+Удалить файл и любой код который в него пишет (deprecated hooks).
+
+**Step 7: Обновить .env.example**
+
+Добавить:
+```
+# Logging level: DEBUG (default), INFO, WARNING, ERROR
+LOG_LEVEL=DEBUG
+```
+
+**Step 8: Удалить custom log файлы из permission_poller**
+
+Перевести poller-debug.log и poller-sent.log на общий logger с level DEBUG.
+
+**Step 9: Commit**
+
+```bash
+git add -A
+git commit -m "refactor(telegram-bridge): унифицировать логирование
+
+- Все логи через python logging
+- Уровень через LOG_LEVEL env (default: INFO)
+- Логируем входящие сообщения от Telegram
+- Удалены deprecated session-hook логи
+- DEBUG уровень для детальной отладки
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+```
+
+---
+
 ## Summary
 
 | Task | Description | Type |
@@ -842,3 +1238,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 | 13 | Unit tests for validation | Testing |
 | 14 | Integration tests for tmux.send | Testing |
 | 15 | Use shell=False in tmux.py | Security |
+| 16 | Fix watcher restart wrong order | Critical bug |
+| 17 | Move session check to on-message | Refactor |
+| 18 | Fix restore_projects cleanup order | Critical bug |
+| 19 | Унифицировать логирование | Refactor |

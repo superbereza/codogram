@@ -164,7 +164,10 @@ class ProjectManager:
             if not project.chat_id or not project.cwd:
                 continue
 
-            # Check if project should be cleaned up
+            # 1. Find session_id from history.jsonl FIRST (sets jsonl_path)
+            self.refresh_project_session(project)
+
+            # 2. NOW check if project should be cleaned up
             if should_cleanup_project(project):
                 logger.info(
                     "project_cleanup",
@@ -173,12 +176,8 @@ class ProjectManager:
                         "reason": "inactive_30_days"
                     }
                 )
-                # Remove from projects dict
                 self.projects.pop(project.project_name, None)
                 continue
-
-            # 1. Find session_id from history.jsonl
-            self.refresh_project_session(project)
 
             logger.info("project_restored", extra={"project": project.project_name})
 
