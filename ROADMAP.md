@@ -1,6 +1,12 @@
-# Telegram Bridge Roadmap
+# Codogram Roadmap
 
 ## Done
+
+### Codogram extraction
+- Extracted from personal-agent to standalone repo
+- Renamed package telegram_bridge → codogram
+- Full git history preserved (242 commits)
+- GitHub: superbereza/codogram
 
 ### Core
 - tmux send-keys для input
@@ -129,14 +135,14 @@
 - Возможно: inline images через base64
 
 ### Self-hosting: default chat = bot project
-Дефолтный личный чат с ботом связан с папкой telegram-bridge:
+Дефолтный личный чат с ботом связан с папкой codogram:
 - Позволяет управлять ботом через самого себя
 - Не нужно создавать отдельную группу для разработки бота
 
 ## PoC / Research
 
-### telegram-bridge-tmux-only
+### codogram-tmux-only
 Эксперимент: использовать только tmux capture-pane без jsonl.
-- См. `docs/designs/telegram-bridge-tmux-only.md`
+- См. `docs/designs/2025-12-23-telegram-bridge-tmux-only.md`
 - Плюсы: проще, не зависит от внутреннего формата Claude
 - Минусы: парсинг ANSI, нестабильно
