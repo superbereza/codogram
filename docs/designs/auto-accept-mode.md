@@ -2,7 +2,7 @@
 
 **Status:** Draft
 **Created:** 2025-12-26
-**Feature:** Automatic permission prompt acceptance for telegram-bridge
+**Feature:** Automatic permission prompt acceptance for codogram
 
 ## Overview
 
@@ -135,7 +135,7 @@ Settings are stored per-user, per-project to allow fine-grained control:
 {
     "user_project_settings": {
         "34185809": {  # user_id
-            "telegram-bridge": {  # project_name
+            "codogram": {  # project_name
                 "auto_accept": true
             },
             "personal-agent": {
@@ -143,15 +143,15 @@ Settings are stored per-user, per-project to allow fine-grained control:
             }
         },
         "98765432": {
-            "telegram-bridge": {
+            "codogram": {
                 "auto_accept": true
             }
         }
     },
     "projects": {
-        "telegram-bridge": {
+        "codogram": {
             "chat_id": -1001234567890,
-            "cwd": "/home/user/dev/telegram-bridge"
+            "cwd": "/home/user/dev/codogram"
         }
     }
 }
@@ -495,7 +495,7 @@ Auto-accepted actions logged at INFO level:
 logger.info(
     "auto_accept",
     extra={
-        "project": "telegram-bridge",
+        "project": "codogram",
         "user_id": 34185809,
         "auto": True,
         "option": "1. Yes",
@@ -506,7 +506,7 @@ logger.info(
 
 **Log output example:**
 ```
-2025-12-26 14:23:45 INFO auto_accept project=telegram-bridge user_id=34185809 auto=true option="1. Yes" preview="Run bash command: git status..."
+2025-12-26 14:23:45 INFO auto_accept project=codogram user_id=34185809 auto=true option="1. Yes" preview="Run bash command: git status..."
 ```
 
 ## Safety & Edge Cases
@@ -549,7 +549,7 @@ logger.info(
 
 ```
 User: /auto_accept on
-Bot:  ⚡ Auto-accept mode ENABLED for `telegram-bridge`
+Bot:  ⚡ Auto-accept mode ENABLED for `codogram`
 ```
 
 ### Auto-Accept in Action
@@ -564,28 +564,28 @@ Bot: 🤖 Auto-accepted: Run bash command: git status...
 User: /status
 Bot:  Claude активен
 
-      Проект: telegram-bridge
-      Путь: /home/user/dev/telegram-bridge
-      Tmux: claude-telegram-bridge
+      Проект: codogram
+      Путь: /home/user/dev/codogram
+      Tmux: claude-codogram
       Session: a3f2c1b8...
       Auto-accept: ⚡ ON
 
-      Подключиться: tmux attach -t claude-telegram-bridge
+      Подключиться: tmux attach -t claude-codogram
 ```
 
 ### Disabling Auto-Accept
 
 ```
 User: /auto_accept off
-Bot:  Auto-accept mode DISABLED for `telegram-bridge`
+Bot:  Auto-accept mode DISABLED for `codogram`
 ```
 
 ### Different Settings Per Project
 
 ```
-# In telegram-bridge chat:
+# In codogram chat:
 User: /auto_accept on
-Bot:  ⚡ Auto-accept mode ENABLED for `telegram-bridge`
+Bot:  ⚡ Auto-accept mode ENABLED for `codogram`
 
 # In personal-agent chat (different project):
 User: /auto_accept

@@ -13,7 +13,7 @@
 ## Task 1: Create ProjectState dataclass
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 - Create: `tests/test_project_state.py`
 
 **Step 1: Write test for ProjectState**
@@ -25,7 +25,7 @@ os.environ.setdefault("TELEGRAM_TOKEN", "test")
 os.environ.setdefault("ADMIN_IDS", "123")
 os.environ.setdefault("BASE_DIR", "/tmp")
 
-from telegram_bridge.session_manager import ProjectState
+from codogram.session_manager import ProjectState
 
 
 def test_project_state_defaults():
@@ -60,13 +60,13 @@ def test_project_state_with_values():
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/test_project_state.py -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/test_project_state.py -v`
 
 Expected: FAIL (ProjectState not defined)
 
 **Step 3: Add ProjectState dataclass**
 
-Add to `src/telegram_bridge/session_manager.py` after imports:
+Add to `src/codogram/session_manager.py` after imports:
 
 ```python
 @dataclass
@@ -92,14 +92,14 @@ class ProjectState:
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/test_project_state.py -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/test_project_state.py -v`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_project_state.py
+git add src/codogram/session_manager.py tests/test_project_state.py
 git commit -m "feat(session): add ProjectState dataclass"
 ```
 
@@ -108,7 +108,7 @@ git commit -m "feat(session): add ProjectState dataclass"
 ## Task 2: Create ProjectManager class
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 - Modify: `tests/test_project_state.py`
 
 **Step 1: Write tests for ProjectManager**
@@ -116,7 +116,7 @@ git commit -m "feat(session): add ProjectState dataclass"
 Add to `tests/test_project_state.py`:
 
 ```python
-from telegram_bridge.session_manager import ProjectManager
+from codogram.session_manager import ProjectManager
 
 
 def test_project_manager_get_or_create():
@@ -162,13 +162,13 @@ def test_project_manager_get_by_session():
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/test_project_state.py -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/test_project_state.py -v`
 
 Expected: FAIL (ProjectManager not defined)
 
 **Step 3: Add ProjectManager class**
 
-Add to `src/telegram_bridge/session_manager.py`:
+Add to `src/codogram/session_manager.py`:
 
 ```python
 class ProjectManager:
@@ -243,14 +243,14 @@ class ProjectManager:
 
 **Step 4: Run tests**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/test_project_state.py -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/test_project_state.py -v`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_project_state.py
+git add src/codogram/session_manager.py tests/test_project_state.py
 git commit -m "feat(session): add ProjectManager class"
 ```
 
@@ -259,7 +259,7 @@ git commit -m "feat(session): add ProjectManager class"
 ## Task 3: Add update_from_telegram and _maybe_start_tasks
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 - Modify: `tests/test_project_state.py`
 
 **Step 1: Write test for update_from_telegram**
@@ -356,7 +356,7 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_project_state.py
+git add src/codogram/session_manager.py tests/test_project_state.py
 git commit -m "feat(session): add update_from_telegram and _maybe_start_tasks"
 ```
 
@@ -365,7 +365,7 @@ git commit -m "feat(session): add update_from_telegram and _maybe_start_tasks"
 ## Task 4: Add update_from_hook
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 - Modify: `tests/test_project_state.py`
 
 **Step 1: Write test**
@@ -466,7 +466,7 @@ Expected: PASS
 **Step 4: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_project_state.py
+git add src/codogram/session_manager.py tests/test_project_state.py
 git commit -m "feat(session): add update_from_hook"
 ```
 
@@ -475,7 +475,7 @@ git commit -m "feat(session): add update_from_hook"
 ## Task 5: Add handle_session_end with race protection
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 - Modify: `tests/test_project_state.py`
 
 **Step 1: Write test for race protection**
@@ -541,7 +541,7 @@ Expected: PASS
 **Step 4: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_project_state.py
+git add src/codogram/session_manager.py tests/test_project_state.py
 git commit -m "feat(session): add handle_session_end with race protection"
 ```
 
@@ -550,7 +550,7 @@ git commit -m "feat(session): add handle_session_end with race protection"
 ## Task 6: Add restore_projects
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 
 **Step 1: Add restore_projects method**
 
@@ -589,7 +589,7 @@ git commit -m "feat(session): add handle_session_end with race protection"
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py
+git add src/codogram/session_manager.py
 git commit -m "feat(session): add restore_projects"
 ```
 
@@ -598,7 +598,7 @@ git commit -m "feat(session): add restore_projects"
 ## Task 7: Create project_manager instance
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 
 **Step 1: Add instance at end of file**
 
@@ -615,7 +615,7 @@ project_manager = ProjectManager()
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py
+git add src/codogram/session_manager.py
 git commit -m "feat(session): add project_manager instance"
 ```
 
@@ -624,7 +624,7 @@ git commit -m "feat(session): add project_manager instance"
 ## Task 8: Update main.py to use ProjectManager
 
 **Files:**
-- Modify: `src/telegram_bridge/main.py`
+- Modify: `src/codogram/main.py`
 
 **Step 1: Update handle_register**
 
@@ -701,7 +701,7 @@ In `async def main()`:
 **Step 4: Commit**
 
 ```bash
-git add src/telegram_bridge/main.py
+git add src/codogram/main.py
 git commit -m "refactor(main): use ProjectManager for hooks"
 ```
 
@@ -710,7 +710,7 @@ git commit -m "refactor(main): use ProjectManager for hooks"
 ## Task 9: Update permission_poller to use ProjectState
 
 **Files:**
-- Modify: `src/telegram_bridge/permission_poller.py`
+- Modify: `src/codogram/permission_poller.py`
 
 **Step 1: Update imports and function signature**
 
@@ -737,7 +737,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/permission_poller.py
+git add src/codogram/permission_poller.py
 git commit -m "refactor(poller): use ProjectState"
 ```
 
@@ -746,7 +746,7 @@ git commit -m "refactor(poller): use ProjectState"
 ## Task 10: Update watcher to use ProjectState
 
 **Files:**
-- Modify: `src/telegram_bridge/watcher.py`
+- Modify: `src/codogram/watcher.py`
 
 **Step 1: Update imports and function signature**
 
@@ -767,7 +767,7 @@ async def watch_jsonl(bot: Bot, project: ProjectState):
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/watcher.py
+git add src/codogram/watcher.py
 git commit -m "refactor(watcher): use ProjectState"
 ```
 
@@ -776,7 +776,7 @@ git commit -m "refactor(watcher): use ProjectState"
 ## Task 11: Update bot.py cmd_start
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Update imports**
 
@@ -892,7 +892,7 @@ def get_session_for_chat(chat_id: int) -> TmuxSession | None:
 **Step 4: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
+git add src/codogram/bot.py
 git commit -m "refactor(bot): use ProjectManager in /start"
 ```
 
@@ -901,9 +901,9 @@ git commit -m "refactor(bot): use ProjectManager in /start"
 ## Task 12: Add /restart_session command
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
-- Modify: `src/telegram_bridge/start_flow.py`
-- Modify: `src/telegram_bridge/main.py`
+- Modify: `src/codogram/bot.py`
+- Modify: `src/codogram/start_flow.py`
+- Modify: `src/codogram/main.py`
 
 **Step 1: Add keyboard to start_flow.py**
 
@@ -986,7 +986,7 @@ await bot.set_my_commands([
 **Step 4: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py src/telegram_bridge/start_flow.py src/telegram_bridge/main.py
+git add src/codogram/bot.py src/codogram/start_flow.py src/codogram/main.py
 git commit -m "feat(bot): add /restart_session command"
 ```
 
@@ -995,8 +995,8 @@ git commit -m "feat(bot): add /restart_session command"
 ## Task 13: Remove old SessionManager usage
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/session_manager.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Remove old SessionManager class**
 
@@ -1009,7 +1009,7 @@ Remove all `manager.` usages, use `project_manager.` instead.
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py src/telegram_bridge/bot.py
+git add src/codogram/session_manager.py src/codogram/bot.py
 git commit -m "refactor(session): remove old SessionManager"
 ```
 
@@ -1020,8 +1020,8 @@ git commit -m "refactor(session): remove old SessionManager"
 **Step 1: Restart bot**
 
 ```bash
-pkill -f telegram_bridge
-./agent-tools/telegram-bridge/restart.sh
+pkill -f codogram
+./agent-tools/codogram/restart.sh
 ```
 
 **Step 2: Test scenarios**
@@ -1035,7 +1035,7 @@ pkill -f telegram_bridge
 **Step 3: Check logs**
 
 ```bash
-tail -f ~/dev/personal-agent/tmp/telegram-bridge-logs/poller-debug.log
+tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log
 ```
 
 **Step 4: Final commit**

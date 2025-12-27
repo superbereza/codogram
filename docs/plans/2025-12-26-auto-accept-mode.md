@@ -13,7 +13,7 @@
 ### Task 1: Create auto_accept module with detection functions
 
 **Files:**
-- Create: `src/telegram_bridge/auto_accept.py`
+- Create: `src/codogram/auto_accept.py`
 - Test: `tests/test_auto_accept.py`
 
 **Step 1: Write the failing test for is_auto_acceptable**
@@ -21,7 +21,7 @@
 ```python
 # tests/test_auto_accept.py
 import pytest
-from telegram_bridge.auto_accept import is_auto_acceptable, AUTO_ACCEPT_PHRASES
+from codogram.auto_accept import is_auto_acceptable, AUTO_ACCEPT_PHRASES
 
 def test_is_auto_acceptable_yes_option():
     """First option with 'yes' triggers auto-accept."""
@@ -45,13 +45,13 @@ def test_is_auto_acceptable_empty():
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && source venv/bin/activate && pytest tests/test_auto_accept.py -v`
-Expected: FAIL with "ModuleNotFoundError: No module named 'telegram_bridge.auto_accept'"
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && source venv/bin/activate && pytest tests/test_auto_accept.py -v`
+Expected: FAIL with "ModuleNotFoundError: No module named 'codogram.auto_accept'"
 
 **Step 3: Write minimal implementation**
 
 ```python
-# src/telegram_bridge/auto_accept.py
+# src/codogram/auto_accept.py
 """Auto-accept mode for permission prompts."""
 import re
 
@@ -73,14 +73,14 @@ def is_auto_acceptable(options: list[str]) -> bool:
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && source venv/bin/activate && pytest tests/test_auto_accept.py -v`
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && source venv/bin/activate && pytest tests/test_auto_accept.py -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge
-git add src/telegram_bridge/auto_accept.py tests/test_auto_accept.py
+cd /home/superbereza/dev/personal-agent/agent-tools/codogram
+git add src/codogram/auto_accept.py tests/test_auto_accept.py
 git commit -m "feat(auto-accept): add is_auto_acceptable detection function"
 ```
 
@@ -89,14 +89,14 @@ git commit -m "feat(auto-accept): add is_auto_acceptable detection function"
 ### Task 2: Add select_option function with intelligent parsing
 
 **Files:**
-- Modify: `src/telegram_bridge/auto_accept.py`
+- Modify: `src/codogram/auto_accept.py`
 - Modify: `tests/test_auto_accept.py`
 
 **Step 1: Write the failing tests for select_option**
 
 ```python
 # Add to tests/test_auto_accept.py
-from telegram_bridge.auto_accept import select_option
+from codogram.auto_accept import select_option
 
 def test_select_option_picks_yes():
     """Selects 'Yes' option, skipping session-wide."""
@@ -130,13 +130,13 @@ def test_select_option_finds_yes_in_middle():
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && source venv/bin/activate && pytest tests/test_auto_accept.py::test_select_option_picks_yes -v`
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && source venv/bin/activate && pytest tests/test_auto_accept.py::test_select_option_picks_yes -v`
 Expected: FAIL with "ImportError: cannot import name 'select_option'"
 
 **Step 3: Write minimal implementation**
 
 ```python
-# Add to src/telegram_bridge/auto_accept.py
+# Add to src/codogram/auto_accept.py
 
 def select_option(options: list[str]) -> str | None:
     """Select option for auto-accept based on option content.
@@ -169,14 +169,14 @@ def select_option(options: list[str]) -> str | None:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && source venv/bin/activate && pytest tests/test_auto_accept.py -v`
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && source venv/bin/activate && pytest tests/test_auto_accept.py -v`
 Expected: PASS (all tests)
 
 **Step 5: Commit**
 
 ```bash
-cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge
-git add src/telegram_bridge/auto_accept.py tests/test_auto_accept.py
+cd /home/superbereza/dev/personal-agent/agent-tools/codogram
+git add src/codogram/auto_accept.py tests/test_auto_accept.py
 git commit -m "feat(auto-accept): add select_option with intelligent parsing"
 ```
 
@@ -185,7 +185,7 @@ git commit -m "feat(auto-accept): add select_option with intelligent parsing"
 ### Task 3: Create UserProjectSettings dataclass and manager
 
 **Files:**
-- Modify: `src/telegram_bridge/config.py`
+- Modify: `src/codogram/config.py`
 - Create: `tests/test_user_project_settings.py`
 
 **Step 1: Write the failing test**
@@ -199,7 +199,7 @@ from pathlib import Path
 
 def test_user_project_settings_default_off():
     """Auto-accept is OFF by default for new user+project."""
-    from telegram_bridge.config import UserProjectSettingsManager
+    from codogram.config import UserProjectSettingsManager
 
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump({"projects": {}}, f)
@@ -213,7 +213,7 @@ def test_user_project_settings_default_off():
 
 def test_user_project_settings_set_and_get():
     """Can enable auto-accept for user+project."""
-    from telegram_bridge.config import UserProjectSettingsManager
+    from codogram.config import UserProjectSettingsManager
 
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump({"projects": {}}, f)
@@ -230,7 +230,7 @@ def test_user_project_settings_set_and_get():
 
 def test_user_project_settings_persistence():
     """Settings persist after reload."""
-    from telegram_bridge.config import UserProjectSettingsManager
+    from codogram.config import UserProjectSettingsManager
 
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump({"projects": {}}, f)
@@ -250,13 +250,13 @@ def test_user_project_settings_persistence():
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && source venv/bin/activate && pytest tests/test_user_project_settings.py::test_user_project_settings_default_off -v`
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && source venv/bin/activate && pytest tests/test_user_project_settings.py::test_user_project_settings_default_off -v`
 Expected: FAIL with "ImportError: cannot import name 'UserProjectSettingsManager'"
 
 **Step 3: Write minimal implementation**
 
 ```python
-# Add to src/telegram_bridge/config.py (after save_config function)
+# Add to src/codogram/config.py (after save_config function)
 
 from dataclasses import dataclass
 
@@ -338,14 +338,14 @@ user_project_settings = UserProjectSettingsManager()
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && source venv/bin/activate && pytest tests/test_user_project_settings.py -v`
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && source venv/bin/activate && pytest tests/test_user_project_settings.py -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge
-git add src/telegram_bridge/config.py tests/test_user_project_settings.py
+cd /home/superbereza/dev/personal-agent/agent-tools/codogram
+git add src/codogram/config.py tests/test_user_project_settings.py
 git commit -m "feat(auto-accept): add UserProjectSettingsManager for per-user per-project settings"
 ```
 
@@ -354,7 +354,7 @@ git commit -m "feat(auto-accept): add UserProjectSettingsManager for per-user pe
 ### Task 4: Integrate auto-accept into permission_poller
 
 **Files:**
-- Modify: `src/telegram_bridge/permission_poller.py:90-130`
+- Modify: `src/codogram/permission_poller.py:90-130`
 
 **Step 1: Read current code location**
 
@@ -432,14 +432,14 @@ Replace the block starting at line 92 (`# Send to Telegram`) with:
 
 **Step 3: Run existing tests to verify no regression**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && source venv/bin/activate && pytest tests/ -v`
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && source venv/bin/activate && pytest tests/ -v`
 Expected: PASS (all existing tests)
 
 **Step 4: Commit**
 
 ```bash
-cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge
-git add src/telegram_bridge/permission_poller.py
+cd /home/superbereza/dev/personal-agent/agent-tools/codogram
+git add src/codogram/permission_poller.py
 git commit -m "feat(auto-accept): integrate auto-accept into permission poller"
 ```
 
@@ -448,7 +448,7 @@ git commit -m "feat(auto-accept): integrate auto-accept into permission poller"
 ### Task 5: Add /auto_accept command to bot.py
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Find command handlers location**
 
@@ -509,7 +509,7 @@ async def cmd_auto_accept(message: Message):
 
 **Step 3: Run bot manually to verify command works**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && ./restart.sh`
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && ./restart.sh`
 
 Manual test:
 1. Send `/auto_accept` in a registered project chat → should show status
@@ -519,8 +519,8 @@ Manual test:
 **Step 4: Commit**
 
 ```bash
-cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge
-git add src/telegram_bridge/bot.py
+cd /home/superbereza/dev/personal-agent/agent-tools/codogram
+git add src/codogram/bot.py
 git commit -m "feat(auto-accept): add /auto_accept command"
 ```
 
@@ -529,7 +529,7 @@ git commit -m "feat(auto-accept): add /auto_accept command"
 ### Task 6: Update /status command to show auto-accept state
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Find show_status function**
 
@@ -549,15 +549,15 @@ status_lines.append(f"Auto-accept: {auto_status}")
 
 **Step 3: Run bot manually to verify**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && ./restart.sh`
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && ./restart.sh`
 
 Send `/status` in a registered project chat → should show auto-accept status line.
 
 **Step 4: Commit**
 
 ```bash
-cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge
-git add src/telegram_bridge/bot.py
+cd /home/superbereza/dev/personal-agent/agent-tools/codogram
+git add src/codogram/bot.py
 git commit -m "feat(auto-accept): show auto-accept status in /status command"
 ```
 
@@ -566,7 +566,7 @@ git commit -m "feat(auto-accept): show auto-accept status in /status command"
 ### Task 7: Add /auto_accept to bot menu
 
 **Files:**
-- Modify: `src/telegram_bridge/main.py` (or wherever bot commands are registered)
+- Modify: `src/codogram/main.py` (or wherever bot commands are registered)
 
 **Step 1: Find bot commands registration**
 
@@ -581,15 +581,15 @@ BotCommand(command="auto_accept", description="Toggle auto-accept mode"),
 
 **Step 3: Restart bot and verify menu**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && ./restart.sh`
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && ./restart.sh`
 
 Check Telegram bot menu → should show /auto_accept command.
 
 **Step 4: Commit**
 
 ```bash
-cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge
-git add src/telegram_bridge/main.py
+cd /home/superbereza/dev/personal-agent/agent-tools/codogram
+git add src/codogram/main.py
 git commit -m "feat(auto-accept): add /auto_accept to bot menu"
 ```
 
@@ -607,7 +607,7 @@ Move the "Auto-accept mode" section from Backlog to Done section.
 **Step 2: Commit**
 
 ```bash
-cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge
+cd /home/superbereza/dev/personal-agent/agent-tools/codogram
 git add ROADMAP.md
 git commit -m "docs: mark auto-accept mode as done in roadmap"
 ```

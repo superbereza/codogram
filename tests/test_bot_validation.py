@@ -4,7 +4,7 @@ import pytest
 
 def test_is_valid_project_name_valid():
     """Test valid project names."""
-    from src.telegram_bridge.bot import is_valid_project_name
+    from codogram.bot import is_valid_project_name
 
     assert is_valid_project_name("my-project") == True
     assert is_valid_project_name("my_project") == True
@@ -14,7 +14,7 @@ def test_is_valid_project_name_valid():
 
 def test_is_valid_project_name_invalid():
     """Test invalid project names."""
-    from src.telegram_bridge.bot import is_valid_project_name
+    from codogram.bot import is_valid_project_name
 
     assert is_valid_project_name("") == False
     assert is_valid_project_name("my project") == False  # space

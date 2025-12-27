@@ -13,7 +13,7 @@
 ### Task 1: Функция find_missed_entries в watcher.py
 
 **Files:**
-- Modify: `src/telegram_bridge/watcher.py`
+- Modify: `src/codogram/watcher.py`
 - Test: `tests/test_watcher.py`
 
 **Step 1: Write the failing test**
@@ -23,7 +23,7 @@
 import json
 import tempfile
 from pathlib import Path
-from telegram_bridge.watcher import find_missed_entries, ParsedEntry, ContentType
+from codogram.watcher import find_missed_entries, ParsedEntry, ContentType
 
 
 def test_find_missed_entries_returns_entries_after_last_user():
@@ -88,7 +88,7 @@ Expected: FAIL with "cannot import name 'find_missed_entries'"
 
 **Step 3: Write implementation**
 
-Add to `src/telegram_bridge/watcher.py`:
+Add to `src/codogram/watcher.py`:
 
 ```python
 def find_missed_entries(path: Path) -> list[ParsedEntry]:
@@ -124,7 +124,7 @@ Expected: PASS (4 tests)
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/watcher.py tests/test_watcher.py
+git add src/codogram/watcher.py tests/test_watcher.py
 git commit -m "feat(watcher): add find_missed_entries function"
 ```
 
@@ -133,7 +133,7 @@ git commit -m "feat(watcher): add find_missed_entries function"
 ### Task 2: Параметр send_missed в create_watcher_task и watcher_for_session
 
 **Files:**
-- Modify: `src/telegram_bridge/watcher.py`
+- Modify: `src/codogram/watcher.py`
 
 **Step 1: Update create_watcher_task signature**
 
@@ -194,7 +194,7 @@ Expected: PASS
 **Step 4: Commit**
 
 ```bash
-git add src/telegram_bridge/watcher.py
+git add src/codogram/watcher.py
 git commit -m "feat(watcher): add send_missed parameter to watcher functions"
 ```
 
@@ -203,7 +203,7 @@ git commit -m "feat(watcher): add send_missed parameter to watcher functions"
 ### Task 3: Прокинуть send_missed через session_manager
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 
 **Step 1: Update _maybe_start_tasks signature**
 
@@ -227,7 +227,7 @@ async def _maybe_start_tasks(self, project: ProjectState, start_poller, start_wa
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py
+git add src/codogram/session_manager.py
 git commit -m "feat(session_manager): add send_missed parameter to _maybe_start_tasks"
 ```
 
@@ -236,7 +236,7 @@ git commit -m "feat(session_manager): add send_missed parameter to _maybe_start_
 ### Task 4: Передать send_missed=True при смене сессии в history_watcher
 
 **Files:**
-- Modify: `src/telegram_bridge/history_watcher.py`
+- Modify: `src/codogram/history_watcher.py`
 
 **Step 1: Update check_session_for_project**
 
@@ -292,7 +292,7 @@ if changed:
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/history_watcher.py
+git add src/codogram/history_watcher.py
 git commit -m "feat(history_watcher): pass send_missed=True on session change"
 ```
 
@@ -301,8 +301,8 @@ git commit -m "feat(history_watcher): pass send_missed=True on session change"
 ### Task 5: Обновить start_watcher в main.py и bot.py
 
 **Files:**
-- Modify: `src/telegram_bridge/main.py`
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/main.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Update main.py**
 
@@ -331,7 +331,7 @@ def _make_task_starters(bot):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/main.py src/telegram_bridge/bot.py
+git add src/codogram/main.py src/codogram/bot.py
 git commit -m "feat: update start_watcher signature in main.py and bot.py"
 ```
 
@@ -340,7 +340,7 @@ git commit -m "feat: update start_watcher signature in main.py and bot.py"
 ### Task 6: Унифицировать текст сообщений в bot.py
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Update _connect_or_launch (lines 224-227)**
 
@@ -385,7 +385,7 @@ await message.answer(
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
+git add src/codogram/bot.py
 git commit -m "refactor(bot): унифицировать текст сообщений, убрать 'ожидание регистрации'"
 ```
 
@@ -394,7 +394,7 @@ git commit -m "refactor(bot): унифицировать текст сообще
 ### Task 7: Добавить таймаут 5 минут в watcher
 
 **Files:**
-- Modify: `src/telegram_bridge/watcher.py`
+- Modify: `src/codogram/watcher.py`
 
 **Step 1: Add timeout constant**
 
@@ -442,7 +442,7 @@ async def watcher_for_session(bot: Bot, project: ProjectState,
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/watcher.py
+git add src/codogram/watcher.py
 git commit -m "feat(watcher): add 5 minute timeout for session detection"
 ```
 
@@ -452,7 +452,7 @@ git commit -m "feat(watcher): add 5 minute timeout for session detection"
 
 **Step 1: Manual test**
 
-1. Убить текущий бот: `pkill -f telegram_bridge`
+1. Убить текущий бот: `pkill -f codogram`
 2. Запустить бот: `./restart.sh`
 3. В Telegram: `/restart_session` для проекта
 4. `/start` — запустить Claude
@@ -463,7 +463,7 @@ git commit -m "feat(watcher): add 5 minute timeout for session detection"
 
 ```bash
 git add -A
-git commit -m "feat(telegram-bridge): implement missed responses feature
+git commit -m "feat(codogram): implement missed responses feature
 
 - Add find_missed_entries to find responses after last user message
 - Add send_missed parameter to watcher functions

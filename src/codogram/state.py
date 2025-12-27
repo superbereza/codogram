@@ -1,4 +1,4 @@
-# src/telegram_bridge/state.py
+# src/codogram/state.py
 """Shared state between modules to avoid circular imports."""
 
 # Track permission messages for deletion: {keyboard_msg_id: [content_msg_ids]}

@@ -1,4 +1,4 @@
-# src/telegram_bridge/chunker.py
+# src/codogram/chunker.py
 def chunk_message(text: str, max_len: int = 4000) -> list[str]:
     """Split text into chunks, preferring natural breakpoints."""
     if len(text) <= max_len:

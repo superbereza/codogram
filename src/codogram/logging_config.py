@@ -1,9 +1,9 @@
-"""Structured logging configuration for telegram_bridge."""
+"""Structured logging configuration for codogram."""
 import logging
 import os
 
 def setup_logging():
-    """Configure logging for telegram_bridge.
+    """Configure logging for codogram.
 
     Level controlled by LOG_LEVEL env var (default: DEBUG).
     Set LOG_LEVEL=INFO for less verbose output.
@@ -18,10 +18,10 @@ def setup_logging():
     )
 
     # Set level for our logger
-    logger = logging.getLogger("telegram_bridge")
+    logger = logging.getLogger("codogram")
     logger.setLevel(level)
 
     return logger
 
 # Module-level logger
-logger = logging.getLogger("telegram_bridge")
+logger = logging.getLogger("codogram")

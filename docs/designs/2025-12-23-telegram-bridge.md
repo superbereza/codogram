@@ -188,7 +188,7 @@ def chunk_message(text: str, max_len: int = 4000) -> list[str]:
 
 **Варианты**:
 
-1. **Config file**: `telegram_bridge.yaml`
+1. **Config file**: `codogram.yaml`
    ```yaml
    groups:
      -123456789: /home/user/project-a

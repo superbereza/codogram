@@ -1,6 +1,6 @@
 # tests/test_session_manager.py
 import os
-# Set env vars BEFORE importing telegram_bridge modules
+# Set env vars BEFORE importing codogram modules
 os.environ.setdefault("TELEGRAM_TOKEN", "test-token")
 os.environ.setdefault("ADMIN_IDS", "123")
 os.environ.setdefault("BASE_DIR", "/tmp")
@@ -14,10 +14,10 @@ def test_refresh_project_session_changes(tmp_path):
     jsonl_file = tmp_path / "test.jsonl"
     jsonl_file.touch()
 
-    with patch('telegram_bridge.session_manager.find_session_for_project', return_value="new-session-123"), \
-         patch('telegram_bridge.session_manager.compute_jsonl_path', return_value=jsonl_file):
+    with patch('codogram.session_manager.find_session_for_project', return_value="new-session-123"), \
+         patch('codogram.session_manager.compute_jsonl_path', return_value=jsonl_file):
 
-        from telegram_bridge.session_manager import ProjectManager, ProjectState
+        from codogram.session_manager import ProjectManager, ProjectState
         manager = ProjectManager()
         project = ProjectState(project_name="test", cwd="/test/path", chat_id=123)
         project.session_id = "old-session"
@@ -31,9 +31,9 @@ def test_refresh_project_session_changes(tmp_path):
 
 def test_refresh_project_session_no_change():
     """refresh_project_session should return False when session unchanged."""
-    with patch('telegram_bridge.session_manager.find_session_for_project', return_value="same-session"):
+    with patch('codogram.session_manager.find_session_for_project', return_value="same-session"):
 
-        from telegram_bridge.session_manager import ProjectManager, ProjectState
+        from codogram.session_manager import ProjectManager, ProjectState
         manager = ProjectManager()
         project = ProjectState(project_name="test", cwd="/test/path", chat_id=123)
         project.session_id = "same-session"
@@ -46,7 +46,7 @@ def test_refresh_project_session_no_change():
 
 def test_refresh_project_session_no_cwd():
     """refresh_project_session should handle missing cwd."""
-    from telegram_bridge.session_manager import ProjectManager, ProjectState
+    from codogram.session_manager import ProjectManager, ProjectState
     manager = ProjectManager()
     project = ProjectState(project_name="test", cwd=None, chat_id=123)
     manager.projects["test"] = project
@@ -57,10 +57,10 @@ def test_refresh_project_session_no_cwd():
 
 def test_refresh_project_session_jsonl_not_exists(tmp_path):
     """refresh_project_session should handle non-existent jsonl."""
-    with patch('telegram_bridge.session_manager.find_session_for_project', return_value="new-session"), \
-         patch('telegram_bridge.session_manager.compute_jsonl_path', return_value=tmp_path / "nonexistent.jsonl"):
+    with patch('codogram.session_manager.find_session_for_project', return_value="new-session"), \
+         patch('codogram.session_manager.compute_jsonl_path', return_value=tmp_path / "nonexistent.jsonl"):
 
-        from telegram_bridge.session_manager import ProjectManager, ProjectState
+        from codogram.session_manager import ProjectManager, ProjectState
         manager = ProjectManager()
         project = ProjectState(project_name="test", cwd="/test/path", chat_id=123)
         manager.projects["test"] = project
@@ -74,7 +74,7 @@ def test_refresh_project_session_jsonl_not_exists(tmp_path):
 
 # Tests for ThreadInfo
 def test_thread_info_creation():
-    from telegram_bridge.session_manager import ThreadInfo
+    from codogram.session_manager import ThreadInfo
     thread = ThreadInfo(thread_id=12345, name="mystic")
     assert thread.thread_id == 12345
     assert thread.name == "mystic"
@@ -83,27 +83,27 @@ def test_thread_info_creation():
 
 
 def test_thread_info_get_tmux_session_main():
-    from telegram_bridge.session_manager import ThreadInfo
+    from codogram.session_manager import ThreadInfo
     thread = ThreadInfo(thread_id=None, name="main")
     assert thread.get_tmux_session("codogram") == "claude-codogram"
 
 
 def test_thread_info_get_tmux_session_named():
-    from telegram_bridge.session_manager import ThreadInfo
+    from codogram.session_manager import ThreadInfo
     thread = ThreadInfo(thread_id=12345, name="mystic")
     assert thread.get_tmux_session("codogram") == "claude-codogram-mystic"
 
 
 # Tests for ProjectState.threads
 def test_project_state_has_threads():
-    from telegram_bridge.session_manager import ProjectState, ThreadInfo
+    from codogram.session_manager import ProjectState, ThreadInfo
     project = ProjectState(project_name="test")
     assert hasattr(project, 'threads')
     assert project.threads == {}
 
 
 def test_project_state_get_thread():
-    from telegram_bridge.session_manager import ProjectState, ThreadInfo
+    from codogram.session_manager import ProjectState, ThreadInfo
     project = ProjectState(project_name="test")
     thread = ThreadInfo(thread_id=None, name="main")
     project.threads[None] = thread
@@ -112,7 +112,7 @@ def test_project_state_get_thread():
 
 
 def test_project_state_get_or_create_thread():
-    from telegram_bridge.session_manager import ProjectState
+    from codogram.session_manager import ProjectState
     project = ProjectState(project_name="test")
     thread = project.get_or_create_thread(None, "main")
     assert thread.name == "main"
@@ -124,8 +124,8 @@ def test_project_state_get_or_create_thread():
 
 # Tests for config save/load with threads
 def test_config_saves_threads(tmp_path, monkeypatch):
-    from telegram_bridge.session_manager import ProjectManager, ThreadInfo
-    from telegram_bridge import config
+    from codogram.session_manager import ProjectManager, ThreadInfo
+    from codogram import config
 
     config_file = tmp_path / ".config.json"
     monkeypatch.setattr(config, "CONFIG_PATH", config_file)
@@ -149,7 +149,7 @@ def test_config_saves_threads(tmp_path, monkeypatch):
 
 
 def test_config_loads_threads(tmp_path, monkeypatch):
-    from telegram_bridge import config
+    from codogram import config
     import json
 
     config_file = tmp_path / ".config.json"
@@ -167,7 +167,7 @@ def test_config_loads_threads(tmp_path, monkeypatch):
     }))
     monkeypatch.setattr(config, "CONFIG_PATH", config_file)
 
-    from telegram_bridge.session_manager import ProjectManager
+    from codogram.session_manager import ProjectManager
     manager = ProjectManager()
     project = manager.projects.get("test-project")
     assert project is not None

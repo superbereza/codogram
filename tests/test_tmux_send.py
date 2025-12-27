@@ -3,7 +3,7 @@ import subprocess
 import time
 import pytest
 
-from telegram_bridge.tmux import TmuxSession
+from codogram.tmux import TmuxSession
 
 
 @pytest.fixture

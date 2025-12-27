@@ -1,18 +1,18 @@
-# Extraction Plan: telegram-bridge → codogram
+# Extraction Plan: codogram → codogram
 
 ## Goal
 
-Extract `agent-tools/telegram-bridge` from personal-agent monorepo into standalone project `codogram` with full git history, rename package, and seamlessly switch bot.
+Extract `agent-tools/codogram` from personal-agent monorepo into standalone project `codogram` with full git history, rename package, and seamlessly switch bot.
 
 ## Summary
 
 | Aspect | Value |
 |--------|-------|
-| Source | `/home/superbereza/dev/personal-agent/agent-tools/telegram-bridge` |
+| Source | `/home/superbereza/dev/personal-agent/agent-tools/codogram` |
 | Target | `/home/superbereza/dev/codogram` |
 | History | Full (240 commits), using `git filter-repo` |
 | GitHub | New private repo `superbereza/codogram` |
-| Package rename | `telegram_bridge` → `codogram` |
+| Package rename | `codogram` → `codogram` |
 | Bot switch | One script: stop old → start new (minimal downtime) |
 | Cleanup | Done by new Claude session in codogram |
 
@@ -26,7 +26,7 @@ pip install git-filter-repo
 cd /tmp
 git clone /home/superbereza/dev/personal-agent codogram-extract
 cd codogram-extract
-git filter-repo --subdirectory-filter agent-tools/telegram-bridge
+git filter-repo --subdirectory-filter agent-tools/codogram
 ```
 
 ### Step 2: Move to final location
@@ -39,41 +39,41 @@ mv /tmp/codogram-extract /home/superbereza/dev/codogram
 
 ```bash
 # .env (credentials)
-cp /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge/.env \
+cp /home/superbereza/dev/personal-agent/agent-tools/codogram/.env \
    /home/superbereza/dev/codogram/.env
 
 # Logs
 mkdir -p /home/superbereza/dev/codogram/tmp
-cp -r /home/superbereza/dev/personal-agent/tmp/telegram-bridge-logs \
+cp -r /home/superbereza/dev/personal-agent/tmp/codogram-logs \
       /home/superbereza/dev/codogram/tmp/
 ```
 
-### Step 4: Rename package telegram_bridge → codogram
+### Step 4: Rename package codogram → codogram
 
 ```bash
 cd /home/superbereza/dev/codogram
 
 # Rename folder
-mv src/telegram_bridge src/codogram
+mv src/codogram src/codogram
 
 # Update imports in code
-find src tests -name "*.py" -exec sed -i 's/telegram_bridge/codogram/g' {} \;
-find src tests -name "*.py" -exec sed -i 's/telegram-bridge/codogram/g' {} \;
+find src tests -name "*.py" -exec sed -i 's/codogram/codogram/g' {} \;
+find src tests -name "*.py" -exec sed -i 's/codogram/codogram/g' {} \;
 
 # Update pyproject.toml
-sed -i 's/telegram-bridge/codogram/g' pyproject.toml
-sed -i 's/telegram_bridge/codogram/g' pyproject.toml
+sed -i 's/codogram/codogram/g' pyproject.toml
+sed -i 's/codogram/codogram/g' pyproject.toml
 
 # Update restart.sh
-sed -i 's/telegram_bridge/codogram/g' restart.sh
+sed -i 's/codogram/codogram/g' restart.sh
 sed -i 's|/home/superbereza/dev/personal-agent/venv|/home/superbereza/dev/codogram/venv|g' restart.sh
-sed -i 's/telegram-bridge/codogram/g' restart.sh
+sed -i 's/codogram/codogram/g' restart.sh
 
 # Update docs
-sed -i 's/telegram_bridge/codogram/g' CLAUDE.md
-sed -i 's/telegram-bridge/codogram/g' CLAUDE.md
-find docs -name "*.md" -exec sed -i 's/telegram_bridge/codogram/g' {} \;
-find docs -name "*.md" -exec sed -i 's/telegram-bridge/codogram/g' {} \;
+sed -i 's/codogram/codogram/g' CLAUDE.md
+sed -i 's/codogram/codogram/g' CLAUDE.md
+find docs -name "*.md" -exec sed -i 's/codogram/codogram/g' {} \;
+find docs -name "*.md" -exec sed -i 's/codogram/codogram/g' {} \;
 ```
 
 ### Step 5: Setup Python environment
@@ -97,7 +97,7 @@ python3 -m py_compile src/codogram/main.py
 ```bash
 cd /home/superbereza/dev/codogram
 git add -A
-git commit -m "refactor: rename telegram_bridge to codogram"
+git commit -m "refactor: rename codogram to codogram"
 gh repo create codogram --private --source=. --push
 ```
 
@@ -106,20 +106,20 @@ gh repo create codogram --private --source=. --push
 **Перед переключением бота — сохрани этот промпт для нового Claude в codogram:**
 
 ```
-Удали из personal-agent всё связанное с telegram-bridge:
-- /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge/
-- /home/superbereza/dev/personal-agent/tmp/telegram-bridge-logs/
+Удали из personal-agent всё связанное с codogram:
+- /home/superbereza/dev/personal-agent/agent-tools/codogram/
+- /home/superbereza/dev/personal-agent/tmp/codogram-logs/
 - План миграции уже выполнен, проект переехал в codogram
 
 Закоммить и запуш:
-git add -A && git commit -m "chore: remove telegram-bridge (moved to codogram repo)" && git push
+git add -A && git commit -m "chore: remove codogram (moved to codogram repo)" && git push
 ```
 
 ### Step 9: Switch bot (one script, minimal downtime)
 
 ```bash
 # Stop old bot
-pkill -f "python -m telegram_bridge.main" || true
+pkill -f "python -m codogram.main" || true
 pkill -f "python -m codogram.main" || true
 
 # Start new bot
@@ -148,4 +148,4 @@ cd /home/superbereza/dev/codogram
 
 Если что-то пошло не так:
 - Original personal-agent repo не изменён до Step 10
-- Можно перезапустить старого бота: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && ./restart.sh`
+- Можно перезапустить старого бота: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && ./restart.sh`

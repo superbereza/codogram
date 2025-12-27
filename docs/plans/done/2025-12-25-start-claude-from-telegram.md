@@ -13,8 +13,8 @@
 ## Task 1: Extend config to store project paths
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
-- Modify: `src/telegram_bridge/config.py`
+- Modify: `src/codogram/session_manager.py`
+- Modify: `src/codogram/config.py`
 
 **Step 1: Update register_project to accept optional path**
 
@@ -67,14 +67,14 @@ def get_project_by_chat(self, chat_id: int) -> str | None:
 
 **Step 4: Run existing tests**
 
-Run: `cd agent-tools/telegram-bridge && source ~/dev/personal-agent/venv/bin/activate && python -m pytest tests/test_session_manager.py -v`
+Run: `cd agent-tools/codogram && source ~/dev/personal-agent/venv/bin/activate && python -m pytest tests/test_session_manager.py -v`
 
 Expected: PASS (backwards compatible)
 
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py
+git add src/codogram/session_manager.py
 git commit -m "feat(config): extend projects to store optional path"
 ```
 
@@ -83,7 +83,7 @@ git commit -m "feat(config): extend projects to store optional path"
 ## Task 2: Add project path resolver
 
 **Files:**
-- Create: `src/telegram_bridge/project_launcher.py`
+- Create: `src/codogram/project_launcher.py`
 - Create: `tests/test_project_launcher.py`
 
 **Step 1: Write tests for path resolution**
@@ -100,7 +100,7 @@ os.environ.setdefault("TELEGRAM_TOKEN", "test")
 os.environ.setdefault("ADMIN_IDS", "123")
 os.environ.setdefault("BASE_DIR", "/tmp")
 
-from telegram_bridge.project_launcher import resolve_project_path, ProjectPathResult
+from codogram.project_launcher import resolve_project_path, ProjectPathResult
 
 
 def test_resolve_path_convention_exists(tmp_path):
@@ -108,7 +108,7 @@ def test_resolve_path_convention_exists(tmp_path):
     project_dir = tmp_path / "my-project"
     project_dir.mkdir()
 
-    with patch("telegram_bridge.project_launcher.settings") as mock_settings:
+    with patch("codogram.project_launcher.settings") as mock_settings:
         mock_settings.base_dir = str(tmp_path)
         result = resolve_project_path("my-project", None)
 
@@ -129,7 +129,7 @@ def test_resolve_path_custom_exists(tmp_path):
 
 def test_resolve_path_not_exists(tmp_path):
     """Return not exists if directory missing."""
-    with patch("telegram_bridge.project_launcher.settings") as mock_settings:
+    with patch("codogram.project_launcher.settings") as mock_settings:
         mock_settings.base_dir = str(tmp_path)
         result = resolve_project_path("nonexistent", None)
 
@@ -139,14 +139,14 @@ def test_resolve_path_not_exists(tmp_path):
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd agent-tools/telegram-bridge && source ~/dev/personal-agent/venv/bin/activate && python -m pytest tests/test_project_launcher.py -v`
+Run: `cd agent-tools/codogram && source ~/dev/personal-agent/venv/bin/activate && python -m pytest tests/test_project_launcher.py -v`
 
 Expected: FAIL (module not found)
 
 **Step 3: Implement project_launcher.py**
 
 ```python
-# src/telegram_bridge/project_launcher.py
+# src/codogram/project_launcher.py
 """Project launcher - resolve paths and start Claude in tmux."""
 import subprocess
 from dataclasses import dataclass
@@ -176,14 +176,14 @@ def resolve_project_path(project_name: str, custom_path: str | None) -> ProjectP
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd agent-tools/telegram-bridge && source ~/dev/personal-agent/venv/bin/activate && python -m pytest tests/test_project_launcher.py -v`
+Run: `cd agent-tools/codogram && source ~/dev/personal-agent/venv/bin/activate && python -m pytest tests/test_project_launcher.py -v`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/project_launcher.py tests/test_project_launcher.py
+git add src/codogram/project_launcher.py tests/test_project_launcher.py
 git commit -m "feat(launcher): add project path resolver"
 ```
 
@@ -192,7 +192,7 @@ git commit -m "feat(launcher): add project path resolver"
 ## Task 3: Add Claude launcher functions
 
 **Files:**
-- Modify: `src/telegram_bridge/project_launcher.py`
+- Modify: `src/codogram/project_launcher.py`
 - Modify: `tests/test_project_launcher.py`
 
 **Step 1: Add tests for Claude launcher**
@@ -200,7 +200,7 @@ git commit -m "feat(launcher): add project path resolver"
 ```python
 # Add to tests/test_project_launcher.py
 
-from telegram_bridge.project_launcher import (
+from codogram.project_launcher import (
     is_tmux_session_exists,
     create_tmux_with_claude,
     LaunchResult,
@@ -230,14 +230,14 @@ def test_create_tmux_with_claude(tmp_path):
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd agent-tools/telegram-bridge && source ~/dev/personal-agent/venv/bin/activate && python -m pytest tests/test_project_launcher.py::test_is_tmux_session_exists_false -v`
+Run: `cd agent-tools/codogram && source ~/dev/personal-agent/venv/bin/activate && python -m pytest tests/test_project_launcher.py::test_is_tmux_session_exists_false -v`
 
 Expected: FAIL (function not defined)
 
 **Step 3: Implement launcher functions**
 
 ```python
-# Add to src/telegram_bridge/project_launcher.py
+# Add to src/codogram/project_launcher.py
 
 @dataclass
 class LaunchResult:
@@ -280,14 +280,14 @@ def create_tmux_with_claude(session_name: str, project_path: str) -> LaunchResul
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd agent-tools/telegram-bridge && source ~/dev/personal-agent/venv/bin/activate && python -m pytest tests/test_project_launcher.py -v`
+Run: `cd agent-tools/codogram && source ~/dev/personal-agent/venv/bin/activate && python -m pytest tests/test_project_launcher.py -v`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/project_launcher.py tests/test_project_launcher.py
+git add src/codogram/project_launcher.py tests/test_project_launcher.py
 git commit -m "feat(launcher): add tmux session creation with Claude"
 ```
 
@@ -296,12 +296,12 @@ git commit -m "feat(launcher): add tmux session creation with Claude"
 ## Task 4: Add git setup functions
 
 **Files:**
-- Modify: `src/telegram_bridge/project_launcher.py`
+- Modify: `src/codogram/project_launcher.py`
 
 **Step 1: Add git/directory setup functions**
 
 ```python
-# Add to src/telegram_bridge/project_launcher.py
+# Add to src/codogram/project_launcher.py
 
 def create_project_directory(path: str) -> LaunchResult:
     """Create project directory."""
@@ -373,7 +373,7 @@ def git_clone(path: str, repo_url: str) -> LaunchResult:
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/project_launcher.py
+git add src/codogram/project_launcher.py
 git commit -m "feat(launcher): add git setup functions"
 ```
 
@@ -382,12 +382,12 @@ git commit -m "feat(launcher): add git setup functions"
 ## Task 5: Add keyboard builders for conversation flow
 
 **Files:**
-- Create: `src/telegram_bridge/start_flow.py`
+- Create: `src/codogram/start_flow.py`
 
 **Step 1: Create keyboard builders**
 
 ```python
-# src/telegram_bridge/start_flow.py
+# src/codogram/start_flow.py
 """Conversation flow for /start command."""
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -429,7 +429,7 @@ def git_visibility_keyboard() -> InlineKeyboardMarkup:
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/start_flow.py
+git add src/codogram/start_flow.py
 git commit -m "feat(start): add keyboard builders for conversation flow"
 ```
 
@@ -438,7 +438,7 @@ git commit -m "feat(start): add keyboard builders for conversation flow"
 ## Task 6: Implement /start handler with launch logic
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add state storage for conversation flow**
 
@@ -543,7 +543,7 @@ async def launch_claude(message: Message, project_name: str, path: str):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
+git add src/codogram/bot.py
 git commit -m "feat(start): implement /start with Claude launch"
 ```
 
@@ -552,7 +552,7 @@ git commit -m "feat(start): implement /start with Claude launch"
 ## Task 7: Add callback handlers for conversation flow
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add callback handlers**
 
@@ -725,7 +725,7 @@ async def on_start_no_git(callback: CallbackQuery):
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
+git add src/codogram/bot.py
 git commit -m "feat(start): add callback handlers for conversation flow"
 ```
 
@@ -734,7 +734,7 @@ git commit -m "feat(start): add callback handlers for conversation flow"
 ## Task 8: Handle text input for custom path and clone URL
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Update on_message handler**
 
@@ -797,7 +797,7 @@ from pathlib import Path
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
+git add src/codogram/bot.py
 git commit -m "feat(start): handle text input for custom path and clone URL"
 ```
 
@@ -806,8 +806,8 @@ git commit -m "feat(start): handle text input for custom path and clone URL"
 ## Task 9: Remove /register_dir command
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
-- Modify: `src/telegram_bridge/main.py`
+- Modify: `src/codogram/bot.py`
+- Modify: `src/codogram/main.py`
 
 **Step 1: Remove cmd_register_dir handler from bot.py**
 
@@ -835,7 +835,7 @@ await bot.set_my_commands([
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py src/telegram_bridge/main.py
+git add src/codogram/bot.py src/codogram/main.py
 git commit -m "refactor(start): remove /register_dir, functionality merged into /start"
 ```
 
@@ -846,8 +846,8 @@ git commit -m "refactor(start): remove /register_dir, functionality merged into 
 **Step 1: Restart bot**
 
 ```bash
-pkill -f telegram_bridge
-cd ~/dev/personal-agent/agent-tools/telegram-bridge && bash restart.sh
+pkill -f codogram
+cd ~/dev/personal-agent/agent-tools/codogram && bash restart.sh
 ```
 
 **Step 2: Test in Telegram**

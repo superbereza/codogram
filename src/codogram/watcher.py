@@ -1,4 +1,4 @@
-# src/telegram_bridge/watcher.py
+# src/codogram/watcher.py
 import json
 import asyncio
 from enum import Enum

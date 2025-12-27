@@ -1,4 +1,4 @@
-# src/telegram_bridge/tmux_selector.py
+# src/codogram/tmux_selector.py
 """Handle multiple tmux session selection."""
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 

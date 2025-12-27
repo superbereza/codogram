@@ -2,7 +2,7 @@
 import json
 import tempfile
 from pathlib import Path
-from telegram_bridge.history_reader import find_session_for_project, reset_history_cache, compute_jsonl_path
+from codogram.history_reader import find_session_for_project, reset_history_cache, compute_jsonl_path
 
 def test_find_session_for_project():
     reset_history_cache()  # Clean state

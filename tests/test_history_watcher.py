@@ -1,6 +1,6 @@
 # tests/test_history_watcher.py
 import os
-# Set env vars BEFORE importing telegram_bridge modules
+# Set env vars BEFORE importing codogram modules
 os.environ.setdefault("TELEGRAM_TOKEN", "test-token")
 os.environ.setdefault("ADMIN_IDS", "123")
 os.environ.setdefault("BASE_DIR", "/tmp")
@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 @pytest.mark.asyncio
 async def test_check_session_for_project_detects_change():
     """Test that check_session_for_project detects session changes."""
-    from telegram_bridge.history_watcher import check_session_for_project
+    from codogram.history_watcher import check_session_for_project
 
     bot = MagicMock()
     start_poller = AsyncMock(return_value=MagicMock())
@@ -31,7 +31,7 @@ async def test_check_session_for_project_detects_change():
     mock_pm._maybe_start_tasks = AsyncMock()
 
     # Patch session_manager module where it's imported from
-    with patch('telegram_bridge.session_manager.project_manager', mock_pm):
+    with patch('codogram.session_manager.project_manager', mock_pm):
         await check_session_for_project(mock_project, bot, start_poller, start_watcher)
 
         # Should have called refresh and _maybe_start_tasks
@@ -41,7 +41,7 @@ async def test_check_session_for_project_detects_change():
 @pytest.mark.asyncio
 async def test_history_watcher_checks_tmux_and_sessions():
     """Test that HistoryWatcher checks tmux health and session changes."""
-    from telegram_bridge.history_watcher import HistoryWatcher
+    from codogram.history_watcher import HistoryWatcher
 
     bot = MagicMock()
     bot.send_message = AsyncMock()
@@ -64,8 +64,8 @@ async def test_history_watcher_checks_tmux_and_sessions():
     mock_pm.refresh_project_session.return_value = False  # No session change
     watcher.project_manager = mock_pm
 
-    with patch('telegram_bridge.session_manager.should_cleanup_project', return_value=False):
-        with patch('telegram_bridge.history_watcher.TmuxSession') as mock_tmux:
+    with patch('codogram.session_manager.should_cleanup_project', return_value=False):
+        with patch('codogram.history_watcher.TmuxSession') as mock_tmux:
             mock_tmux.return_value.exists.return_value = True
 
             await watcher._check_for_changes()

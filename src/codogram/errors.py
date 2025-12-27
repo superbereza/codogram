@@ -1,5 +1,5 @@
-# src/telegram_bridge/errors.py
-"""Error handling policy for telegram-bridge.
+# src/codogram/errors.py
+"""Error handling policy for codogram.
 
 ERROR level (requires attention):
 - Bot startup failures
@@ -24,7 +24,7 @@ DEBUG level (troubleshooting):
 """
 
 class TelegramBridgeError(Exception):
-    """Base exception for telegram-bridge."""
+    """Base exception for codogram."""
     pass
 
 class ConfigError(TelegramBridgeError):

@@ -23,13 +23,13 @@ Telegram-bridge — бот для управления Claude Code через Te
 ## Ключевые файлы
 
 ```
-agent-tools/telegram-bridge/
+agent-tools/codogram/
 ├── .env                      # TELEGRAM_TOKEN, ADMIN_CHAT_ID, BASE_DIR
 ├── .config.json              # projects + sessions mapping (создаётся автоматически)
 ├── hooks/
 │   ├── session-start.sh      # POST /session/register при старте Claude
 │   └── session-end.sh        # POST /session/unregister при завершении
-├── src/telegram_bridge/
+├── src/codogram/
 │   ├── main.py               # HTTP server :8787 + Telegram bot
 │   ├── config.py             # Settings + load/save .config.json
 │   ├── session_manager.py    # SessionManager - регистрация, персистенция
@@ -45,7 +45,7 @@ agent-tools/telegram-bridge/
 ## Архитектура
 
 ```
-Claude Code                    telegram-bridge                 Telegram
+Claude Code                    codogram                 Telegram
     │                               │                              │
     │ SessionStart hook ──────────► HTTP :8787                     │
     │                               │                              │
@@ -68,26 +68,26 @@ Claude Code                    telegram-bridge                 Telegram
 
 ```bash
 # Что отправлено в Telegram
-tail -f ~/dev/personal-agent/tmp/telegram-bridge-logs/poller-sent.log
+tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-sent.log
 
 # State machine поллера
-tail -f ~/dev/personal-agent/tmp/telegram-bridge-logs/poller-debug.log
+tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log
 
 # Сырой экран tmux
-cat ~/dev/personal-agent/tmp/telegram-bridge-logs/poller-screen-raw.txt
+cat ~/dev/personal-agent/tmp/codogram-logs/poller-screen-raw.txt
 ```
 
 ### Проверить что бот запущен
 
 ```bash
-ps aux | grep telegram_bridge
+ps aux | grep codogram
 ```
 
 ### Убить все инстансы и перезапустить
 
 ```bash
-pkill -f "telegram_bridge"
-./agent-tools/telegram-bridge/restart.sh
+pkill -f "codogram"
+./agent-tools/codogram/restart.sh
 ```
 
 ### Проверить HTTP server
@@ -108,15 +108,15 @@ cat ~/.claude/settings.json | jq '.hooks'
 ### Проверить .config.json
 
 ```bash
-cat agent-tools/telegram-bridge/.config.json
+cat agent-tools/codogram/.config.json
 ```
 
 ## Типичные проблемы
 
 ### Бот не отвечает
 
-1. Проверить запущен ли: `ps aux | grep telegram_bridge`
-2. Проверить логи: `tail -20 ~/dev/personal-agent/tmp/telegram-bridge-logs/poller-debug.log`
+1. Проверить запущен ли: `ps aux | grep codogram`
+2. Проверить логи: `tail -20 ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log`
 3. Перезапустить: `./restart.sh`
 
 ### Permission prompts не появляются в Telegram
@@ -141,7 +141,7 @@ cat agent-tools/telegram-bridge/.config.json
 ### Ошибка "No module named..."
 
 ```bash
-cd agent-tools/telegram-bridge
+cd agent-tools/codogram
 source ../../venv/bin/activate
 pip install -e .
 ```
@@ -169,7 +169,7 @@ pip install -e .
 source ~/dev/personal-agent/venv/bin/activate
 
 # Запустить тесты
-cd agent-tools/telegram-bridge
+cd agent-tools/codogram
 python -m pytest tests/ -v
 
 # Перезапустить бота

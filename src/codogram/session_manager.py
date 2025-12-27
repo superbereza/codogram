@@ -1,4 +1,4 @@
-# src/telegram_bridge/session_manager.py
+# src/codogram/session_manager.py
 import asyncio
 import time
 from dataclasses import dataclass, field

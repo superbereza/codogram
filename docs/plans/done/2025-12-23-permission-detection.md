@@ -8,22 +8,22 @@
 
 **Tech Stack:** Python 3.11+, aiogram 3.x (InlineKeyboardMarkup, CallbackQuery), tmux
 
-**Design Doc:** `docs/designs/telegram-bridge.md` — секция "Permission & Progress Detection"
+**Design Doc:** `docs/designs/codogram.md` — секция "Permission & Progress Detection"
 
 ---
 
 ## Task 1: Screen Parser
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/screen.py`
-- Create: `agent-tools/telegram-bridge/tests/test_screen.py`
+- Create: `agent-tools/codogram/src/codogram/screen.py`
+- Create: `agent-tools/codogram/tests/test_screen.py`
 
 **Step 1: Write failing test for permission detection**
 
 ```python
 # tests/test_screen.py
 import pytest
-from telegram_bridge.screen import parse_screen, PermissionPrompt, ToolProgress, Idle
+from codogram.screen import parse_screen, PermissionPrompt, ToolProgress, Idle
 
 PERMISSION_SCREEN = """
 ● Write(test.txt)
@@ -55,13 +55,13 @@ def test_parse_idle():
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd agent-tools/telegram-bridge && pytest tests/test_screen.py -v`
+Run: `cd agent-tools/codogram && pytest tests/test_screen.py -v`
 Expected: FAIL (module not found)
 
 **Step 3: Implement screen parser**
 
 ```python
-# src/telegram_bridge/screen.py
+# src/codogram/screen.py
 import re
 from dataclasses import dataclass
 
@@ -111,14 +111,14 @@ def parse_screen(output: str) -> ScreenState:
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd agent-tools/telegram-bridge && pytest tests/test_screen.py -v`
+Run: `cd agent-tools/codogram && pytest tests/test_screen.py -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/screen.py agent-tools/telegram-bridge/tests/test_screen.py
-git commit -m "feat(telegram-bridge): screen parser for permission detection"
+git add agent-tools/codogram/src/codogram/screen.py agent-tools/codogram/tests/test_screen.py
+git commit -m "feat(codogram): screen parser for permission detection"
 ```
 
 ---
@@ -126,8 +126,8 @@ git commit -m "feat(telegram-bridge): screen parser for permission detection"
 ## Task 2: Tmux Capture Function
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/tmux.py`
-- Modify: `agent-tools/telegram-bridge/tests/test_tmux.py`
+- Modify: `agent-tools/codogram/src/codogram/tmux.py`
+- Modify: `agent-tools/codogram/tests/test_tmux.py`
 
 **Step 1: Add capture_pane method to TmuxSession**
 
@@ -148,13 +148,13 @@ def capture_pane(self) -> str:
 
 **Step 2: Test manually**
 
-Run: `python -c "from telegram_bridge.tmux import TmuxSession; s = TmuxSession('test', '/tmp'); print(repr(s.capture_pane()))"`
+Run: `python -c "from codogram.tmux import TmuxSession; s = TmuxSession('test', '/tmp'); print(repr(s.capture_pane()))"`
 
 **Step 3: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/tmux.py
-git commit -m "feat(telegram-bridge): add capture_pane to TmuxSession"
+git add agent-tools/codogram/src/codogram/tmux.py
+git commit -m "feat(codogram): add capture_pane to TmuxSession"
 ```
 
 ---
@@ -162,12 +162,12 @@ git commit -m "feat(telegram-bridge): add capture_pane to TmuxSession"
 ## Task 3: Inline Keyboard for Permissions
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/keyboards.py`
+- Create: `agent-tools/codogram/src/codogram/keyboards.py`
 
 **Step 1: Create keyboard builder**
 
 ```python
-# src/telegram_bridge/keyboards.py
+# src/codogram/keyboards.py
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 def permission_keyboard(options: list[str]) -> InlineKeyboardMarkup:
@@ -195,8 +195,8 @@ def permission_keyboard(options: list[str]) -> InlineKeyboardMarkup:
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/keyboards.py
-git commit -m "feat(telegram-bridge): inline keyboard for permissions"
+git add agent-tools/codogram/src/codogram/keyboards.py
+git commit -m "feat(codogram): inline keyboard for permissions"
 ```
 
 ---
@@ -204,7 +204,7 @@ git commit -m "feat(telegram-bridge): inline keyboard for permissions"
 ## Task 4: Callback Handler
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/bot.py`
+- Modify: `agent-tools/codogram/src/codogram/bot.py`
 
 **Step 1: Add callback query handler**
 
@@ -237,8 +237,8 @@ async def on_permission_callback(callback: CallbackQuery):
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): callback handler for permission buttons"
+git add agent-tools/codogram/src/codogram/bot.py
+git commit -m "feat(codogram): callback handler for permission buttons"
 ```
 
 ---
@@ -246,7 +246,7 @@ git commit -m "feat(telegram-bridge): callback handler for permission buttons"
 ## Task 5: Permission Polling Integration
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/main.py`
+- Modify: `agent-tools/codogram/src/codogram/main.py`
 
 **⚠️ Архитектурное замечание:**
 - Контент permission НЕ попадает в jsonl
@@ -299,7 +299,7 @@ elif entry.content_type == ContentType.TOOL_USE:
 **Step 2: Test end-to-end**
 
 1. Start Claude Code in tmux
-2. Start bridge: `python -m telegram_bridge.main`
+2. Start bridge: `python -m codogram.main`
 3. Send message that triggers permission (e.g., "create file test.txt")
 4. Verify buttons appear in Telegram
 5. Press button, verify action sent to tmux
@@ -307,8 +307,8 @@ elif entry.content_type == ContentType.TOOL_USE:
 **Step 3: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/main.py
-git commit -m "feat(telegram-bridge): permission polling integration"
+git add agent-tools/codogram/src/codogram/main.py
+git commit -m "feat(codogram): permission polling integration"
 ```
 
 ---
@@ -316,7 +316,7 @@ git commit -m "feat(telegram-bridge): permission polling integration"
 ## Task 6: Watcher tool_result Detection
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/watcher.py`
+- Modify: `agent-tools/codogram/src/codogram/watcher.py`
 
 **Step 1: Add tool_result parsing**
 
@@ -349,8 +349,8 @@ The polling loop should check for tool_result to know when to stop.
 **Step 3: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/watcher.py
-git commit -m "feat(telegram-bridge): parse tool_result from jsonl"
+git add agent-tools/codogram/src/codogram/watcher.py
+git commit -m "feat(codogram): parse tool_result from jsonl"
 ```
 
 ---

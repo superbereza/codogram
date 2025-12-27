@@ -1,5 +1,5 @@
 # tests/test_tmux_selector.py
-from telegram_bridge.tmux_selector import create_tmux_selection_keyboard
+from codogram.tmux_selector import create_tmux_selection_keyboard
 
 def test_create_tmux_selection_keyboard():
     keyboard = create_tmux_selection_keyboard(["session1", "session2"], "my-project")

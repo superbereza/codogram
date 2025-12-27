@@ -13,7 +13,7 @@
 ### Task 1: Update .gitignore
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/.gitignore`
+- Modify: `agent-tools/codogram/.gitignore`
 
 **Step 1: Add config files to gitignore**
 
@@ -27,8 +27,8 @@ __pycache__/
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/.gitignore
-git commit -m "chore(telegram-bridge): add .config.json to gitignore"
+git add agent-tools/codogram/.gitignore
+git commit -m "chore(codogram): add .config.json to gitignore"
 ```
 
 ---
@@ -36,8 +36,8 @@ git commit -m "chore(telegram-bridge): add .config.json to gitignore"
 ### Task 2: Create project_resolver.py
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/project_resolver.py`
-- Create: `agent-tools/telegram-bridge/tests/test_project_resolver.py`
+- Create: `agent-tools/codogram/src/codogram/project_resolver.py`
+- Create: `agent-tools/codogram/tests/test_project_resolver.py`
 
 **Step 1: Write the failing test**
 
@@ -45,7 +45,7 @@ git commit -m "chore(telegram-bridge): add .config.json to gitignore"
 # tests/test_project_resolver.py
 import pytest
 from pathlib import Path
-from telegram_bridge.project_resolver import get_project_name
+from codogram.project_resolver import get_project_name
 
 def test_simple_directory():
     """Directory without git returns its name."""
@@ -73,17 +73,17 @@ def test_worktree(tmp_path):
 **Step 2: Run test to verify it fails**
 
 ```bash
-cd agent-tools/telegram-bridge
+cd agent-tools/codogram
 source ../../venv/bin/activate
 python -m pytest tests/test_project_resolver.py -v
 ```
 
-Expected: FAIL with "No module named 'telegram_bridge.project_resolver'"
+Expected: FAIL with "No module named 'codogram.project_resolver'"
 
 **Step 3: Write implementation**
 
 ```python
-# src/telegram_bridge/project_resolver.py
+# src/codogram/project_resolver.py
 from pathlib import Path
 
 def get_project_name(cwd: Path) -> str:
@@ -117,8 +117,8 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/project_resolver.py agent-tools/telegram-bridge/tests/test_project_resolver.py
-git commit -m "feat(telegram-bridge): add project_resolver for worktree support"
+git add agent-tools/codogram/src/codogram/project_resolver.py agent-tools/codogram/tests/test_project_resolver.py
+git commit -m "feat(codogram): add project_resolver for worktree support"
 ```
 
 ---
@@ -126,12 +126,12 @@ git commit -m "feat(telegram-bridge): add project_resolver for worktree support"
 ### Task 3: Update config.py
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/config.py`
+- Modify: `agent-tools/codogram/src/codogram/config.py`
 
 **Step 1: Update Settings class**
 
 ```python
-# src/telegram_bridge/config.py
+# src/codogram/config.py
 import json
 from pathlib import Path
 from pydantic_settings import BaseSettings
@@ -165,8 +165,8 @@ def save_config(config: dict) -> None:
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/config.py
-git commit -m "feat(telegram-bridge): update config for multi-session support"
+git add agent-tools/codogram/src/codogram/config.py
+git commit -m "feat(codogram): update config for multi-session support"
 ```
 
 ---
@@ -174,12 +174,12 @@ git commit -m "feat(telegram-bridge): update config for multi-session support"
 ### Task 4: Create session_manager.py
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/session_manager.py`
+- Create: `agent-tools/codogram/src/codogram/session_manager.py`
 
 **Step 1: Write SessionManager class**
 
 ```python
-# src/telegram_bridge/session_manager.py
+# src/codogram/session_manager.py
 import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -321,8 +321,8 @@ manager = SessionManager()
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/session_manager.py
-git commit -m "feat(telegram-bridge): add SessionManager for multi-session support"
+git add agent-tools/codogram/src/codogram/session_manager.py
+git commit -m "feat(codogram): add SessionManager for multi-session support"
 ```
 
 ---
@@ -330,15 +330,15 @@ git commit -m "feat(telegram-bridge): add SessionManager for multi-session suppo
 ### Task 5: Create Claude hooks
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/hooks/session-start.sh`
-- Create: `agent-tools/telegram-bridge/hooks/session-end.sh`
+- Create: `agent-tools/codogram/hooks/session-start.sh`
+- Create: `agent-tools/codogram/hooks/session-end.sh`
 
 **Step 1: Create session-start.sh**
 
 ```bash
 #!/bin/bash
 # Claude Code SessionStart hook
-# Registers session with telegram-bridge
+# Registers session with codogram
 
 set -e
 
@@ -355,7 +355,7 @@ fi
 # Detect tmux session
 tmux_session=$(tmux display-message -p '#S' 2>/dev/null || echo "")
 
-# Register with telegram-bridge (fire and forget)
+# Register with codogram (fire and forget)
 curl -s -X POST "http://localhost:8787/session/register" \
     -H "Content-Type: application/json" \
     -d "{
@@ -372,7 +372,7 @@ exit 0
 ```bash
 #!/bin/bash
 # Claude Code SessionEnd hook
-# Unregisters session from telegram-bridge
+# Unregisters session from codogram
 
 set -e
 
@@ -393,15 +393,15 @@ exit 0
 **Step 3: Make executable**
 
 ```bash
-chmod +x agent-tools/telegram-bridge/hooks/session-start.sh
-chmod +x agent-tools/telegram-bridge/hooks/session-end.sh
+chmod +x agent-tools/codogram/hooks/session-start.sh
+chmod +x agent-tools/codogram/hooks/session-end.sh
 ```
 
 **Step 4: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/hooks/
-git commit -m "feat(telegram-bridge): add Claude Code session hooks"
+git add agent-tools/codogram/hooks/
+git commit -m "feat(codogram): add Claude Code session hooks"
 ```
 
 ---
@@ -409,12 +409,12 @@ git commit -m "feat(telegram-bridge): add Claude Code session hooks"
 ### Task 6: Add HTTP server to main.py
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/main.py`
+- Modify: `agent-tools/codogram/src/codogram/main.py`
 
 **Step 1: Add aiohttp to requirements**
 
 ```bash
-echo "aiohttp" >> agent-tools/telegram-bridge/requirements.txt
+echo "aiohttp" >> agent-tools/codogram/requirements.txt
 pip install aiohttp
 ```
 
@@ -426,7 +426,7 @@ Replace main.py content - add HTTP server running alongside Telegram bot. Key ch
 - Start both HTTP server and Telegram polling
 
 ```python
-# src/telegram_bridge/main.py
+# src/codogram/main.py
 import asyncio
 from pathlib import Path
 from aiohttp import web
@@ -529,8 +529,8 @@ if __name__ == "__main__":
 **Step 3: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/main.py agent-tools/telegram-bridge/requirements.txt
-git commit -m "feat(telegram-bridge): add HTTP server for session registration"
+git add agent-tools/codogram/src/codogram/main.py agent-tools/codogram/requirements.txt
+git commit -m "feat(codogram): add HTTP server for session registration"
 ```
 
 ---
@@ -538,7 +538,7 @@ git commit -m "feat(telegram-bridge): add HTTP server for session registration"
 ### Task 7: Update bot.py for multi-session
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/bot.py`
+- Modify: `agent-tools/codogram/src/codogram/bot.py`
 
 **Step 1: Update bot.py**
 
@@ -549,7 +549,7 @@ Key changes:
 - Auto-register project when bot added to group
 
 ```python
-# src/telegram_bridge/bot.py
+# src/codogram/bot.py
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
@@ -673,8 +673,8 @@ async def on_message(message: Message):
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): update bot for multi-session routing"
+git add agent-tools/codogram/src/codogram/bot.py
+git commit -m "feat(codogram): update bot for multi-session routing"
 ```
 
 ---
@@ -682,7 +682,7 @@ git commit -m "feat(telegram-bridge): update bot for multi-session routing"
 ### Task 8: Update permission_poller.py for multi-session
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/permission_poller.py`
+- Modify: `agent-tools/codogram/src/codogram/permission_poller.py`
 
 **Step 1: Add create_poller_task function**
 
@@ -712,8 +712,8 @@ The key change is parameterizing the poller with session info instead of using g
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/permission_poller.py
-git commit -m "refactor(telegram-bridge): parameterize permission_poller for multi-session"
+git add agent-tools/codogram/src/codogram/permission_poller.py
+git commit -m "refactor(codogram): parameterize permission_poller for multi-session"
 ```
 
 ---
@@ -721,7 +721,7 @@ git commit -m "refactor(telegram-bridge): parameterize permission_poller for mul
 ### Task 9: Update watcher.py for multi-session
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/watcher.py`
+- Modify: `agent-tools/codogram/src/codogram/watcher.py`
 
 **Step 1: Add create_watcher_task function**
 
@@ -747,8 +747,8 @@ async def watcher_for_session(bot: Bot, session: SessionState):
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/watcher.py
-git commit -m "refactor(telegram-bridge): parameterize watcher for multi-session"
+git add agent-tools/codogram/src/codogram/watcher.py
+git commit -m "refactor(codogram): parameterize watcher for multi-session"
 ```
 
 ---
@@ -756,7 +756,7 @@ git commit -m "refactor(telegram-bridge): parameterize watcher for multi-session
 ### Task 10: Update .env
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/.env`
+- Modify: `agent-tools/codogram/.env`
 
 **Step 1: Update .env file**
 
@@ -790,7 +790,7 @@ BASE_DIR=/home/superbereza/dev
         "hooks": [
           {
             "type": "command",
-            "command": "/home/superbereza/dev/personal-agent/agent-tools/telegram-bridge/hooks/session-start.sh"
+            "command": "/home/superbereza/dev/personal-agent/agent-tools/codogram/hooks/session-start.sh"
           }
         ]
       }
@@ -800,7 +800,7 @@ BASE_DIR=/home/superbereza/dev
         "hooks": [
           {
             "type": "command",
-            "command": "/home/superbereza/dev/personal-agent/agent-tools/telegram-bridge/hooks/session-end.sh"
+            "command": "/home/superbereza/dev/personal-agent/agent-tools/codogram/hooks/session-end.sh"
           }
         ]
       }

@@ -66,7 +66,7 @@
   - Из jsonl приходит первая строка — на ней можно якориться
 
 - [ ] **R4: Voice + Multi-project** — голосовые сообщения через Whisper, несколько проектов
-  - План: `plans/2025-12-23-telegram-bridge.md` (Release 4)
+  - План: `plans/2025-12-23-codogram.md` (Release 4)
 
 ## Идеи / PoC
 
@@ -105,8 +105,8 @@
   - `•` плохо рендерится в некоторых клиентах
   - Заменить на `\`•\`` или другой символ
 
-- [ ] **Extract to separate repository** — вынести telegram-bridge в отдельный репозиторий
-  - `git subtree split -P agent-tools/telegram-bridge -b telegram-bridge-only`
+- [ ] **Extract to separate repository** — вынести codogram в отдельный репозиторий
+  - `git subtree split -P agent-tools/codogram -b codogram-only`
   - Сохранит историю коммитов только для этой папки
   - Ветки main и with-hooks можно вынести отдельно
 
@@ -115,7 +115,7 @@
   - Поискать готовые решения (telegramify-markdown, etc.)
 
 - [ ] **tmux-only архитектура** — парсить только tmux вместо jsonl + tmux
-  - Дизайн: `designs/telegram-bridge-tmux-only.md`
+  - Дизайн: `designs/codogram-tmux-only.md`
   - Проще, но хрупче (зависит от формата вывода Claude)
 
 ## Выполнено

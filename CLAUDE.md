@@ -1,4 +1,4 @@
-# Telegram Bridge - Claude Runtime Context
+# Codogram - Claude Runtime Context
 
 ## What it does
 
@@ -29,10 +29,10 @@ Telegram bot for managing Claude Code sessions through Telegram:
 ## Key files
 
 ```
-agent-tools/telegram-bridge/
+agent-tools/codogram/
 ├── .env                      # TELEGRAM_TOKEN, ADMIN_IDS, BASE_DIR
 ├── .config.json              # Projects + chat mapping (auto-created)
-├── src/telegram_bridge/
+├── src/codogram/
 │   ├── main.py               # Bot entry point
 │   ├── config.py             # Settings + config persistence
 │   ├── session_manager.py    # ProjectManager - project state
@@ -65,11 +65,11 @@ agent-tools/telegram-bridge/
 
 ```bash
 # Check if running
-ps aux | grep telegram_bridge
+ps aux | grep codogram
 
 # View logs
-tail -f ~/dev/personal-agent/tmp/telegram-bridge-logs/poller-debug.log
-tail -f ~/dev/personal-agent/tmp/telegram-bridge-logs/poller-sent.log
+tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log
+tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-sent.log
 
 # View config
 cat .config.json | jq

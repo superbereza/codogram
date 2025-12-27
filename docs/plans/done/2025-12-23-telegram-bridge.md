@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.11+, aiogram 3.x, aiofiles, pydantic-settings
 
-**Design Doc:** `docs/designs/telegram-bridge.md`
+**Design Doc:** `docs/designs/codogram.md`
 
 ---
 
@@ -19,15 +19,15 @@
 ### Task 1.1: Project Skeleton
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/pyproject.toml`
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/__init__.py`
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/config.py`
+- Create: `agent-tools/codogram/pyproject.toml`
+- Create: `agent-tools/codogram/src/codogram/__init__.py`
+- Create: `agent-tools/codogram/src/codogram/config.py`
 
 **Step 1: Create pyproject.toml**
 
 ```toml
 [project]
-name = "telegram-bridge"
+name = "codogram"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
@@ -66,8 +66,8 @@ __version__ = "0.1.0"
 **Step 4: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/
-git commit -m "feat(telegram-bridge): project skeleton"
+git add agent-tools/codogram/
+git commit -m "feat(codogram): project skeleton"
 ```
 
 ---
@@ -75,15 +75,15 @@ git commit -m "feat(telegram-bridge): project skeleton"
 ### Task 1.2: TmuxSession Class
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/tmux.py`
-- Create: `agent-tools/telegram-bridge/tests/test_tmux.py`
+- Create: `agent-tools/codogram/src/codogram/tmux.py`
+- Create: `agent-tools/codogram/tests/test_tmux.py`
 
 **Step 1: Write failing test**
 
 ```python
 # tests/test_tmux.py
 import pytest
-from telegram_bridge.tmux import TmuxSession
+from codogram.tmux import TmuxSession
 
 def test_send_escapes_quotes():
     session = TmuxSession("test-session", "/tmp")
@@ -95,7 +95,7 @@ def test_send_escapes_quotes():
 **Step 2: Run test to verify it fails**
 
 ```bash
-cd agent-tools/telegram-bridge
+cd agent-tools/codogram
 pytest tests/test_tmux.py -v
 ```
 
@@ -104,7 +104,7 @@ Expected: FAIL (module not found)
 **Step 3: Implement TmuxSession**
 
 ```python
-# src/telegram_bridge/tmux.py
+# src/codogram/tmux.py
 import subprocess
 import shlex
 from dataclasses import dataclass
@@ -151,7 +151,7 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add -A && git commit -m "feat(telegram-bridge): TmuxSession class"
+git add -A && git commit -m "feat(codogram): TmuxSession class"
 ```
 
 ---
@@ -159,13 +159,13 @@ git add -A && git commit -m "feat(telegram-bridge): TmuxSession class"
 ### Task 1.3: Basic Telegram Bot
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/bot.py`
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/main.py`
+- Create: `agent-tools/codogram/src/codogram/bot.py`
+- Create: `agent-tools/codogram/src/codogram/main.py`
 
 **Step 1: Create bot.py**
 
 ```python
-# src/telegram_bridge/bot.py
+# src/codogram/bot.py
 from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message
 from aiogram.filters import Command
@@ -213,7 +213,7 @@ async def on_message(message: Message):
 **Step 2: Create main.py**
 
 ```python
-# src/telegram_bridge/main.py
+# src/codogram/main.py
 import asyncio
 from aiogram import Bot, Dispatcher
 
@@ -246,10 +246,10 @@ TMUX_SESSION=claude-bridge
 **Step 4: Test manually**
 
 ```bash
-cd agent-tools/telegram-bridge
+cd agent-tools/codogram
 cp .env.example .env
 # Edit .env with real values
-python -m telegram_bridge.main
+python -m codogram.main
 ```
 
 Send message in Telegram → check tmux session.
@@ -257,7 +257,7 @@ Send message in Telegram → check tmux session.
 **Step 5: Commit**
 
 ```bash
-git add -A && git commit -m "feat(telegram-bridge): basic telegram bot with tmux send"
+git add -A && git commit -m "feat(codogram): basic telegram bot with tmux send"
 ```
 
 ---
@@ -269,8 +269,8 @@ git add -A && git commit -m "feat(telegram-bridge): basic telegram bot with tmux
 ### Task 2.1: JsonlWatcher
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/watcher.py`
-- Create: `agent-tools/telegram-bridge/tests/test_watcher.py`
+- Create: `agent-tools/codogram/src/codogram/watcher.py`
+- Create: `agent-tools/codogram/tests/test_watcher.py`
 
 **Step 1: Write failing test**
 
@@ -281,7 +281,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from telegram_bridge.watcher import parse_jsonl_entry, ContentType
+from codogram.watcher import parse_jsonl_entry, ContentType
 
 def test_parse_text_entry():
     entry = {
@@ -317,7 +317,7 @@ pytest tests/test_watcher.py -v
 **Step 3: Implement watcher.py**
 
 ```python
-# src/telegram_bridge/watcher.py
+# src/codogram/watcher.py
 import json
 import asyncio
 from enum import Enum
@@ -410,7 +410,7 @@ pytest tests/test_watcher.py -v
 **Step 5: Commit**
 
 ```bash
-git add -A && git commit -m "feat(telegram-bridge): jsonl watcher with parsing"
+git add -A && git commit -m "feat(codogram): jsonl watcher with parsing"
 ```
 
 ---
@@ -418,13 +418,13 @@ git add -A && git commit -m "feat(telegram-bridge): jsonl watcher with parsing"
 ### Task 2.2: Integrate Watcher with Bot
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/bot.py`
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/main.py`
+- Modify: `agent-tools/codogram/src/codogram/bot.py`
+- Modify: `agent-tools/codogram/src/codogram/main.py`
 
 **Step 1: Add watcher task to main.py**
 
 ```python
-# src/telegram_bridge/main.py
+# src/codogram/main.py
 import asyncio
 from pathlib import Path
 from aiogram import Bot, Dispatcher
@@ -495,13 +495,13 @@ async def on_message(message: Message):
 
 1. Start Claude Code in tmux: `tmux new -s claude-bridge -c /path/to/project`
 2. In tmux: `claude`
-3. Start bridge: `python -m telegram_bridge.main`
+3. Start bridge: `python -m codogram.main`
 4. Send message in Telegram → see Claude response
 
 **Step 4: Commit**
 
 ```bash
-git add -A && git commit -m "feat(telegram-bridge): integrate jsonl watcher"
+git add -A && git commit -m "feat(codogram): integrate jsonl watcher"
 ```
 
 ---
@@ -509,14 +509,14 @@ git add -A && git commit -m "feat(telegram-bridge): integrate jsonl watcher"
 ### Task 2.3: Chunking
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/chunker.py`
-- Create: `agent-tools/telegram-bridge/tests/test_chunker.py`
+- Create: `agent-tools/codogram/src/codogram/chunker.py`
+- Create: `agent-tools/codogram/tests/test_chunker.py`
 
 **Step 1: Write failing test**
 
 ```python
 # tests/test_chunker.py
-from telegram_bridge.chunker import chunk_message
+from codogram.chunker import chunk_message
 
 def test_short_message_no_split():
     result = chunk_message("Hello world", max_len=100)
@@ -537,7 +537,7 @@ def test_split_on_newline():
 **Step 2: Implement chunker.py**
 
 ```python
-# src/telegram_bridge/chunker.py
+# src/codogram/chunker.py
 def chunk_message(text: str, max_len: int = 4000) -> list[str]:
     """Split text into chunks, preferring natural breakpoints."""
     if len(text) <= max_len:
@@ -604,7 +604,7 @@ if entry.content_type == ContentType.TEXT:
 **Step 5: Commit**
 
 ```bash
-git add -A && git commit -m "feat(telegram-bridge): message chunking"
+git add -A && git commit -m "feat(codogram): message chunking"
 ```
 
 ---
@@ -620,12 +620,12 @@ git add -A && git commit -m "feat(telegram-bridge): message chunking"
 ### Task 3.1: Edit Message Streaming ❌ CANCELLED
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/streamer.py`
+- Create: `agent-tools/codogram/src/codogram/streamer.py`
 
 **Step 1: Create streamer.py**
 
 ```python
-# src/telegram_bridge/streamer.py
+# src/codogram/streamer.py
 import asyncio
 from aiogram import Bot
 from aiogram.types import Message
@@ -679,7 +679,7 @@ async def watcher_task(bot: Bot):
 **Step 3: Commit**
 
 ```bash
-git add -A && git commit -m "feat(telegram-bridge): edit-message streaming"
+git add -A && git commit -m "feat(codogram): edit-message streaming"
 ```
 
 ---
@@ -687,8 +687,8 @@ git add -A && git commit -m "feat(telegram-bridge): edit-message streaming"
 ### Task 3.2: Permission Display
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/watcher.py`
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/main.py`
+- Modify: `agent-tools/codogram/src/codogram/watcher.py`
+- Modify: `agent-tools/codogram/src/codogram/main.py`
 
 **Step 1: Add permission detection**
 
@@ -731,7 +731,7 @@ Note: R3 only shows permissions, doesn't handle approval. User must approve in t
 **Step 4: Commit**
 
 ```bash
-git add -A && git commit -m "feat(telegram-bridge): show permission requests"
+git add -A && git commit -m "feat(codogram): show permission requests"
 ```
 
 ---
@@ -743,9 +743,9 @@ git add -A && git commit -m "feat(telegram-bridge): show permission requests"
 ### Task 4.1: Whisper Integration
 
 **Files:**
-- Create: `agent-tools/telegram-bridge/src/telegram_bridge/whisper.py`
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/bot.py`
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/config.py`
+- Create: `agent-tools/codogram/src/codogram/whisper.py`
+- Modify: `agent-tools/codogram/src/codogram/bot.py`
+- Modify: `agent-tools/codogram/src/codogram/config.py`
 
 **Step 1: Add openai to dependencies**
 
@@ -762,7 +762,7 @@ dependencies = [
 **Step 2: Create whisper.py**
 
 ```python
-# src/telegram_bridge/whisper.py
+# src/codogram/whisper.py
 import tempfile
 from pathlib import Path
 from openai import AsyncOpenAI
@@ -817,7 +817,7 @@ async def on_voice(message: Message, bot: Bot):
 **Step 4: Commit**
 
 ```bash
-git add -A && git commit -m "feat(telegram-bridge): whisper voice transcription"
+git add -A && git commit -m "feat(codogram): whisper voice transcription"
 ```
 
 ---
@@ -825,13 +825,13 @@ git add -A && git commit -m "feat(telegram-bridge): whisper voice transcription"
 ### Task 4.2: Multi-project Config
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/config.py`
-- Create: `agent-tools/telegram-bridge/config.yaml`
+- Modify: `agent-tools/codogram/src/codogram/config.py`
+- Create: `agent-tools/codogram/config.yaml`
 
 **Step 1: Update config.py**
 
 ```python
-# src/telegram_bridge/config.py
+# src/codogram/config.py
 from pathlib import Path
 from pydantic_settings import BaseSettings
 import yaml
@@ -887,7 +887,7 @@ async def on_message(message: Message):
 **Step 4: Commit**
 
 ```bash
-git add -A && git commit -m "feat(telegram-bridge): multi-project config"
+git add -A && git commit -m "feat(codogram): multi-project config"
 ```
 
 ---

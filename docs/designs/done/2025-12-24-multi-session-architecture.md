@@ -11,7 +11,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    telegram-bridge                       │
+│                    codogram                       │
 │                    (один процесс)                        │
 ├─────────────────────────────────────────────────────────┤
 │  HTTP Server :8787                                       │
@@ -119,7 +119,7 @@ def get_project_name(cwd: Path) -> str:
 ### Хранение
 
 ```
-agent-tools/telegram-bridge/.config.json
+agent-tools/codogram/.config.json
 
 {
   "projects": {
@@ -205,14 +205,14 @@ ADMIN_CHAT_ID=12345678  # личный чат для алертов
 ## Структура файлов
 
 ```
-agent-tools/telegram-bridge/
+agent-tools/codogram/
 ├── .env                      # TELEGRAM_TOKEN, BASE_DIR, ADMIN_CHAT_ID
 ├── .config.json              # projects + sessions (gitignored)
 ├── .gitignore                # .env, .config.json
 ├── hooks/
 │   ├── session-start.sh      # → POST /session/register
 │   └── session-end.sh        # → POST /session/unregister
-├── src/telegram_bridge/
+├── src/codogram/
 │   ├── main.py               # HTTP server + Telegram bot
 │   ├── config.py             # загрузка .env + .config.json
 │   ├── session_manager.py    # регистрация, персистенция

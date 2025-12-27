@@ -26,15 +26,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 @pytest.fixture
 def mock_config():
     """Mock config loading/saving."""
-    with patch("telegram_bridge.session_manager.load_config") as load, \
-         patch("telegram_bridge.session_manager.save_config") as save:
+    with patch("codogram.session_manager.load_config") as load, \
+         patch("codogram.session_manager.save_config") as save:
         load.return_value = {"projects": {}, "sessions": {}}
         yield {"load": load, "save": save}
 
 @pytest.fixture
 def session_manager(mock_config):
     """Create fresh SessionManager."""
-    from telegram_bridge.session_manager import SessionManager
+    from codogram.session_manager import SessionManager
     return SessionManager()
 
 @pytest.mark.asyncio
@@ -53,7 +53,7 @@ async def test_unregister_awaits_task_cancellation(session_manager):
     task = asyncio.create_task(slow_poller())
 
     # Manually add session with the task
-    from telegram_bridge.session_manager import SessionState
+    from codogram.session_manager import SessionState
     session = SessionState(
         session_id="test-123",
         tmux_session="test-tmux",
@@ -73,13 +73,13 @@ async def test_unregister_awaits_task_cancellation(session_manager):
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/test_session_manager.py::test_unregister_awaits_task_cancellation -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/test_session_manager.py::test_unregister_awaits_task_cancellation -v`
 
 Expected: FAIL - cancel_awaited.is_set() is False
 
 **Step 3: Implement fix in unregister_session**
 
-Modify: `src/telegram_bridge/session_manager.py:115-123`
+Modify: `src/codogram/session_manager.py:115-123`
 
 ```python
     async def unregister_session(self, session_id: str) -> None:
@@ -103,14 +103,14 @@ Modify: `src/telegram_bridge/session_manager.py:115-123`
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/test_session_manager.py::test_unregister_awaits_task_cancellation -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/test_session_manager.py::test_unregister_awaits_task_cancellation -v`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add tests/test_session_manager.py src/telegram_bridge/session_manager.py
+git add tests/test_session_manager.py src/codogram/session_manager.py
 git commit -m "fix(session): await task cancellation in unregister"
 ```
 
@@ -146,7 +146,7 @@ async def test_restore_sessions_deduplicates_by_tmux(mock_config):
         },
     }
 
-    from telegram_bridge.session_manager import SessionManager
+    from codogram.session_manager import SessionManager
     manager = SessionManager()
 
     poller_starts = []
@@ -158,7 +158,7 @@ async def test_restore_sessions_deduplicates_by_tmux(mock_config):
     async def mock_start_watcher(session):
         return AsyncMock()
 
-    with patch("telegram_bridge.session_manager.TmuxSession") as mock_tmux:
+    with patch("codogram.session_manager.TmuxSession") as mock_tmux:
         mock_tmux.return_value.exists.return_value = True
         await manager.restore_sessions(mock_start_poller, mock_start_watcher)
 
@@ -171,13 +171,13 @@ async def test_restore_sessions_deduplicates_by_tmux(mock_config):
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/test_session_manager.py::test_restore_sessions_deduplicates_by_tmux -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/test_session_manager.py::test_restore_sessions_deduplicates_by_tmux -v`
 
 Expected: FAIL - len(poller_starts) == 2
 
 **Step 3: Implement fix in restore_sessions**
 
-Modify: `src/telegram_bridge/session_manager.py:125-150`
+Modify: `src/codogram/session_manager.py:125-150`
 
 ```python
     async def restore_sessions(
@@ -219,14 +219,14 @@ Modify: `src/telegram_bridge/session_manager.py:125-150`
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/test_session_manager.py::test_restore_sessions_deduplicates_by_tmux -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/test_session_manager.py::test_restore_sessions_deduplicates_by_tmux -v`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_session_manager.py
+git add src/codogram/session_manager.py tests/test_session_manager.py
 git commit -m "fix(session): deduplicate pollers by tmux in restore"
 ```
 
@@ -236,7 +236,7 @@ git commit -m "fix(session): deduplicate pollers by tmux in restore"
 
 **Files:**
 - Modify: `tests/test_session_manager.py`
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 
 **Step 1: Write the failing test**
 
@@ -256,7 +256,7 @@ async def test_restore_sessions_cleans_dead_tmux(mock_config):
         },
     }
 
-    from telegram_bridge.session_manager import SessionManager
+    from codogram.session_manager import SessionManager
     manager = SessionManager()
 
     async def mock_start_poller(session):
@@ -265,7 +265,7 @@ async def test_restore_sessions_cleans_dead_tmux(mock_config):
     async def mock_start_watcher(session):
         return AsyncMock()
 
-    with patch("telegram_bridge.session_manager.TmuxSession") as mock_tmux:
+    with patch("codogram.session_manager.TmuxSession") as mock_tmux:
         mock_tmux.return_value.exists.return_value = False  # tmux doesn't exist
         await manager.restore_sessions(mock_start_poller, mock_start_watcher)
 
@@ -277,7 +277,7 @@ async def test_restore_sessions_cleans_dead_tmux(mock_config):
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/test_session_manager.py::test_restore_sessions_cleans_dead_tmux -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/test_session_manager.py::test_restore_sessions_cleans_dead_tmux -v`
 
 Expected: FAIL - session still in manager.sessions
 
@@ -328,14 +328,14 @@ Modify `restore_sessions` to not add sessions with dead tmux and save cleaned co
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/test_session_manager.py::test_restore_sessions_cleans_dead_tmux -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/test_session_manager.py::test_restore_sessions_cleans_dead_tmux -v`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_session_manager.py
+git add src/codogram/session_manager.py tests/test_session_manager.py
 git commit -m "fix(session): clean dead tmux sessions on restore"
 ```
 
@@ -345,7 +345,7 @@ git commit -m "fix(session): clean dead tmux sessions on restore"
 
 **Step 1: Run full test suite**
 
-Run: `cd agent-tools/telegram-bridge && python -m pytest tests/ -v`
+Run: `cd agent-tools/codogram && python -m pytest tests/ -v`
 
 Expected: All tests PASS
 
@@ -353,13 +353,13 @@ Expected: All tests PASS
 
 ```bash
 # 1. Kill bot
-pkill -f telegram_bridge
+pkill -f codogram
 
 # 2. Clear config
-echo '{"projects": {"personal-agent": -5077677938}, "sessions": {}}' > agent-tools/telegram-bridge/.config.json
+echo '{"projects": {"personal-agent": -5077677938}, "sessions": {}}' > agent-tools/codogram/.config.json
 
 # 3. Restart bot
-./agent-tools/telegram-bridge/restart.sh
+./agent-tools/codogram/restart.sh
 
 # 4. Register session
 curl -X POST http://localhost:8787/session/register \
@@ -372,7 +372,7 @@ curl -X POST http://localhost:8787/session/register \
   -d '{"session_id": "test-2", "cwd": "/home/superbereza/dev/personal-agent", "tmux_session": "personal-agent"}'
 
 # 6. Check logs - should show only ONE poller active
-tail -20 ~/dev/personal-agent/tmp/telegram-bridge-logs/poller-debug.log
+tail -20 ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log
 ```
 
 **Step 3: Commit if all good**

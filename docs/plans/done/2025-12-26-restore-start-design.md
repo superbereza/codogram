@@ -26,7 +26,7 @@ The building blocks exist but are disconnected:
 ## Task 1: Add get_project_for_chat helper
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add helper function after get_session_for_chat**
 
@@ -51,8 +51,8 @@ def get_project_for_chat(chat_id: int) -> tuple[str | None, ProjectState | None]
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): add get_project_for_chat helper
+git add src/codogram/bot.py
+git commit -m "feat(codogram): add get_project_for_chat helper
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -64,7 +64,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 2: Add is_claude_running helper
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add helper function**
 
@@ -95,8 +95,8 @@ def is_claude_running(project: ProjectState) -> bool:
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): add is_claude_running helper
+git add src/codogram/bot.py
+git commit -m "feat(codogram): add is_claude_running helper
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -108,7 +108,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 3: Add show_status helper
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add helper function**
 
@@ -139,8 +139,8 @@ async def show_status(message: Message, project: ProjectState):
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): add show_status helper
+git add src/codogram/bot.py
+git commit -m "feat(codogram): add show_status helper
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -152,7 +152,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 4: Add ask_project_name_keyboard
 
 **Files:**
-- Modify: `src/telegram_bridge/start_flow.py`
+- Modify: `src/codogram/start_flow.py`
 
 **Step 1: Add keyboard for asking project name**
 
@@ -171,8 +171,8 @@ def ask_project_name_keyboard() -> InlineKeyboardMarkup:
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/start_flow.py
-git commit -m "feat(telegram-bridge): add ask_project_name_keyboard
+git add src/codogram/start_flow.py
+git commit -m "feat(codogram): add ask_project_name_keyboard
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -184,7 +184,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 5: Rewrite cmd_start to auto-detect
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Replace cmd_start function**
 
@@ -291,8 +291,8 @@ async def _start_with_explicit_args(message: Message, project_name: str, cwd: st
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): rewrite cmd_start with auto-detection
+git add src/codogram/bot.py
+git commit -m "feat(codogram): rewrite cmd_start with auto-detection
 
 - /start without args: auto-detect from chat
 - /start <project>: start with project name
@@ -309,7 +309,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 6: Add _start_project_flow helper
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add the main flow logic**
 
@@ -423,8 +423,8 @@ async def _connect_or_launch(message: Message, project: ProjectState):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): add _start_project_flow and _connect_or_launch
+git add src/codogram/bot.py
+git commit -m "feat(codogram): add _start_project_flow and _connect_or_launch
 
 - Auto-resolve path from convention or saved
 - Offer to launch if no tmux found
@@ -440,7 +440,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 7: Add launch_claude callback handler
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add callback handler**
 
@@ -495,8 +495,8 @@ async def on_start_cancel(callback: CallbackQuery):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): add launch_claude and cancel callbacks
+git add src/codogram/bot.py
+git commit -m "feat(codogram): add launch_claude and cancel callbacks
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -508,7 +508,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 8: Handle awaiting_project_name state
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add handling in on_message**
 
@@ -540,8 +540,8 @@ The existing `if state["state"] == "awaiting_custom_path":` becomes `elif`.
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): handle project name input in /start flow
+git add src/codogram/bot.py
+git commit -m "feat(codogram): handle project name input in /start flow
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -553,7 +553,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 9: Add import for InlineKeyboardMarkup
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Update imports**
 
@@ -566,8 +566,8 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "fix(telegram-bridge): add missing imports
+git add src/codogram/bot.py
+git commit -m "fix(codogram): add missing imports
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -584,7 +584,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 **Step 1: Run tests**
 
 ```bash
-cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge
+cd /home/superbereza/dev/personal-agent/agent-tools/codogram
 source venv/bin/activate
 python -m pytest tests/ -v
 ```
@@ -638,7 +638,7 @@ To:
 
 ```bash
 git add docs/designs/2025-12-25-start-claude-from-telegram.md
-git commit -m "docs(telegram-bridge): mark start design as restored
+git commit -m "docs(codogram): mark start design as restored
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 

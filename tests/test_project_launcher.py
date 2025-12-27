@@ -9,7 +9,7 @@ os.environ.setdefault("TELEGRAM_TOKEN", "test")
 os.environ.setdefault("ADMIN_IDS", "123")
 os.environ.setdefault("BASE_DIR", "/tmp")
 
-from telegram_bridge.project_launcher import (
+from codogram.project_launcher import (
     resolve_project_path,
     ProjectPathResult,
     is_tmux_session_exists,
@@ -23,7 +23,7 @@ def test_resolve_path_convention_exists(tmp_path):
     project_dir = tmp_path / "my-project"
     project_dir.mkdir()
 
-    with patch("telegram_bridge.project_launcher.settings") as mock_settings:
+    with patch("codogram.project_launcher.settings") as mock_settings:
         mock_settings.base_dir = str(tmp_path)
         result = resolve_project_path("my-project", None)
 
@@ -44,7 +44,7 @@ def test_resolve_path_custom_exists(tmp_path):
 
 def test_resolve_path_not_exists(tmp_path):
     """Return not exists if directory missing."""
-    with patch("telegram_bridge.project_launcher.settings") as mock_settings:
+    with patch("codogram.project_launcher.settings") as mock_settings:
         mock_settings.base_dir = str(tmp_path)
         result = resolve_project_path("nonexistent", None)
 

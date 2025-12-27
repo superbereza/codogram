@@ -2,7 +2,7 @@
 
 ## Zero-Config Mode (Default)
 
-telegram-bridge now works without any Claude configuration:
+codogram now works without any Claude configuration:
 
 1. Start bot: `./restart.sh`
 2. Send `/start <project_name> <cwd>` in Telegram
@@ -44,8 +44,8 @@ BASE_DIR=/home/user/dev/personal-agent
 cd ~/dev/personal-agent
 source venv/bin/activate
 
-# Install telegram-bridge
-cd agent-tools/telegram-bridge
+# Install codogram
+cd agent-tools/codogram
 pip install -e .
 ```
 
@@ -56,10 +56,10 @@ pip install -e .
 ./restart.sh
 
 # Check if running
-ps aux | grep telegram_bridge
+ps aux | grep codogram
 
 # View logs
-tail -f ~/dev/personal-agent/tmp/telegram-bridge-logs/poller-debug.log
+tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log
 ```
 
 ## Usage
@@ -89,8 +89,8 @@ Use this ID in `ADMIN_IDS` environment variable.
 
 ### Bot not responding
 
-1. Check if running: `ps aux | grep telegram_bridge`
-2. Check logs: `tail -20 ~/dev/personal-agent/tmp/telegram-bridge-logs/poller-debug.log`
+1. Check if running: `ps aux | grep codogram`
+2. Check logs: `tail -20 ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log`
 3. Restart: `./restart.sh`
 
 ### Permission prompts not appearing
@@ -125,7 +125,7 @@ Edit `~/.claude/settings.json` and remove the hooks section:
 ### 2. Update bot
 
 ```bash
-cd agent-tools/telegram-bridge
+cd agent-tools/codogram
 git pull origin main
 ./restart.sh
 ```

@@ -1,4 +1,4 @@
-# src/telegram_bridge/project_launcher.py
+# src/codogram/project_launcher.py
 """Project launcher - resolve paths and start Claude in tmux."""
 import subprocess
 from dataclasses import dataclass

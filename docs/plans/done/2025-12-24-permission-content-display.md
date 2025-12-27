@@ -15,8 +15,8 @@
 ## Task 1: Расширить PermissionPrompt dataclass
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/screen.py`
-- Modify: `agent-tools/telegram-bridge/tests/test_screen.py`
+- Modify: `agent-tools/codogram/src/codogram/screen.py`
+- Modify: `agent-tools/codogram/tests/test_screen.py`
 
 **Step 1: Добавить тест на парсинг контента**
 
@@ -52,13 +52,13 @@ def test_parse_permission_content():
 
 **Step 2: Запустить тест — убедиться что падает**
 
-Run: `cd agent-tools/telegram-bridge && pytest tests/test_screen.py::test_parse_permission_content -v`
+Run: `cd agent-tools/codogram && pytest tests/test_screen.py::test_parse_permission_content -v`
 Expected: FAIL (AttributeError: 'PermissionPrompt' object has no attribute 'description')
 
 **Step 3: Расширить dataclass и парсер**
 
 ```python
-# src/telegram_bridge/screen.py
+# src/codogram/screen.py
 
 @dataclass
 class PermissionPrompt:
@@ -149,14 +149,14 @@ def parse_screen(output: str) -> ScreenState:
 
 **Step 4: Запустить тесты**
 
-Run: `cd agent-tools/telegram-bridge && pytest tests/test_screen.py -v`
+Run: `cd agent-tools/codogram && pytest tests/test_screen.py -v`
 Expected: PASS (all tests)
 
 **Step 5: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/screen.py agent-tools/telegram-bridge/tests/test_screen.py
-git commit -m "feat(telegram-bridge): parse permission content from tmux"
+git add agent-tools/codogram/src/codogram/screen.py agent-tools/codogram/tests/test_screen.py
+git commit -m "feat(codogram): parse permission content from tmux"
 ```
 
 ---
@@ -164,7 +164,7 @@ git commit -m "feat(telegram-bridge): parse permission content from tmux"
 ## Task 2: Добавить константы и форматирование
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/main.py`
+- Modify: `agent-tools/codogram/src/codogram/main.py`
 
 **Step 1: Добавить константы и функцию форматирования**
 
@@ -197,8 +197,8 @@ def format_permission_content(perm: PermissionPrompt) -> str:
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/main.py
-git commit -m "feat(telegram-bridge): add permission content formatting"
+git add agent-tools/codogram/src/codogram/main.py
+git commit -m "feat(codogram): add permission content formatting"
 ```
 
 ---
@@ -206,7 +206,7 @@ git commit -m "feat(telegram-bridge): add permission content formatting"
 ## Task 3: Добавить хранение message_id
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/main.py`
+- Modify: `agent-tools/codogram/src/codogram/main.py`
 
 **Step 1: Добавить глобальный dict**
 
@@ -220,8 +220,8 @@ permission_messages: dict[int, list[int]] = {}
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/main.py
-git commit -m "feat(telegram-bridge): add permission_messages storage"
+git add agent-tools/codogram/src/codogram/main.py
+git commit -m "feat(codogram): add permission_messages storage"
 ```
 
 ---
@@ -229,7 +229,7 @@ git commit -m "feat(telegram-bridge): add permission_messages storage"
 ## Task 4: Обновить polling loop для отправки контента
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/main.py`
+- Modify: `agent-tools/codogram/src/codogram/main.py`
 
 **Step 1: Заменить логику в elif TOOL_USE блоке**
 
@@ -294,8 +294,8 @@ elif entry.content_type == ContentType.TOOL_USE:
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/main.py
-git commit -m "feat(telegram-bridge): send permission content to Telegram"
+git add agent-tools/codogram/src/codogram/main.py
+git commit -m "feat(codogram): send permission content to Telegram"
 ```
 
 ---
@@ -303,7 +303,7 @@ git commit -m "feat(telegram-bridge): send permission content to Telegram"
 ## Task 5: Обновить callback handler для удаления сообщений
 
 **Files:**
-- Modify: `agent-tools/telegram-bridge/src/telegram_bridge/bot.py`
+- Modify: `agent-tools/codogram/src/codogram/bot.py`
 
 **Step 1: Добавить импорт и обновить handler**
 
@@ -350,8 +350,8 @@ async def on_permission_callback(callback: CallbackQuery):
 **Step 2: Commit**
 
 ```bash
-git add agent-tools/telegram-bridge/src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): delete permission messages on callback"
+git add agent-tools/codogram/src/codogram/bot.py
+git commit -m "feat(codogram): delete permission messages on callback"
 ```
 
 ---
@@ -361,7 +361,7 @@ git commit -m "feat(telegram-bridge): delete permission messages on callback"
 **Step 1: Рестартовать бота**
 
 ```bash
-/home/superbereza/dev/personal-agent/agent-tools/telegram-bridge/restart.sh
+/home/superbereza/dev/personal-agent/agent-tools/codogram/restart.sh
 ```
 
 **Step 2: Тестирование**
@@ -375,7 +375,7 @@ git commit -m "feat(telegram-bridge): delete permission messages on callback"
 
 ```bash
 git add -A
-git commit -m "fix(telegram-bridge): permission content display fixes"
+git commit -m "fix(codogram): permission content display fixes"
 ```
 
 ---

@@ -1,5 +1,5 @@
 import pytest
-from telegram_bridge.screen import parse_screen, PermissionPrompt, ToolProgress, Idle
+from codogram.screen import parse_screen, PermissionPrompt, ToolProgress, Idle
 
 PERMISSION_SCREEN = """
 ● Write(test.txt)

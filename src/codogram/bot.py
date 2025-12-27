@@ -1,4 +1,4 @@
-# src/telegram_bridge/bot.py
+# src/codogram/bot.py
 from pathlib import Path
 import asyncio
 import re

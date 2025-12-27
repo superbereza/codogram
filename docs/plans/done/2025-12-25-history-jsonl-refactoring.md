@@ -22,7 +22,7 @@
 ## Task 1: Add HistoryReader utility with truncation detection
 
 **Files:**
-- Create: `src/telegram_bridge/history_reader.py`
+- Create: `src/codogram/history_reader.py`
 - Test: `tests/test_history_reader.py`
 
 **Step 1: Write the failing test**
@@ -32,7 +32,7 @@
 import json
 import tempfile
 from pathlib import Path
-from telegram_bridge.history_reader import find_session_for_project, reset_history_cache
+from codogram.history_reader import find_session_for_project, reset_history_cache
 
 def test_find_session_for_project():
     reset_history_cache()  # Clean state
@@ -139,12 +139,12 @@ def test_malformed_json_handling():
 pytest tests/test_history_reader.py -v
 ```
 
-Expected: FAIL with "No module named 'telegram_bridge.history_reader'"
+Expected: FAIL with "No module named 'codogram.history_reader'"
 
 **Step 3: Write implementation with truncation detection**
 
 ```python
-# src/telegram_bridge/history_reader.py
+# src/codogram/history_reader.py
 """Read session info from Claude's history.jsonl with incremental reading."""
 import json
 from pathlib import Path
@@ -228,9 +228,9 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/history_reader.py tests/test_history_reader.py
+git add src/codogram/history_reader.py tests/test_history_reader.py
 git commit -m "$(cat <<'EOF'
-feat(telegram-bridge): add history_reader with truncation detection
+feat(codogram): add history_reader with truncation detection
 
 - Incremental reading: only reads new lines since last check
 - Truncation detection: resets cache when file size decreases
@@ -249,14 +249,14 @@ EOF
 ## Task 2: Add compute_jsonl_path utility
 
 **Files:**
-- Modify: `src/telegram_bridge/history_reader.py`
+- Modify: `src/codogram/history_reader.py`
 - Test: `tests/test_history_reader.py`
 
 **Step 1: Write the failing test**
 
 ```python
 # Add to tests/test_history_reader.py
-from telegram_bridge.history_reader import compute_jsonl_path
+from codogram.history_reader import compute_jsonl_path
 
 def test_compute_jsonl_path():
     result = compute_jsonl_path("/home/user/dev/my-project", "abc-123-def")
@@ -280,7 +280,7 @@ Expected: FAIL with "cannot import name 'compute_jsonl_path'"
 **Step 3: Write implementation**
 
 ```python
-# Add to src/telegram_bridge/history_reader.py
+# Add to src/codogram/history_reader.py
 
 def compute_jsonl_path(cwd: str, session_id: str) -> Path:
     """Compute jsonl path from cwd and session_id.
@@ -302,9 +302,9 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/history_reader.py tests/test_history_reader.py
+git add src/codogram/history_reader.py tests/test_history_reader.py
 git commit -m "$(cat <<'EOF'
-feat(telegram-bridge): add compute_jsonl_path utility
+feat(codogram): add compute_jsonl_path utility
 
 Formula: ~/.claude/projects/{cwd.replace("/", "-")}/{session_id}.jsonl
 
@@ -320,14 +320,14 @@ EOF
 ## Task 3: Add tmux discovery functions
 
 **Files:**
-- Modify: `src/telegram_bridge/tmux.py`
+- Modify: `src/codogram/tmux.py`
 - Test: `tests/test_tmux.py`
 
 **Step 1: Write the failing test**
 
 ```python
 # tests/test_tmux.py (append to existing or create)
-from telegram_bridge.tmux import find_all_tmux_by_cwd, find_tmux_by_convention
+from codogram.tmux import find_all_tmux_by_cwd, find_tmux_by_convention
 
 def test_find_all_tmux_by_cwd_single(mocker):
     # Mock subprocess to return one matching session
@@ -361,21 +361,21 @@ def test_find_all_tmux_by_cwd_not_found(mocker):
 
 def test_find_tmux_by_convention_found(mocker):
     # Mock TmuxSession.exists() to return True
-    mocker.patch('telegram_bridge.tmux.TmuxSession.exists', return_value=True)
+    mocker.patch('codogram.tmux.TmuxSession.exists', return_value=True)
 
     result = find_tmux_by_convention("my-project")
     assert result == "claude-my-project"
 
 def test_find_tmux_by_convention_fallback(mocker):
     # Mock first pattern not found, second found
-    exists_mock = mocker.patch('telegram_bridge.tmux.TmuxSession.exists')
+    exists_mock = mocker.patch('codogram.tmux.TmuxSession.exists')
     exists_mock.side_effect = [False, True]
 
     result = find_tmux_by_convention("my-project")
     assert result == "my-project"
 
 def test_find_tmux_by_convention_not_found(mocker):
-    mocker.patch('telegram_bridge.tmux.TmuxSession.exists', return_value=False)
+    mocker.patch('codogram.tmux.TmuxSession.exists', return_value=False)
 
     result = find_tmux_by_convention("my-project")
     assert result is None
@@ -392,7 +392,7 @@ Expected: FAIL with "cannot import name 'find_all_tmux_by_cwd'"
 **Step 3: Write implementation**
 
 ```python
-# Add to src/telegram_bridge/tmux.py
+# Add to src/codogram/tmux.py
 
 def find_all_tmux_by_cwd(cwd: str) -> list[str]:
     """Find all tmux sessions with panes in the given cwd.
@@ -449,9 +449,9 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/tmux.py tests/test_tmux.py
+git add src/codogram/tmux.py tests/test_tmux.py
 git commit -m "$(cat <<'EOF'
-feat(telegram-bridge): add tmux discovery functions
+feat(codogram): add tmux discovery functions
 
 - find_all_tmux_by_cwd: returns all sessions with panes in cwd
 - find_tmux_by_convention: tries claude-{name} then {name}
@@ -468,12 +468,12 @@ EOF
 ## Task 4: Update ProjectState model
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 
 **Step 1: Update ProjectState dataclass**
 
 ```python
-# In src/telegram_bridge/session_manager.py
+# In src/codogram/session_manager.py
 
 @dataclass
 class ProjectState:
@@ -507,7 +507,7 @@ class ProjectState:
 **Step 2: Run syntax check**
 
 ```bash
-python -m py_compile src/telegram_bridge/session_manager.py
+python -m py_compile src/codogram/session_manager.py
 ```
 
 Expected: No output (success)
@@ -515,9 +515,9 @@ Expected: No output (success)
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py
+git add src/codogram/session_manager.py
 git commit -m "$(cat <<'EOF'
-refactor(telegram-bridge): simplify ProjectState model
+refactor(codogram): simplify ProjectState model
 
 - Optional fields instead of dicts (session_id, tmux_session)
 - Clear separation: watcher (session_id, jsonl_path) vs poller (tmux_session)
@@ -535,7 +535,7 @@ EOF
 ## Task 5: Add refresh_project_session method
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 - Test: `tests/test_session_manager.py`
 
 **Step 1: Write the failing test**
@@ -543,18 +543,18 @@ EOF
 ```python
 # Add to tests/test_session_manager.py or create new
 import pytest
-from telegram_bridge.session_manager import ProjectManager, ProjectState
+from codogram.session_manager import ProjectManager, ProjectState
 
 def test_refresh_project_session_changes(mocker, tmp_path):
     # Mock history_reader
     mocker.patch(
-        'telegram_bridge.session_manager.find_session_for_project',
+        'codogram.session_manager.find_session_for_project',
         return_value="new-session-123"
     )
     jsonl_file = tmp_path / "test.jsonl"
     jsonl_file.touch()
     mocker.patch(
-        'telegram_bridge.session_manager.compute_jsonl_path',
+        'codogram.session_manager.compute_jsonl_path',
         return_value=jsonl_file
     )
 
@@ -571,7 +571,7 @@ def test_refresh_project_session_changes(mocker, tmp_path):
 
 def test_refresh_project_session_no_change(mocker):
     mocker.patch(
-        'telegram_bridge.session_manager.find_session_for_project',
+        'codogram.session_manager.find_session_for_project',
         return_value="same-session"
     )
 
@@ -596,12 +596,12 @@ def test_refresh_project_session_no_cwd(mocker):
 
 def test_refresh_project_session_jsonl_not_exists(mocker, tmp_path):
     mocker.patch(
-        'telegram_bridge.session_manager.find_session_for_project',
+        'codogram.session_manager.find_session_for_project',
         return_value="new-session"
     )
     # Point to non-existent file
     mocker.patch(
-        'telegram_bridge.session_manager.compute_jsonl_path',
+        'codogram.session_manager.compute_jsonl_path',
         return_value=tmp_path / "nonexistent.jsonl"
     )
 
@@ -670,9 +670,9 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_session_manager.py
+git add src/codogram/session_manager.py tests/test_session_manager.py
 git commit -m "$(cat <<'EOF'
-feat(telegram-bridge): add refresh_project_session method
+feat(codogram): add refresh_project_session method
 
 - Reads latest session_id from history.jsonl
 - Computes jsonl_path using formula
@@ -690,7 +690,7 @@ EOF
 ## Task 6: Add HistoryWatcher periodic task
 
 **Files:**
-- Create: `src/telegram_bridge/history_watcher.py`
+- Create: `src/codogram/history_watcher.py`
 - Test: `tests/test_history_watcher.py`
 
 **Step 1: Write the failing test**
@@ -704,7 +704,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 @pytest.mark.asyncio
 async def test_history_watcher_detects_session_change():
     """Test that HistoryWatcher detects session changes."""
-    from telegram_bridge.history_watcher import HistoryWatcher
+    from codogram.history_watcher import HistoryWatcher
 
     bot = MagicMock()
     start_poller = AsyncMock(return_value=MagicMock())
@@ -713,7 +713,7 @@ async def test_history_watcher_detects_session_change():
     watcher = HistoryWatcher(bot, start_poller, start_watcher)
 
     # Mock project_manager with a test project
-    with patch('telegram_bridge.history_watcher.project_manager') as mock_pm:
+    with patch('codogram.history_watcher.project_manager') as mock_pm:
         mock_project = MagicMock()
         mock_project.chat_id = 123
         mock_project.cwd = "/test/path"
@@ -722,7 +722,7 @@ async def test_history_watcher_detects_session_change():
         mock_pm.projects = {"test": mock_project}
         mock_pm.refresh_project_session.return_value = True  # Session changed
 
-        with patch('telegram_bridge.history_watcher.HISTORY_PATH') as mock_path:
+        with patch('codogram.history_watcher.HISTORY_PATH') as mock_path:
             mock_path.exists.return_value = True
             mock_path.stat.return_value.st_mtime = 12345
 
@@ -735,17 +735,17 @@ async def test_history_watcher_detects_session_change():
 @pytest.mark.asyncio
 async def test_history_watcher_skips_when_no_change():
     """Test that HistoryWatcher skips when mtime unchanged."""
-    from telegram_bridge.history_watcher import HistoryWatcher
+    from codogram.history_watcher import HistoryWatcher
 
     bot = MagicMock()
     watcher = HistoryWatcher(bot, AsyncMock(), AsyncMock())
     watcher._last_mtime = 12345  # Same as we'll return
 
-    with patch('telegram_bridge.history_watcher.HISTORY_PATH') as mock_path:
+    with patch('codogram.history_watcher.HISTORY_PATH') as mock_path:
         mock_path.exists.return_value = True
         mock_path.stat.return_value.st_mtime = 12345
 
-        with patch('telegram_bridge.history_watcher.project_manager') as mock_pm:
+        with patch('codogram.history_watcher.project_manager') as mock_pm:
             await watcher._check_for_changes()
 
             # Should not have called refresh
@@ -754,7 +754,7 @@ async def test_history_watcher_skips_when_no_change():
 @pytest.mark.asyncio
 async def test_history_watcher_restarts_watcher_on_change():
     """Test that old watcher is cancelled when session changes."""
-    from telegram_bridge.history_watcher import HistoryWatcher
+    from codogram.history_watcher import HistoryWatcher
 
     bot = MagicMock()
     start_poller = AsyncMock()
@@ -762,7 +762,7 @@ async def test_history_watcher_restarts_watcher_on_change():
 
     watcher = HistoryWatcher(bot, start_poller, start_watcher)
 
-    with patch('telegram_bridge.history_watcher.project_manager') as mock_pm:
+    with patch('codogram.history_watcher.project_manager') as mock_pm:
         # Setup project with existing watcher
         old_watcher_task = MagicMock()
         mock_project = MagicMock()
@@ -773,7 +773,7 @@ async def test_history_watcher_restarts_watcher_on_change():
         mock_pm.projects = {"test": mock_project}
         mock_pm.refresh_project_session.return_value = True
 
-        with patch('telegram_bridge.history_watcher.HISTORY_PATH') as mock_path:
+        with patch('codogram.history_watcher.HISTORY_PATH') as mock_path:
             mock_path.exists.return_value = True
             mock_path.stat.return_value.st_mtime = 12345
 
@@ -790,12 +790,12 @@ async def test_history_watcher_restarts_watcher_on_change():
 pytest tests/test_history_watcher.py -v
 ```
 
-Expected: FAIL with "No module named 'telegram_bridge.history_watcher'"
+Expected: FAIL with "No module named 'codogram.history_watcher'"
 
 **Step 3: Write implementation**
 
 ```python
-# src/telegram_bridge/history_watcher.py
+# src/codogram/history_watcher.py
 """Periodic watcher for history.jsonl changes."""
 import asyncio
 from pathlib import Path
@@ -890,9 +890,9 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/history_watcher.py tests/test_history_watcher.py
+git add src/codogram/history_watcher.py tests/test_history_watcher.py
 git commit -m "$(cat <<'EOF'
-feat(telegram-bridge): add HistoryWatcher periodic task
+feat(codogram): add HistoryWatcher periodic task
 
 - Polls history.jsonl every 15s for changes
 - Detects session changes and restarts watcher automatically
@@ -912,7 +912,7 @@ EOF
 **Depends on:** Task 20 (tmux_selector.py must exist)
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py` (or wherever /start handler is)
+- Modify: `src/codogram/bot.py` (or wherever /start handler is)
 
 **Step 1: Rewrite /start handler**
 
@@ -985,9 +985,9 @@ Start bot and test /start command.
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
+git add src/codogram/bot.py
 git commit -m "$(cat <<'EOF'
-refactor(telegram-bridge): two-phase discovery in /start
+refactor(codogram): two-phase discovery in /start
 
 Phase 1 (tmux): find_all_tmux_by_cwd -> selection/convention
 Phase 2 (session): refresh_project_session from history.jsonl
@@ -1006,7 +1006,7 @@ EOF
 ## Task 8: Simplify restore_projects with multi-tmux selection
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 
 **Step 1: Rewrite restore_projects**
 
@@ -1069,9 +1069,9 @@ Expected: PASS
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py
+git add src/codogram/session_manager.py
 git commit -m "$(cat <<'EOF'
-refactor(telegram-bridge): simplify restore_projects
+refactor(codogram): simplify restore_projects
 
 - Uses refresh_project_session for session_id discovery
 - Independent tmux discovery (cwd or convention)
@@ -1089,7 +1089,7 @@ EOF
 ## Task 9: Remove hook-related code, add get_by_tmux
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 
 **Step 1: Remove methods**
 
@@ -1127,7 +1127,7 @@ def _save(self) -> None:
 **Step 4: Run syntax check**
 
 ```bash
-python -m py_compile src/telegram_bridge/session_manager.py
+python -m py_compile src/codogram/session_manager.py
 ```
 
 Expected: No output
@@ -1135,9 +1135,9 @@ Expected: No output
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py
+git add src/codogram/session_manager.py
 git commit -m "$(cat <<'EOF'
-refactor(telegram-bridge): remove hook-related code, add get_by_tmux
+refactor(codogram): remove hook-related code, add get_by_tmux
 
 Deleted:
 - update_from_hook
@@ -1162,8 +1162,8 @@ EOF
 ## Task 10: Remove HTTP server
 
 **Files:**
-- Modify: `src/telegram_bridge/main.py`
-- Modify: `src/telegram_bridge/config.py`
+- Modify: `src/codogram/main.py`
+- Modify: `src/codogram/config.py`
 
 **Step 1: Remove HTTP code from main.py**
 
@@ -1177,7 +1177,7 @@ Delete:
 **Step 2: Update main() function**
 
 ```python
-# src/telegram_bridge/main.py
+# src/codogram/main.py
 import asyncio
 from aiogram import Bot, Dispatcher
 
@@ -1230,7 +1230,7 @@ if __name__ == "__main__":
 **Step 3: Remove http_port from config.py**
 
 ```python
-# In src/telegram_bridge/config.py
+# In src/codogram/config.py
 # Remove http_port field from Settings class
 ```
 
@@ -1244,7 +1244,7 @@ def default_config() -> dict:
 **Step 5: Run syntax check**
 
 ```bash
-python -m py_compile src/telegram_bridge/main.py src/telegram_bridge/config.py
+python -m py_compile src/codogram/main.py src/codogram/config.py
 ```
 
 Expected: No output
@@ -1252,9 +1252,9 @@ Expected: No output
 **Step 6: Commit**
 
 ```bash
-git add src/telegram_bridge/main.py src/telegram_bridge/config.py
+git add src/codogram/main.py src/codogram/config.py
 git commit -m "$(cat <<'EOF'
-refactor(telegram-bridge): remove HTTP server completely
+refactor(codogram): remove HTTP server completely
 
 - No /session/register, /session/unregister endpoints
 - No /debug endpoint
@@ -1281,7 +1281,7 @@ EOF
 ```bash
 #!/bin/bash
 # DEPRECATED: This hook is no longer needed.
-# telegram-bridge now uses history.jsonl for session discovery.
+# codogram now uses history.jsonl for session discovery.
 # You can remove this hook from ~/.claude/settings.json
 #
 # Keeping for backwards compatibility - does nothing.
@@ -1293,7 +1293,7 @@ exit 0
 ```bash
 git add hooks/
 git commit -m "$(cat <<'EOF'
-deprecate(telegram-bridge): mark hooks as no longer needed
+deprecate(codogram): mark hooks as no longer needed
 
 Hooks replaced by history.jsonl polling.
 Users can remove from ~/.claude/settings.json.
@@ -1310,7 +1310,7 @@ EOF
 ## Task 12: Add cleanup logic
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/session_manager.py`
 
 **Step 1: Add should_cleanup helper**
 
@@ -1343,9 +1343,9 @@ def should_cleanup_project(project: ProjectState) -> bool:
 **Note:** `restore_projects` in Task 8 already uses `should_cleanup_project`. This task only adds the helper.
 
 ```bash
-git add src/telegram_bridge/session_manager.py
+git add src/codogram/session_manager.py
 git commit -m "$(cat <<'EOF'
-feat(telegram-bridge): add cleanup by jsonl mtime
+feat(codogram): add cleanup by jsonl mtime
 
 - Cleanup projects with jsonl inactive > 30 days
 - No last_activity tracking needed
@@ -1366,10 +1366,10 @@ EOF
 
 ```bash
 # 1. Restart bot
-/home/superbereza/dev/personal-agent/agent-tools/telegram-bridge/restart.sh
+/home/superbereza/dev/personal-agent/agent-tools/codogram/restart.sh
 
 # 2. Check bot logs
-tail -50 /home/superbereza/dev/personal-agent/tmp/telegram-bridge-logs/bot.log
+tail -50 /home/superbereza/dev/personal-agent/tmp/codogram-logs/bot.log
 
 # Expected: "Starting Telegram Bridge (history.jsonl mode)", "History watcher started", no errors
 
@@ -1417,7 +1417,7 @@ Remove hook setup instructions. Add:
 ```markdown
 ## Zero-Config Mode (Default)
 
-telegram-bridge now works without any Claude configuration:
+codogram now works without any Claude configuration:
 
 1. Start bot: `./restart.sh`
 2. Send `/start <project_name> <cwd>` in Telegram
@@ -1454,7 +1454,7 @@ The bridge automatically discovers Claude sessions via `~/.claude/history.jsonl`
 ```bash
 git add docs/setup.md CLAUDE.md
 git commit -m "$(cat <<'EOF'
-docs(telegram-bridge): update for history.jsonl architecture
+docs(codogram): update for history.jsonl architecture
 
 - Removed hook setup instructions
 - Added zero-config explanation
@@ -1472,14 +1472,14 @@ EOF
 ## Task 15: Add logging strategy
 
 **Files:**
-- Modify: `src/telegram_bridge/history_watcher.py`
-- Modify: `src/telegram_bridge/history_reader.py`
-- Modify: `src/telegram_bridge/session_manager.py`
+- Modify: `src/codogram/history_watcher.py`
+- Modify: `src/codogram/history_reader.py`
+- Modify: `src/codogram/session_manager.py`
 
 **Step 1: Setup structured logging**
 
 ```python
-# src/telegram_bridge/logging_config.py
+# src/codogram/logging_config.py
 import logging
 
 def setup_logging():
@@ -1489,7 +1489,7 @@ def setup_logging():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
-logger = logging.getLogger("telegram_bridge")
+logger = logging.getLogger("codogram")
 ```
 
 **Step 2: Add logging to key points**
@@ -1516,9 +1516,9 @@ logger.info("project_cleanup", extra={"project": project.project_name, "reason":
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/
+git add src/codogram/
 git commit -m "$(cat <<'EOF'
-feat(telegram-bridge): add structured logging
+feat(codogram): add structured logging
 
 Key log events:
 - session_changed: session_id transition
@@ -1538,7 +1538,7 @@ EOF
 ## Task 16: Add path sanitization
 
 **Files:**
-- Modify: `src/telegram_bridge/history_reader.py`
+- Modify: `src/codogram/history_reader.py`
 - Test: `tests/test_history_reader.py`
 
 **Step 1: Write failing tests for edge cases**
@@ -1590,9 +1590,9 @@ def compute_jsonl_path(cwd: str, session_id: str) -> Path:
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/history_reader.py tests/test_history_reader.py
+git add src/codogram/history_reader.py tests/test_history_reader.py
 git commit -m "$(cat <<'EOF'
-fix(telegram-bridge): normalize paths in compute_jsonl_path
+fix(codogram): normalize paths in compute_jsonl_path
 
 - Remove trailing slashes
 - Collapse double slashes
@@ -1610,7 +1610,7 @@ EOF
 ## Task 17: Add cleanup, tmux death check, and notification in periodic refresh
 
 **Files:**
-- Modify: `src/telegram_bridge/history_watcher.py`
+- Modify: `src/codogram/history_watcher.py`
 
 **Step 1: Add cleanup, tmux check, and notification before session check**
 
@@ -1685,9 +1685,9 @@ async def _check_for_changes(self):
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/history_watcher.py
+git add src/codogram/history_watcher.py
 git commit -m "$(cat <<'EOF'
-feat(telegram-bridge): add cleanup, tmux death check, and notification
+feat(codogram): add cleanup, tmux death check, and notification
 
 - Cleanup projects inactive > 30 days (by jsonl mtime)
 - Check if tmux session still exists before refreshing
@@ -1707,15 +1707,15 @@ EOF
 ## Task 18: Add error handling policy
 
 **Files:**
-- Create: `src/telegram_bridge/errors.py`
-- Modify: `src/telegram_bridge/history_reader.py`
-- Modify: `src/telegram_bridge/history_watcher.py`
+- Create: `src/codogram/errors.py`
+- Modify: `src/codogram/history_reader.py`
+- Modify: `src/codogram/history_watcher.py`
 
 **Step 1: Define error handling policy**
 
 ```python
-# src/telegram_bridge/errors.py
-"""Error handling policy for telegram-bridge.
+# src/codogram/errors.py
+"""Error handling policy for codogram.
 
 ERROR level (requires attention):
 - Bot startup failures
@@ -1740,7 +1740,7 @@ DEBUG level (troubleshooting):
 """
 
 class TelegramBridgeError(Exception):
-    """Base exception for telegram-bridge."""
+    """Base exception for codogram."""
     pass
 
 class ConfigError(TelegramBridgeError):
@@ -1779,9 +1779,9 @@ def find_session_for_project(cwd: str, history_path: Path = HISTORY_PATH) -> str
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/
+git add src/codogram/
 git commit -m "$(cat <<'EOF'
-feat(telegram-bridge): add error handling policy
+feat(codogram): add error handling policy
 
 Error levels defined:
 - ERROR: startup failures, API errors, config errors
@@ -1801,7 +1801,7 @@ EOF
 ## Task 19: Update permission callback routing to use tmux_session
 
 **Files:**
-- Modify: `src/telegram_bridge/permission_poller.py`
+- Modify: `src/codogram/permission_poller.py`
 - Test: `tests/test_permission_poller.py`
 
 **Context:** Permission callbacks currently use session_id which changes on /new, /resume. Need to use tmux_session instead for stable routing.
@@ -1863,9 +1863,9 @@ async def handle_permission_callback(callback: CallbackQuery):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/permission_poller.py tests/test_permission_poller.py
+git add src/codogram/permission_poller.py tests/test_permission_poller.py
 git commit -m "$(cat <<'EOF'
-fix(telegram-bridge): use tmux_session in permission callbacks
+fix(codogram): use tmux_session in permission callbacks
 
 - Callback format: {action}:{tmux_session} instead of {action}:{session_id}
 - tmux_session is stable across /new, /resume, /compact
@@ -1883,15 +1883,15 @@ EOF
 ## Task 20: Add multiple tmux selection UI
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
-- Create: `src/telegram_bridge/tmux_selector.py`
+- Modify: `src/codogram/bot.py`
+- Create: `src/codogram/tmux_selector.py`
 
 **Context:** When multiple tmux sessions match cwd, currently we just take first. Need inline keyboard for user to choose.
 
 **Step 1: Create tmux selector module**
 
 ```python
-# src/telegram_bridge/tmux_selector.py
+# src/codogram/tmux_selector.py
 """Handle multiple tmux session selection."""
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -1963,9 +1963,9 @@ async def on_tmux_selected(callback: CallbackQuery):
 **Step 4: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py src/telegram_bridge/tmux_selector.py
+git add src/codogram/bot.py src/codogram/tmux_selector.py
 git commit -m "$(cat <<'EOF'
-feat(telegram-bridge): add multiple tmux selection UI
+feat(codogram): add multiple tmux selection UI
 
 - When multiple tmux match cwd, show inline keyboard
 - User selects which tmux to connect
@@ -2008,7 +2008,7 @@ Edit `~/.claude/settings.json` and remove the hooks section:
 ### 2. Update bot
 
 ```bash
-cd agent-tools/telegram-bridge
+cd agent-tools/codogram
 git pull origin main
 ./restart.sh
 ```
@@ -2035,7 +2035,7 @@ Then restore the hooks in `~/.claude/settings.json`.
 ```bash
 git add docs/setup.md
 git commit -m "$(cat <<'EOF'
-docs(telegram-bridge): add migration guide for existing users
+docs(codogram): add migration guide for existing users
 
 - How to remove hooks from settings.json
 - How to update and reconnect
@@ -2083,10 +2083,10 @@ EOF
 pytest tests/ -v
 
 # Syntax check all modified files
-python -m py_compile src/telegram_bridge/*.py
+python -m py_compile src/codogram/*.py
 
 # Integration test
-./restart.sh && tail -f tmp/telegram-bridge-logs/bot.log
+./restart.sh && tail -f tmp/codogram-logs/bot.log
 ```
 
 **Key design points implemented:**

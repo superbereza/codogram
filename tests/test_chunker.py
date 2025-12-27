@@ -1,5 +1,5 @@
 # tests/test_chunker.py
-from telegram_bridge.chunker import chunk_message
+from codogram.chunker import chunk_message
 
 def test_short_message_no_split():
     result = chunk_message("Hello world", max_len=100)

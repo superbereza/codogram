@@ -15,14 +15,14 @@
 ### Task 1: Fix watcher.py string bug
 
 **Files:**
-- Modify: `src/telegram_bridge/watcher.py:30-31, 45-46`
+- Modify: `src/codogram/watcher.py:30-31, 45-46`
 - Test: `tests/test_watcher.py`
 
 **Step 1: Write failing test**
 
 ```python
 # tests/test_watcher.py
-from telegram_bridge.watcher import parse_jsonl_entry, ContentType
+from codogram.watcher import parse_jsonl_entry, ContentType
 
 def test_parse_jsonl_entry_handles_string_in_content():
     """content может содержать строки, не только dict."""
@@ -50,13 +50,13 @@ def test_parse_jsonl_entry_handles_string_in_assistant_content():
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge && source /home/superbereza/dev/personal-agent/venv/bin/activate && pytest tests/test_watcher.py -v`
+Run: `cd /home/superbereza/dev/personal-agent/agent-tools/codogram && source /home/superbereza/dev/personal-agent/venv/bin/activate && pytest tests/test_watcher.py -v`
 
 Expected: FAIL with `AttributeError: 'str' object has no attribute 'get'`
 
 **Step 3: Write minimal implementation**
 
-В `src/telegram_bridge/watcher.py` добавить проверку isinstance:
+В `src/codogram/watcher.py` добавить проверку isinstance:
 
 ```python
 # Line 30-31: в user entries loop
@@ -81,8 +81,8 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/watcher.py tests/test_watcher.py
-git commit -m "fix(telegram-bridge): handle strings in jsonl content array"
+git add src/codogram/watcher.py tests/test_watcher.py
+git commit -m "fix(codogram): handle strings in jsonl content array"
 ```
 
 ---
@@ -90,14 +90,14 @@ git commit -m "fix(telegram-bridge): handle strings in jsonl content array"
 ### Task 2: Create PollerState enum
 
 **Files:**
-- Create: `src/telegram_bridge/permission_poller.py`
+- Create: `src/codogram/permission_poller.py`
 - Test: `tests/test_permission_poller.py`
 
 **Step 1: Write failing test**
 
 ```python
 # tests/test_permission_poller.py
-from telegram_bridge.permission_poller import PollerState
+from codogram.permission_poller import PollerState
 
 def test_poller_state_enum():
     assert PollerState.IDLE.value == "idle"
@@ -114,7 +114,7 @@ Expected: FAIL with `ModuleNotFoundError`
 **Step 3: Write minimal implementation**
 
 ```python
-# src/telegram_bridge/permission_poller.py
+# src/codogram/permission_poller.py
 """Background permission poller - independent of jsonl watcher."""
 from enum import Enum
 
@@ -134,8 +134,8 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/permission_poller.py tests/test_permission_poller.py
-git commit -m "feat(telegram-bridge): add PollerState enum"
+git add src/codogram/permission_poller.py tests/test_permission_poller.py
+git commit -m "feat(codogram): add PollerState enum"
 ```
 
 ---
@@ -143,15 +143,15 @@ git commit -m "feat(telegram-bridge): add PollerState enum"
 ### Task 3: Create format_permission_content function
 
 **Files:**
-- Modify: `src/telegram_bridge/permission_poller.py`
+- Modify: `src/codogram/permission_poller.py`
 - Test: `tests/test_permission_poller.py`
 
 **Step 1: Write failing test**
 
 ```python
 # tests/test_permission_poller.py (добавить)
-from telegram_bridge.permission_poller import format_permission_content
-from telegram_bridge.screen import PermissionPrompt
+from codogram.permission_poller import format_permission_content
+from codogram.screen import PermissionPrompt
 
 def test_format_permission_content_full():
     perm = PermissionPrompt(
@@ -180,7 +180,7 @@ Expected: FAIL with `ImportError`
 **Step 3: Write minimal implementation**
 
 ```python
-# src/telegram_bridge/permission_poller.py (добавить)
+# src/codogram/permission_poller.py (добавить)
 from dataclasses import dataclass
 
 # Separators for Telegram display
@@ -216,8 +216,8 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/permission_poller.py tests/test_permission_poller.py
-git commit -m "feat(telegram-bridge): add format_permission_content"
+git add src/codogram/permission_poller.py tests/test_permission_poller.py
+git commit -m "feat(codogram): add format_permission_content"
 ```
 
 ---
@@ -225,12 +225,12 @@ git commit -m "feat(telegram-bridge): add format_permission_content"
 ### Task 4: Create permission_poller_task skeleton
 
 **Files:**
-- Modify: `src/telegram_bridge/permission_poller.py`
+- Modify: `src/codogram/permission_poller.py`
 
 **Step 1: Write the skeleton**
 
 ```python
-# src/telegram_bridge/permission_poller.py (добавить)
+# src/codogram/permission_poller.py (добавить)
 import asyncio
 from aiogram import Bot
 
@@ -278,15 +278,15 @@ async def permission_poller_task(bot: Bot, get_session_fn):
 
 **Step 2: Verify syntax**
 
-Run: `python -m py_compile src/telegram_bridge/permission_poller.py`
+Run: `python -m py_compile src/codogram/permission_poller.py`
 
 Expected: No output (success)
 
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/permission_poller.py
-git commit -m "feat(telegram-bridge): permission_poller_task skeleton"
+git add src/codogram/permission_poller.py
+git commit -m "feat(codogram): permission_poller_task skeleton"
 ```
 
 ---
@@ -294,7 +294,7 @@ git commit -m "feat(telegram-bridge): permission_poller_task skeleton"
 ### Task 5: Implement state machine transitions
 
 **Files:**
-- Modify: `src/telegram_bridge/permission_poller.py`
+- Modify: `src/codogram/permission_poller.py`
 
 **Step 1: Replace `pass` with state machine logic**
 
@@ -375,15 +375,15 @@ git commit -m "feat(telegram-bridge): permission_poller_task skeleton"
 
 **Step 2: Verify syntax**
 
-Run: `python -m py_compile src/telegram_bridge/permission_poller.py`
+Run: `python -m py_compile src/codogram/permission_poller.py`
 
 Expected: No output (success)
 
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/permission_poller.py
-git commit -m "feat(telegram-bridge): implement poller state machine"
+git add src/codogram/permission_poller.py
+git commit -m "feat(codogram): implement poller state machine"
 ```
 
 ---
@@ -391,7 +391,7 @@ git commit -m "feat(telegram-bridge): implement poller state machine"
 ### Task 6: Refactor main.py
 
 **Files:**
-- Modify: `src/telegram_bridge/main.py`
+- Modify: `src/codogram/main.py`
 
 **Step 1: Remove blocking loop and start poller**
 
@@ -428,15 +428,15 @@ await dp.start_polling(bot)
 
 **Step 2: Verify syntax**
 
-Run: `python -m py_compile src/telegram_bridge/main.py`
+Run: `python -m py_compile src/codogram/main.py`
 
 Expected: No output (success)
 
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/main.py
-git commit -m "refactor(telegram-bridge): use background permission poller"
+git add src/codogram/main.py
+git commit -m "refactor(codogram): use background permission poller"
 ```
 
 ---
@@ -448,7 +448,7 @@ git commit -m "refactor(telegram-bridge): use background permission poller"
 **Step 1: Restart bot**
 
 ```bash
-/home/superbereza/dev/personal-agent/agent-tools/telegram-bridge/restart.sh
+/home/superbereza/dev/personal-agent/agent-tools/codogram/restart.sh
 ```
 
 **Step 2: Check logs**
@@ -478,7 +478,7 @@ git push
 **Problem:** `parse_screen` ищет строку с "?" как question, но подхватывает текст из предыдущих сообщений в tmux буфере.
 
 **Files:**
-- Modify: `src/telegram_bridge/screen.py:65-74`
+- Modify: `src/codogram/screen.py:65-74`
 - Test: `tests/test_screen.py`
 
 **Step 1: Write failing test**
@@ -525,7 +525,7 @@ for i, line in enumerate(lines):
 **Step 5: Commit**
 
 ```bash
-git commit -m "fix(telegram-bridge): ignore bullet lines when parsing question"
+git commit -m "fix(codogram): ignore bullet lines when parsing question"
 ```
 
 ---
@@ -535,7 +535,7 @@ git commit -m "fix(telegram-bridge): ignore bullet lines when parsing question"
 **Problem:** Inline кнопки в Telegram имеют лимит ~64 символа, длинные варианты обрезаются.
 
 **Files:**
-- Modify: `src/telegram_bridge/permission_poller.py`
+- Modify: `src/codogram/permission_poller.py`
 
 **Step 1: Update send logic**
 
@@ -557,12 +557,12 @@ kb = permission_keyboard(parsed.options)
 
 **Step 2: Verify syntax**
 
-Run: `python -m py_compile src/telegram_bridge/permission_poller.py`
+Run: `python -m py_compile src/codogram/permission_poller.py`
 
 **Step 3: Commit**
 
 ```bash
-git commit -m "feat(telegram-bridge): show options text before buttons"
+git commit -m "feat(codogram): show options text before buttons"
 ```
 
 ---

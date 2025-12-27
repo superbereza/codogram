@@ -4,7 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from telegram_bridge.watcher import parse_jsonl_entry, ContentType
+from codogram.watcher import parse_jsonl_entry, ContentType
 
 def test_parse_text_entry():
     entry = {
@@ -56,7 +56,7 @@ def test_parse_jsonl_entry_handles_string_in_assistant_content():
 
 # Tests for find_missed_entries
 
-from telegram_bridge.watcher import find_missed_entries, ParsedEntry
+from codogram.watcher import find_missed_entries, ParsedEntry
 
 
 def test_find_missed_entries_returns_entries_after_last_user():

@@ -13,7 +13,7 @@
 ## Task 1: Fix critical _stop_tasks bug
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py:578-604`
+- Modify: `src/codogram/bot.py:578-604`
 
 **Problem:** Line 590 calls `project_manager._stop_tasks(project)` which doesn't exist. Crashes `/restart_session`.
 
@@ -49,8 +49,8 @@ if project.watcher_task and not project.watcher_task.done():
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "fix(telegram-bridge): fix _stop_tasks crash in restart_session
+git add src/codogram/bot.py
+git commit -m "fix(codogram): fix _stop_tasks crash in restart_session
 
 The method was removed but still called. Inline the task cancellation logic.
 
@@ -64,7 +64,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 2: Remove backwards compatibility
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py:213-306`
+- Modify: `src/codogram/bot.py:213-306`
 
 **Step 1: Delete _start_with_explicit_args function**
 
@@ -119,8 +119,8 @@ async def cmd_start(message: Message):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "refactor(telegram-bridge): remove /start backwards compatibility
+git add src/codogram/bot.py
+git commit -m "refactor(codogram): remove /start backwards compatibility
 
 BREAKING: /start <project> <cwd> no longer supported.
 Use /start or /start <project> instead.
@@ -135,7 +135,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 3: Remove dead code
 
 **Files:**
-- Modify: `src/telegram_bridge/start_flow.py:49-55`
+- Modify: `src/codogram/start_flow.py:49-55`
 
 **Step 1: Delete unused ask_project_name_keyboard**
 
@@ -155,8 +155,8 @@ def ask_project_name_keyboard() -> InlineKeyboardMarkup:
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/start_flow.py
-git commit -m "refactor(telegram-bridge): remove unused ask_project_name_keyboard
+git add src/codogram/start_flow.py
+git commit -m "refactor(codogram): remove unused ask_project_name_keyboard
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -168,7 +168,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 4: Add asyncio import at top level
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py:1-10`
+- Modify: `src/codogram/bot.py:1-10`
 
 **Step 1: Add asyncio to imports**
 
@@ -187,8 +187,8 @@ Search and remove these lines throughout the file:
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "refactor(telegram-bridge): move asyncio import to top level
+git add src/codogram/bot.py
+git commit -m "refactor(codogram): move asyncio import to top level
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -200,7 +200,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 5: Add InlineKeyboard imports at top level
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py:5`
+- Modify: `src/codogram/bot.py:5`
 
 **Step 1: Update aiogram.types import**
 
@@ -224,8 +224,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "refactor(telegram-bridge): move InlineKeyboard imports to top
+git add src/codogram/bot.py
+git commit -m "refactor(codogram): move InlineKeyboard imports to top
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -237,7 +237,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 6: Extract task starter helper
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add helper function after show_status**
 
@@ -283,8 +283,8 @@ start_poller, start_watcher = _make_task_starters(message.bot)  # or callback.bo
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "refactor(telegram-bridge): extract _make_task_starters helper
+git add src/codogram/bot.py
+git commit -m "refactor(codogram): extract _make_task_starters helper
 
 Reduces code duplication from 9 places to 1.
 
@@ -298,7 +298,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 7: Improve project name validation
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add validation function after is_admin**
 
@@ -348,8 +348,8 @@ if args:
 **Step 4: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): improve project name validation
+git add src/codogram/bot.py
+git commit -m "feat(codogram): improve project name validation
 
 Only allow alphanumeric, dash, underscore. Prevents directory traversal.
 
@@ -363,7 +363,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 8: Fix is_claude_running to check watcher
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py:69-87`
+- Modify: `src/codogram/bot.py:69-87`
 
 **Step 1: Update is_claude_running**
 
@@ -396,8 +396,8 @@ def is_claude_running(project: ProjectState) -> bool:
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "fix(telegram-bridge): is_claude_running checks watcher_task too
+git add src/codogram/bot.py
+git commit -m "fix(codogram): is_claude_running checks watcher_task too
 
 Previously only checked poller, now requires both tasks running.
 
@@ -411,7 +411,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 9: Add error handling in launch_claude_new
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py` (launch_claude_new function)
+- Modify: `src/codogram/bot.py` (launch_claude_new function)
 
 **Step 1: Check create_tmux_with_claude result**
 
@@ -456,8 +456,8 @@ async def launch_claude_new(message: Message, project: ProjectState, start_polle
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "fix(telegram-bridge): handle errors in launch_claude_new
+git add src/codogram/bot.py
+git commit -m "fix(codogram): handle errors in launch_claude_new
 
 Check create_tmux_with_claude result and report errors to user.
 
@@ -495,7 +495,7 @@ Search for `/start <project_name> <cwd>` and remove.
 
 ```bash
 git add CLAUDE.md
-git commit -m "docs(telegram-bridge): update CLAUDE.md for new /start format
+git commit -m "docs(codogram): update CLAUDE.md for new /start format
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -521,7 +521,7 @@ Expected: All tests pass
 **Step 2: Verify bot imports**
 
 ```bash
-python -c "from telegram_bridge.bot import router; print('OK')"
+python -c "from codogram.bot import router; print('OK')"
 ```
 
 Expected: "OK"
@@ -529,7 +529,7 @@ Expected: "OK"
 **Step 3: Check syntax**
 
 ```bash
-python -m py_compile src/telegram_bridge/bot.py
+python -m py_compile src/codogram/bot.py
 ```
 
 Expected: No output (success)
@@ -539,7 +539,7 @@ Expected: No output (success)
 ## Task 12: Add delay between text and Enter in tmux.send
 
 **Files:**
-- Modify: `src/telegram_bridge/tmux.py:1-16`
+- Modify: `src/codogram/tmux.py:1-16`
 
 **Problem:** Sometimes text from Telegram is sent to tmux but Enter doesn't register. Need small delay between sending text and Enter.
 
@@ -569,8 +569,8 @@ class TmuxSession:
 **Step 2: Commit**
 
 ```bash
-git add src/telegram_bridge/tmux.py
-git commit -m "fix(telegram-bridge): add delay between text and Enter in tmux.send
+git add src/codogram/tmux.py
+git commit -m "fix(codogram): add delay between text and Enter in tmux.send
 
 Adds small delay to ensure text is processed before Enter.
 
@@ -595,7 +595,7 @@ import pytest
 
 def test_is_valid_project_name_valid():
     """Test valid project names."""
-    from telegram_bridge.bot import is_valid_project_name
+    from codogram.bot import is_valid_project_name
 
     assert is_valid_project_name("my-project") == True
     assert is_valid_project_name("my_project") == True
@@ -605,7 +605,7 @@ def test_is_valid_project_name_valid():
 
 def test_is_valid_project_name_invalid():
     """Test invalid project names."""
-    from telegram_bridge.bot import is_valid_project_name
+    from codogram.bot import is_valid_project_name
 
     assert is_valid_project_name("") == False
     assert is_valid_project_name("my project") == False  # space
@@ -627,7 +627,7 @@ Expected: All tests pass
 
 ```bash
 git add tests/test_bot_validation.py
-git commit -m "test(telegram-bridge): add unit tests for project name validation
+git commit -m "test(codogram): add unit tests for project name validation
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -649,7 +649,7 @@ import subprocess
 import time
 import pytest
 
-from telegram_bridge.tmux import TmuxSession
+from codogram.tmux import TmuxSession
 
 
 @pytest.fixture
@@ -708,7 +708,7 @@ Expected: All tests pass (requires tmux installed)
 
 ```bash
 git add tests/test_tmux_send.py
-git commit -m "test(telegram-bridge): add integration tests for tmux.send
+git commit -m "test(codogram): add integration tests for tmux.send
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -720,7 +720,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 15: Use shell=False in tmux.py
 
 **Files:**
-- Modify: `src/telegram_bridge/tmux.py`
+- Modify: `src/codogram/tmux.py`
 
 **Problem:** `shell=True` is security risk — shell interprets `$`, `` ` ``, `;` etc.
 
@@ -811,8 +811,8 @@ Expected: All tests pass
 **Step 8: Commit**
 
 ```bash
-git add src/telegram_bridge/tmux.py
-git commit -m "security(telegram-bridge): use shell=False in tmux.py
+git add src/codogram/tmux.py
+git commit -m "security(codogram): use shell=False in tmux.py
 
 Prevents shell injection attacks. Arguments passed directly to execve().
 
@@ -826,7 +826,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 16: Fix watcher restart wrong order
 
 **Files:**
-- Modify: `src/telegram_bridge/history_watcher.py:104-118`
+- Modify: `src/codogram/history_watcher.py:104-118`
 
 **Problem:** When session changes, `_maybe_start_tasks` is called before old watcher is cancelled. But `_maybe_start_tasks` checks `if not project.watcher_task or project.watcher_task.done()` — old watcher is still running, so new watcher is NOT created. Then old watcher is cancelled. Result: no watcher running.
 
@@ -863,8 +863,8 @@ Expected: All tests pass
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/history_watcher.py
-git commit -m "fix(telegram-bridge): fix watcher restart wrong order
+git add src/codogram/history_watcher.py
+git commit -m "fix(codogram): fix watcher restart wrong order
 
 Cancel old watcher BEFORE calling _maybe_start_tasks.
 Previously, _maybe_start_tasks saw old task still running and skipped creating new one.
@@ -879,8 +879,8 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 17: Move session check from background polling to on-message
 
 **Files:**
-- Modify: `src/telegram_bridge/history_watcher.py`
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/history_watcher.py`
+- Modify: `src/codogram/bot.py`
 
 **Problem:** Background polling every 15s is unnecessary. Session changes only matter when user is active. Check on each user message instead.
 
@@ -1012,8 +1012,8 @@ Expected: All tests pass
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/history_watcher.py src/telegram_bridge/bot.py
-git commit -m "refactor(telegram-bridge): check session on user message instead of polling
+git add src/codogram/history_watcher.py src/codogram/bot.py
+git commit -m "refactor(codogram): check session on user message instead of polling
 
 Session changes now detected when user sends message, not via 15s polling.
 Reduces unnecessary background work while still handling /new in tmux.
@@ -1028,7 +1028,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 18: Fix restore_projects cleanup order
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py:158-213`
+- Modify: `src/codogram/session_manager.py:158-213`
 
 **Problem:** In `restore_projects`, `should_cleanup_project` is called BEFORE `refresh_project_session`. Since `jsonl_path` is not saved in config, it's None at check time. `should_cleanup_project` returns True for None jsonl_path → project deleted on every restart.
 
@@ -1074,8 +1074,8 @@ Expected: All tests pass
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py
-git commit -m "fix(telegram-bridge): fix restore_projects cleanup order
+git add src/codogram/session_manager.py
+git commit -m "fix(codogram): fix restore_projects cleanup order
 
 Call refresh_project_session BEFORE should_cleanup_project.
 Previously, jsonl_path was None at check time, causing all projects to be deleted on restart.
@@ -1090,11 +1090,11 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ## Task 19: Унифицировать логирование
 
 **Files:**
-- Modify: `src/telegram_bridge/logging_config.py`
-- Modify: `src/telegram_bridge/main.py`
-- Modify: `src/telegram_bridge/watcher.py`
-- Modify: `src/telegram_bridge/permission_poller.py`
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/logging_config.py`
+- Modify: `src/codogram/main.py`
+- Modify: `src/codogram/watcher.py`
+- Modify: `src/codogram/permission_poller.py`
+- Modify: `src/codogram/bot.py`
 - Delete: `session-hook.log` related code (if any)
 - Modify: `.env.example`
 
@@ -1103,12 +1103,12 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 **Step 1: Настроить logging_config.py с уровнем из env**
 
 ```python
-"""Structured logging configuration for telegram_bridge."""
+"""Structured logging configuration for codogram."""
 import logging
 import os
 
 def setup_logging():
-    """Configure logging for telegram_bridge.
+    """Configure logging for codogram.
 
     Level controlled by LOG_LEVEL env var (default: DEBUG).
     Set LOG_LEVEL=INFO for less verbose output.
@@ -1123,13 +1123,13 @@ def setup_logging():
     )
 
     # Set level for our logger
-    logger = logging.getLogger("telegram_bridge")
+    logger = logging.getLogger("codogram")
     logger.setLevel(level)
 
     return logger
 
 # Module-level logger
-logger = logging.getLogger("telegram_bridge")
+logger = logging.getLogger("codogram")
 ```
 
 **Step 2: Вызвать setup_logging() в main.py**
@@ -1204,7 +1204,7 @@ LOG_LEVEL=DEBUG
 
 ```bash
 git add -A
-git commit -m "refactor(telegram-bridge): унифицировать логирование
+git commit -m "refactor(codogram): унифицировать логирование
 
 - Все логи через python logging
 - Уровень через LOG_LEVEL env (default: INFO)

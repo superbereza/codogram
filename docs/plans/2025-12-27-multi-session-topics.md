@@ -41,7 +41,7 @@
 ## Task 1: Create ThreadInfo dataclass
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py:44-66`
+- Modify: `src/codogram/session_manager.py:44-66`
 - Test: `tests/test_session_manager.py`
 
 **Step 1: Write the failing test**
@@ -49,7 +49,7 @@
 ```python
 # tests/test_session_manager.py
 import pytest
-from telegram_bridge.session_manager import ThreadInfo
+from codogram.session_manager import ThreadInfo
 
 def test_thread_info_creation():
     thread = ThreadInfo(thread_id=12345, name="mystic")
@@ -74,7 +74,7 @@ Expected: FAIL with "cannot import name 'ThreadInfo'"
 
 **Step 3: Write minimal implementation**
 
-Add to `src/telegram_bridge/session_manager.py` before ProjectState:
+Add to `src/codogram/session_manager.py` before ProjectState:
 
 ```python
 @dataclass
@@ -111,8 +111,8 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_session_manager.py
-git commit -m "feat(telegram-bridge): add ThreadInfo dataclass"
+git add src/codogram/session_manager.py tests/test_session_manager.py
+git commit -m "feat(codogram): add ThreadInfo dataclass"
 ```
 
 ---
@@ -120,20 +120,20 @@ git commit -m "feat(telegram-bridge): add ThreadInfo dataclass"
 ## Task 2: Add threads dict to ProjectState
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py:44-66`
+- Modify: `src/codogram/session_manager.py:44-66`
 - Test: `tests/test_session_manager.py`
 
 **Step 1: Write the failing test**
 
 ```python
 def test_project_state_has_threads():
-    from telegram_bridge.session_manager import ProjectState, ThreadInfo
+    from codogram.session_manager import ProjectState, ThreadInfo
     project = ProjectState(project_name="test")
     assert hasattr(project, 'threads')
     assert project.threads == {}
 
 def test_project_state_get_thread():
-    from telegram_bridge.session_manager import ProjectState, ThreadInfo
+    from codogram.session_manager import ProjectState, ThreadInfo
     project = ProjectState(project_name="test")
     thread = ThreadInfo(thread_id=None, name="main")
     project.threads[None] = thread
@@ -141,7 +141,7 @@ def test_project_state_get_thread():
     assert project.get_thread(12345) is None
 
 def test_project_state_get_or_create_thread():
-    from telegram_bridge.session_manager import ProjectState
+    from codogram.session_manager import ProjectState
     project = ProjectState(project_name="test")
     thread = project.get_or_create_thread(None, "main")
     assert thread.name == "main"
@@ -158,7 +158,7 @@ Expected: FAIL
 
 **Step 3: Write minimal implementation**
 
-Update ProjectState in `src/telegram_bridge/session_manager.py`:
+Update ProjectState in `src/codogram/session_manager.py`:
 
 ```python
 @dataclass
@@ -200,8 +200,8 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_session_manager.py
-git commit -m "feat(telegram-bridge): add threads dict to ProjectState"
+git add src/codogram/session_manager.py tests/test_session_manager.py
+git commit -m "feat(codogram): add threads dict to ProjectState"
 ```
 
 ---
@@ -209,15 +209,15 @@ git commit -m "feat(telegram-bridge): add threads dict to ProjectState"
 ## Task 3: Update config save/load for threads
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py:75-98`
+- Modify: `src/codogram/session_manager.py:75-98`
 - Test: `tests/test_session_manager.py`
 
 **Step 1: Write the failing test**
 
 ```python
 def test_config_saves_threads(tmp_path, monkeypatch):
-    from telegram_bridge.session_manager import ProjectManager, ThreadInfo
-    from telegram_bridge import config
+    from codogram.session_manager import ProjectManager, ThreadInfo
+    from codogram import config
 
     config_file = tmp_path / ".config.json"
     monkeypatch.setattr(config, "CONFIG_PATH", config_file)
@@ -240,7 +240,7 @@ def test_config_saves_threads(tmp_path, monkeypatch):
     assert "12345" in saved["projects"]["test-project"]["threads"]
 
 def test_config_loads_threads(tmp_path, monkeypatch):
-    from telegram_bridge import config
+    from codogram import config
     import json
 
     config_file = tmp_path / ".config.json"
@@ -258,7 +258,7 @@ def test_config_loads_threads(tmp_path, monkeypatch):
     }))
     monkeypatch.setattr(config, "CONFIG_PATH", config_file)
 
-    from telegram_bridge.session_manager import ProjectManager
+    from codogram.session_manager import ProjectManager
     manager = ProjectManager()
     project = manager.projects.get("test-project")
     assert project is not None
@@ -328,8 +328,8 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py tests/test_session_manager.py
-git commit -m "feat(telegram-bridge): save/load threads in config"
+git add src/codogram/session_manager.py tests/test_session_manager.py
+git commit -m "feat(codogram): save/load threads in config"
 ```
 
 ---
@@ -337,7 +337,7 @@ git commit -m "feat(telegram-bridge): save/load threads in config"
 ## Task 4: Add MAGIC_NAMES for thread naming
 
 **Files:**
-- Create: `src/telegram_bridge/magic_names.py`
+- Create: `src/codogram/magic_names.py`
 - Test: `tests/test_magic_names.py`
 
 **Step 1: Write the failing test**
@@ -345,20 +345,20 @@ git commit -m "feat(telegram-bridge): save/load threads in config"
 ```python
 # tests/test_magic_names.py
 def test_get_random_magic_name():
-    from telegram_bridge.magic_names import get_random_magic_name
+    from codogram.magic_names import get_random_magic_name
     name = get_random_magic_name()
     assert isinstance(name, str)
     assert len(name) > 0
 
 def test_get_random_magic_name_excludes():
-    from telegram_bridge.magic_names import get_random_magic_name, MAGIC_NAMES
+    from codogram.magic_names import get_random_magic_name, MAGIC_NAMES
     # Exclude all but one
     excluded = set(MAGIC_NAMES[:-1])
     name = get_random_magic_name(excluded)
     assert name == MAGIC_NAMES[-1]
 
 def test_get_random_magic_name_all_excluded_returns_uuid():
-    from telegram_bridge.magic_names import get_random_magic_name, MAGIC_NAMES
+    from codogram.magic_names import get_random_magic_name, MAGIC_NAMES
     excluded = set(MAGIC_NAMES)
     name = get_random_magic_name(excluded)
     # Should be a short UUID-like string
@@ -368,11 +368,11 @@ def test_get_random_magic_name_all_excluded_returns_uuid():
 **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/test_magic_names.py -v`
-Expected: FAIL with "No module named 'telegram_bridge.magic_names'"
+Expected: FAIL with "No module named 'codogram.magic_names'"
 
 **Step 3: Write minimal implementation**
 
-Create `src/telegram_bridge/magic_names.py`:
+Create `src/codogram/magic_names.py`:
 
 ```python
 """Magic names for thread naming."""
@@ -406,8 +406,8 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add src/telegram_bridge/magic_names.py tests/test_magic_names.py
-git commit -m "feat(telegram-bridge): add magic names for threads"
+git add src/codogram/magic_names.py tests/test_magic_names.py
+git commit -m "feat(codogram): add magic names for threads"
 ```
 
 ---
@@ -418,7 +418,7 @@ git commit -m "feat(telegram-bridge): add magic names for threads"
 
 1. Запустить unit тесты:
 ```bash
-cd agent-tools/telegram-bridge
+cd agent-tools/codogram
 pytest tests/test_session_manager.py tests/test_magic_names.py -v
 ```
 
@@ -437,7 +437,7 @@ pytest tests/test_session_manager.py tests/test_magic_names.py -v
 ## Task 5: Add /session_new command and /start in topic support
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 - Test: manual testing (Telegram commands hard to unit test)
 
 **Step 1: Add helper function for launching Claude in thread**
@@ -581,8 +581,8 @@ BotCommand(command="session_new", description="Create new Claude thread"),
 **Step 4: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): add /session_new command"
+git add src/codogram/bot.py
+git commit -m "feat(codogram): add /session_new command"
 ```
 
 ---
@@ -590,7 +590,7 @@ git commit -m "feat(telegram-bridge): add /session_new command"
 ## Task 6: Add /session_close command
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add command handler**
 
@@ -694,8 +694,8 @@ async def on_session_close_callback(callback: CallbackQuery):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): add /session_close command"
+git add src/codogram/bot.py
+git commit -m "feat(codogram): add /session_close command"
 ```
 
 ---
@@ -742,7 +742,7 @@ git commit -m "feat(telegram-bridge): add /session_close command"
 ## Task 7: Update message routing for thread_id
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py:799-850` (on_message handler)
+- Modify: `src/codogram/bot.py:799-850` (on_message handler)
 
 **Step 1: Update on_message handler**
 
@@ -847,8 +847,8 @@ async def on_message(message: Message):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): route messages by thread_id"
+git add src/codogram/bot.py
+git commit -m "feat(codogram): route messages by thread_id"
 ```
 
 ---
@@ -884,7 +884,7 @@ git commit -m "feat(telegram-bridge): route messages by thread_id"
 ## Task 8: Add thread-aware session binding
 
 **Files:**
-- Modify: `src/telegram_bridge/history_watcher.py`
+- Modify: `src/codogram/history_watcher.py`
 
 **Step 1: Add poll_for_session_thread function**
 
@@ -996,8 +996,8 @@ async def check_session_for_thread(
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/history_watcher.py
-git commit -m "feat(telegram-bridge): add thread-aware session binding"
+git add src/codogram/history_watcher.py
+git commit -m "feat(codogram): add thread-aware session binding"
 ```
 
 ---
@@ -1005,8 +1005,8 @@ git commit -m "feat(telegram-bridge): add thread-aware session binding"
 ## Task 9: Add thread-specific watcher
 
 **Files:**
-- Modify: `src/telegram_bridge/history_watcher.py`
-- Modify: `src/telegram_bridge/watcher.py`
+- Modify: `src/codogram/history_watcher.py`
+- Modify: `src/codogram/watcher.py`
 
 **Step 1: Add watch_thread_jsonl function**
 
@@ -1034,7 +1034,7 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
 
 **Step 2: Update send_entry_to_telegram to accept thread_id**
 
-In `src/telegram_bridge/watcher.py`, update function signature:
+In `src/codogram/watcher.py`, update function signature:
 
 ```python
 async def send_entry_to_telegram(
@@ -1056,8 +1056,8 @@ async def send_entry_to_telegram(
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/history_watcher.py src/telegram_bridge/watcher.py
-git commit -m "feat(telegram-bridge): add thread-specific watcher"
+git add src/codogram/history_watcher.py src/codogram/watcher.py
+git commit -m "feat(codogram): add thread-specific watcher"
 ```
 
 ---
@@ -1096,7 +1096,7 @@ git commit -m "feat(telegram-bridge): add thread-specific watcher"
 ## Task 10: Add thread-specific permission poller
 
 **Files:**
-- Modify: `src/telegram_bridge/permission_poller.py`
+- Modify: `src/codogram/permission_poller.py`
 
 **Step 1: Update start_poller to accept thread**
 
@@ -1161,8 +1161,8 @@ async def on_permission_callback(callback: CallbackQuery):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/permission_poller.py src/telegram_bridge/bot.py
-git commit -m "feat(telegram-bridge): add thread-specific permission poller"
+git add src/codogram/permission_poller.py src/codogram/bot.py
+git commit -m "feat(codogram): add thread-specific permission poller"
 ```
 
 ---
@@ -1197,8 +1197,8 @@ git commit -m "feat(telegram-bridge): add thread-specific permission poller"
 ## Task 11: Migration and thread lifecycle management
 
 **Files:**
-- Modify: `src/telegram_bridge/session_manager.py`
-- Modify: `src/telegram_bridge/history_watcher.py`
+- Modify: `src/codogram/session_manager.py`
+- Modify: `src/codogram/history_watcher.py`
 
 **Step 1: Update restore_projects for migration**
 
@@ -1288,8 +1288,8 @@ async def _check_for_changes(self):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/session_manager.py src/telegram_bridge/history_watcher.py
-git commit -m "feat(telegram-bridge): add thread lifecycle management"
+git add src/codogram/session_manager.py src/codogram/history_watcher.py
+git commit -m "feat(codogram): add thread lifecycle management"
 ```
 
 ---
@@ -1297,7 +1297,7 @@ git commit -m "feat(telegram-bridge): add thread lifecycle management"
 ## Task 12: Block /resume command
 
 **Files:**
-- Modify: `src/telegram_bridge/bot.py`
+- Modify: `src/codogram/bot.py`
 
 **Step 1: Add /resume detection**
 
@@ -1346,8 +1346,8 @@ async def poll_for_session_thread(...):
 **Step 3: Commit**
 
 ```bash
-git add src/telegram_bridge/bot.py src/telegram_bridge/history_watcher.py
-git commit -m "feat(telegram-bridge): block /resume with error message"
+git add src/codogram/bot.py src/codogram/history_watcher.py
+git commit -m "feat(codogram): block /resume with error message"
 ```
 
 ---

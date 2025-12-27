@@ -20,7 +20,7 @@
 ```
 Bash command
 
-   kill 136858 2>/dev/null; sleep 1; ps aux | grep telegram_bridge | grep -v
+   kill 136858 2>/dev/null; sleep 1; ps aux | grep codogram | grep -v
    grep
    Kill old bot process
 
@@ -36,7 +36,7 @@ OPTIONS:
 ```
 Bash command
 
-   cat /proc/162774/fd/1 2>/dev/null || journalctl --user -u telegram-bridge
+   cat /proc/162774/fd/1 2>/dev/null || journalctl --user -u codogram
    --no-pager -n 30 2>/dev/null || echo "no logs available"
    Try to get stdout from process
 
@@ -52,7 +52,7 @@ OPTIONS:
 ```
 Bash command
 
-   cd /home/superbereza/dev/personal-agent/agent-tools/telegram-bridge &&
+   cd /home/superbereza/dev/personal-agent/agent-tools/codogram &&
    source ../../venv/bin/activate && python -m pytest
    tests/test_project_resolver.py -v
    Run pytest to verify test fails
@@ -70,7 +70,7 @@ OPTIONS:
 Bash command
 
    tail -50
-   /home/superbereza/dev/personal-agent/tmp/telegram-bridge-logs/*.log
+   /home/superbereza/dev/personal-agent/tmp/codogram-logs/*.log
    2>/dev/null
    Check bot logs
 

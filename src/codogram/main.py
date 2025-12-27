@@ -1,4 +1,4 @@
-# src/telegram_bridge/main.py
+# src/codogram/main.py
 import asyncio
 from pathlib import Path
 from aiogram import Bot, Dispatcher

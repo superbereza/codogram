@@ -1,4 +1,4 @@
-# src/telegram_bridge/config.py
+# src/codogram/config.py
 import json
 from pathlib import Path
 from pydantic_settings import BaseSettings
