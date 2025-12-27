@@ -91,6 +91,37 @@ class HistoryWatcher:
                     project.session_id = None
                     continue
 
+            # 2b. Check thread health (tmux died detection for threads)
+            for thread in list(project.threads.values()):
+                tmux_name = thread.get_tmux_session(project.project_name)
+                tmux = TmuxSession(tmux_name, project.cwd)
+
+                # Only check if thread has an active session
+                if thread.session_id and not tmux.exists():
+                    logger.warning(f"thread_tmux_died: project={project.project_name}, thread={thread.name}")
+
+                    # Stop thread tasks
+                    if thread.watcher_task:
+                        thread.watcher_task.cancel()
+                        thread.watcher_task = None
+                    if thread.poller_task:
+                        thread.poller_task.cancel()
+                        thread.poller_task = None
+
+                    # Notify user
+                    try:
+                        await self.bot.send_message(
+                            project.chat_id,
+                            f"⚠️ Claude session closed: {thread.name}",
+                            message_thread_id=thread.thread_id
+                        )
+                    except Exception:
+                        pass
+
+                    # Reset thread state
+                    thread.session_id = None
+                    thread.jsonl_path = None
+
             # 3. Skip if awaiting new session (after /start, before first message)
             if project.awaiting_new_session:
                 continue
@@ -183,7 +214,7 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
             except Exception as e:
                 logger.error("watch_thread_error", extra={"error": str(e)})
     except asyncio.CancelledError:
-        logger.info("watch_thread_cancelled", extra={"thread": thread.name})
+        logger.info(f"watch_thread_cancelled: thread={thread.name}")
         raise
 
 
@@ -314,6 +345,11 @@ async def poll_for_session_thread(
                         watch_thread_jsonl(bot, project, thread)
                     )
 
+                # Start thread-specific permission poller
+                from .permission_poller import create_poller_task_for_thread
+                if not thread.poller_task or thread.poller_task.done():
+                    thread.poller_task = await create_poller_task_for_thread(bot, project, thread)
+
                 logger.info(f"thread_watcher_started: thread={thread.name}, session={session_id[:8]}")
                 return
 
@@ -323,10 +359,27 @@ async def poll_for_session_thread(
         await asyncio.sleep(BINDING_INTERVAL)
 
     # Timeout
-    logger.warning("poll_for_session_thread_timeout", extra={
-        "project": project.project_name,
-        "thread": thread.name,
-    })
+    logger.warning(f"poll_for_session_thread_timeout: project={project.project_name}, thread={thread.name}")
+
+    # Check if this might be a /resume (has multiple user messages already)
+    from .history_reader import is_likely_resume
+
+    latest_session_id = find_session_for_project(project.cwd)
+    if latest_session_id:
+        jsonl_path = compute_jsonl_path(project.cwd, latest_session_id)
+        if jsonl_path.exists() and is_likely_resume(jsonl_path):
+            try:
+                await bot.send_message(
+                    project.chat_id,
+                    "⚠️ /resume не поддерживается в мультисессионном режиме.\n"
+                    "Используйте /new для новой сессии.",
+                    message_thread_id=thread.thread_id
+                )
+            except Exception:
+                pass
+            thread.awaiting_new_session = False
+            return
+
     thread.awaiting_new_session = False
     try:
         await bot.send_message(
@@ -354,12 +407,10 @@ async def check_session_for_thread(
 
     if new_session_id and new_session_id != old_session:
         # Session changed - user did /new or /compact
-        logger.info("session_changed_thread", extra={
-            "project": project.project_name,
-            "thread": thread.name,
-            "old_session": old_session[:8] if old_session else None,
-            "new_session": new_session_id[:8],
-        })
+        logger.info(
+            f"session_changed_thread: project={project.project_name}, thread={thread.name}, "
+            f"old={old_session[:8] if old_session else None}, new={new_session_id[:8]}"
+        )
 
         # Reset and wait for binding
         thread.session_id = None

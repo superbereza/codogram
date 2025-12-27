@@ -149,6 +149,21 @@ def compute_jsonl_path(cwd: str, session_id: str) -> Path:
     return Path.home() / ".claude" / "projects" / project_hash / f"{session_id}.jsonl"
 
 
+def is_likely_resume(jsonl_path: Path) -> bool:
+    """Check if session looks like a /resume (has old history with multiple user messages)."""
+    user_msg_count = 0
+    try:
+        with open(jsonl_path, 'r') as f:
+            for line in f:
+                if '"type":"user"' in line:
+                    user_msg_count += 1
+                    if user_msg_count > 1:
+                        return True
+    except Exception:
+        pass
+    return False
+
+
 def find_session_by_user_message(cwd: str, user_message: str) -> tuple[str, Path] | None:
     """Find session that contains the given user message.
 

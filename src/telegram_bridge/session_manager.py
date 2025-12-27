@@ -160,10 +160,15 @@ class ProjectManager:
         return None
 
     def get_by_tmux(self, tmux_session: str) -> ProjectState | None:
-        """Find project by tmux_session."""
+        """Find project by tmux_session (including thread sessions)."""
         for project in self.projects.values():
+            # Check main project tmux
             if project.tmux_session == tmux_session:
                 return project
+            # Check thread tmux sessions
+            for thread in project.threads.values():
+                if thread.get_tmux_session(project.project_name) == tmux_session:
+                    return project
         return None
 
     def refresh_project_session(self, project: ProjectState) -> bool:

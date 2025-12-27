@@ -11,7 +11,7 @@ from .screen import parse_screen, PermissionPrompt
 from .keyboards import permission_keyboard
 from .chunker import chunk_message
 from .state import permission_messages
-from .session_manager import ProjectState
+from .session_manager import ProjectState, ThreadInfo
 from .tmux import TmuxSession
 from .logging_config import logger
 
@@ -198,3 +198,170 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
                     last_body = parsed.body
                 except Exception as e:
                     logger.warning(f"Poller SHOWING: resend error: {e}")
+
+
+async def create_poller_task_for_thread(bot: Bot, project: ProjectState, thread: ThreadInfo) -> asyncio.Task:
+    """Create permission poller task for a specific thread."""
+    return asyncio.create_task(permission_poller_for_thread(bot, project, thread))
+
+
+async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: ThreadInfo):
+    """
+    Background poller for permission prompts in a specific thread/topic.
+
+    Same as permission_poller_for_project but sends to message_thread_id.
+    """
+    tmux_name = thread.get_tmux_session(project.project_name)
+    logger.info(f"Permission poller started for thread {thread.name} (tmux: {tmux_name})")
+
+    tmux = TmuxSession(tmux_name, project.cwd)
+    chat_id = project.chat_id
+    thread_id = thread.thread_id  # For sending to correct topic
+
+    state = PollerState.IDLE
+    debounce_start = 0.0
+    last_options = None
+    last_body = None
+    content_msg_ids: list[int] = []
+    kb_msg = None
+
+    DEBOUNCE_TIME = 0.5
+    POLL_INTERVAL = 0.5
+
+    while True:
+        await asyncio.sleep(POLL_INTERVAL)
+
+        try:
+            screen = tmux.capture_pane()
+            parsed = parse_screen(screen)
+        except Exception as e:
+            logger.warning(f"Thread poller {thread.name}: capture error: {e}")
+            continue
+
+        is_permission = isinstance(parsed, PermissionPrompt)
+
+        if state == PollerState.IDLE:
+            if is_permission:
+                logger.debug(f"Thread poller {thread.name} IDLE→DEBOUNCING")
+                state = PollerState.DEBOUNCING
+                debounce_start = asyncio.get_event_loop().time()
+                last_options = parsed.options
+
+        elif state == PollerState.DEBOUNCING:
+            if not is_permission:
+                state = PollerState.IDLE
+                last_options = None
+            elif parsed.options != last_options:
+                debounce_start = asyncio.get_event_loop().time()
+                last_options = parsed.options
+            else:
+                elapsed = asyncio.get_event_loop().time() - debounce_start
+                if elapsed >= DEBOUNCE_TIME:
+                    logger.debug(f"Thread poller {thread.name} DEBOUNCING→SHOWING")
+                    try:
+                        content_msg_ids = []
+
+                        if parsed.body:
+                            body_text = SEPARATOR_SOLID + "\n" + parsed.body
+                            for chunk in chunk_message(body_text):
+                                try:
+                                    msg = await bot.send_message(
+                                        chat_id, chunk, parse_mode="Markdown",
+                                        message_thread_id=thread_id
+                                    )
+                                except Exception:
+                                    msg = await bot.send_message(
+                                        chat_id, chunk, message_thread_id=thread_id
+                                    )
+                                content_msg_ids.append(msg.message_id)
+
+                        options_text = "\n".join(parsed.options)
+                        try:
+                            opts_msg = await bot.send_message(
+                                chat_id, options_text, message_thread_id=thread_id
+                            )
+                            content_msg_ids.append(opts_msg.message_id)
+                        except Exception:
+                            pass
+
+                        kb = permission_keyboard(parsed.options, tmux_name)
+                        kb_msg = await bot.send_message(
+                            chat_id, "👆", reply_markup=kb, message_thread_id=thread_id
+                        )
+                        permission_messages[kb_msg.message_id] = content_msg_ids
+
+                        state = PollerState.SHOWING
+                        last_body = parsed.body
+                    except Exception as e:
+                        logger.warning(f"Thread poller {thread.name}: send error: {e}")
+                        state = PollerState.IDLE
+
+        elif state == PollerState.SHOWING:
+            if not is_permission:
+                logger.debug(f"Thread poller {thread.name} SHOWING→IDLE: cleanup")
+                if kb_msg and kb_msg.message_id in permission_messages:
+                    for msg_id in content_msg_ids:
+                        try:
+                            await bot.delete_message(chat_id, msg_id)
+                        except Exception:
+                            pass
+                    try:
+                        await bot.delete_message(chat_id, kb_msg.message_id)
+                    except Exception:
+                        pass
+                    permission_messages.pop(kb_msg.message_id, None)
+
+                state = PollerState.IDLE
+                last_options = None
+                last_body = None
+                content_msg_ids = []
+                kb_msg = None
+            elif parsed.options != last_options or parsed.body != last_body:
+                logger.debug(f"Thread poller {thread.name} SHOWING: resending")
+                try:
+                    for msg_id in content_msg_ids:
+                        try:
+                            await bot.delete_message(chat_id, msg_id)
+                        except Exception:
+                            pass
+                    if kb_msg:
+                        try:
+                            await bot.delete_message(chat_id, kb_msg.message_id)
+                        except Exception:
+                            pass
+                        permission_messages.pop(kb_msg.message_id, None)
+
+                    content_msg_ids = []
+                    if parsed.body:
+                        body_text = SEPARATOR_SOLID + "\n" + parsed.body
+                        for chunk in chunk_message(body_text):
+                            try:
+                                msg = await bot.send_message(
+                                    chat_id, chunk, parse_mode="Markdown",
+                                    message_thread_id=thread_id
+                                )
+                            except Exception:
+                                msg = await bot.send_message(
+                                    chat_id, chunk, message_thread_id=thread_id
+                                )
+                            content_msg_ids.append(msg.message_id)
+
+                    options_text = "\n".join(parsed.options)
+                    try:
+                        opts_msg = await bot.send_message(
+                            chat_id, options_text, message_thread_id=thread_id
+                        )
+                        content_msg_ids.append(opts_msg.message_id)
+                    except Exception:
+                        pass
+
+                    kb = permission_keyboard(parsed.options, tmux_name)
+                    kb_msg = await bot.send_message(
+                        chat_id, "👆", reply_markup=kb, message_thread_id=thread_id
+                    )
+                    permission_messages[kb_msg.message_id] = content_msg_ids
+
+                    last_options = parsed.options
+                    last_body = parsed.body
+                except Exception as e:
+                    logger.warning(f"Thread poller {thread.name}: resend error: {e}")
