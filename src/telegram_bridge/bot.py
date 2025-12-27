@@ -293,6 +293,12 @@ async def launch_claude_new(message: Message, project: ProjectState, start_polle
 
     convention = f"claude-{project.project_name}"
 
+    # Block HistoryWatcher from grabbing old session during startup
+    project.awaiting_new_session = True
+
+    # Wait before showing anything
+    await asyncio.sleep(3.0)
+
     # Case 1: Our tmux exists - reuse
     if project.tmux_session == convention and is_tmux_session_exists(convention):
         subprocess.run(["tmux", "send-keys", "-t", convention, "claude", "Enter"], capture_output=True)
@@ -310,6 +316,81 @@ async def launch_claude_new(message: Message, project: ProjectState, start_polle
             await message.answer(f"Ошибка запуска: {result.error}")
             return
         project.tmux_session = convention
+
+    # Start animation
+    tmux = TmuxSession(project.tmux_session, project.cwd)
+    status_msg = await message.answer("`[._.]`", parse_mode="Markdown")
+
+    # Doom-guy frustration animation
+    faces = [
+        # Sleeping / waking up
+        "[._.]",
+        "[._.]",
+        "[-_-]",
+        "[-_-]",
+        "[.o.]",
+        "[o_o]",
+        # Alert, waiting
+        "[o_o]",
+        "[◉_◉]",
+        "[◉_◉]",
+        "[◉_◉]",
+        # Getting tense
+        "[◉︿◉]",
+        "[◉~◉]",
+        "[°_°]",
+        "[°_°]",
+        # Confusion
+        "[°□°]",
+        "[°□°]",
+        # Frustration builds
+        "[ಠ_ಠ]",
+        "[ಠ_ಠ]",
+        "[ಠ︿ಠ]",
+        "[ಠ益ಠ]",
+        # Panic
+        "[>_<]",
+        "[>︿<]",
+        "[>△<]",
+        # Overload
+        "[×_×]",
+        "[×_×]",
+        "[✖_✖]",
+        "[✖益✖]",
+        # Death
+        "[☠_☠]",
+        "[☠_☠]",
+        # Restart
+        "[._.]",
+    ]
+
+    frame = 0
+    for _ in range(60):  # max 60 seconds
+        if tmux.is_claude_ready():
+            break
+        face = faces[frame % len(faces)]
+        try:
+            await status_msg.edit_text(f"`{face}`", parse_mode="Markdown")
+        except Exception:
+            pass  # Ignore flood control
+        await asyncio.sleep(1.5)  # 1.5s between frames - safe for Telegram
+        frame += 1
+
+    # Extra delay to ensure Claude's input is truly ready
+    await asyncio.sleep(1.0)
+
+    # Happy face when ready
+    try:
+        await status_msg.edit_text("`[≖‿≖] Ready!`", parse_mode="Markdown")
+        await asyncio.sleep(1.0)
+    except Exception:
+        pass
+
+    # Delete status message
+    try:
+        await status_msg.delete()
+    except Exception:
+        pass
 
     await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
     project_manager._save()
@@ -693,6 +774,7 @@ async def on_start_launch_claude(callback: CallbackQuery):
         await callback.answer("Сессия истекла, начни заново с /start")
         return
 
+    await callback.answer()  # Answer immediately to avoid timeout
     await callback.message.edit_text("Запускаю Claude...")
 
     project = project_manager.get_or_create(state["project"])
@@ -703,7 +785,6 @@ async def on_start_launch_claude(callback: CallbackQuery):
     await launch_claude_new(callback.message, project, start_poller, start_watcher)
 
     _start_state.pop(chat_id, None)
-    await callback.answer()
 
 
 @router.callback_query(F.data == "start:cancel")
@@ -790,10 +871,24 @@ async def on_message(message: Message):
     # Normal message - check session and send to tmux
     project = project_manager.get_by_chat(chat_id)
     if project:
-        # Check if session changed (user might have done /new in tmux)
-        from .history_watcher import check_session_for_project
         start_poller, start_watcher = _make_task_starters(message.bot)
-        await check_session_for_project(project, message.bot, start_poller, start_watcher)
+
+        if project.session_id is None:
+            # No session bound - use session binding (match by user message)
+            # This avoids grabbing an old session after /restart_session + /start
+            from .history_watcher import poll_for_session
+
+            project.last_sent_message = message.text
+
+            # Start binding task if not already running
+            if not project.binding_task or project.binding_task.done():
+                project.binding_task = asyncio.create_task(
+                    poll_for_session(project, message.bot, start_poller, start_watcher)
+                )
+        else:
+            # Session already bound - check if it changed (user might have done /new in tmux)
+            from .history_watcher import check_session_for_project
+            await check_session_for_project(project, message.bot, start_poller, start_watcher)
 
     tmux = get_session_for_chat(chat_id)
     if tmux:
