@@ -28,6 +28,12 @@
 ### Bot command menu
 - /start, /my_chat_id, /register_dir, /esc в меню Telegram
 
+### Session binding
+- Привязка сессии по совпадению текста сообщения
+- poll_for_session() для поиска новой сессии
+- is_claude_ready() проверка готовности Claude TUI
+- Doom-guy loading animation при запуске
+
 ### Security improvements
 - shell=False во всех subprocess calls (предотвращает shell injection)
 - Валидация project name (только alphanumeric, dash, underscore)
