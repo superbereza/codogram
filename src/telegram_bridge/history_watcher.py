@@ -157,6 +157,28 @@ BINDING_TIMEOUT = 300  # 5 minutes
 BINDING_INTERVAL = 0.5  # seconds
 
 
+async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo):
+    """Watch jsonl for a specific thread and send messages to that thread."""
+    from .watcher import JsonlWatcher, send_entry_to_telegram
+    from pathlib import Path
+
+    if not thread.jsonl_path:
+        return
+
+    watcher = JsonlWatcher(Path(thread.jsonl_path))
+
+    async for entry in watcher.watch():
+        try:
+            await send_entry_to_telegram(
+                bot,
+                project.chat_id,
+                entry,
+                message_thread_id=thread.thread_id
+            )
+        except Exception as e:
+            logger.error("watch_thread_error", extra={"error": str(e)})
+
+
 async def poll_for_session(
     project: ProjectState,
     bot: Bot,
@@ -272,9 +294,13 @@ async def poll_for_session_thread(
                         thread.jsonl_path = str(jsonl_path)
                         thread.awaiting_new_session = False
 
-                        # Start thread-specific watcher (Task 9 will implement watch_thread_jsonl)
-                        # For now just log
-                        logger.info("thread_session_bound", extra={
+                        # Start thread-specific watcher
+                        if not thread.watcher_task or thread.watcher_task.done():
+                            thread.watcher_task = asyncio.create_task(
+                                watch_thread_jsonl(bot, project, thread)
+                            )
+
+                        logger.info("thread_watcher_started", extra={
                             "thread": thread.name,
                             "session_id": latest_session_id[:8],
                         })

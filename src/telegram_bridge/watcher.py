@@ -134,33 +134,106 @@ def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
         preview = str(tool_input)[:200]
         return f"● *{tool_name}*\n`{preview}`"
 
+class JsonlWatcher:
+    """Watches a jsonl file and yields new entries."""
+
+    def __init__(self, path: Path, poll_interval: float = 0.5):
+        self.path = path
+        self.poll_interval = poll_interval
+        self.last_position = path.stat().st_size if path.exists() else 0
+
+    async def watch(self) -> AsyncIterator[ParsedEntry]:
+        """Watch jsonl file and yield new parsed entries."""
+        while True:
+            if not self.path.exists():
+                await asyncio.sleep(self.poll_interval)
+                continue
+
+            current_size = self.path.stat().st_size
+            if current_size > self.last_position:
+                with open(self.path, "r") as f:
+                    f.seek(self.last_position)
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            entry = json.loads(line)
+                            parsed = parse_jsonl_entry(entry)
+                            if parsed:
+                                yield parsed
+                        except json.JSONDecodeError:
+                            pass
+                    self.last_position = f.tell()
+
+            await asyncio.sleep(self.poll_interval)
+
+
 async def watch_jsonl(path: Path, poll_interval: float = 0.5) -> AsyncIterator[ParsedEntry]:
     """Watch jsonl file and yield new parsed entries."""
-    last_position = path.stat().st_size if path.exists() else 0
+    watcher = JsonlWatcher(path, poll_interval)
+    async for entry in watcher.watch():
+        yield entry
 
-    while True:
-        if not path.exists():
-            await asyncio.sleep(poll_interval)
-            continue
 
-        current_size = path.stat().st_size
-        if current_size > last_position:
-            with open(path, "r") as f:
-                f.seek(last_position)
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        entry = json.loads(line)
-                        parsed = parse_jsonl_entry(entry)
-                        if parsed:
-                            yield parsed
-                    except json.JSONDecodeError:
-                        pass
-                last_position = f.tell()
+async def send_entry_to_telegram(
+    bot: Bot,
+    chat_id: int,
+    entry: ParsedEntry,
+    message_thread_id: int | None = None,
+):
+    """Send parsed entry to Telegram chat."""
+    try:
+        if entry.content_type == ContentType.TEXT:
+            for chunk in chunk_message(entry.text):
+                try:
+                    await bot.send_message(
+                        chat_id,
+                        f"● {chunk}",
+                        parse_mode="Markdown",
+                        message_thread_id=message_thread_id,
+                    )
+                except Exception:
+                    await bot.send_message(
+                        chat_id,
+                        f"● {chunk}",
+                        message_thread_id=message_thread_id,
+                    )
 
-        await asyncio.sleep(poll_interval)
+        elif entry.content_type == ContentType.TOOL_USE:
+            logger.debug(f"send_entry: TOOL_USE {entry.tool_name}")
+            text = format_tool_use(entry.tool_name, entry.tool_input)
+            try:
+                await bot.send_message(
+                    chat_id,
+                    text,
+                    parse_mode="Markdown",
+                    message_thread_id=message_thread_id,
+                )
+                logger.debug(f"send_entry: sent {entry.tool_name}")
+            except Exception as e:
+                logger.warning(f"send_entry: error sending {entry.tool_name}: {e}")
+                await bot.send_message(
+                    chat_id,
+                    f"● {entry.tool_name}",
+                    message_thread_id=message_thread_id,
+                )
+
+    except Exception as e:
+        logger.warning(f"send_entry_to_telegram error: {e}")
+        if entry.content_type == ContentType.TEXT:
+            await bot.send_message(
+                chat_id,
+                f"● {entry.text[:4000]}",
+                message_thread_id=message_thread_id,
+            )
+        elif entry.content_type == ContentType.TOOL_USE:
+            await bot.send_message(
+                chat_id,
+                f"● {entry.tool_name}",
+                message_thread_id=message_thread_id,
+            )
+
 
 async def create_watcher_task(bot: Bot, project: ProjectState,
                               send_missed: bool = False) -> asyncio.Task:
