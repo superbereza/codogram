@@ -6,6 +6,7 @@ import re
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
+from aiogram.exceptions import TelegramRetryAfter
 
 from .config import settings
 from .session_manager import project_manager, ProjectState
@@ -54,6 +55,20 @@ def is_valid_project_name(name: str) -> bool:
     Valid names contain only: letters, digits, dash, underscore.
     """
     return bool(re.match(r'^[a-zA-Z0-9_-]+$', name))
+
+
+async def send_with_retry(message: Message, text: str, parse_mode: str = "Markdown", retries: int = 3) -> bool:
+    """Send message with retry on rate limit."""
+    for attempt in range(retries):
+        try:
+            await message.answer(text, parse_mode=parse_mode)
+            return True
+        except TelegramRetryAfter as e:
+            logger.warning(f"Rate limited, retrying in {e.retry_after}s (attempt {attempt + 1}/{retries})")
+            await asyncio.sleep(e.retry_after + 1)
+    logger.error("Failed to send message after retries")
+    return False
+
 
 def get_session_for_chat(chat_id: int) -> TmuxSession | None:
     """Get TmuxSession for chat_id."""
@@ -221,10 +236,10 @@ async def _connect_or_launch(message: Message, project: ProjectState):
     await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
     project_manager._save()
 
-    await message.answer(
+    await send_with_retry(
+        message,
         f"Claude запущен в `{project.tmux_session}`\n"
         f"Подключиться: `tmux attach -t {project.tmux_session}`",
-        parse_mode="Markdown",
     )
 
 
@@ -395,10 +410,10 @@ async def launch_claude_new(message: Message, project: ProjectState, start_polle
     await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
     project_manager._save()
 
-    await message.answer(
+    await send_with_retry(
+        message,
         f"Claude запущен в `{project.tmux_session}`\n"
         f"Подключиться: `tmux attach -t {project.tmux_session}`",
-        parse_mode="Markdown",
     )
 
 
@@ -754,10 +769,10 @@ async def on_tmux_selected(callback: CallbackQuery):
     await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
     project_manager._save()
 
-    await callback.message.answer(
+    await send_with_retry(
+        callback.message,
         f"Claude запущен в `{project.tmux_session}`\n"
         f"Подключиться: `tmux attach -t {project.tmux_session}`",
-        parse_mode="Markdown",
     )
 
 
