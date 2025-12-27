@@ -57,11 +57,25 @@ def is_valid_project_name(name: str) -> bool:
     return bool(re.match(r'^[a-zA-Z0-9_-]+$', name))
 
 
-async def send_with_retry(message: Message, text: str, parse_mode: str = "Markdown", retries: int = 3) -> bool:
+async def send_with_retry(
+    message: Message,
+    text: str,
+    parse_mode: str = "Markdown",
+    retries: int = 3,
+    message_thread_id: int | None = None,
+) -> bool:
     """Send message with retry on rate limit."""
     for attempt in range(retries):
         try:
-            await message.answer(text, parse_mode=parse_mode)
+            if message_thread_id is not None:
+                await message.bot.send_message(
+                    message.chat.id,
+                    text,
+                    parse_mode=parse_mode,
+                    message_thread_id=message_thread_id,
+                )
+            else:
+                await message.answer(text, parse_mode=parse_mode)
             return True
         except TelegramRetryAfter as e:
             logger.warning(f"Rate limited, retrying in {e.retry_after}s (attempt {attempt + 1}/{retries})")
@@ -456,12 +470,21 @@ async def launch_claude_in_thread(
     # Create tmux session with Claude
     result = create_tmux_with_claude(tmux_name, project.cwd)
     if not result.success:
-        await message.answer(f"Ошибка запуска Claude: {result.error}")
+        await message.bot.send_message(
+            message.chat.id,
+            f"Ошибка запуска Claude: {result.error}",
+            message_thread_id=thread.thread_id,
+        )
         return False
 
-    # Start animation
+    # Start animation in the topic
     tmux = TmuxSession(tmux_name, project.cwd)
-    status_msg = await message.answer("`[._.]`", parse_mode="Markdown")
+    status_msg = await message.bot.send_message(
+        message.chat.id,
+        "`[._.]`",
+        parse_mode="Markdown",
+        message_thread_id=thread.thread_id,
+    )
 
     # Doom-guy frustration animation
     faces = [
@@ -538,8 +561,9 @@ async def launch_claude_in_thread(
 
     await send_with_retry(
         message,
-        f"Claude запущен в `{tmux_name}`\n"
+        f"🚀 Claude запущен в `{tmux_name}`\n"
         f"Подключиться: `tmux attach -t {tmux_name}`",
+        message_thread_id=thread.thread_id,
     )
     return True
 
