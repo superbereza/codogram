@@ -118,15 +118,30 @@ class ProjectManager:
                 # New format: dict with chat_id and cwd
                 project.chat_id = data.get("chat_id")
                 project.cwd = data.get("cwd")
+                # Load threads
+                threads_data = data.get("threads", {})
+                for tid_str, thread_data in threads_data.items():
+                    tid = None if tid_str == "null" else int(tid_str)
+                    project.threads[tid] = ThreadInfo(
+                        thread_id=tid,
+                        name=thread_data.get("name", "main")
+                    )
             self.projects[project_name] = project
 
     def _save(self) -> None:
         """Persist to disk."""
-        self._config["projects"] = {
-            name: {"chat_id": p.chat_id, "cwd": p.cwd}
-            for name, p in self.projects.items()
-            if p.chat_id is not None
-        }
+        projects_data = {}
+        for name, p in self.projects.items():
+            if p.chat_id is None:
+                continue
+            project_data = {"chat_id": p.chat_id, "cwd": p.cwd}
+            if p.threads:
+                project_data["threads"] = {
+                    str(tid) if tid is not None else "null": {"name": t.name}
+                    for tid, t in p.threads.items()
+                }
+            projects_data[name] = project_data
+        self._config["projects"] = projects_data
         # Remove sessions - no longer needed
         self._config.pop("sessions", None)
         save_config(self._config)

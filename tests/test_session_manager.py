@@ -120,3 +120,58 @@ def test_project_state_get_or_create_thread():
     # Second call returns same thread
     thread2 = project.get_or_create_thread(None, "main")
     assert thread2 is thread
+
+
+# Tests for config save/load with threads
+def test_config_saves_threads(tmp_path, monkeypatch):
+    from telegram_bridge.session_manager import ProjectManager, ThreadInfo
+    from telegram_bridge import config
+
+    config_file = tmp_path / ".config.json"
+    monkeypatch.setattr(config, "CONFIG_PATH", config_file)
+
+    manager = ProjectManager()
+    project = manager.get_or_create("test-project")
+    project.chat_id = 123
+    project.cwd = "/test/path"
+    project.threads[None] = ThreadInfo(thread_id=None, name="main")
+    project.threads[12345] = ThreadInfo(thread_id=12345, name="mystic")
+    manager._save()
+
+    # Reload and check
+    import json
+    saved = json.loads(config_file.read_text())
+    assert "test-project" in saved["projects"]
+    assert "threads" in saved["projects"]["test-project"]
+    assert "null" in saved["projects"]["test-project"]["threads"]
+    assert saved["projects"]["test-project"]["threads"]["null"]["name"] == "main"
+    assert "12345" in saved["projects"]["test-project"]["threads"]
+
+
+def test_config_loads_threads(tmp_path, monkeypatch):
+    from telegram_bridge import config
+    import json
+
+    config_file = tmp_path / ".config.json"
+    config_file.write_text(json.dumps({
+        "projects": {
+            "test-project": {
+                "chat_id": 123,
+                "cwd": "/test/path",
+                "threads": {
+                    "null": {"name": "main"},
+                    "12345": {"name": "mystic"}
+                }
+            }
+        }
+    }))
+    monkeypatch.setattr(config, "CONFIG_PATH", config_file)
+
+    from telegram_bridge.session_manager import ProjectManager
+    manager = ProjectManager()
+    project = manager.projects.get("test-project")
+    assert project is not None
+    assert None in project.threads
+    assert project.threads[None].name == "main"
+    assert 12345 in project.threads
+    assert project.threads[12345].name == "mystic"
