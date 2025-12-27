@@ -92,3 +92,31 @@ def test_thread_info_get_tmux_session_named():
     from telegram_bridge.session_manager import ThreadInfo
     thread = ThreadInfo(thread_id=12345, name="mystic")
     assert thread.get_tmux_session("codogram") == "claude-codogram-mystic"
+
+
+# Tests for ProjectState.threads
+def test_project_state_has_threads():
+    from telegram_bridge.session_manager import ProjectState, ThreadInfo
+    project = ProjectState(project_name="test")
+    assert hasattr(project, 'threads')
+    assert project.threads == {}
+
+
+def test_project_state_get_thread():
+    from telegram_bridge.session_manager import ProjectState, ThreadInfo
+    project = ProjectState(project_name="test")
+    thread = ThreadInfo(thread_id=None, name="main")
+    project.threads[None] = thread
+    assert project.get_thread(None) == thread
+    assert project.get_thread(12345) is None
+
+
+def test_project_state_get_or_create_thread():
+    from telegram_bridge.session_manager import ProjectState
+    project = ProjectState(project_name="test")
+    thread = project.get_or_create_thread(None, "main")
+    assert thread.name == "main"
+    assert project.threads[None] == thread
+    # Second call returns same thread
+    thread2 = project.get_or_create_thread(None, "main")
+    assert thread2 is thread

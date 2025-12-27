@@ -75,21 +75,28 @@ class ProjectState:
     chat_id: int | None = None
     cwd: str | None = None
 
-    # Watcher (one active session_id)
+    # Multi-thread support: thread_id -> ThreadInfo
+    threads: dict[int | None, ThreadInfo] = field(default_factory=dict)
+
+    # Legacy fields (for migration, will be moved to ThreadInfo)
     session_id: str | None = None
     jsonl_path: str | None = None
     watcher_task: asyncio.Task | None = field(default=None, repr=False)
-
-    # Poller (one selected tmux)
     tmux_session: str | None = None
     poller_task: asyncio.Task | None = field(default=None, repr=False)
-
-    # Session binding (match by user message)
     last_sent_message: str | None = None
     binding_task: asyncio.Task | None = field(default=None, repr=False)
-
-    # Flag: waiting for new session after /start (blocks HistoryWatcher from grabbing old session)
     awaiting_new_session: bool = False
+
+    def get_thread(self, thread_id: int | None) -> ThreadInfo | None:
+        """Get thread by thread_id."""
+        return self.threads.get(thread_id)
+
+    def get_or_create_thread(self, thread_id: int | None, name: str) -> ThreadInfo:
+        """Get existing thread or create new one."""
+        if thread_id not in self.threads:
+            self.threads[thread_id] = ThreadInfo(thread_id=thread_id, name=name)
+        return self.threads[thread_id]
 
 class ProjectManager:
     """Manages ProjectState instances."""
