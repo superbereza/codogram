@@ -18,6 +18,14 @@ def should_cleanup_project(project: 'ProjectState') -> bool:
     """
     import subprocess
 
+    # Don't cleanup if waiting for new session (Claude starting up)
+    if project.awaiting_new_session:
+        return False
+
+    # Don't cleanup if binding task is running
+    if project.binding_task and not project.binding_task.done():
+        return False
+
     # If tmux session is running, don't cleanup (even if no jsonl yet)
     if project.tmux_session:
         result = subprocess.run(
