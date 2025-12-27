@@ -17,7 +17,7 @@ class TmuxSession:
             ["tmux", "send-keys", "-t", self.name, "-l", "--", text],
             check=True
         )
-        time.sleep(0.05)  # Small delay to ensure text is processed
+        time.sleep(0.1)  # Delay to ensure text is processed before Enter
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, "Enter"],
             check=True

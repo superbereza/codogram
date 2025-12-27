@@ -1261,9 +1261,13 @@ async def on_message(message: Message):
 
         tmux = get_session_for_chat(chat_id)
 
+    logger.debug(f"tmux_send: project={project.project_name} tmux_session={project.tmux_session} tmux={tmux}")
+
     if tmux:
         tmux.send(message.text)
+        logger.debug(f"sent_to_tmux: {message.text[:50]}")
     else:
         # No active session - only respond in group chats
+        logger.warning(f"no_tmux_session: project={project.project_name}")
         if message.chat.id < 0:  # Negative IDs are groups/channels
             await message.answer("Нет активной сессии Claude. Используй /start для запуска.")
