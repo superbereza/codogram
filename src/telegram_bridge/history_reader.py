@@ -97,6 +97,39 @@ def reset_history_cache() -> None:
     _session_cache = {}
 
 
+def get_last_user_message_from_jsonl(jsonl_path: Path) -> str | None:
+    """Read the last user message from a session jsonl file."""
+    if not jsonl_path.exists():
+        return None
+
+    try:
+        last_user_msg = None
+        with open(jsonl_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("type") == "user":
+                        # Extract text from user message
+                        content = entry.get("message", {}).get("content")
+                        if isinstance(content, str):
+                            # External messages (from Telegram) have plain string content
+                            last_user_msg = content
+                        elif isinstance(content, list):
+                            # Internal Claude messages have array of content blocks
+                            for item in content:
+                                if isinstance(item, dict) and item.get("type") == "text":
+                                    last_user_msg = item.get("text")
+                                    break
+                except json.JSONDecodeError:
+                    continue
+        return last_user_msg
+    except Exception:
+        return None
+
+
 def compute_jsonl_path(cwd: str, session_id: str) -> Path:
     """Compute jsonl path from cwd and session_id.
 

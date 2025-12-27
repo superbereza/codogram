@@ -58,6 +58,12 @@ class TmuxSession:
         )
         return result.stdout if result.returncode == 0 else ""
 
+    def is_claude_ready(self) -> bool:
+        """Check if Claude UI is loaded and ready for input."""
+        from .screen import is_claude_ready
+        output = self.capture_pane()
+        return is_claude_ready(output)
+
 
 def find_all_tmux_by_cwd(cwd: str) -> list[str]:
     """Find all tmux sessions with panes in the given cwd.

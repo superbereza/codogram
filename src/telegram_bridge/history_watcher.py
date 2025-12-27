@@ -1,9 +1,15 @@
 """Periodic watcher for history.jsonl changes."""
 import asyncio
+import time
 from aiogram import Bot
 
 from .session_manager import project_manager, ProjectState
-from .history_reader import HISTORY_PATH
+from .history_reader import (
+    HISTORY_PATH,
+    find_session_for_project,
+    compute_jsonl_path,
+    get_last_user_message_from_jsonl,
+)
 from .logging_config import logger
 from .tmux import TmuxSession
 
@@ -85,7 +91,15 @@ class HistoryWatcher:
                     project.session_id = None
                     continue
 
-            # 3. Check for new/changed sessions (discover new Claude sessions)
+            # 3. Skip if awaiting new session (after /start, before first message)
+            if project.awaiting_new_session:
+                continue
+
+            # 4. Skip if binding_task is running (poll_for_session is waiting for new session)
+            if project.binding_task and not project.binding_task.done():
+                continue
+
+            # 4. Check for new/changed sessions (discover new Claude sessions)
             old_session = project.session_id
             changed = self.project_manager.refresh_project_session(project)
 
@@ -137,6 +151,83 @@ async def check_session_for_project(project: ProjectState, bot: Bot, start_polle
         # If old_session is None, this is just initial discovery after bot restart
         send_missed = old_session is not None
         await project_manager._maybe_start_tasks(project, start_poller, start_watcher, send_missed=send_missed)
+
+
+BINDING_TIMEOUT = 300  # 5 minutes
+BINDING_INTERVAL = 0.5  # seconds
+
+
+async def poll_for_session(
+    project: ProjectState,
+    bot: Bot,
+    start_poller,
+    start_watcher,
+) -> None:
+    """Poll for a session that matches project.last_sent_message.
+
+    This is used after /start to wait for the NEW session (not grab old one).
+    Matches session by comparing user message in jsonl with what we sent.
+    """
+    if not project.cwd or not project.last_sent_message:
+        logger.warning("poll_for_session: missing cwd or last_sent_message")
+        return
+
+    old_session_id = project.session_id
+    start_time = time.time()
+
+    logger.info("poll_for_session_start", extra={
+        "project": project.project_name,
+        "old_session": old_session_id[:8] if old_session_id else None,
+        "looking_for": project.last_sent_message[:30] if project.last_sent_message else None,
+    })
+
+    while time.time() - start_time < BINDING_TIMEOUT:
+        try:
+            # Get latest session for this cwd
+            latest_session_id = find_session_for_project(project.cwd)
+
+            if latest_session_id and latest_session_id != old_session_id:
+                # New session appeared! Check if user message matches
+                jsonl_path = compute_jsonl_path(project.cwd, latest_session_id)
+
+                if jsonl_path.exists():
+                    last_user_msg = get_last_user_message_from_jsonl(jsonl_path)
+
+                    if last_user_msg == project.last_sent_message:
+                        # Found it! Bind this session
+                        logger.info("session_bound", extra={
+                            "project": project.project_name,
+                            "session_id": latest_session_id[:8],
+                            "matched_msg": last_user_msg[:30] if last_user_msg else None,
+                        })
+
+                        project.session_id = latest_session_id
+                        project.jsonl_path = str(jsonl_path)
+                        project.awaiting_new_session = False
+
+                        # Start watcher with send_missed=True
+                        await project_manager._maybe_start_tasks(
+                            project, start_poller, start_watcher, send_missed=True
+                        )
+                        return
+
+        except Exception as e:
+            logger.warning("poll_for_session_error", extra={"error": str(e)})
+
+        await asyncio.sleep(BINDING_INTERVAL)
+
+    # Timeout reached
+    logger.warning("poll_for_session_timeout", extra={
+        "project": project.project_name,
+    })
+    project.awaiting_new_session = False
+    try:
+        await bot.send_message(
+            project.chat_id,
+            "⚠️ Сессия не обнаружена. Проверьте что Claude запущен."
+        )
+    except Exception:
+        pass
 
 
 async def create_history_watcher(bot: Bot, start_poller, start_watcher) -> HistoryWatcher:

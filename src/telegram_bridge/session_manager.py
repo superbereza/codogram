@@ -57,6 +57,13 @@ class ProjectState:
     tmux_session: str | None = None
     poller_task: asyncio.Task | None = field(default=None, repr=False)
 
+    # Session binding (match by user message)
+    last_sent_message: str | None = None
+    binding_task: asyncio.Task | None = field(default=None, repr=False)
+
+    # Flag: waiting for new session after /start (blocks HistoryWatcher from grabbing old session)
+    awaiting_new_session: bool = False
+
 class ProjectManager:
     """Manages ProjectState instances."""
 
