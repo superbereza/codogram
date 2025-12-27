@@ -167,16 +167,20 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
 
     watcher = JsonlWatcher(Path(thread.jsonl_path))
 
-    async for entry in watcher.watch():
-        try:
-            await send_entry_to_telegram(
-                bot,
-                project.chat_id,
-                entry,
-                message_thread_id=thread.thread_id
-            )
-        except Exception as e:
-            logger.error("watch_thread_error", extra={"error": str(e)})
+    try:
+        async for entry in watcher.watch():
+            try:
+                await send_entry_to_telegram(
+                    bot,
+                    project.chat_id,
+                    entry,
+                    message_thread_id=thread.thread_id
+                )
+            except Exception as e:
+                logger.error("watch_thread_error", extra={"error": str(e)})
+    except asyncio.CancelledError:
+        logger.info("watch_thread_cancelled", extra={"thread": thread.name})
+        raise
 
 
 async def poll_for_session(

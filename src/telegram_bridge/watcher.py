@@ -145,11 +145,12 @@ class JsonlWatcher:
     async def watch(self) -> AsyncIterator[ParsedEntry]:
         """Watch jsonl file and yield new parsed entries."""
         while True:
-            if not self.path.exists():
+            try:
+                current_size = self.path.stat().st_size
+            except FileNotFoundError:
                 await asyncio.sleep(self.poll_interval)
                 continue
 
-            current_size = self.path.stat().st_size
             if current_size > self.last_position:
                 with open(self.path, "r") as f:
                     f.seek(self.last_position)
