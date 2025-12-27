@@ -544,6 +544,96 @@ async def launch_claude_in_thread(
     return True
 
 
+@router.message(Command("session_close"))
+async def on_session_close(message: Message):
+    """Close current thread and its Claude session."""
+    if not is_admin(message.from_user.id):
+        return
+
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    if thread_id is None:
+        await message.answer("Эту команду можно использовать только в топике")
+        return
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await message.answer("Проект не найден")
+        return
+
+    thread = project.threads.get(thread_id)
+    if not thread:
+        await message.answer("Этот топик не связан с Claude сессией")
+        return
+
+    # Confirmation
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Да, закрыть", callback_data=f"session_close:{thread_id}"),
+            InlineKeyboardButton(text="Отмена", callback_data="session_close:cancel"),
+        ]
+    ])
+    await message.answer(
+        f"Закрыть тред '{thread.name}'?\n"
+        "Топик и tmux сессия будут удалены.",
+        reply_markup=keyboard
+    )
+
+
+@router.callback_query(F.data.startswith("session_close:"))
+async def on_session_close_callback(callback: CallbackQuery):
+    """Handle thread close confirmation."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    data = callback.data.split(":")[1]
+    if data == "cancel":
+        await callback.message.edit_text("Отменено")
+        await callback.answer()
+        return
+
+    thread_id = int(data)
+    chat_id = callback.message.chat.id
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await callback.answer("Проект не найден")
+        return
+
+    thread = project.threads.get(thread_id)
+    if not thread:
+        await callback.answer("Тред не найден")
+        return
+
+    # Stop tasks
+    if thread.watcher_task:
+        thread.watcher_task.cancel()
+    if thread.poller_task:
+        thread.poller_task.cancel()
+    if thread.binding_task:
+        thread.binding_task.cancel()
+
+    # Kill tmux
+    tmux_name = thread.get_tmux_session(project.project_name)
+    import subprocess
+    subprocess.run(["tmux", "kill-session", "-t", tmux_name], capture_output=True)
+
+    # Delete topic
+    try:
+        await callback.bot.delete_forum_topic(chat_id, thread_id)
+    except Exception as e:
+        await callback.message.edit_text(f"Ошибка удаления топика: {e}")
+        await callback.answer()
+        return
+
+    # Remove from project
+    del project.threads[thread_id]
+    project_manager._save()
+
+    await callback.answer("Тред закрыт")
+
+
 @router.message(Command("session_new"))
 async def on_session_new(message: Message):
     """Create a new thread (topic) with its own Claude session."""
