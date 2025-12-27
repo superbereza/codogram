@@ -22,6 +22,7 @@ async def main():
     from aiogram.types import BotCommand
     await bot.set_my_commands([
         BotCommand(command="start", description="Start Claude / show status"),
+        BotCommand(command="session_new", description="Create new Claude thread"),
         BotCommand(command="restart_session", description="Restart Claude session"),
         BotCommand(command="my_chat_id", description="Show your user ID"),
         BotCommand(command="esc", description="Send Escape to Claude"),

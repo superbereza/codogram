@@ -9,7 +9,7 @@ from aiogram.filters import Command
 from aiogram.exceptions import TelegramRetryAfter
 
 from .config import settings
-from .session_manager import project_manager, ProjectState
+from .session_manager import project_manager, ProjectState, ThreadInfo
 from .tmux import TmuxSession
 from .state import permission_messages
 from .logging_config import logger
@@ -255,7 +255,24 @@ async def cmd_start(message: Message):
         return
 
     chat_id = message.chat.id
+    thread_id = message.message_thread_id
     args = message.text.split()[1:]  # Skip /start
+
+    # If in a topic, check for pending thread
+    if thread_id is not None:
+        project = project_manager.get_by_chat(chat_id)
+        if project:
+            thread = project.threads.get(thread_id)
+            if thread and thread.name == "pending":
+                # Upgrade pending thread
+                from .magic_names import get_random_magic_name
+                existing_names = {t.name for t in project.threads.values() if t.name != "pending"}
+                thread.name = get_random_magic_name(existing_names)
+
+                start_poller, start_watcher = _make_task_starters(message.bot)
+                await launch_claude_in_thread(message, project, thread, start_poller, start_watcher)
+                project_manager._save()
+                return
 
     # Case 1: Project name provided
     if args:
@@ -415,6 +432,175 @@ async def launch_claude_new(message: Message, project: ProjectState, start_polle
         f"Claude запущен в `{project.tmux_session}`\n"
         f"Подключиться: `tmux attach -t {project.tmux_session}`",
     )
+
+
+async def launch_claude_in_thread(
+    message: Message,
+    project: ProjectState,
+    thread: ThreadInfo,
+    start_poller,
+    start_watcher,
+) -> bool:
+    """Launch Claude for a specific thread (topic).
+
+    Returns True if successful, False otherwise.
+    """
+    tmux_name = thread.get_tmux_session(project.project_name)
+
+    # Block HistoryWatcher from grabbing old session during startup
+    thread.awaiting_new_session = True
+
+    # Wait before showing anything
+    await asyncio.sleep(3.0)
+
+    # Create tmux session with Claude
+    result = create_tmux_with_claude(tmux_name, project.cwd)
+    if not result.success:
+        await message.answer(f"Ошибка запуска Claude: {result.error}")
+        return False
+
+    # Start animation
+    tmux = TmuxSession(tmux_name, project.cwd)
+    status_msg = await message.answer("`[._.]`", parse_mode="Markdown")
+
+    # Doom-guy frustration animation
+    faces = [
+        # Sleeping / waking up
+        "[._.]",
+        "[._.]",
+        "[-_-]",
+        "[-_-]",
+        "[.o.]",
+        "[o_o]",
+        # Alert, waiting
+        "[o_o]",
+        "[◉_◉]",
+        "[◉_◉]",
+        "[◉_◉]",
+        # Getting tense
+        "[◉︿◉]",
+        "[◉~◉]",
+        "[°_°]",
+        "[°_°]",
+        # Confusion
+        "[°□°]",
+        "[°□°]",
+        # Frustration builds
+        "[ಠ_ಠ]",
+        "[ಠ_ಠ]",
+        "[ಠ︿ಠ]",
+        "[ಠ益ಠ]",
+        # Panic
+        "[>_<]",
+        "[>︿<]",
+        "[>△<]",
+        # Overload
+        "[×_×]",
+        "[×_×]",
+        "[✖_✖]",
+        "[✖益✖]",
+        # Death
+        "[☠_☠]",
+        "[☠_☠]",
+        # Restart
+        "[._.]",
+    ]
+
+    frame = 0
+    for _ in range(60):  # max 60 seconds
+        if tmux.is_claude_ready():
+            break
+        face = faces[frame % len(faces)]
+        try:
+            await status_msg.edit_text(f"`{face}`", parse_mode="Markdown")
+        except Exception:
+            pass  # Ignore flood control
+        await asyncio.sleep(1.5)  # 1.5s between frames - safe for Telegram
+        frame += 1
+
+    # Extra delay to ensure Claude's input is truly ready
+    await asyncio.sleep(1.0)
+
+    # Happy face when ready
+    try:
+        await status_msg.edit_text("`[≖‿≖] Ready!`", parse_mode="Markdown")
+        await asyncio.sleep(1.0)
+    except Exception:
+        pass
+
+    # Delete status message
+    try:
+        await status_msg.delete()
+    except Exception:
+        pass
+
+    # TODO: Start thread-specific tasks (for now we don't have thread-level polling)
+
+    await send_with_retry(
+        message,
+        f"Claude запущен в `{tmux_name}`\n"
+        f"Подключиться: `tmux attach -t {tmux_name}`",
+    )
+    return True
+
+
+@router.message(Command("session_new"))
+async def on_session_new(message: Message):
+    """Create a new thread (topic) with its own Claude session."""
+    if not is_admin(message.from_user.id):
+        return
+
+    chat_id = message.chat.id
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await message.answer("Проект не найден. Сначала используй /start")
+        return
+
+    # Check if chat supports topics
+    chat = await message.bot.get_chat(chat_id)
+    if not chat.is_forum:
+        await message.answer("Этот чат не поддерживает топики. Включите Topics в настройках группы.")
+        return
+
+    # Parse optional name from command
+    from .magic_names import get_random_magic_name
+    args = message.text.split(maxsplit=1)
+    if len(args) > 1:
+        name = args[1].strip().lower()
+        # Validate name
+        if not name.replace("-", "").replace("_", "").isalnum():
+            await message.answer("Имя должно содержать только буквы, цифры, - и _")
+            return
+    else:
+        # Get existing thread names to exclude
+        existing_names = {t.name for t in project.threads.values() if t.name != "pending"}
+        name = get_random_magic_name(existing_names)
+
+    # Check if name already exists
+    for thread in project.threads.values():
+        if thread.name == name:
+            await message.answer(f"Тред с именем '{name}' уже существует")
+            return
+
+    # Create Telegram topic
+    try:
+        topic = await message.bot.create_forum_topic(chat_id, name.capitalize())
+    except Exception as e:
+        await message.answer(f"Ошибка создания топика: {e}")
+        return
+
+    # Create ThreadInfo
+    thread = ThreadInfo(thread_id=topic.message_thread_id, name=name)
+    project.threads[topic.message_thread_id] = thread
+
+    # Launch Claude
+    start_poller, start_watcher = _make_task_starters(message.bot)
+    success = await launch_claude_in_thread(
+        message, project, thread, start_poller, start_watcher
+    )
+
+    if success:
+        project_manager._save()
 
 
 @router.callback_query(F.data == "start:create_dir")
