@@ -41,6 +41,33 @@ def should_cleanup_project(project: 'ProjectState') -> bool:
     except Exception:
         return True  # Error = cleanup
 
+
+@dataclass
+class ThreadInfo:
+    """State for a single thread (topic) within a project."""
+    thread_id: int | None  # None = General topic
+    name: str              # mystic, arcane, user-provided, or "main"
+
+    # Runtime state (from history.jsonl):
+    session_id: str | None = None
+    jsonl_path: str | None = None
+
+    # Tasks:
+    watcher_task: asyncio.Task | None = field(default=None, repr=False)
+    poller_task: asyncio.Task | None = field(default=None, repr=False)
+    binding_task: asyncio.Task | None = field(default=None, repr=False)
+
+    # For session binding:
+    last_sent_message: str | None = None
+    awaiting_new_session: bool = False
+
+    def get_tmux_session(self, project_name: str) -> str:
+        """Get tmux session name for this thread."""
+        if self.name == "main":
+            return f"claude-{project_name}"
+        return f"claude-{project_name}-{self.name}"
+
+
 @dataclass
 class ProjectState:
     """State for a single project."""

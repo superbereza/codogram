@@ -70,3 +70,25 @@ def test_refresh_project_session_jsonl_not_exists(tmp_path):
         assert changed is True
         assert project.session_id == "new-session"
         assert project.jsonl_path is None  # File doesn't exist
+
+
+# Tests for ThreadInfo
+def test_thread_info_creation():
+    from telegram_bridge.session_manager import ThreadInfo
+    thread = ThreadInfo(thread_id=12345, name="mystic")
+    assert thread.thread_id == 12345
+    assert thread.name == "mystic"
+    assert thread.session_id is None
+    assert thread.jsonl_path is None
+
+
+def test_thread_info_get_tmux_session_main():
+    from telegram_bridge.session_manager import ThreadInfo
+    thread = ThreadInfo(thread_id=None, name="main")
+    assert thread.get_tmux_session("codogram") == "claude-codogram"
+
+
+def test_thread_info_get_tmux_session_named():
+    from telegram_bridge.session_manager import ThreadInfo
+    thread = ThreadInfo(thread_id=12345, name="mystic")
+    assert thread.get_tmux_session("codogram") == "claude-codogram-mystic"
