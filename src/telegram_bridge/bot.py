@@ -1089,6 +1089,7 @@ async def on_start_cancel(callback: CallbackQuery):
 
 @router.message()
 async def on_message(message: Message):
+    """Handle regular messages."""
     # Log incoming message
     text_preview = message.text[:100] if message.text else '<no text>'
     logger.info(f"Incoming message from user={message.from_user.id} chat={message.chat.id}: {text_preview}")
@@ -1101,6 +1102,11 @@ async def on_message(message: Message):
         return
 
     chat_id = message.chat.id
+    thread_id = message.message_thread_id  # None for General topic
+
+    # Skip commands
+    if message.text.startswith("/"):
+        return
 
     # Check if we're in conversation flow
     state = _start_state.get(chat_id)
@@ -1159,9 +1165,34 @@ async def on_message(message: Message):
             await launch_claude_new(message, project, start_poller, start_watcher)
             return
 
-    # Normal message - check session and send to tmux
+    # Normal message - route by thread_id
     project = project_manager.get_by_chat(chat_id)
-    if project:
+    if not project:
+        return
+
+    # Get thread for this topic
+    thread = project.threads.get(thread_id)
+
+    if thread_id is not None and not thread:
+        # Unknown topic - create pending ThreadInfo, show hint once
+        thread = ThreadInfo(thread_id=thread_id, name="pending")
+        project.threads[thread_id] = thread
+        project_manager._save()
+        await message.answer("Используй /start или /session_new для подключения Claude к этому топику")
+        return
+
+    # Skip pending threads (no tmux yet)
+    if thread and thread.name == "pending":
+        return
+
+    # Determine which tmux to send to
+    if thread:
+        # Multi-thread mode: use ThreadInfo
+        tmux_name = thread.get_tmux_session(project.project_name)
+        tmux = TmuxSession(tmux_name, project.cwd)
+    else:
+        # Legacy single-thread mode (General topic without ThreadInfo)
+        # Check session binding for legacy mode
         start_poller, start_watcher = _make_task_starters(message.bot)
 
         if project.session_id is None:
@@ -1181,7 +1212,8 @@ async def on_message(message: Message):
             from .history_watcher import check_session_for_project
             await check_session_for_project(project, message.bot, start_poller, start_watcher)
 
-    tmux = get_session_for_chat(chat_id)
+        tmux = get_session_for_chat(chat_id)
+
     if tmux:
         tmux.send(message.text)
     else:
