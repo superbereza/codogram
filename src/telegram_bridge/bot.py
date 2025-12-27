@@ -1211,7 +1211,25 @@ async def on_message(message: Message):
 
     # Determine which tmux to send to
     if thread:
-        # Multi-thread mode: use ThreadInfo
+        # Multi-thread mode: use ThreadInfo for binding
+        start_poller, start_watcher = _make_task_starters(message.bot)
+
+        if thread.session_id is None:
+            # No session bound - use session binding (match by user message)
+            from .history_watcher import poll_for_session_thread
+
+            thread.last_sent_message = message.text
+
+            # Start binding task if not already running
+            if not thread.binding_task or thread.binding_task.done():
+                thread.binding_task = asyncio.create_task(
+                    poll_for_session_thread(project, thread, message.bot, start_poller, start_watcher)
+                )
+        else:
+            # Session already bound - check if it changed (user might have done /new in tmux)
+            from .history_watcher import check_session_for_thread
+            await check_session_for_thread(project, thread, message.bot, start_poller, start_watcher)
+
         tmux_name = thread.get_tmux_session(project.project_name)
         tmux = TmuxSession(tmux_name, project.cwd)
     else:

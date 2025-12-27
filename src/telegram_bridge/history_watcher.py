@@ -3,7 +3,7 @@ import asyncio
 import time
 from aiogram import Bot
 
-from .session_manager import project_manager, ProjectState
+from .session_manager import project_manager, ProjectState, ThreadInfo
 from .history_reader import (
     HISTORY_PATH,
     find_session_for_project,
@@ -228,6 +228,108 @@ async def poll_for_session(
         )
     except Exception:
         pass
+
+
+async def poll_for_session_thread(
+    project: ProjectState,
+    thread: ThreadInfo,
+    bot: Bot,
+    start_poller,
+    start_watcher,
+) -> None:
+    """Poll for a session that matches thread.last_sent_message."""
+    if not project.cwd or not thread.last_sent_message:
+        logger.warning("poll_for_session_thread: missing cwd or last_sent_message")
+        return
+
+    old_session_id = thread.session_id
+    start_time = time.time()
+
+    logger.info("poll_for_session_thread_start", extra={
+        "project": project.project_name,
+        "thread": thread.name,
+        "looking_for": thread.last_sent_message[:30] if thread.last_sent_message else None,
+    })
+
+    while time.time() - start_time < BINDING_TIMEOUT:
+        try:
+            latest_session_id = find_session_for_project(project.cwd)
+
+            if latest_session_id and latest_session_id != old_session_id:
+                jsonl_path = compute_jsonl_path(project.cwd, latest_session_id)
+
+                if jsonl_path.exists():
+                    last_user_msg = get_last_user_message_from_jsonl(jsonl_path)
+
+                    if last_user_msg == thread.last_sent_message:
+                        logger.info("session_bound_thread", extra={
+                            "project": project.project_name,
+                            "thread": thread.name,
+                            "session_id": latest_session_id[:8],
+                        })
+
+                        thread.session_id = latest_session_id
+                        thread.jsonl_path = str(jsonl_path)
+                        thread.awaiting_new_session = False
+
+                        # Start thread-specific watcher (Task 9 will implement watch_thread_jsonl)
+                        # For now just log
+                        logger.info("thread_session_bound", extra={
+                            "thread": thread.name,
+                            "session_id": latest_session_id[:8],
+                        })
+                        return
+
+        except Exception as e:
+            logger.warning("poll_for_session_thread_error", extra={"error": str(e)})
+
+        await asyncio.sleep(BINDING_INTERVAL)
+
+    # Timeout
+    logger.warning("poll_for_session_thread_timeout", extra={
+        "project": project.project_name,
+        "thread": thread.name,
+    })
+    thread.awaiting_new_session = False
+    try:
+        await bot.send_message(
+            project.chat_id,
+            "⚠️ Сессия не обнаружена. Проверьте что Claude запущен.",
+            message_thread_id=thread.thread_id
+        )
+    except Exception:
+        pass
+
+
+async def check_session_for_thread(
+    project: ProjectState,
+    thread: ThreadInfo,
+    bot: Bot,
+    start_poller,
+    start_watcher,
+) -> None:
+    """Check if session changed for a thread."""
+    if not project.cwd:
+        return
+
+    old_session = thread.session_id
+    new_session_id = find_session_for_project(project.cwd)
+
+    if new_session_id and new_session_id != old_session:
+        # Session changed - user did /new or /compact
+        logger.info("session_changed_thread", extra={
+            "project": project.project_name,
+            "thread": thread.name,
+            "old_session": old_session[:8] if old_session else None,
+            "new_session": new_session_id[:8],
+        })
+
+        # Reset and wait for binding
+        thread.session_id = None
+        thread.jsonl_path = None
+        if thread.watcher_task:
+            thread.watcher_task.cancel()
+            thread.watcher_task = None
 
 
 async def create_history_watcher(bot: Bot, start_poller, start_watcher) -> HistoryWatcher:
