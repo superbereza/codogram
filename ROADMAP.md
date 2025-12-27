@@ -34,6 +34,17 @@
 - is_claude_ready() проверка готовности Claude TUI
 - Doom-guy loading animation при запуске
 
+### Multi-session topics
+- Telegram Forum Topics: каждый топик = отдельная Claude сессия
+- ThreadInfo dataclass для per-thread state
+- `/session_new [name]` — создать новый топик с Claude
+- `/session_close` — закрыть топик и убить tmux
+- Magic names для автонейминга (arcane, mystic, celestial...)
+- Thread-specific watcher и permission poller
+- Session binding по user message для каждого thread
+- tmux died detection с уведомлением в топик
+- /resume блокировка в мультисессионном режиме
+
 ### Security improvements
 - shell=False во всех subprocess calls (предотвращает shell injection)
 - Валидация project name (только alphanumeric, dash, underscore)
@@ -58,12 +69,11 @@
 - Используем существующий код из bz-merch-assistant
 - `ai_bot_core/services/whisper.py`
 
-### One chat — multi sessions management
-Управление несколькими сессиями в одном проекте:
-- Spawn: запустить дополнительную сессию (worktree)
-- Change: переключиться на другую сессию
-- Resume: `--resume` для продолжения предыдущей
-- UI: команды или inline кнопки для переключения
+### Session switching UI
+Улучшения для multi-session:
+- Inline кнопки для переключения между топиками
+- `/sessions` — список активных сессий
+- Быстрое переключение без перехода в топик
 
 ### Activity indicators
 Отображение что Claude думает/работает:
