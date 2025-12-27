@@ -1116,7 +1116,8 @@ async def on_message(message: Message):
     """Handle regular messages."""
     # Log incoming message
     text_preview = message.text[:100] if message.text else '<no text>'
-    logger.info(f"Incoming message from user={message.from_user.id} chat={message.chat.id}: {text_preview}")
+    thread_id = message.message_thread_id
+    logger.info(f"Incoming message from user={message.from_user.id} chat={message.chat.id} thread={thread_id}: {text_preview}")
 
     if not is_admin(message.from_user.id):
         logger.debug(f"Ignored: not admin (user={message.from_user.id})")
@@ -1126,7 +1127,7 @@ async def on_message(message: Message):
         return
 
     chat_id = message.chat.id
-    thread_id = message.message_thread_id  # None for General topic
+    # thread_id already logged above
 
     # Skip commands
     if message.text.startswith("/"):
@@ -1196,6 +1197,7 @@ async def on_message(message: Message):
 
     # Get thread for this topic
     thread = project.threads.get(thread_id)
+    logger.debug(f"Message routing: project={project.project_name} thread_id={thread_id} thread={thread}")
 
     if thread_id is not None and not thread:
         # Unknown topic - create pending ThreadInfo, show hint once
@@ -1222,9 +1224,12 @@ async def on_message(message: Message):
 
             # Start binding task if not already running
             if not thread.binding_task or thread.binding_task.done():
+                logger.debug(f"Starting binding task for thread {thread.name}")
                 thread.binding_task = asyncio.create_task(
                     poll_for_session_thread(project, thread, message.bot, start_poller, start_watcher)
                 )
+            else:
+                logger.debug(f"Binding task already running for thread {thread.name}")
         else:
             # Session already bound - check if it changed (user might have done /new in tmux)
             from .history_watcher import check_session_for_thread

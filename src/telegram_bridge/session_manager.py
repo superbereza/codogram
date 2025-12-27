@@ -262,7 +262,12 @@ class ProjectManager:
 
             logger.info("project_restored", extra={"project": project.project_name})
 
-            # 4. Handle multiple tmux sessions (ask user to select)
+            # 4. Skip projects with threads - they use thread-specific watchers
+            #    Thread sessions will be re-bound when user sends message in topic
+            if project.threads:
+                continue
+
+            # 5. Handle multiple tmux sessions (ask user to select)
             if not project.tmux_session:
                 tmux_list = find_all_tmux_by_cwd(project.cwd)
                 if len(tmux_list) > 1:

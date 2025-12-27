@@ -99,7 +99,11 @@ class HistoryWatcher:
             if project.binding_task and not project.binding_task.done():
                 continue
 
-            # 4. Check for new/changed sessions (discover new Claude sessions)
+            # 5. Skip projects with threads - they use thread-specific watchers
+            if project.threads:
+                continue
+
+            # 6. Check for new/changed sessions (discover new Claude sessions)
             old_session = project.session_id
             changed = self.project_manager.refresh_project_session(project)
 
@@ -263,55 +267,58 @@ async def poll_for_session_thread(
     start_poller,
     start_watcher,
 ) -> None:
-    """Poll for a session that matches thread.last_sent_message."""
+    """Poll for a session that matches thread.last_sent_message.
+
+    Scans ALL sessions for this cwd (not just the latest) because multiple
+    threads may have different Claude sessions in the same project directory.
+    """
+    try:
+        from .history_reader import find_session_by_user_message
+    except Exception as e:
+        logger.error(f"poll_for_session_thread: import error: {e}")
+        return
+
+    logger.debug(f"poll_for_session_thread called: cwd={project.cwd}, msg={thread.last_sent_message}")
+
     if not project.cwd or not thread.last_sent_message:
         logger.warning("poll_for_session_thread: missing cwd or last_sent_message")
         return
 
-    old_session_id = thread.session_id
+    logger.debug("poll_for_session_thread: passed validation, starting loop")
     start_time = time.time()
 
-    logger.info("poll_for_session_thread_start", extra={
-        "project": project.project_name,
-        "thread": thread.name,
-        "looking_for": thread.last_sent_message[:30] if thread.last_sent_message else None,
-    })
+    try:
+        logger.debug(f"poll_for_session_thread_start: project={project.project_name}, thread={thread.name}")
+    except Exception as e:
+        logger.error(f"poll_for_session_thread: logging error: {e}")
 
+    logger.debug("poll_for_session_thread: entering while loop")
     while time.time() - start_time < BINDING_TIMEOUT:
         try:
-            latest_session_id = find_session_for_project(project.cwd)
+            # Scan ALL sessions for this cwd to find one with matching user message
+            result = find_session_by_user_message(project.cwd, thread.last_sent_message)
+            logger.debug(f"poll_for_session_thread: search result={result is not None}")
 
-            if latest_session_id and latest_session_id != old_session_id:
-                jsonl_path = compute_jsonl_path(project.cwd, latest_session_id)
+            if result:
+                session_id, jsonl_path = result
 
-                if jsonl_path.exists():
-                    last_user_msg = get_last_user_message_from_jsonl(jsonl_path)
+                logger.info(f"session_bound_thread: project={project.project_name}, thread={thread.name}, session={session_id[:8]}")
 
-                    if last_user_msg == thread.last_sent_message:
-                        logger.info("session_bound_thread", extra={
-                            "project": project.project_name,
-                            "thread": thread.name,
-                            "session_id": latest_session_id[:8],
-                        })
+                thread.session_id = session_id
+                thread.jsonl_path = str(jsonl_path)
+                thread.awaiting_new_session = False
 
-                        thread.session_id = latest_session_id
-                        thread.jsonl_path = str(jsonl_path)
-                        thread.awaiting_new_session = False
+                # Start thread-specific watcher
+                if not thread.watcher_task or thread.watcher_task.done():
+                    thread.watcher_task = asyncio.create_task(
+                        watch_thread_jsonl(bot, project, thread)
+                    )
 
-                        # Start thread-specific watcher
-                        if not thread.watcher_task or thread.watcher_task.done():
-                            thread.watcher_task = asyncio.create_task(
-                                watch_thread_jsonl(bot, project, thread)
-                            )
-
-                        logger.info("thread_watcher_started", extra={
-                            "thread": thread.name,
-                            "session_id": latest_session_id[:8],
-                        })
-                        return
+                logger.info(f"thread_watcher_started: thread={thread.name}, session={session_id[:8]}")
+                return
 
         except Exception as e:
-            logger.warning("poll_for_session_thread_error", extra={"error": str(e)})
+            logger.warning(f"poll_for_session_thread_error: {e}")
 
         await asyncio.sleep(BINDING_INTERVAL)
 

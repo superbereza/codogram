@@ -147,3 +147,32 @@ def compute_jsonl_path(cwd: str, session_id: str) -> Path:
 
     project_hash = normalized.replace("/", "-")
     return Path.home() / ".claude" / "projects" / project_hash / f"{session_id}.jsonl"
+
+
+def find_session_by_user_message(cwd: str, user_message: str) -> tuple[str, Path] | None:
+    """Find session that contains the given user message.
+
+    Scans ALL session jsonl files for a cwd (not just the latest).
+    Returns (session_id, jsonl_path) or None if not found.
+    """
+    # Compute project directory
+    normalized = cwd.rstrip("/") or "/"
+    while "//" in normalized:
+        normalized = normalized.replace("//", "/")
+    project_hash = normalized.replace("/", "-")
+    project_dir = Path.home() / ".claude" / "projects" / project_hash
+
+    if not project_dir.exists():
+        return None
+
+    # Scan all jsonl files, sorted by mtime (newest first)
+    jsonl_files = list(project_dir.glob("*.jsonl"))
+    jsonl_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+    for jsonl_path in jsonl_files:
+        last_msg = get_last_user_message_from_jsonl(jsonl_path)
+        if last_msg == user_message:
+            session_id = jsonl_path.stem
+            return (session_id, jsonl_path)
+
+    return None
