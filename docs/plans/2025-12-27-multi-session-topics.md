@@ -12,50 +12,29 @@
 
 ## Этапы (для изолированного тестирования)
 
-### Этап 1: Инфраструктура (Tasks 1-4)
+### Этап 1: Инфраструктура (Tasks 1-4, 4a)
 **Что:** ThreadInfo, ProjectState.threads, config save/load, magic names
-**Тест:** Unit тесты, `pytest tests/test_session_manager.py`
-**Результат:** Структуры данных готовы, но UI пока не работает
+**Чекпоинт:** Task 4a — unit тесты должны пройти
 
-### Этап 2: Команды (Tasks 5-6)
+### Этап 2: Команды (Tasks 5-6, 6a)
 **Что:** `/session_new`, `/session_close`, `/start` в топике
-**Тест:**
-1. В супергруппе с Topics: `/session_new` → создаётся топик + tmux
-2. В топике: `/session_close` → топик и tmux удаляются
-3. Создать топик руками → написать → `/start` → Claude запускается
-**Результат:** Можно создавать/закрывать сессии, но сообщения ещё не роутятся
+**Чекпоинт:** Task 6a — ручное тестирование команд
 
-### Этап 3: Message routing (Task 7)
+### Этап 3: Message routing (Task 7, 7a)
 **Что:** Роутинг сообщений по thread_id
-**Тест:**
-1. Создать топик через `/session_new`
-2. Написать сообщение в топик
-3. Проверить в tmux что сообщение пришло
-**Результат:** Сообщения идут в правильный tmux
+**Чекпоинт:** Task 7a — проверка что сообщения идут в правильный tmux
 
-### Этап 4: Session binding & watcher (Tasks 8-9)
+### Этап 4: Session binding & watcher (Tasks 8-9, 9a)
 **Что:** Привязка сессии, watcher для threads
-**Тест:**
-1. Создать топик, написать сообщение
-2. Дождаться ответа Claude
-3. Ответ должен прийти в тот же топик
-**Результат:** Полный цикл общения работает
+**Чекпоинт:** Task 9a — полный цикл общения
 
-### Этап 5: Permission poller (Task 10)
+### Этап 5: Permission poller (Task 10, 10a)
 **Что:** Permission poller для threads
-**Тест:**
-1. Создать топик
-2. Попросить Claude сделать что-то требующее разрешения
-3. Кнопки должны появиться в топике
-**Результат:** Permissions работают per-thread
+**Чекпоинт:** Task 10a — permissions в топике
 
-### Этап 6: Lifecycle (Tasks 11-12)
+### Этап 6: Lifecycle (Tasks 11-12, 12a)
 **Что:** Migration, tmux died, /resume block
-**Тест:**
-1. Перезапустить бота → сессии восстанавливаются
-2. Убить tmux → уведомление в топике
-3. Сделать /resume в tmux → ошибка
-**Результат:** Устойчивость к edge cases
+**Чекпоинт:** Task 12a — edge cases
 
 ---
 
@@ -433,6 +412,28 @@ git commit -m "feat(telegram-bridge): add magic names for threads"
 
 ---
 
+## Task 4a: Checkpoint — Unit tests
+
+**Инструкция для ручного тестирования:**
+
+1. Запустить unit тесты:
+```bash
+cd agent-tools/telegram-bridge
+pytest tests/test_session_manager.py tests/test_magic_names.py -v
+```
+
+2. Все тесты должны пройти (зелёные)
+
+3. Проверить что тесты покрывают:
+   - ThreadInfo создание и get_tmux_session
+   - ProjectState.threads, get_thread, get_or_create_thread
+   - Сохранение/загрузка threads в config
+   - Magic names: get_random_magic_name, excludes, UUID fallback
+
+**Критерий успеха:** Все тесты зелёные, pytest exit code 0
+
+---
+
 ## Task 5: Add /session_new command and /start in topic support
 
 **Files:**
@@ -699,6 +700,45 @@ git commit -m "feat(telegram-bridge): add /session_close command"
 
 ---
 
+## Task 6a: Checkpoint — Commands manual test
+
+**Инструкция для ручного тестирования:**
+
+**Подготовка:**
+1. Создать Telegram supergroup с включёнными Topics
+2. Добавить бота как админа с правами "Manage Topics"
+3. Зарегистрировать проект через `/start`
+
+**Тест /session_new:**
+1. В группе выполнить `/session_new`
+   - Ожидание: создаётся новый топик с magic name (arcane/mystic/etc)
+   - Ожидание: запускается tmux с Claude
+   - Ожидание: doom-guy анимация, затем "Ready!"
+
+2. В группе выполнить `/session_new mytest`
+   - Ожидание: создаётся топик "Mytest"
+   - Ожидание: tmux session = `claude-<project>-mytest`
+
+3. Попробовать `/session_new invalid@name`
+   - Ожидание: ошибка про допустимые символы
+
+**Тест /start в топике:**
+1. Создать топик вручную через Telegram UI
+2. Написать любое сообщение в нём
+   - Ожидание: бот отвечает "Используй /start или /session_new..."
+3. Выполнить `/start` в этом топике
+   - Ожидание: pending thread апгрейдится, запускается Claude
+
+**Тест /session_close:**
+1. В созданном топике выполнить `/session_close`
+   - Ожидание: кнопки подтверждения
+2. Нажать "Да, закрыть"
+   - Ожидание: топик удаляется, tmux session убивается
+
+**Критерий успеха:** Все сценарии работают без ошибок
+
+---
+
 ## Task 7: Update message routing for thread_id
 
 **Files:**
@@ -810,6 +850,34 @@ async def on_message(message: Message):
 git add src/telegram_bridge/bot.py
 git commit -m "feat(telegram-bridge): route messages by thread_id"
 ```
+
+---
+
+## Task 7a: Checkpoint — Message routing test
+
+**Инструкция для ручного тестирования:**
+
+**Подготовка:**
+- Иметь группу с минимум 2 топиками + General
+
+**Тест изоляции сообщений:**
+1. Открыть `tmux attach -t claude-<project>-<topic1>` в одном терминале
+2. Открыть `tmux attach -t claude-<project>-<topic2>` в другом терминале
+3. Отправить "test1" в topic1 в Telegram
+   - Ожидание: "test1" появляется только в tmux topic1
+4. Отправить "test2" в topic2 в Telegram
+   - Ожидание: "test2" появляется только в tmux topic2
+5. Отправить "test3" в General topic
+   - Ожидание: идёт в legacy project tmux (если есть) или игнорируется
+
+**Тест pending thread:**
+1. Создать новый топик вручную (не через /session_new)
+2. Написать сообщение
+   - Ожидание: "Используй /start или /session_new..."
+3. Написать ещё сообщение
+   - Ожидание: тишина (pending thread игнорирует сообщения)
+
+**Критерий успеха:** Сообщения идут в правильные tmux сессии
 
 ---
 
@@ -994,6 +1062,37 @@ git commit -m "feat(telegram-bridge): add thread-specific watcher"
 
 ---
 
+## Task 9a: Checkpoint — Full conversation cycle
+
+**Инструкция для ручного тестирования:**
+
+**Тест полного цикла в топике:**
+1. Создать топик через `/session_new`
+2. Дождаться "Ready!"
+3. Написать простой запрос: "Say hello"
+4. Ожидание:
+   - Сообщение уходит в tmux (видно в attach)
+   - Claude отвечает
+   - Ответ появляется в Telegram в том же топике
+5. Написать ещё запрос: "What's 2+2?"
+   - Ожидание: ответ появляется в этом же топике
+
+**Тест session binding:**
+1. В другом топике (без Claude) написать сообщение
+2. Затем создать там Claude через `/start`
+3. Написать "test binding"
+   - Ожидание: session_id привязывается, watcher запускается
+
+**Тест смены сессии (/new):**
+1. В tmux выполнить `/new` (новая Claude сессия)
+2. В Telegram написать сообщение
+   - Ожидание: session rebinding происходит автоматически
+   - Ожидание: новый watcher запускается
+
+**Критерий успеха:** Полный цикл общения работает в каждом топике независимо
+
+---
+
 ## Task 10: Add thread-specific permission poller
 
 **Files:**
@@ -1065,6 +1164,33 @@ async def on_permission_callback(callback: CallbackQuery):
 git add src/telegram_bridge/permission_poller.py src/telegram_bridge/bot.py
 git commit -m "feat(telegram-bridge): add thread-specific permission poller"
 ```
+
+---
+
+## Task 10a: Checkpoint — Permissions in topics
+
+**Инструкция для ручного тестирования:**
+
+**Тест permission prompt в топике:**
+1. Создать топик через `/session_new`
+2. Попросить Claude сделать что-то требующее разрешения:
+   ```
+   Create a file test.txt with content "hello"
+   ```
+3. Ожидание:
+   - Permission prompt появляется В ЭТОМ ЖЕ топике
+   - Кнопки Yes/No работают
+   - После нажатия Yes файл создаётся
+   - Сообщение с кнопками удаляется
+
+**Тест изоляции permissions:**
+1. Открыть два топика с Claude
+2. В первом попросить создать файл
+3. Убедиться что permission приходит только в первый топик
+4. Во втором попросить создать другой файл
+5. Убедиться что permission приходит только во второй топик
+
+**Критерий успеха:** Permissions работают изолированно в каждом топике
 
 ---
 
@@ -1226,19 +1352,74 @@ git commit -m "feat(telegram-bridge): block /resume with error message"
 
 ---
 
+## Task 12a: Checkpoint — Edge cases
+
+**Инструкция для ручного тестирования:**
+
+**Тест migration (legacy → threads):**
+1. Иметь старый проект БЕЗ threads в .config.json
+2. Перезапустить бота
+3. Проверить .config.json
+   - Ожидание: появился `threads: { "null": { "name": "main" } }`
+4. Написать сообщение в General topic
+   - Ожидание: работает как раньше
+
+**Тест tmux died:**
+1. Создать топик через `/session_new`
+2. Дождаться Ready
+3. Убить tmux вручную: `tmux kill-session -t claude-<project>-<name>`
+4. Ожидание: в топике появляется "⚠️ Claude session closed: <name>"
+5. Написать сообщение
+   - Ожидание: предложение использовать /start или /session_new
+
+**Тест /resume блокировки:**
+1. В tmux выполнить `/resume` для старой сессии
+2. Написать сообщение в Telegram
+   - Ожидание: через timeout появляется сообщение про /resume
+   - Ожидание: "⚠️ /resume не поддерживается..."
+
+**Тест restore после рестарта бота:**
+1. Создать 2-3 топика с активными Claude сессиями
+2. Перезапустить бота (`./restart.sh`)
+3. Написать сообщение в каждый топик
+   - Ожидание: все сессии восстановились, ответы приходят
+
+**Критерий успеха:** Все edge cases обрабатываются корректно
+
+---
+
 ## Summary
 
-12 tasks total:
+18 tasks total (12 implementation + 6 checkpoints):
+
+**Stage 1: Infrastructure (Tasks 1-4, 4a)**
 1. ThreadInfo dataclass
 2. Add threads dict to ProjectState
 3. Config save/load for threads
 4. Magic names for thread naming
-5. /session_new command
+4a. ✅ Checkpoint — Unit tests
+
+**Stage 2: Commands (Tasks 5-6, 6a)**
+5. /session_new command and /start in topic
 6. /session_close command
+6a. ✅ Checkpoint — Commands manual test
+
+**Stage 3: Message routing (Task 7, 7a)**
 7. Message routing by thread_id
+7a. ✅ Checkpoint — Message routing test
+
+**Stage 4: Session binding & watcher (Tasks 8-9, 9a)**
 8. Thread-aware session binding
 9. Thread-specific watcher
-10. Thread-specific permission poller
-11. Migration for existing projects
+9a. ✅ Checkpoint — Full conversation cycle
 
-Each task is atomic and can be committed separately. Tests are provided where unit testing is practical.
+**Stage 5: Permission poller (Task 10, 10a)**
+10. Thread-specific permission poller
+10a. ✅ Checkpoint — Permissions in topics
+
+**Stage 6: Lifecycle (Tasks 11-12, 12a)**
+11. Migration and thread lifecycle management
+12. Block /resume command
+12a. ✅ Checkpoint — Edge cases
+
+Each task is atomic and can be committed separately. Checkpoints require user manual testing before proceeding to next stage.
