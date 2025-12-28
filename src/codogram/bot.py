@@ -1209,12 +1209,12 @@ async def on_message(message: Message):
             await launch_claude_new(message, project, start_poller, start_watcher)
             return
 
-    # Normal message - route by thread_id
+    # Normal message - route through threads (unified path)
     project = project_manager.get_by_chat(chat_id)
     if not project:
         return
 
-    # Get thread for this topic
+    # Get or create thread for this topic
     thread = project.threads.get(thread_id)
     logger.debug(f"Message routing: project={project.project_name} thread_id={thread_id} thread={thread}")
 
@@ -1226,63 +1226,43 @@ async def on_message(message: Message):
         await message.answer("Используй /start или /session_new для подключения Claude к этому топику")
         return
 
+    # For thread_id=None (General/Private/Simple), auto-create "main" thread if missing
+    if thread_id is None and not thread:
+        thread = project.get_or_create_thread(None, "main")
+        project_manager._save()
+
     # Skip pending threads (no tmux yet)
     if thread and thread.name == "pending":
         return
 
-    # Determine which tmux to send to
-    if thread:
-        # Multi-thread mode: use ThreadInfo for binding
-        start_poller, start_watcher = _make_task_starters(message.bot)
+    # All messages now go through thread path
+    start_poller, start_watcher = _make_task_starters(message.bot)
 
-        if thread.session_id is None:
-            # No session bound - use session binding (match by user message)
-            from .history_watcher import poll_for_session_thread
+    if thread.session_id is None:
+        # No session bound - use session binding (match by user message)
+        from .history_watcher import poll_for_session_thread
 
-            thread.last_sent_message = message.text
+        thread.last_sent_message = message.text
 
-            # Start binding task if not already running
-            if not thread.binding_task or thread.binding_task.done():
-                logger.debug(f"Starting binding task for thread {thread.name}")
-                thread.binding_task = asyncio.create_task(
-                    poll_for_session_thread(project, thread, message.bot, start_poller, start_watcher)
-                )
-            else:
-                logger.debug(f"Binding task already running for thread {thread.name}")
+        # Start binding task if not already running
+        if not thread.binding_task or thread.binding_task.done():
+            logger.debug(f"Starting binding task for thread {thread.name}")
+            thread.binding_task = asyncio.create_task(
+                poll_for_session_thread(project, thread, message.bot, start_poller, start_watcher)
+            )
         else:
-            # Session already bound - check if it changed (user might have done /new in tmux)
-            from .history_watcher import check_session_for_thread
-            await check_session_for_thread(project, thread, message.bot, start_poller, start_watcher)
-
-        tmux_name = thread.get_tmux_session(project.project_name)
-        tmux = TmuxSession(tmux_name, project.cwd)
+            logger.debug(f"Binding task already running for thread {thread.name}")
     else:
-        # Legacy single-thread mode (General topic without ThreadInfo)
-        # Check session binding for legacy mode
-        start_poller, start_watcher = _make_task_starters(message.bot)
+        # Session already bound - check if it changed (user might have done /new in tmux)
+        from .history_watcher import check_session_for_thread
+        await check_session_for_thread(project, thread, message.bot, start_poller, start_watcher)
 
-        if project.session_id is None:
-            # No session bound - use session binding (match by user message)
-            # This avoids grabbing an old session after /restart_session + /start
-            from .history_watcher import poll_for_session
+    tmux_name = thread.get_tmux_session(project.project_name)
+    tmux = TmuxSession(tmux_name, project.cwd)
 
-            project.last_sent_message = message.text
+    logger.debug(f"tmux_send: project={project.project_name} tmux={tmux_name}")
 
-            # Start binding task if not already running
-            if not project.binding_task or project.binding_task.done():
-                project.binding_task = asyncio.create_task(
-                    poll_for_session(project, message.bot, start_poller, start_watcher)
-                )
-        else:
-            # Session already bound - check if it changed (user might have done /new in tmux)
-            from .history_watcher import check_session_for_project
-            await check_session_for_project(project, message.bot, start_poller, start_watcher)
-
-        tmux = get_session_for_chat(chat_id)
-
-    logger.debug(f"tmux_send: project={project.project_name} tmux_session={project.tmux_session} tmux={tmux}")
-
-    if tmux:
+    if tmux.exists():
         tmux.send(message.text)
         logger.debug(f"sent_to_tmux: {message.text[:50]}")
     else:
