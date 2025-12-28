@@ -139,6 +139,65 @@
 - Позволяет управлять ботом через самого себя
 - Не нужно создавать отдельную группу для разработки бота
 
+### Forward unhandled commands
+`/команды` без хэндлера прокидывать в Claude как есть:
+- Сейчас добавляются в tmux с двумя слэшами, не отправляются
+- Нужен fallback в `on_message` или отдельный хэндлер
+
+### Tool progress display
+Показывать прогресс выполнения инструментов:
+- Расширить Task 5 в плане permission-detection
+- Сейчас `ToolProgress` парсится, но не отображается (pass)
+- **Инсайт:** В Claude первая строка статична (Task/Tool name), остальные бегут
+  ```
+  Task(Implement Task 1: Screen Parser)
+    ⎿  Read 46 lines
+       Read 30 lines
+       Waiting…
+  ```
+- Из jsonl приходит первая строка — на ней можно якориться
+
+### Ultrathink mode
+`/ultrathink_mode` toggle, добавляет " ultrathink" к каждому сообщению:
+- Хранить в per-project settings
+- Показывать статус при /start
+
+### Context window indicator
+Показывать сколько осталось до compact:
+- Парсить из jsonl (если есть) или tmux screen
+- Показывать в /settings и/или в статусной строке
+
+### Ctrl+B command
+`/ctrl_b` отправляет Ctrl+B в tmux:
+- Полезно для vim-mode или tmux prefix
+
+### Silent push notifications
+Тихие пуши на обычные сообщения, громкие на permissions и остановку:
+- Обычные сообщения: `disable_notification=True`
+- Permissions, generation stopped: громкий пуш
+- Возможно потребуются webhooks для быстрой реакции
+
+### Silent mode
+Режим без показа tool calls, только финальные генерации:
+- Команда `/silent` для переключения
+- Фильтровать TOOL_USE, TOOL_RESULT, показывать только TEXT
+
+### Thread summarization
+Суммаризация длинных тредов (под вопросом):
+- Команда `/summary` или автоматически при N сообщениях
+- Использовать Claude API для суммаризации
+- Вопрос: нужно ли это если есть scroll в Telegram?
+
+### Fix bullet point rendering
+Заменить большую точку `•` на точку в code block:
+- `•` плохо рендерится в некоторых клиентах
+- Заменить на `\`•\`` или другой символ
+
+### Markdown to Telegram converter
+Библиотека для конвертации обычного MD в TG-совместимый:
+- Таблицы, headers не рендерятся в Telegram
+- Поискать готовые решения (telegramify-markdown, etc.)
+
 ## PoC / Research
 
 ### codogram-tmux-only
