@@ -23,7 +23,7 @@ class PollerState(Enum):
 
 
 # Separator for Telegram display
-SEPARATOR_SOLID = "─────────────────────"
+SEPARATOR_SOLID = "──────────────────"
 
 
 async def create_poller_task(bot: Bot, project: ProjectState) -> asyncio.Task:
@@ -127,6 +127,21 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
                         logger.debug(f"Poller SHOWING: sent {len(parsed.options)} options, kb_msg={kb_msg.message_id}")
                     except Exception as e:
                         logger.warning(f"Permission poller: send error: {e}")
+                        # Cleanup already-sent messages to avoid orphans
+                        for msg_id in content_msg_ids:
+                            try:
+                                await bot.delete_message(chat_id, msg_id)
+                            except Exception:
+                                pass
+                        content_msg_ids = []
+                        # Handle flood control - wait before retry
+                        if "retry after" in str(e).lower():
+                            try:
+                                retry_after = int(str(e).split("retry after")[1].split()[0])
+                                logger.info(f"Permission poller: flood control, waiting {retry_after}s")
+                                await asyncio.sleep(retry_after)
+                            except (ValueError, IndexError):
+                                await asyncio.sleep(5)
                         state = PollerState.IDLE
 
         elif state == PollerState.SHOWING:
@@ -198,6 +213,21 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
                     last_body = parsed.body
                 except Exception as e:
                     logger.warning(f"Poller SHOWING: resend error: {e}")
+                    # Cleanup already-sent messages
+                    for msg_id in content_msg_ids:
+                        try:
+                            await bot.delete_message(chat_id, msg_id)
+                        except Exception:
+                            pass
+                    content_msg_ids = []
+                    # Handle flood control
+                    if "retry after" in str(e).lower():
+                        try:
+                            retry_after = int(str(e).split("retry after")[1].split()[0])
+                            logger.info(f"Permission poller: flood control, waiting {retry_after}s")
+                            await asyncio.sleep(retry_after)
+                        except (ValueError, IndexError):
+                            await asyncio.sleep(5)
 
 
 async def create_poller_task_for_thread(bot: Bot, project: ProjectState, thread: ThreadInfo) -> asyncio.Task:
@@ -294,6 +324,21 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                         last_body = parsed.body
                     except Exception as e:
                         logger.warning(f"Thread poller {thread.name}: send error: {e}")
+                        # Cleanup already-sent messages to avoid orphans
+                        for msg_id in content_msg_ids:
+                            try:
+                                await bot.delete_message(chat_id, msg_id)
+                            except Exception:
+                                pass
+                        content_msg_ids = []
+                        # Handle flood control - wait before retry
+                        if "retry after" in str(e).lower():
+                            try:
+                                retry_after = int(str(e).split("retry after")[1].split()[0])
+                                logger.info(f"Thread poller {thread.name}: flood control, waiting {retry_after}s")
+                                await asyncio.sleep(retry_after)
+                            except (ValueError, IndexError):
+                                await asyncio.sleep(5)  # Default backoff
                         state = PollerState.IDLE
 
         elif state == PollerState.SHOWING:
@@ -365,3 +410,18 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                     last_body = parsed.body
                 except Exception as e:
                     logger.warning(f"Thread poller {thread.name}: resend error: {e}")
+                    # Cleanup already-sent messages
+                    for msg_id in content_msg_ids:
+                        try:
+                            await bot.delete_message(chat_id, msg_id)
+                        except Exception:
+                            pass
+                    content_msg_ids = []
+                    # Handle flood control
+                    if "retry after" in str(e).lower():
+                        try:
+                            retry_after = int(str(e).split("retry after")[1].split()[0])
+                            logger.info(f"Thread poller {thread.name}: flood control, waiting {retry_after}s")
+                            await asyncio.sleep(retry_after)
+                        except (ValueError, IndexError):
+                            await asyncio.sleep(5)
