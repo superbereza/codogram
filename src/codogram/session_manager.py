@@ -115,15 +115,19 @@ class ProjectState:
     # Multi-thread support: thread_id -> ThreadInfo
     threads: dict[int | None, ThreadInfo] = field(default_factory=dict)
 
-    # Legacy fields (for migration, will be moved to ThreadInfo)
-    session_id: str | None = None
-    jsonl_path: str | None = None
-    watcher_task: asyncio.Task | None = field(default=None, repr=False)
-    tmux_session: str | None = None
-    poller_task: asyncio.Task | None = field(default=None, repr=False)
-    last_sent_message: str | None = None
-    binding_task: asyncio.Task | None = field(default=None, repr=False)
-    awaiting_new_session: bool = False
+    # DEPRECATED: Legacy fields kept for backward compatibility with old configs.
+    # All new code should use threads[None] for main thread.
+    # These fields are used by: bot.py (is_claude_running, show_status, launch_claude_new,
+    # cmd_restart_session, on_tmux_selected), permission_poller.py (permission_poller_for_project),
+    # history_watcher.py (HistoryWatcher._check_for_changes), and session_manager.py itself.
+    session_id: str | None = None  # DEPRECATED: use threads[None].session_id
+    jsonl_path: str | None = None  # DEPRECATED: use threads[None].jsonl_path
+    watcher_task: asyncio.Task | None = field(default=None, repr=False)  # DEPRECATED: use threads[None].watcher_task
+    tmux_session: str | None = None  # DEPRECATED: use threads[None].get_tmux_session()
+    poller_task: asyncio.Task | None = field(default=None, repr=False)  # DEPRECATED: use threads[None].poller_task
+    last_sent_message: str | None = None  # DEPRECATED: use threads[None].last_sent_message
+    binding_task: asyncio.Task | None = field(default=None, repr=False)  # DEPRECATED: use threads[None].binding_task
+    awaiting_new_session: bool = False  # DEPRECATED: use threads[None].awaiting_new_session
 
     def get_thread(self, thread_id: int | None) -> ThreadInfo | None:
         """Get thread by thread_id."""
