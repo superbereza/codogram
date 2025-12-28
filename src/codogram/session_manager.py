@@ -292,65 +292,52 @@ class ProjectManager:
 
     async def restore_projects(self, bot, start_poller, start_watcher) -> None:
         """Restore sessions from history.jsonl after bot restart."""
-        from .tmux import find_all_tmux_by_cwd, find_tmux_by_convention
-        from .tmux_selector import create_tmux_selection_keyboard
+        from .history_watcher import watch_thread_jsonl
 
-        for project in list(self.projects.values()):  # Copy to allow removal
+        for project in list(self.projects.values()):
             if not project.chat_id or not project.cwd:
                 continue
 
-            # 1. Find tmux by cwd or convention FIRST (needed for cleanup check)
-            if not project.tmux_session:
-                tmux_list = find_all_tmux_by_cwd(project.cwd)
-                if len(tmux_list) == 1:
-                    project.tmux_session = tmux_list[0]
-                elif len(tmux_list) == 0:
-                    # Fallback to convention
-                    tmux_by_convention = find_tmux_by_convention(project.project_name)
-                    if tmux_by_convention:
-                        project.tmux_session = tmux_by_convention
-                # Multiple tmux handled after cleanup check
-
-            # 2. Find session_id from history.jsonl (sets jsonl_path)
-            self.refresh_project_session(project)
-
-            # 3. Check if project should be cleaned up
+            # 1. Check if should cleanup
             if should_cleanup_project(project):
-                logger.info(
-                    "project_cleanup",
-                    extra={
-                        "project": project.project_name,
-                        "reason": "inactive_30_days"
-                    }
-                )
+                logger.info("project_cleanup", extra={"project": project.project_name, "reason": "inactive_30_days"})
                 self.projects.pop(project.project_name, None)
                 continue
 
             logger.info("project_restored", extra={"project": project.project_name})
 
-            # 4. Skip projects with threads - they use thread-specific watchers
-            #    Thread sessions will be re-bound when user sends message in topic
-            if project.threads:
-                continue
+            # 2. Ensure threads[None] exists for main thread
+            if None not in project.threads:
+                project.threads[None] = ThreadInfo(thread_id=None, name="main")
 
-            # 5. Handle multiple tmux sessions (ask user to select)
-            if not project.tmux_session:
-                tmux_list = find_all_tmux_by_cwd(project.cwd)
-                if len(tmux_list) > 1:
-                    keyboard = create_tmux_selection_keyboard(tmux_list, project.project_name)
-                    try:
-                        await bot.send_message(
-                            project.chat_id,
-                            f"🔄 Bot restarted. Multiple tmux sessions found for {project.project_name}:\n\n"
-                            "Select which one to connect:",
-                            reply_markup=keyboard
-                        )
-                    except Exception:
-                        pass
-                    continue  # Don't start tasks, wait for selection
+            # 3. For each thread, try to restore tmux and session
+            for thread in project.threads.values():
+                tmux_name = thread.get_tmux_session(project.project_name)
 
-            # 5. Start tasks if ready
-            await self._maybe_start_tasks(project, start_poller, start_watcher)
+                # Check if tmux exists
+                import subprocess
+                result = subprocess.run(
+                    ["tmux", "has-session", "-t", tmux_name],
+                    capture_output=True
+                )
+
+                if result.returncode != 0:
+                    # No tmux - will need /start to launch
+                    continue
+
+                # Tmux exists - refresh session if we have one
+                if thread.session_id and thread.jsonl_path:
+                    from pathlib import Path
+                    if Path(thread.jsonl_path).exists():
+                        # Start watcher for this thread
+                        if not thread.watcher_task or thread.watcher_task.done():
+                            thread.watcher_task = asyncio.create_task(
+                                watch_thread_jsonl(bot, project, thread)
+                            )
+                        # Start poller for this thread
+                        from .permission_poller import create_poller_task_for_thread
+                        if not thread.poller_task or thread.poller_task.done():
+                            thread.poller_task = await create_poller_task_for_thread(bot, project, thread)
 
         self._save()
 
