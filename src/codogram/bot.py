@@ -85,10 +85,21 @@ async def send_with_retry(
 
 
 def get_session_for_chat(chat_id: int) -> TmuxSession | None:
-    """Get TmuxSession for chat_id."""
+    """Get TmuxSession for chat_id (main thread)."""
     project = project_manager.get_by_chat(chat_id)
-    if project and project.tmux_session:
+    if not project:
+        return None
+
+    # Try threads[None] first (unified path)
+    thread = project.threads.get(None)
+    if thread:
+        tmux_name = thread.get_tmux_session(project.project_name)
+        return TmuxSession(tmux_name, project.cwd or "/tmp")
+
+    # Legacy fallback
+    if project.tmux_session:
         return TmuxSession(project.tmux_session, project.cwd or "/tmp")
+
     return None
 
 def get_project_for_chat(chat_id: int) -> tuple[str | None, ProjectState | None]:
