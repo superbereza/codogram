@@ -2,13 +2,10 @@
 import json
 import asyncio
 from enum import Enum
-
-SESSION_TIMEOUT = 300  # 5 minutes
 from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator
 from aiogram import Bot
-from .session_manager import ProjectState
 from .chunker import chunk_message
 from .logging_config import logger
 
@@ -234,85 +231,3 @@ async def send_entry_to_telegram(
                 f"● {entry.tool_name}",
                 message_thread_id=message_thread_id,
             )
-
-
-async def create_watcher_task(bot: Bot, project: ProjectState,
-                              send_missed: bool = False) -> asyncio.Task:
-    """Create watcher task for project."""
-    return asyncio.create_task(watcher_for_session(bot, project, send_missed))
-
-async def watcher_for_session(bot: Bot, project: ProjectState,
-                              send_missed: bool = False):
-    """Watch jsonl for specific project."""
-    if not project.jsonl_path:
-        logger.warning(f"Watcher: no jsonl_path for project {project.project_name}")
-        return
-
-    path = Path(project.jsonl_path)
-    chat_id = project.chat_id
-
-    logger.info(f"Watcher started: watching {path} for chat {chat_id}")
-
-    # Wait for file to appear with timeout
-    start_time = asyncio.get_event_loop().time()
-    while not path.exists():
-        elapsed = asyncio.get_event_loop().time() - start_time
-        if elapsed > SESSION_TIMEOUT:
-            logger.warning(f"Watcher timeout: {path} not found after {SESSION_TIMEOUT}s")
-            try:
-                await bot.send_message(
-                    chat_id,
-                    "⚠️ Сессия не обнаружена. Проверьте что Claude запущен."
-                )
-            except Exception:
-                pass
-            return
-        await asyncio.sleep(1)
-
-    # Send missed entries if requested
-    if send_missed:
-        missed = find_missed_entries(path)
-        if missed:
-            logger.info(f"Sending {len(missed)} missed entries for {project.project_name}")
-            for entry in missed:
-                try:
-                    if entry.content_type == ContentType.TEXT:
-                        for chunk in chunk_message(entry.text):
-                            try:
-                                await bot.send_message(chat_id, f"● {chunk}", parse_mode="Markdown")
-                            except Exception:
-                                await bot.send_message(chat_id, f"● {chunk}")
-
-                    elif entry.content_type == ContentType.TOOL_USE:
-                        text = format_tool_use(entry.tool_name, entry.tool_input)
-                        try:
-                            await bot.send_message(chat_id, text, parse_mode="Markdown")
-                        except Exception:
-                            await bot.send_message(chat_id, f"● {entry.tool_name}")
-                except Exception as e:
-                    logger.warning(f"Error sending missed entry: {e}")
-
-    async for entry in watch_jsonl(path):
-        try:
-            if entry.content_type == ContentType.TEXT:
-                for chunk in chunk_message(entry.text):
-                    try:
-                        await bot.send_message(chat_id, f"● {chunk}", parse_mode="Markdown")
-                    except Exception:
-                        await bot.send_message(chat_id, f"● {chunk}")
-
-            elif entry.content_type == ContentType.TOOL_USE:
-                logger.debug(f"Watcher: TOOL_USE {entry.tool_name}")
-                text = format_tool_use(entry.tool_name, entry.tool_input)
-                try:
-                    await bot.send_message(chat_id, text, parse_mode="Markdown")
-                    logger.debug(f"Watcher: sent {entry.tool_name}")
-                except Exception as e:
-                    logger.warning(f"Watcher: error sending {entry.tool_name}: {e}")
-                    await bot.send_message(chat_id, f"● {entry.tool_name}")
-
-        except Exception as e:
-            if entry.content_type == ContentType.TEXT:
-                await bot.send_message(chat_id, f"● {entry.text[:4000]}")
-            elif entry.content_type == ContentType.TOOL_USE:
-                await bot.send_message(chat_id, f"● {entry.tool_name}")
