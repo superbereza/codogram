@@ -1,65 +1,57 @@
-# Telegram Bridge Onboarding
+# Codogram Onboarding
 
-Документ для быстрого онбординга новой сессии Claude на продолжение разработки/дебага.
+Документ для быстрого онбординга новой сессии Claude.
 
 ## Что это
 
-Telegram-bridge — бот для управления Claude Code через Telegram:
+Codogram — Telegram бот для управления Claude Code:
 - Показывает permission prompts (кнопки Yes/No)
 - Отправляет сообщения в tmux сессию Claude
 - Следит за jsonl и показывает tool calls
 
-## Текущий статус (2025-12-24)
+## Архитектура
 
-**Только что имплементировано:** Multi-session architecture
+```
+Claude Code                    Codogram                     Telegram
+    │                              │                              │
+    │                         history.jsonl                       │
+    │                         polling (15s)                       │
+    │                              │                              │
+    │                         ProjectManager                      │
+    │                              │                              │
+    │                         ┌────┴────┐                         │
+    │                         │         │                         │
+    │ ◄──── tmux ◄──── Permission    Watcher ─────────────────────►│
+    │                   Poller       (jsonl)                       │
+    │                         │         │                         │
+    │                         └────┬────┘                         │
+    │                              │                              │
+    │                         ThreadInfo                          │
+    │                    (multi-session topics)                   │
+```
 
-- Один процесс бота обслуживает несколько Claude сессий
-- Сессии регистрируются через Claude Code hooks (SessionStart/SessionEnd)
-- Каждый проект = отдельная Telegram группа
-- Маппинг project_name → chat_id
-
-**Ещё не протестировано:** интеграционный тест после рефакторинга.
+**Session discovery:** history.jsonl polling (не hooks)
+**Refresh interval:** 15s
+**Cleanup threshold:** 30 days (по mtime jsonl)
 
 ## Ключевые файлы
 
 ```
-agent-tools/codogram/
-├── .env                      # TELEGRAM_TOKEN, ADMIN_CHAT_ID, BASE_DIR
-├── .config.json              # projects + sessions mapping (создаётся автоматически)
-├── hooks/
-│   ├── session-start.sh      # POST /session/register при старте Claude
-│   └── session-end.sh        # POST /session/unregister при завершении
+codogram/
+├── .env                      # TELEGRAM_TOKEN, ADMIN_IDS
+├── .config.json              # Projects + chat mapping (auto-created)
 ├── src/codogram/
-│   ├── main.py               # HTTP server :8787 + Telegram bot
-│   ├── config.py             # Settings + load/save .config.json
-│   ├── session_manager.py    # SessionManager - регистрация, персистенция
-│   ├── project_resolver.py   # get_project_name (worktree support)
-│   ├── permission_poller.py  # Поллит tmux, отправляет permission prompts
-│   ├── watcher.py            # Следит за jsonl, отправляет tool calls
-│   ├── bot.py                # Telegram handlers, роутинг по chat_id
-│   ├── screen.py             # Парсинг tmux экрана
-│   └── tmux.py               # TmuxSession class
-└── restart.sh                # Перезапуск бота
-```
-
-## Архитектура
-
-```
-Claude Code                    codogram                 Telegram
-    │                               │                              │
-    │ SessionStart hook ──────────► HTTP :8787                     │
-    │                               │                              │
-    │                          SessionManager                      │
-    │                          register_session()                  │
-    │                               │                              │
-    │                          ┌────┴────┐                         │
-    │                          │         │                         │
-    │ ◄──── tmux ◄──── Permission    Watcher ─────────────────────►│
-    │                   Poller       (jsonl)                       │
-    │                          │         │                         │
-    │                          └────┬────┘                         │
-    │                               │                              │
-    │ SessionEnd hook ────────────► unregister_session()           │
+│   ├── main.py               # Bot entry point
+│   ├── config.py             # Settings + config persistence
+│   ├── session_manager.py    # ProjectManager - project state
+│   ├── history_reader.py     # Parse ~/.claude/history.jsonl
+│   ├── history_watcher.py    # Monitor history.jsonl for session changes
+│   ├── permission_poller.py  # Poll tmux for permission prompts
+│   ├── watcher.py            # Monitor session jsonl for tool calls
+│   ├── bot.py                # Telegram command handlers
+│   ├── tmux.py               # Tmux session interaction
+│   └── screen.py             # Parse tmux screen content
+└── restart.sh                # Restart bot script
 ```
 
 ## Как дебажить
@@ -72,9 +64,6 @@ tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-sent.log
 
 # State machine поллера
 tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log
-
-# Сырой экран tmux
-cat ~/dev/personal-agent/tmp/codogram-logs/poller-screen-raw.txt
 ```
 
 ### Проверить что бот запущен
@@ -83,32 +72,16 @@ cat ~/dev/personal-agent/tmp/codogram-logs/poller-screen-raw.txt
 ps aux | grep codogram
 ```
 
-### Убить все инстансы и перезапустить
+### Перезапустить бота
 
 ```bash
-pkill -f "codogram"
-./agent-tools/codogram/restart.sh
+./restart.sh
 ```
 
-### Проверить HTTP server
+### Проверить конфиг
 
 ```bash
-curl -X POST http://localhost:8787/session/register \
-  -H "Content-Type: application/json" \
-  -d '{"session_id": "test", "cwd": "/tmp", "tmux_session": "test"}'
-```
-
-### Проверить hooks
-
-```bash
-# Должен быть в ~/.claude/settings.json
-cat ~/.claude/settings.json | jq '.hooks'
-```
-
-### Проверить .config.json
-
-```bash
-cat agent-tools/codogram/.config.json
+cat .config.json | jq
 ```
 
 ## Типичные проблемы
@@ -119,62 +92,38 @@ cat agent-tools/codogram/.config.json
 2. Проверить логи: `tail -20 ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log`
 3. Перезапустить: `./restart.sh`
 
-### Permission prompts не появляются в Telegram
+### Permission prompts не появляются
 
-1. Проверить что сессия зарегистрирована: `cat .config.json | jq '.sessions'`
-2. Проверить маппинг project → chat: `cat .config.json | jq '.projects'`
-3. Проверить что chat_id правильный
-4. Проверить поллер логи: `tail -f poller-debug.log`
+1. Проверить что проект зарегистрирован: `cat .config.json | jq '.projects'`
+2. Проверить что tmux сессия найдена
+3. Подождать до 15s (polling interval)
 
-### Сообщения из Telegram не доходят до tmux
+### Сообщения не доходят до tmux
 
 1. **Бот должен быть админом группы** (Privacy Mode в Telegram)
-2. Проверить что сессия зарегистрирована с правильным chat_id
-3. После компакта session_id меняется — нужна перерегистрация
-
-### Hook не срабатывает
-
-1. Проверить что hook исполняемый: `ls -la hooks/`
-2. Проверить что jq установлен: `which jq`
-3. Проверить что HTTP server запущен: `curl localhost:8787/session/register`
-
-### Ошибка "No module named..."
-
-```bash
-cd agent-tools/codogram
-source ../../venv/bin/activate
-pip install -e .
-```
-
-## Дизайн документы
-
-- `docs/designs/2025-12-24-multi-session-architecture.md` — полный дизайн
-- `docs/plans/2025-12-24-multi-session-implementation.md` — план имплементации
-- `docs/plans/2025-12-24-telegram-display-samples.md` — примеры отображения для улучшения UI
-
-## Roadmap
-
-См. `ROADMAP.md`:
-- Multi-session in one chat (worktree support)
-- Activity indicators
-- Tool results formatting
-- Hidden tools filtering
-- Bot command menu
-- Self-hosting exception
+2. Проверить что tmux сессия жива: `tmux ls`
+3. Проверить chat_id в конфиге
 
 ## Команды для разработки
 
 ```bash
 # Активировать venv
-source ~/dev/personal-agent/venv/bin/activate
+source ~/dev/codogram/venv/bin/activate
 
 # Запустить тесты
-cd agent-tools/codogram
 python -m pytest tests/ -v
 
 # Перезапустить бота
 ./restart.sh
 
-# Посмотреть git log
+# Git log
 git log --oneline -10
 ```
+
+## Документация
+
+- `CLAUDE.md` — runtime context для Claude
+- `docs/setup.md` — установка и настройка
+- `docs/ROADMAP.md` — roadmap и backlog
+- `docs/designs/` — design documents
+- `docs/plans/` — implementation plans
