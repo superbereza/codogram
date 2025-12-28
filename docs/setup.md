@@ -1,14 +1,13 @@
-# Telegram Bridge Setup
+# Codogram Setup
 
-## Zero-Config Mode (Default)
+## Zero-Config Mode
 
-codogram now works without any Claude configuration:
+Codogram works without any Claude configuration:
 
-1. Start bot: `./restart.sh`
-2. Send `/start <project_name> <cwd>` in Telegram
-3. Done! No hooks, no settings.json edits needed.
-
-The bridge automatically discovers Claude sessions via `~/.claude/history.jsonl`.
+1. Clone repo and setup environment
+2. Start bot: `./restart.sh`
+3. Send `/start` in Telegram
+4. Done! Sessions are auto-discovered.
 
 ### How it works
 
@@ -30,22 +29,17 @@ Create `.env` file in the project root:
 ```bash
 TELEGRAM_TOKEN=your_bot_token_here
 ADMIN_IDS=123456789,987654321
-BASE_DIR=/home/user/dev/personal-agent
 ```
 
 - `TELEGRAM_TOKEN`: Get from @BotFather
 - `ADMIN_IDS`: Comma-separated list of Telegram user IDs
-- `BASE_DIR`: Path to personal-agent repository
 
 ## Installation
 
 ```bash
-# Activate venv
-cd ~/dev/personal-agent
+cd ~/dev/codogram
+python3 -m venv venv
 source venv/bin/activate
-
-# Install codogram
-cd agent-tools/codogram
 pip install -e .
 ```
 
@@ -68,7 +62,8 @@ tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log
 
 ```bash
 # In Telegram, send:
-/start myproject /path/to/project
+/start              # Auto-detect project from chat name
+/start myproject    # Explicit project name
 ```
 
 This will:
@@ -104,44 +99,3 @@ Use this ID in `ADMIN_IDS` environment variable.
 1. Bot must be admin in Telegram group (Privacy Mode)
 2. Check tmux session still running: `tmux ls`
 3. Verify chat_id matches in config
-
-## Migrating from Hooks (v1) to history.jsonl (v2)
-
-If you were using the previous version with hooks, follow these steps:
-
-### 1. Remove hooks from Claude settings
-
-Edit `~/.claude/settings.json` and remove the hooks section:
-
-```json
-{
-  "hooks": {
-    "session_start": "...",   // ← DELETE
-    "session_end": "..."      // ← DELETE
-  }
-}
-```
-
-### 2. Update bot
-
-```bash
-cd agent-tools/codogram
-git pull origin main
-./restart.sh
-```
-
-### 3. Reconnect projects
-
-Send `/start <project_name> <cwd>` in each Telegram chat to reconnect.
-The bot will auto-discover sessions from `~/.claude/history.jsonl`.
-
-### Rollback
-
-If you need to go back to hooks-based version:
-
-```bash
-git checkout with-hooks
-./restart.sh
-```
-
-Then restore the hooks in `~/.claude/settings.json`.
