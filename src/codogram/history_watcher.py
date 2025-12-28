@@ -62,6 +62,13 @@ class HistoryWatcher:
             # 1. Check if should cleanup (inactive > 30 days)
             if should_cleanup_project(project):
                 logger.info("project_cleanup", extra={"project": project.project_name, "reason": "inactive_30_days"})
+                # Cancel all thread tasks
+                for thread in project.threads.values():
+                    if thread.watcher_task:
+                        thread.watcher_task.cancel()
+                    if thread.poller_task:
+                        thread.poller_task.cancel()
+                # Cancel legacy tasks
                 if project.watcher_task:
                     project.watcher_task.cancel()
                 if project.poller_task:
@@ -69,34 +76,18 @@ class HistoryWatcher:
                 del self.project_manager.projects[project.project_name]
                 continue
 
-            # 2. Check if tmux died
-            if project.tmux_session:
-                tmux = TmuxSession(project.tmux_session, project.cwd)
-                if not tmux.exists():
-                    logger.warning("tmux_died", extra={"project": project.project_name, "tmux": project.tmux_session})
-                    try:
-                        await self.bot.send_message(
-                            project.chat_id,
-                            f"⚠️ Claude session closed (tmux died): {project.project_name}"
-                        )
-                    except Exception:
-                        pass
-                    if project.watcher_task:
-                        project.watcher_task.cancel()
-                        project.watcher_task = None
-                    if project.poller_task:
-                        project.poller_task.cancel()
-                        project.poller_task = None
-                    project.tmux_session = None
-                    project.session_id = None
+            # 2. Check thread health (tmux died detection for ALL threads)
+            for thread in list(project.threads.values()):
+                # Skip if awaiting or binding
+                if thread.awaiting_new_session:
+                    continue
+                if thread.binding_task and not thread.binding_task.done():
                     continue
 
-            # 2b. Check thread health (tmux died detection for threads)
-            for thread in list(project.threads.values()):
                 tmux_name = thread.get_tmux_session(project.project_name)
                 tmux = TmuxSession(tmux_name, project.cwd)
 
-                # Only check if thread has an active session
+                # Check if tmux died
                 if thread.session_id and not tmux.exists():
                     logger.warning(f"thread_tmux_died: project={project.project_name}, thread={thread.name}")
 
@@ -122,39 +113,7 @@ class HistoryWatcher:
                     thread.session_id = None
                     thread.jsonl_path = None
 
-            # 3. Skip if awaiting new session (after /start, before first message)
-            if project.awaiting_new_session:
-                continue
-
-            # 4. Skip if binding_task is running (poll_for_session is waiting for new session)
-            if project.binding_task and not project.binding_task.done():
-                continue
-
-            # 5. Skip projects with threads - they use thread-specific watchers
-            if project.threads:
-                continue
-
-            # 6. Check for new/changed sessions (discover new Claude sessions)
-            old_session = project.session_id
-            changed = self.project_manager.refresh_project_session(project)
-
-            if changed:
-                logger.info("session_changed", extra={
-                    "project": project.project_name,
-                    "old_session": old_session[:8] if old_session else None,
-                    "new_session": project.session_id[:8] if project.session_id else None,
-                })
-
-                # Cancel old watcher and start new one
-                if project.watcher_task:
-                    project.watcher_task.cancel()
-                    project.watcher_task = None
-
-                # Only send missed if this is a REAL session change
-                send_missed = old_session is not None
-                await self.project_manager._maybe_start_tasks(
-                    project, self.start_poller, self.start_watcher, send_missed=send_missed
-                )
+            # NOTE: Legacy project-level checks removed - all handled through threads now
 
 
 async def check_session_for_project(project: ProjectState, bot: Bot, start_poller, start_watcher) -> None:
