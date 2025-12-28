@@ -231,9 +231,43 @@ async def test_separate_queues_per_chat(queue, mock_bot):
     assert len(queue._workers) == 2
 ```
 
-## Интеграция с рефакторингом bot.py
+## Варианты интеграции
 
-Добавляется в **Фазу 3** (adapters/telegram.py):
+### Вариант A: Без рефакторинга (рекомендуется для быстрого фикса)
+
+Добавляем отдельный файл, не трогая структуру:
+
+```
+src/codogram/
+├── telegram_queue.py        # NEW — TelegramQueue + OutgoingBatch
+├── permission_poller.py     # использует telegram_queue
+├── watcher.py               # использует telegram_queue
+├── bot.py                   # без изменений
+└── main.py                  # создаёт TelegramQueue, передаёт в pollers
+```
+
+**Изменения:**
+
+1. Создать `src/codogram/telegram_queue.py`
+2. В `main.py`:
+   ```python
+   telegram_queue = TelegramQueue(bot)
+   # Передать в create_poller_task, create_watcher_task
+   ```
+3. В `permission_poller.py`:
+   ```python
+   def __init__(self, ..., telegram_queue: TelegramQueue):
+       self.telegram_queue = telegram_queue
+   ```
+
+**Плюсы:** Быстро, решает проблему сейчас
+**Минусы:** Потом нужно перенести при рефакторинге
+
+---
+
+### Вариант B: В рамках рефакторинга (Фаза 3)
+
+Добавляется в `adapters/telegram.py` вместе с другими Telegram-адаптерами:
 
 ```
 src/codogram/
@@ -242,12 +276,36 @@ src/codogram/
 │       ├── TelegramQueue        # NEW
 │       ├── OutgoingBatch        # NEW
 │       └── send_with_retry()    # существующий
+├── handlers/
+├── services/
+└── ...
 ```
 
-**Зависимости:**
+**Плюсы:** Сразу в правильном месте
+**Минусы:** Нужно сначала сделать Фазы 1-2
+
+---
+
+### Путь миграции A → B
+
+Если начали с варианта A:
+
+```bash
+# После завершения Фаз 1-2 рефакторинга:
+mv src/codogram/telegram_queue.py src/codogram/adapters/telegram_queue.py
+
+# Или объединить с adapters/telegram.py:
+# - Перенести TelegramQueue, OutgoingBatch в adapters/telegram.py
+# - Удалить telegram_queue.py
+# - Обновить импорты
+```
+
+---
+
+### Зависимости (оба варианта)
 
 ```
-permission_poller.py ──► TelegramQueue (inject через DI)
+permission_poller.py ──► TelegramQueue (inject через конструктор)
 watcher.py ───────────► TelegramQueue
 handlers/*.py ─────────► bot.send_message() напрямую
 ```
