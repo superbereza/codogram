@@ -2,6 +2,8 @@ import subprocess
 import time
 from dataclasses import dataclass
 
+from .logging_config import logger
+
 @dataclass
 class TmuxSession:
     name: str
@@ -11,6 +13,15 @@ class TmuxSession:
         """Send text to tmux session and press Enter."""
         if not text.strip():
             return  # Don't send empty messages
+
+        logger.info(f"tmux_send: session={self.name} text={repr(text[:100])}")
+
+        # Clear any pending input first (handles stuck multiline mode)
+        subprocess.run(
+            ["tmux", "send-keys", "-t", self.name, "C-c"],
+            check=True
+        )
+        time.sleep(0.05)
 
         # Use shell=False for safety (no escaping needed)
         subprocess.run(
