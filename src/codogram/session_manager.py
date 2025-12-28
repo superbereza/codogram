@@ -156,14 +156,25 @@ class ProjectManager:
             if p.chat_id is None:
                 continue
             project_data = {"chat_id": p.chat_id, "cwd": p.cwd}
+
+            # Backward compat: duplicate threads[None] to legacy fields
+            if None in p.threads:
+                main_thread = p.threads[None]
+                project_data["session_id"] = main_thread.session_id
+                project_data["jsonl_path"] = main_thread.jsonl_path
+
+            # Save all threads with full state
             if p.threads:
                 project_data["threads"] = {
-                    str(tid) if tid is not None else "null": {"name": t.name}
+                    str(tid) if tid is not None else "null": {
+                        "name": t.name,
+                        "session_id": t.session_id,
+                        "jsonl_path": t.jsonl_path,
+                    }
                     for tid, t in p.threads.items()
                 }
             projects_data[name] = project_data
         self._config["projects"] = projects_data
-        # Remove sessions - no longer needed
         self._config.pop("sessions", None)
         save_config(self._config)
 
