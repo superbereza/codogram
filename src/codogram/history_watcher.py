@@ -360,26 +360,6 @@ async def poll_for_session_thread(
 
     # Timeout
     logger.warning(f"poll_for_session_thread_timeout: project={project.project_name}, thread={thread.name}")
-
-    # Check if this might be a /resume (has multiple user messages already)
-    from .history_reader import is_likely_resume
-
-    latest_session_id = find_session_for_project(project.cwd)
-    if latest_session_id:
-        jsonl_path = compute_jsonl_path(project.cwd, latest_session_id)
-        if jsonl_path.exists() and is_likely_resume(jsonl_path):
-            try:
-                await bot.send_message(
-                    project.chat_id,
-                    "⚠️ /resume не поддерживается в мультисессионном режиме.\n"
-                    "Используйте /new для новой сессии.",
-                    message_thread_id=thread.thread_id
-                )
-            except Exception:
-                pass
-            thread.awaiting_new_session = False
-            return
-
     thread.awaiting_new_session = False
     try:
         await bot.send_message(

@@ -27,6 +27,7 @@ async def main():
         BotCommand(command="restart_session", description="Restart Claude session"),
         BotCommand(command="my_chat_id", description="Show your user ID"),
         BotCommand(command="esc", description="Send Escape to Claude"),
+        # /resume intentionally not in menu - just responds "not supported" if someone tries it
     ])
 
     # Define task starters

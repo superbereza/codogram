@@ -917,6 +917,25 @@ async def cmd_esc(message: Message):
     if tmux:
         tmux.send_key("Escape")
 
+
+@router.message(Command("resume"))
+async def cmd_resume(message: Message):
+    """Handle /resume command - not supported in multi-session mode."""
+    thread_id = message.message_thread_id
+    if thread_id is not None:
+        # In a topic - resume not supported
+        await message.answer(
+            "⚠️ /resume не поддерживается в мультисессионном режиме.\n"
+            "Используйте /session_new для новой сессии."
+        )
+    else:
+        # In private/general - just inform
+        await message.answer(
+            "⚠️ /resume не поддерживается.\n"
+            "Используйте /start для подключения к существующей сессии."
+        )
+
+
 @router.message(Command("restart_session"))
 async def cmd_restart_session(message: Message):
     if not is_admin(message.from_user.id):
