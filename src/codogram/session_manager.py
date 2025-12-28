@@ -18,36 +18,65 @@ def should_cleanup_project(project: 'ProjectState') -> bool:
     """
     import subprocess
 
-    # Don't cleanup if waiting for new session (Claude starting up)
+    # Check any thread awaiting new session
+    for thread in project.threads.values():
+        if thread.awaiting_new_session:
+            return False
+        if thread.binding_task and not thread.binding_task.done():
+            return False
+
+    # Legacy checks (for transition period)
     if project.awaiting_new_session:
         return False
-
-    # Don't cleanup if binding task is running
     if project.binding_task and not project.binding_task.done():
         return False
 
-    # If tmux session is running, don't cleanup (even if no jsonl yet)
+    # Check tmux for all threads
+    for thread in project.threads.values():
+        tmux_name = thread.get_tmux_session(project.project_name)
+        result = subprocess.run(
+            ["tmux", "has-session", "-t", tmux_name],
+            capture_output=True
+        )
+        if result.returncode == 0:
+            return False  # Tmux exists, don't cleanup
+
+    # Legacy tmux check
     if project.tmux_session:
         result = subprocess.run(
             ["tmux", "has-session", "-t", project.tmux_session],
             capture_output=True
         )
         if result.returncode == 0:
-            return False  # Tmux exists, don't cleanup
+            return False
 
-    if not project.jsonl_path:
-        return True  # No jsonl and no tmux = cleanup
+    # Check jsonl mtime for any thread
+    newest_mtime = 0
+    for thread in project.threads.values():
+        if thread.jsonl_path:
+            jsonl_path = Path(thread.jsonl_path)
+            if jsonl_path.exists():
+                try:
+                    mtime = jsonl_path.stat().st_mtime
+                    newest_mtime = max(newest_mtime, mtime)
+                except Exception:
+                    pass
 
-    jsonl_path = Path(project.jsonl_path)
-    if not jsonl_path.exists():
-        return True  # File deleted
+    # Legacy jsonl check
+    if project.jsonl_path:
+        jsonl_path = Path(project.jsonl_path)
+        if jsonl_path.exists():
+            try:
+                mtime = jsonl_path.stat().st_mtime
+                newest_mtime = max(newest_mtime, mtime)
+            except Exception:
+                pass
 
-    try:
-        mtime = jsonl_path.stat().st_mtime
-        age_days = (time.time() - mtime) / 86400
-        return age_days > 30
-    except Exception:
-        return True  # Error = cleanup
+    if newest_mtime == 0:
+        return True  # No jsonl anywhere = cleanup
+
+    age_days = (time.time() - newest_mtime) / 86400
+    return age_days > 30
 
 
 @dataclass
