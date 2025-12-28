@@ -126,14 +126,27 @@ class ProjectManager:
                 # New format: dict with chat_id and cwd
                 project.chat_id = data.get("chat_id")
                 project.cwd = data.get("cwd")
-                # Load threads
+
+                # Load explicit threads first
                 threads_data = data.get("threads", {})
                 for tid_str, thread_data in threads_data.items():
                     tid = None if tid_str == "null" else int(tid_str)
                     project.threads[tid] = ThreadInfo(
                         thread_id=tid,
-                        name=thread_data.get("name", "main")
+                        name=thread_data.get("name", "main"),
+                        session_id=thread_data.get("session_id"),
+                        jsonl_path=thread_data.get("jsonl_path"),
                     )
+
+                # Migrate legacy → threads[None] if not already present
+                if None not in project.threads and data.get("cwd"):
+                    project.threads[None] = ThreadInfo(
+                        thread_id=None,
+                        name="main",
+                        session_id=data.get("session_id"),
+                        jsonl_path=data.get("jsonl_path"),
+                    )
+
             self.projects[project_name] = project
 
     def _save(self) -> None:
