@@ -279,16 +279,8 @@ class ProjectManager:
 
     async def _maybe_start_tasks(self, project: ProjectState, start_poller, start_watcher,
                                  send_missed: bool = False) -> None:
-        """Start tasks if all required data is present."""
-        # Poller: needs tmux_session + chat_id
-        if project.tmux_session and project.chat_id:
-            if not project.poller_task or project.poller_task.done():
-                project.poller_task = await start_poller(project)
-
-        # Watcher: needs jsonl_path + chat_id
-        if project.jsonl_path and project.chat_id:
-            if not project.watcher_task or project.watcher_task.done():
-                project.watcher_task = await start_watcher(project, send_missed)
+        """DEPRECATED: Tasks are now started per-thread in poll_for_session_thread."""
+        logger.warning("_maybe_start_tasks called but is deprecated - tasks now handled per-thread")
 
     async def restore_projects(self, bot, start_poller, start_watcher) -> None:
         """Restore sessions from history.jsonl after bot restart."""

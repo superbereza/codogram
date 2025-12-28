@@ -348,10 +348,14 @@ async def launch_claude_new(message: Message, project: ProjectState, start_polle
     """Launch Claude in tmux session using new ProjectState."""
     import subprocess
 
+    # Ensure main thread exists
+    thread = project.get_or_create_thread(None, "main")
+
     convention = f"claude-{project.project_name}"
 
-    # Block HistoryWatcher from grabbing old session during startup
-    project.awaiting_new_session = True
+    # Block session discovery during startup
+    thread.awaiting_new_session = True
+    project.awaiting_new_session = True  # Also set legacy for backward compat
 
     # Wait before showing anything
     await asyncio.sleep(3.0)
