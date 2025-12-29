@@ -118,6 +118,84 @@ class HistoryWatcher:
 
             # NOTE: Legacy project-level checks removed - all handled through threads now
 
+    async def _bind_awaiting_threads(self, project: ProjectState):
+        """Find new sessions and bind to awaiting threads.
+
+        NOTE: Binds only ONE thread per cycle to prevent race condition where
+        multiple awaiting threads bind to the same session.
+        """
+        from .history_reader import find_session_for_project
+
+        # Get latest session once
+        new_session = find_session_for_project(project.cwd)
+        if not new_session:
+            return
+
+        # Find first awaiting thread that can bind to this session
+        for thread in project.threads.values():
+            if not thread.awaiting_new_session:
+                continue
+            if thread.session_id == new_session:
+                continue  # Already has this session
+
+            # Bind ONE thread and exit - next cycle will handle others
+            await self._bind_thread_to_session(project, thread, new_session)
+            return
+
+    async def _bind_thread_to_session(
+        self,
+        project: ProjectState,
+        thread: ThreadInfo,
+        new_session_id: str
+    ):
+        """Bind thread to new session."""
+        from .history_reader import compute_jsonl_path
+
+        logger.info(
+            f"session_bound: project={project.project_name}, thread={thread.name}, "
+            f"old={thread.session_id[:8] if thread.session_id else None}, "
+            f"new={new_session_id[:8]}"
+        )
+
+        # Cancel old watcher if exists
+        if thread.watcher_task:
+            thread.watcher_task.cancel()
+            thread.watcher_task = None
+
+        # Update binding
+        thread.session_id = new_session_id
+        thread.jsonl_path = str(compute_jsonl_path(project.cwd, new_session_id))
+        thread.awaiting_new_session = False
+
+        # Start new watcher
+        thread.watcher_task = asyncio.create_task(
+            watch_thread_jsonl(self.bot, project, thread, self.telegram_queue)
+        )
+
+        # Restart permission poller
+        if thread.poller_task:
+            thread.poller_task.cancel()
+        from .permission_poller import create_poller_task_for_thread
+        thread.poller_task = await create_poller_task_for_thread(
+            self.bot, project, thread, self.telegram_queue
+        )
+
+        # Notify user
+        from .telegram_queue import OutgoingBatch
+        try:
+            batch = OutgoingBatch(
+                chat_id=project.chat_id,
+                thread_id=thread.thread_id,
+                messages=[{"text": "✅ Новая сессия создана"}],
+            )
+            # Fire-and-forget notification
+            await self.telegram_queue.enqueue_nowait(batch)
+        except Exception:
+            pass
+
+        # Save config
+        self.project_manager._save()
+
 
 BINDING_TIMEOUT = 300  # 5 minutes
 BINDING_INTERVAL = 0.5  # seconds
