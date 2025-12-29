@@ -55,6 +55,12 @@
 - Валидация project name (только alphanumeric, dash, underscore)
 - Unified logging через python logging module
 
+## Bugs
+
+### Thread session mixup
+При создании новой сессии в одном топике, другие топики теряют привязку к своей сессии.
+- См. [docs/bugs/2025-12-29-thread-session-mixup.md](bugs/2025-12-29-thread-session-mixup.md)
+
 ## Backlog
 
 ### Auto-accept mode
@@ -73,6 +79,12 @@
 Голосовые сообщения через Whisper transcription:
 - Используем существующий код из bz-merch-assistant
 - `ai_bot_core/services/whisper.py`
+
+### Pin startup message
+Пинить сообщение при запуске сессии:
+- `🚀 Claude запущен в claude-codogram-sublime`
+- `Подключиться: tmux attach -t claude-codogram-sublime`
+- Анпинить предыдущее при рестарте
 
 ### Session switching UI
 Улучшения для multi-session:
