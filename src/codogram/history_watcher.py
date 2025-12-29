@@ -1,9 +1,14 @@
 """Periodic watcher for history.jsonl changes."""
 import asyncio
 import time
+from typing import TYPE_CHECKING
+
 from aiogram import Bot
 
 from .session_manager import project_manager, ProjectState, ThreadInfo
+
+if TYPE_CHECKING:
+    from .telegram_queue import TelegramQueue
 from .history_reader import find_session_for_project
 from .logging_config import logger
 from .tmux import TmuxSession
@@ -14,10 +19,11 @@ REFRESH_INTERVAL = 15  # seconds
 class HistoryWatcher:
     """Watches history.jsonl for session changes."""
 
-    def __init__(self, bot: Bot, start_poller, start_watcher):
+    def __init__(self, bot: Bot, start_poller, start_watcher, telegram_queue: "TelegramQueue"):
         self.bot = bot
         self.start_poller = start_poller
         self.start_watcher = start_watcher
+        self.telegram_queue = telegram_queue
         self.project_manager = project_manager
         self._last_mtime = 0
         self._task: asyncio.Task | None = None
@@ -94,13 +100,15 @@ class HistoryWatcher:
                         thread.poller_task.cancel()
                         thread.poller_task = None
 
-                    # Notify user
+                    # Notify user through queue
+                    from .telegram_queue import OutgoingBatch
                     try:
-                        await self.bot.send_message(
-                            project.chat_id,
-                            f"⚠️ Claude session closed: {thread.name}",
-                            message_thread_id=thread.thread_id
+                        batch = OutgoingBatch(
+                            chat_id=project.chat_id,
+                            thread_id=thread.thread_id,
+                            messages=[{"text": f"⚠️ Claude session closed: {thread.name}"}],
                         )
+                        await self.telegram_queue.enqueue_nowait(batch)
                     except Exception:
                         pass
 
@@ -115,9 +123,10 @@ BINDING_TIMEOUT = 300  # 5 minutes
 BINDING_INTERVAL = 0.5  # seconds
 
 
-async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo):
-    """Watch jsonl for a specific thread and send messages to that thread."""
-    from .watcher import JsonlWatcher, send_entry_to_telegram
+async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo, telegram_queue: "TelegramQueue"):
+    """Watch jsonl for a specific thread and send messages through queue."""
+    from .watcher import JsonlWatcher, _entry_to_messages
+    from .telegram_queue import OutgoingBatch
     from pathlib import Path
 
     if not thread.jsonl_path:
@@ -128,12 +137,14 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
     try:
         async for entry in watcher.watch():
             try:
-                await send_entry_to_telegram(
-                    bot,
-                    project.chat_id,
-                    entry,
-                    message_thread_id=thread.thread_id
-                )
+                messages = _entry_to_messages(entry)
+                if messages:
+                    batch = OutgoingBatch(
+                        chat_id=project.chat_id,
+                        thread_id=thread.thread_id,
+                        messages=messages,
+                    )
+                    await telegram_queue.enqueue_nowait(batch)
             except Exception as e:
                 logger.error("watch_thread_error", extra={"error": str(e)})
     except asyncio.CancelledError:
@@ -147,6 +158,7 @@ async def poll_for_session_thread(
     bot: Bot,
     start_poller,
     start_watcher,
+    telegram_queue: "TelegramQueue",
 ) -> None:
     """Poll for a session that matches thread.last_sent_message.
 
@@ -192,7 +204,7 @@ async def poll_for_session_thread(
                 # Start thread-specific watcher
                 if not thread.watcher_task or thread.watcher_task.done():
                     thread.watcher_task = asyncio.create_task(
-                        watch_thread_jsonl(bot, project, thread)
+                        watch_thread_jsonl(bot, project, thread, telegram_queue)
                     )
 
                 # Start thread-specific permission poller
@@ -212,11 +224,13 @@ async def poll_for_session_thread(
     logger.warning(f"poll_for_session_thread_timeout: project={project.project_name}, thread={thread.name}")
     thread.awaiting_new_session = False
     try:
-        await bot.send_message(
-            project.chat_id,
-            "⚠️ Сессия не обнаружена. Проверьте что Claude запущен.",
-            message_thread_id=thread.thread_id
+        from .telegram_queue import OutgoingBatch
+        batch = OutgoingBatch(
+            chat_id=project.chat_id,
+            thread_id=thread.thread_id,
+            messages=[{"text": "⚠️ Сессия не обнаружена. Проверьте что Claude запущен."}],
         )
+        await telegram_queue.enqueue_nowait(batch)
     except Exception:
         pass
 
@@ -250,8 +264,8 @@ async def check_session_for_thread(
             thread.watcher_task = None
 
 
-async def create_history_watcher(bot: Bot, start_poller, start_watcher) -> HistoryWatcher:
+async def create_history_watcher(bot: Bot, start_poller, start_watcher, telegram_queue: "TelegramQueue") -> HistoryWatcher:
     """Create and start history watcher."""
-    watcher = HistoryWatcher(bot, start_poller, start_watcher)
+    watcher = HistoryWatcher(bot, start_poller, start_watcher, telegram_queue)
     await watcher.start()
     return watcher
