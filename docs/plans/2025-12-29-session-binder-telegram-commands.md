@@ -12,40 +12,60 @@
 
 ---
 
-## Task 1: Add awaiting_new_session field to ThreadInfo
+## Task 1: ~~Add awaiting_new_session field to ThreadInfo~~ SKIP
+
+> **Already implemented.** Field `awaiting_new_session: bool = False` exists in `ThreadInfo` at `session_manager.py:99`.
+
+---
+
+## Task 1b: Persist awaiting_new_session in config
 
 **Files:**
-- Modify: `src/codogram/session_manager.py:89-95`
-- Test: manual verification
+- Modify: `src/codogram/session_manager.py`
 
-**Step 1: Add field to ThreadInfo dataclass**
+**Why:** If bot restarts while thread is awaiting new session, the flag is lost and thread becomes stuck.
 
-In `src/codogram/session_manager.py`, find the `ThreadInfo` class and add `awaiting_new_session` field:
+**Step 1: Update _save() to include awaiting_new_session**
+
+Find the thread serialization in `_save()` method and add the field:
 
 ```python
-@dataclass
-class ThreadInfo:
-    thread_id: int | None  # None for main thread
-    name: str
-    session_id: str | None = None
-    jsonl_path: str | None = None
-    awaiting_new_session: bool = False  # NEW FIELD
-    last_sent_message: str | None = None
-    watcher_task: asyncio.Task | None = None
-    poller_task: asyncio.Task | None = None
-    binding_task: asyncio.Task | None = None
+if p.threads:
+    project_data["threads"] = {
+        str(tid) if tid is not None else "null": {
+            "name": t.name,
+            "session_id": t.session_id,
+            "jsonl_path": t.jsonl_path,
+            "awaiting_new_session": t.awaiting_new_session,  # ADD THIS
+        }
+        for tid, t in p.threads.items()
+    }
 ```
 
-**Step 2: Verify syntax**
+**Step 2: Update _load_projects() to read awaiting_new_session**
+
+Find where ThreadInfo is created in `_load_projects()` and add:
+
+```python
+project.threads[tid] = ThreadInfo(
+    thread_id=tid,
+    name=thread_data.get("name", "main"),
+    session_id=thread_data.get("session_id"),
+    jsonl_path=thread_data.get("jsonl_path"),
+    awaiting_new_session=thread_data.get("awaiting_new_session", False),  # ADD THIS
+)
+```
+
+**Step 3: Verify syntax**
 
 Run: `python -m py_compile src/codogram/session_manager.py && echo "OK"`
 Expected: OK
 
-**Step 3: Commit**
+**Step 4: Commit**
 
 ```bash
 git add src/codogram/session_manager.py
-git commit -m "feat(session_manager): add awaiting_new_session field to ThreadInfo"
+git commit -m "fix(session_manager): persist awaiting_new_session flag"
 ```
 
 ---
@@ -87,10 +107,9 @@ async def cmd_new(message: Message):
         await message.answer("tmux сессия не найдена. Запусти Claude в терминале.")
         return
 
-    # Cancel current watcher - will be restarted after binding
-    if thread.watcher_task:
-        thread.watcher_task.cancel()
-        thread.watcher_task = None
+    # NOTE: Do NOT cancel watcher here - let it continue watching old session.
+    # _bind_thread_to_session will cancel it when new session is found.
+    # This prevents thread becoming "dead" if user cancels /new in Claude.
 
     # Mark thread as awaiting new session
     thread.awaiting_new_session = True
@@ -151,10 +170,7 @@ async def cmd_clear(message: Message):
         await message.answer("tmux сессия не найдена. Запусти Claude в терминале.")
         return
 
-    # Cancel current watcher
-    if thread.watcher_task:
-        thread.watcher_task.cancel()
-        thread.watcher_task = None
+    # NOTE: Do NOT cancel watcher here - same reason as cmd_new
 
     # Mark thread as awaiting new session
     thread.awaiting_new_session = True
@@ -193,18 +209,28 @@ Add to `HistoryWatcher` class after `_check_for_changes`:
 
 ```python
 async def _bind_awaiting_threads(self, project: ProjectState):
-    """Find new sessions and bind to awaiting threads."""
-    from .history_reader import find_session_for_project, compute_jsonl_path
+    """Find new sessions and bind to awaiting threads.
 
+    NOTE: Binds only ONE thread per cycle to prevent race condition where
+    multiple awaiting threads bind to the same session.
+    """
+    from .history_reader import find_session_for_project
+
+    # Get latest session once
+    new_session = find_session_for_project(project.cwd)
+    if not new_session:
+        return
+
+    # Find first awaiting thread that can bind to this session
     for thread in project.threads.values():
         if not thread.awaiting_new_session:
             continue
+        if thread.session_id == new_session:
+            continue  # Already has this session
 
-        # Find latest session for this project
-        new_session = find_session_for_project(project.cwd)
-
-        if new_session and new_session != thread.session_id:
-            await self._bind_thread_to_session(project, thread, new_session)
+        # Bind ONE thread and exit - next cycle will handle others
+        await self._bind_thread_to_session(project, thread, new_session)
+        return
 
 
 async def _bind_thread_to_session(
@@ -253,7 +279,8 @@ async def _bind_thread_to_session(
             thread_id=thread.thread_id,
             messages=[{"text": "✅ Новая сессия создана"}],
         )
-        await self.telegram_queue.enqueue_nowait(batch)
+        # enqueue_nowait is sync, no await needed
+        self.telegram_queue.enqueue_nowait(batch)
     except Exception:
         pass
 
@@ -341,7 +368,44 @@ git commit -m "feat(main): register /new and /clear commands"
 
 ---
 
-## Task 7: Manual testing
+## Task 7: Remove dead code check_session_for_thread
+
+**Files:**
+- Modify: `src/codogram/history_watcher.py`
+- Modify: `tests/test_history_watcher.py`
+
+**Step 1: Remove check_session_for_thread function**
+
+Delete `check_session_for_thread` function from `history_watcher.py` (approximately lines 238-265).
+
+**Step 2: Remove unused import in bot.py (if exists)**
+
+Check if `check_session_for_thread` is imported in `bot.py`. If so, remove the import.
+
+**Step 3: Update tests**
+
+In `tests/test_history_watcher.py`, remove or update any tests for `check_session_for_thread`.
+
+**Step 4: Verify syntax**
+
+Run: `python -m py_compile src/codogram/history_watcher.py && python -m py_compile src/codogram/bot.py && echo "OK"`
+Expected: OK
+
+**Step 5: Run tests**
+
+Run: `pytest tests/test_history_watcher.py -v`
+Expected: All tests pass
+
+**Step 6: Commit**
+
+```bash
+git add src/codogram/history_watcher.py src/codogram/bot.py tests/test_history_watcher.py
+git commit -m "refactor(history_watcher): remove unused check_session_for_thread"
+```
+
+---
+
+## Task 8: Manual testing
 
 **Step 1: Restart bot**
 
@@ -391,13 +455,18 @@ See: docs/designs/2025-12-29-session-binder-design.md"
 
 ## Summary
 
-**Total tasks:** 7
+**Total tasks:** 9 (Task 1 skipped - already implemented)
 **Key changes:**
-1. `session_manager.py` - `awaiting_new_session` field
+1. ~~`session_manager.py` - `awaiting_new_session` field~~ (already exists)
+1b. `session_manager.py` - persist `awaiting_new_session` in `_save/_load`
 2. `bot.py` - `/new` and `/clear` command handlers
-3. `history_watcher.py` - `_bind_awaiting_threads` method
+3. `history_watcher.py` - `_bind_awaiting_threads` method + remove dead code
 4. `main.py` - register new commands
 
 **Testing:**
 - Manual testing of /new and /clear
 - Verify session mixup bug is fixed
+
+**Known Limitations:**
+- 15-sec binding delay: Tool calls during `/new` → session bound may be delayed (HistoryWatcher polls every 15 sec). No data loss, just latency.
+- If user cancels /new in Claude terminal, thread continues with old session (graceful degradation).
