@@ -220,13 +220,12 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
     try:
         async for entry in watcher.watch():
             try:
-                # Extract message ID for tracking
-                msg_id = entry.get("message", {}).get("id", "unknown")
-
                 messages = _entry_to_messages(entry)
                 if messages:
                     text_preview = messages[0].get("text", "")[:40].replace("\n", " ")
-                    logger.info(f"message_read: msg_id={msg_id} thread={thread.name} preview='{text_preview}'")
+                    # Use hash of preview as tracking ID
+                    msg_id = hash(text_preview) & 0xFFFFFF
+                    logger.info(f"message_read: msg_id={msg_id:06x} thread={thread.name} preview='{text_preview}'")
 
                     batch = OutgoingBatch(
                         chat_id=project.chat_id,
@@ -234,7 +233,7 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
                         messages=messages,
                     )
                     telegram_ids = await telegram_queue.enqueue(batch)
-                    logger.info(f"message_sent: msg_id={msg_id} thread={thread.name} telegram_ids={telegram_ids}")
+                    logger.info(f"message_sent: msg_id={msg_id:06x} thread={thread.name} telegram_ids={telegram_ids}")
             except Exception as e:
                 logger.error(f"watch_thread_error: {e}")
     except asyncio.CancelledError:

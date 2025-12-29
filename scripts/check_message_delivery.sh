@@ -20,8 +20,8 @@ echo "Log file: $LOG_FILE"
 echo ""
 
 # Extract message IDs
-READ_IDS=$(grep "message_read:" "$LOG_FILE" | sed -E 's/.*msg_id=([^ ]+).*/\1/' | sort)
-SENT_IDS=$(grep "message_sent:" "$LOG_FILE" | sed -E 's/.*msg_id=([^ ]+).*/\1/' | sort)
+READ_IDS=$(grep "message_read:" "$LOG_FILE" | sed -E 's/.*msg_id=([0-9a-f]+).*/\1/' | sort)
+SENT_IDS=$(grep "message_sent:" "$LOG_FILE" | sed -E 's/.*msg_id=([0-9a-f]+).*/\1/' | sort)
 
 READ_COUNT=$(echo "$READ_IDS" | grep -c .)
 SENT_COUNT=$(echo "$SENT_IDS" | grep -c .)
