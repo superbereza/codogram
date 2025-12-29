@@ -249,31 +249,26 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                 if elapsed >= DEBOUNCE_TIME:
                     logger.debug(f"Thread poller {thread.name} DEBOUNCING→SHOWING")
                     try:
-                        content_msg_ids = []
-
+                        # Build batch of body messages
+                        body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
                             for chunk in chunk_message(body_text):
-                                try:
-                                    msg = await bot.send_message(
-                                        chat_id, chunk, parse_mode="Markdown",
-                                        message_thread_id=thread_id
-                                    )
-                                except Exception:
-                                    msg = await bot.send_message(
-                                        chat_id, chunk, message_thread_id=thread_id
-                                    )
-                                content_msg_ids.append(msg.message_id)
+                                body_messages.append({"text": chunk, "parse_mode": "Markdown"})
 
+                        # Options as text
                         options_text = "\n".join(parsed.options)
-                        try:
-                            opts_msg = await bot.send_message(
-                                chat_id, options_text, message_thread_id=thread_id
-                            )
-                            content_msg_ids.append(opts_msg.message_id)
-                        except Exception:
-                            pass
+                        body_messages.append({"text": options_text})
 
+                        # Send body through queue, get IDs for cleanup
+                        batch = OutgoingBatch(
+                            chat_id=chat_id,
+                            thread_id=thread_id,
+                            messages=body_messages,
+                        )
+                        content_msg_ids = await telegram_queue.enqueue(batch)
+
+                        # Keyboard sent directly (need to track for button handler)
                         kb = permission_keyboard(parsed.options, tmux_name)
                         kb_msg = await bot.send_message(
                             chat_id, "👆", reply_markup=kb, message_thread_id=thread_id
@@ -282,30 +277,16 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
 
                         state = PollerState.SHOWING
                         last_body = parsed.body
+                        logger.debug(f"Thread poller {thread.name} SHOWING: sent {len(parsed.options)} options, kb_msg={kb_msg.message_id}")
                     except Exception as e:
                         logger.warning(f"Thread poller {thread.name}: send error: {e}")
-                        # Cleanup already-sent messages to avoid orphans
-                        for msg_id in content_msg_ids:
-                            try:
-                                await bot.delete_message(chat_id, msg_id)
-                            except Exception:
-                                pass
-                        content_msg_ids = []
-                        # Handle flood control - wait before retry
-                        if "retry after" in str(e).lower():
-                            try:
-                                retry_after = int(str(e).split("retry after")[1].split()[0])
-                                logger.info(f"Thread poller {thread.name}: flood control, waiting {retry_after}s")
-                                await asyncio.sleep(retry_after)
-                            except (ValueError, IndexError):
-                                await asyncio.sleep(5)  # Default backoff
                         state = PollerState.IDLE
 
         elif state == PollerState.SHOWING:
             if not is_permission:
                 logger.debug(f"Thread poller {thread.name} SHOWING→IDLE: cleanup")
                 if kb_msg and kb_msg.message_id in permission_messages:
-                    for msg_id in content_msg_ids:
+                    for msg_id in permission_messages[kb_msg.message_id]:
                         try:
                             await bot.delete_message(chat_id, msg_id)
                         except Exception:
@@ -324,42 +305,34 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
             elif parsed.options != last_options or parsed.body != last_body:
                 logger.debug(f"Thread poller {thread.name} SHOWING: resending")
                 try:
-                    for msg_id in content_msg_ids:
-                        try:
-                            await bot.delete_message(chat_id, msg_id)
-                        except Exception:
-                            pass
-                    if kb_msg:
+                    # Delete old messages
+                    if kb_msg and kb_msg.message_id in permission_messages:
+                        for msg_id in permission_messages[kb_msg.message_id]:
+                            try:
+                                await bot.delete_message(chat_id, msg_id)
+                            except Exception:
+                                pass
                         try:
                             await bot.delete_message(chat_id, kb_msg.message_id)
                         except Exception:
                             pass
                         permission_messages.pop(kb_msg.message_id, None)
 
-                    content_msg_ids = []
+                    # Build new body messages
+                    body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
                         for chunk in chunk_message(body_text):
-                            try:
-                                msg = await bot.send_message(
-                                    chat_id, chunk, parse_mode="Markdown",
-                                    message_thread_id=thread_id
-                                )
-                            except Exception:
-                                msg = await bot.send_message(
-                                    chat_id, chunk, message_thread_id=thread_id
-                                )
-                            content_msg_ids.append(msg.message_id)
+                            body_messages.append({"text": chunk, "parse_mode": "Markdown"})
 
                     options_text = "\n".join(parsed.options)
-                    try:
-                        opts_msg = await bot.send_message(
-                            chat_id, options_text, message_thread_id=thread_id
-                        )
-                        content_msg_ids.append(opts_msg.message_id)
-                    except Exception:
-                        pass
+                    body_messages.append({"text": options_text})
 
+                    # Send through queue
+                    batch = OutgoingBatch(chat_id=chat_id, thread_id=thread_id, messages=body_messages)
+                    content_msg_ids = await telegram_queue.enqueue(batch)
+
+                    # Keyboard directly
                     kb = permission_keyboard(parsed.options, tmux_name)
                     kb_msg = await bot.send_message(
                         chat_id, "👆", reply_markup=kb, message_thread_id=thread_id
@@ -370,18 +343,3 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                     last_body = parsed.body
                 except Exception as e:
                     logger.warning(f"Thread poller {thread.name}: resend error: {e}")
-                    # Cleanup already-sent messages
-                    for msg_id in content_msg_ids:
-                        try:
-                            await bot.delete_message(chat_id, msg_id)
-                        except Exception:
-                            pass
-                    content_msg_ids = []
-                    # Handle flood control
-                    if "retry after" in str(e).lower():
-                        try:
-                            retry_after = int(str(e).split("retry after")[1].split()[0])
-                            logger.info(f"Thread poller {thread.name}: flood control, waiting {retry_after}s")
-                            await asyncio.sleep(retry_after)
-                        except (ValueError, IndexError):
-                            await asyncio.sleep(5)
