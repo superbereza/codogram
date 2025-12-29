@@ -22,7 +22,7 @@ class OutgoingBatch:
 class _QueueItem:
     """Internal queue item with result future."""
     batch: OutgoingBatch
-    result: asyncio.Future  # Future[list[int]]
+    result: asyncio.Future[list[int]] | None  # None for fire-and-forget
 
 
 class TelegramQueue:
@@ -43,7 +43,7 @@ class TelegramQueue:
         Use this when you need to track sent message IDs (e.g., for cleanup).
         """
         chat_id = batch.chat_id
-        result_future: asyncio.Future[list[int]] = asyncio.get_event_loop().create_future()
+        result_future: asyncio.Future[list[int]] = asyncio.get_running_loop().create_future()
         item = _QueueItem(batch=batch, result=result_future)
 
         async with self._locks[chat_id]:
@@ -59,15 +59,13 @@ class TelegramQueue:
         Use this when you don't need message IDs (e.g., watcher notifications).
         """
         chat_id = batch.chat_id
-        result_future: asyncio.Future[list[int]] = asyncio.get_event_loop().create_future()
-        item = _QueueItem(batch=batch, result=result_future)
+        item = _QueueItem(batch=batch, result=None)  # None for fire-and-forget
 
         async with self._locks[chat_id]:
             if chat_id not in self._workers or self._workers[chat_id].done():
                 self._workers[chat_id] = asyncio.create_task(self._worker(chat_id))
 
         await self._queues[chat_id].put(item)
-        # Don't await result - fire and forget
 
     async def _worker(self, chat_id: int) -> None:
         """Process queue FIFO. Exits after 5 min idle."""
@@ -82,10 +80,10 @@ class TelegramQueue:
 
             try:
                 sent_ids = await self._send_batch(item.batch)
-                if not item.result.done():
+                if item.result is not None and not item.result.done():
                     item.result.set_result(sent_ids)
             except Exception as e:
-                if not item.result.done():
+                if item.result is not None and not item.result.done():
                     item.result.set_exception(e)
             finally:
                 queue.task_done()
