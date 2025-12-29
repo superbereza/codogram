@@ -316,35 +316,6 @@ async def poll_for_session_thread(
         pass
 
 
-async def check_session_for_thread(
-    project: ProjectState,
-    thread: ThreadInfo,
-    bot: Bot,
-    start_poller,
-    start_watcher,
-) -> None:
-    """Check if session changed for a thread."""
-    if not project.cwd:
-        return
-
-    old_session = thread.session_id
-    new_session_id = find_session_for_project(project.cwd)
-
-    if new_session_id and new_session_id != old_session:
-        # Session changed - user did /new or /compact
-        logger.info(
-            f"session_changed_thread: project={project.project_name}, thread={thread.name}, "
-            f"old={old_session[:8] if old_session else None}, new={new_session_id[:8]}"
-        )
-
-        # Reset and wait for binding
-        thread.session_id = None
-        thread.jsonl_path = None
-        if thread.watcher_task:
-            thread.watcher_task.cancel()
-            thread.watcher_task = None
-
-
 async def create_history_watcher(bot: Bot, start_poller, start_watcher, telegram_queue: "TelegramQueue") -> HistoryWatcher:
     """Create and start history watcher."""
     watcher = HistoryWatcher(bot, start_poller, start_watcher, telegram_queue)

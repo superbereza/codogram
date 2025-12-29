@@ -10,35 +10,6 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 @pytest.mark.asyncio
-async def test_check_session_for_thread_detects_change():
-    """Test that check_session_for_thread detects session changes."""
-    from codogram.history_watcher import check_session_for_thread
-    from codogram.session_manager import ThreadInfo
-
-    bot = MagicMock()
-    start_poller = AsyncMock(return_value=MagicMock())
-    start_watcher = AsyncMock(return_value=MagicMock())
-
-    # Mock project
-    mock_project = MagicMock()
-    mock_project.chat_id = 123
-    mock_project.cwd = "/test/path"
-    mock_project.project_name = "test-project"
-
-    # Create a real thread with old session
-    thread = ThreadInfo(thread_id=None, name="main")
-    thread.session_id = "old-session"
-    thread.watcher_task = None
-
-    # Patch find_session_for_project to return a new session
-    with patch('codogram.history_watcher.find_session_for_project', return_value="new-session-id"):
-        await check_session_for_thread(mock_project, thread, bot, start_poller, start_watcher)
-
-        # Session should have been cleared (waiting for new binding)
-        assert thread.session_id is None
-        assert thread.jsonl_path is None
-
-@pytest.mark.asyncio
 async def test_history_watcher_checks_tmux_and_sessions():
     """Test that HistoryWatcher checks tmux health for threads."""
     from codogram.history_watcher import HistoryWatcher
