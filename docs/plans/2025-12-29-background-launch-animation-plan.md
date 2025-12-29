@@ -8,13 +8,26 @@
 
 **Tech Stack:** Python 3.11+, asyncio, aiogram 3.x, pytest
 
+**Design:** [docs/designs/2025-12-29-background-launch-animation.md](../designs/2025-12-29-background-launch-animation.md)
+
 ---
 
-## Task 1: Add launch_task field to ThreadInfo
+## Task 1: TelegramQueue with OutgoingBatch ✅ DONE
+
+Already implemented in earlier session. See `src/codogram/telegram_queue.py`.
+
+---
+
+## Task 2: Add EditBatch to TelegramQueue ✅ DONE
+
+Already implemented. Commit: `69abc7a feat(telegram_queue): add EditBatch support for message editing`
+
+---
+
+## Task 3: Add launch_task field to ThreadInfo
 
 **Files:**
 - Modify: `src/codogram/session_manager.py`
-- Test: `tests/test_session_manager.py`
 
 **Step 1: Add launch_task field**
 
@@ -35,21 +48,17 @@ class ThreadInfo:
     launch_task: asyncio.Task | None = None  # NEW
 ```
 
-**Step 2: Update _to_dict to exclude launch_task**
-
-In ThreadInfo._to_dict(), ensure launch_task is not serialized (it's already not included since only specific fields are serialized).
-
-**Step 3: Verify syntax**
+**Step 2: Verify syntax**
 
 Run: `python3 -m py_compile src/codogram/session_manager.py`
 Expected: No errors
 
-**Step 4: Run existing tests**
+**Step 3: Run existing tests**
 
 Run: `pytest tests/test_session_manager.py -v`
 Expected: PASS
 
-**Step 5: Commit**
+**Step 4: Commit**
 
 ```bash
 git add src/codogram/session_manager.py
@@ -58,11 +67,11 @@ git commit -m "feat(session_manager): add launch_task field to ThreadInfo"
 
 ---
 
-## Task 2: Create launch animation module
+## Task 4: Create launch_animation module with FACES
 
 **Files:**
 - Create: `src/codogram/launch_animation.py`
-- Test: `tests/test_launch_animation.py`
+- Create: `tests/test_launch_animation.py`
 
 **Step 1: Write test for FACES constant**
 
@@ -133,16 +142,16 @@ git commit -m "feat(launch_animation): add faces constants"
 
 ---
 
-## Task 3: Implement launch_with_animation function
+## Task 5: Implement launch_with_animation function
 
 **Files:**
 - Modify: `src/codogram/launch_animation.py`
 
 **Step 1: Add launch_with_animation function**
 
-```python
-# src/codogram/launch_animation.py (append)
+Append to `src/codogram/launch_animation.py`:
 
+```python
 async def launch_with_animation(
     bot: Bot,
     chat_id: int,
@@ -274,65 +283,45 @@ git commit -m "feat(launch_animation): implement launch_with_animation"
 
 ---
 
-## Task 4: Update bot.py to use background launch
+## Task 6: Update on_start_launch_claude to use background launch
 
 **Files:**
 - Modify: `src/codogram/bot.py`
 
 **Step 1: Find and update on_start_launch_claude callback**
 
-Find the callback handler for `start:launch_claude` and update it:
+Find the callback handler for `start:launch_claude` and update it to:
+1. Get or create thread
+2. Check if launch already in progress
+3. Launch in background task
 
+Key changes:
 ```python
-@router.callback_query(F.data == "start:launch_claude")
-async def on_start_launch_claude(callback: CallbackQuery):
-    """Handle launch Claude button click."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
+# Get or create main thread
+thread = project.get_or_create_thread(None, "main")
 
-    chat_id = callback.message.chat.id
-    state = _start_state.get(chat_id)
-    if not state or state.get("state") != "awaiting_launch_confirm":
-        await callback.answer("Session expired")
-        return
+# Check if launch already in progress
+if thread.launch_task and not thread.launch_task.done():
+    await callback.answer("⏳ Запуск уже идёт...")
+    return
 
-    project = project_manager.get_or_create(state["project"])
-    project.cwd = state["path"]
-    project.chat_id = chat_id
+# Import here to avoid circular imports
+from .launch_animation import launch_with_animation
+from .main import telegram_queue
 
-    # Get or create main thread
-    thread = project.get_or_create_thread(None, "main")
-
-    # Check if launch already in progress
-    if thread.launch_task and not thread.launch_task.done():
-        await callback.answer("⏳ Запуск уже идёт...")
-        return
-
-    await callback.answer()
-    _start_state.pop(chat_id, None)
-
-    # Import here to avoid circular imports
-    from .launch_animation import launch_with_animation
-    from .main import telegram_queue
-
-    start_poller, start_watcher = _make_task_starters(callback.bot)
-
-    # Launch in background
-    thread.launch_task = asyncio.create_task(
-        launch_with_animation(
-            bot=callback.bot,
-            chat_id=chat_id,
-            thread_id=None,
-            project=project,
-            thread=thread,
-            queue=telegram_queue,
-            start_poller=start_poller,
-            start_watcher=start_watcher,
-        )
+# Launch in background
+thread.launch_task = asyncio.create_task(
+    launch_with_animation(
+        bot=callback.bot,
+        chat_id=chat_id,
+        thread_id=None,
+        project=project,
+        thread=thread,
+        queue=telegram_queue,
+        start_poller=start_poller,
+        start_watcher=start_watcher,
     )
-
-    project_manager._save()
+)
 ```
 
 **Step 2: Verify syntax**
@@ -349,52 +338,17 @@ git commit -m "feat(bot): use background launch with animation"
 
 ---
 
-## Task 5: Update launch_claude_in_thread to use animation
+## Task 7: Update launch_claude_in_thread to use animation
 
 **Files:**
 - Modify: `src/codogram/bot.py`
 
-**Step 1: Replace launch_claude_in_thread body**
+**Step 1: Update launch_claude_in_thread function**
 
-Find the `launch_claude_in_thread` function and update to use the new animation:
-
-```python
-async def launch_claude_in_thread(
-    message: Message,
-    project: ProjectState,
-    thread: ThreadInfo,
-    start_poller,
-    start_watcher,
-) -> bool:
-    """Launch Claude for a specific thread (topic).
-
-    Returns True if successful, False otherwise.
-    """
-    # Check if launch already in progress
-    if thread.launch_task and not thread.launch_task.done():
-        await message.answer("⏳ Запуск уже идёт...")
-        return False
-
-    from .launch_animation import launch_with_animation
-    from .main import telegram_queue
-
-    # Launch in background and wait
-    thread.launch_task = asyncio.create_task(
-        launch_with_animation(
-            bot=message.bot,
-            chat_id=message.chat.id,
-            thread_id=thread.thread_id,
-            project=project,
-            thread=thread,
-            queue=telegram_queue,
-            start_poller=start_poller,
-            start_watcher=start_watcher,
-        )
-    )
-
-    # For backwards compatibility, wait for completion
-    return await thread.launch_task
-```
+Find `launch_claude_in_thread` and update to use animation:
+1. Check if launch already in progress
+2. Launch in background task
+3. Wait for completion (backwards compatibility)
 
 **Step 2: Verify syntax**
 
@@ -410,7 +364,7 @@ git commit -m "refactor(bot): use launch_with_animation in launch_claude_in_thre
 
 ---
 
-## Task 6: Run all tests and verify
+## Task 8: Run all tests and manual verification
 
 **Step 1: Run full test suite**
 
@@ -419,7 +373,7 @@ Expected: All tests PASS
 
 **Step 2: Manual test**
 
-1. Start bot: `python -m codogram.main`
+1. Restart bot: `./restart.sh`
 2. Send `/start` in Telegram
 3. Click "Да, запустить"
 4. Verify:
@@ -428,24 +382,15 @@ Expected: All tests PASS
    - Other messages can be sent during launch
    - "✓ Claude готов!" appears when ready
 
-**Step 3: Commit any fixes**
-
-```bash
-git add -A
-git commit -m "fix: address issues found in manual testing"
-```
-
 ---
 
-## Task 7: Final cleanup and documentation
+## Task 9: Final cleanup
 
 **Step 1: Remove old animation code from bot.py**
 
-Delete the old `launch_claude_new` function if it's still there and not being used.
+Delete the old `launch_claude_new` function if it exists and is unused.
 
-**Step 2: Update any stale comments**
-
-**Step 3: Final commit**
+**Step 2: Commit**
 
 ```bash
 git add -A
@@ -456,16 +401,14 @@ git commit -m "chore: cleanup old launch code"
 
 ## Summary
 
-| Task | Description | Files |
-|------|-------------|-------|
-| 1 | Create TelegramQueue dataclasses | telegram_queue.py |
-| 2 | Implement TelegramQueue class | telegram_queue.py |
-| 3 | Add error handling tests | test_telegram_queue.py |
-| 4 | Integrate into main.py | main.py |
-| 5 | Add launch_task to ThreadInfo | session_manager.py |
-| 6 | Create launch_animation module | launch_animation.py |
-| 7 | Implement launch_with_animation | launch_animation.py |
-| 8 | Update on_start_launch_claude | bot.py |
-| 9 | Update launch_claude_in_thread | bot.py |
-| 10 | Run tests and verify | - |
-| 11 | Cleanup | - |
+| Task | Description | Status |
+|------|-------------|--------|
+| 1 | TelegramQueue with OutgoingBatch | ✅ DONE |
+| 2 | Add EditBatch to TelegramQueue | ✅ DONE |
+| 3 | Add launch_task to ThreadInfo | TODO |
+| 4 | Create launch_animation module | TODO |
+| 5 | Implement launch_with_animation | TODO |
+| 6 | Update on_start_launch_claude | TODO |
+| 7 | Update launch_claude_in_thread | TODO |
+| 8 | Run tests and verify | TODO |
+| 9 | Cleanup | TODO |
