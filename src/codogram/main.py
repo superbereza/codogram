@@ -8,6 +8,9 @@ from .bot import router
 from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 from .logging_config import setup_logging, logger
+from .telegram_queue import TelegramQueue
+
+telegram_queue: TelegramQueue | None = None
 
 async def main():
     setup_logging()
@@ -16,6 +19,8 @@ async def main():
     logger.info(f"Base dir: {settings.base_dir}")
 
     bot = Bot(token=settings.telegram_token)
+    global telegram_queue
+    telegram_queue = TelegramQueue(bot)
     dp = Dispatcher()
     dp.include_router(router)
 
@@ -33,11 +38,11 @@ async def main():
     # Define task starters
     async def start_poller(project: ProjectState) -> asyncio.Task:
         from .permission_poller import create_poller_task
-        return await create_poller_task(bot, project)
+        return await create_poller_task(bot, project, telegram_queue)
 
     async def start_watcher(project: ProjectState, send_missed: bool = False) -> asyncio.Task:
         from .watcher import create_watcher_task
-        return await create_watcher_task(bot, project, send_missed)
+        return await create_watcher_task(bot, project, telegram_queue, send_missed)
 
     # Restore sessions from history.jsonl
     await project_manager.restore_projects(bot, start_poller, start_watcher)
@@ -49,7 +54,11 @@ async def main():
     logger.info("History watcher started (15s polling)")
 
     # Start Telegram polling
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        if telegram_queue:
+            await telegram_queue.shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())
