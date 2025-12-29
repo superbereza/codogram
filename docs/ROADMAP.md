@@ -55,6 +55,14 @@
 - Валидация project name (только alphanumeric, dash, underscore)
 - Unified logging через python logging module
 
+### Telegram Rate Limiter
+- FIFO очередь для предотвращения flood control (429)
+- TelegramQueue класс с воркером на каждый chat_id
+- Atomic batch sending (body + keyboard вместе)
+- Orphan cleanup при ошибках
+- enqueue() возвращает message IDs для cleanup
+- enqueue_nowait() для fire-and-forget
+
 ## Bugs
 
 ### Thread session mixup
