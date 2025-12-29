@@ -993,80 +993,58 @@ async def cmd_resume(message: Message):
         )
 
 
-@router.message(Command("new"))
-async def cmd_new(message: Message):
-    """Start new Claude session in current thread."""
+async def _send_session_command(message: Message, command: str, status_text: str) -> bool:
+    """Common logic for /new and /clear commands.
+
+    Returns True if command was sent successfully, False otherwise.
+    """
     if not is_admin(message.from_user.id):
-        return
+        return False
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
         await message.answer("Проект не зарегистрирован. Используй /start")
-        return
+        return False
 
     thread_id = message.message_thread_id
     thread = project.threads.get(thread_id)
     if not thread:
         await message.answer("Thread не найден. Используй /start")
-        return
+        return False
 
     tmux_name = thread.get_tmux_session(project.project_name)
 
     if not is_tmux_session_exists(tmux_name):
         await message.answer("tmux сессия не найдена. Запусти Claude в терминале.")
-        return
+        return False
 
     # NOTE: Do NOT cancel watcher here - let it continue watching old session.
     # _bind_thread_to_session will cancel it when new session is found.
-    # This prevents thread becoming "dead" if user cancels /new in Claude.
+    # This prevents thread becoming "dead" if user cancels the command in Claude.
 
     # Mark thread as awaiting new session
     thread.awaiting_new_session = True
     thread.last_sent_message = None
     project_manager._save()
 
-    # Send /new to tmux
+    # Send command to tmux
     tmux = TmuxSession(tmux_name, project.cwd)
-    tmux.send_keys("/new")
+    tmux.send_keys(command)
 
-    await message.answer("⏳ Создаю новую сессию...")
+    await message.answer(status_text)
+    return True
+
+
+@router.message(Command("new"))
+async def cmd_new(message: Message):
+    """Start new Claude session in current thread."""
+    await _send_session_command(message, "/new", "⏳ Создаю новую сессию...")
 
 
 @router.message(Command("clear"))
 async def cmd_clear(message: Message):
     """Clear Claude session and start fresh."""
-    if not is_admin(message.from_user.id):
-        return
-
-    project = project_manager.get_by_chat(message.chat.id)
-    if not project:
-        await message.answer("Проект не зарегистрирован. Используй /start")
-        return
-
-    thread_id = message.message_thread_id
-    thread = project.threads.get(thread_id)
-    if not thread:
-        await message.answer("Thread не найден. Используй /start")
-        return
-
-    tmux_name = thread.get_tmux_session(project.project_name)
-
-    if not is_tmux_session_exists(tmux_name):
-        await message.answer("tmux сессия не найдена. Запусти Claude в терминале.")
-        return
-
-    # NOTE: Do NOT cancel watcher here - same reason as cmd_new
-
-    # Mark thread as awaiting new session
-    thread.awaiting_new_session = True
-    thread.last_sent_message = None
-    project_manager._save()
-
-    # Send /clear to tmux
-    tmux = TmuxSession(tmux_name, project.cwd)
-    tmux.send_keys("/clear")
-
-    await message.answer("⏳ Очищаю сессию...")
+    await _send_session_command(message, "/clear", "⏳ Очищаю сессию...")
 
 
 @router.message(Command("restart_session"))
