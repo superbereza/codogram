@@ -321,6 +321,19 @@ async def cmd_start(message: Message):
                     # Existing thread - check tmux and connect or launch
                     await _start_thread_flow(message, project, thread)
                 return
+            else:
+                # Topic not registered - register and launch
+                from .magic_names import get_random_magic_name
+                existing_names = {t.name for t in project.threads.values() if t.name != "pending"}
+                thread_name = get_random_magic_name(existing_names)
+
+                thread = ThreadInfo(thread_id=thread_id, name=thread_name)
+                project.threads[thread_id] = thread
+
+                start_poller, start_watcher = _make_task_starters(message.bot)
+                await launch_claude_in_thread(message, project, thread, start_poller, start_watcher)
+                project_manager._save()
+                return
 
     # Case 1: Project name provided
     if args:
