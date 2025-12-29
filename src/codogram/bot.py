@@ -1384,9 +1384,11 @@ async def on_message(message: Message):
         else:
             logger.debug(f"Binding task already running for thread {thread.name}")
     else:
-        # Session already bound - check if it changed (user might have done /new in tmux)
-        from .history_watcher import check_session_for_thread
-        await check_session_for_thread(project, thread, message.bot, start_poller, start_watcher)
+        # Session already bound - session changes now handled by:
+        # - /new, /clear Telegram commands (set awaiting_new_session)
+        # - HistoryWatcher (binds new sessions to awaiting threads)
+        # See: docs/designs/2025-12-29-session-binder-design.md
+        pass
 
     tmux_name = thread.get_tmux_session(project.project_name)
     tmux = TmuxSession(tmux_name, project.cwd)
