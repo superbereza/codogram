@@ -329,13 +329,19 @@ class ProjectManager:
                     if Path(thread.jsonl_path).exists():
                         # Start watcher for this thread
                         if not thread.watcher_task or thread.watcher_task.done():
+                            logger.info(f"restore: starting watcher for thread={thread.name}")
                             thread.watcher_task = asyncio.create_task(
                                 watch_thread_jsonl(bot, project, thread, telegram_queue)
                             )
-                        # Start poller for this thread
-                        from .permission_poller import create_poller_task_for_thread
-                        if not thread.poller_task or thread.poller_task.done():
-                            thread.poller_task = await create_poller_task_for_thread(bot, project, thread, telegram_queue)
+                    else:
+                        logger.warning(f"restore: jsonl not found for thread={thread.name}: {thread.jsonl_path}")
+                else:
+                    logger.debug(f"restore: no session for thread={thread.name} (session_id={thread.session_id}, jsonl={thread.jsonl_path})")
+
+                # Start poller for this thread (regardless of watcher)
+                from .permission_poller import create_poller_task_for_thread
+                if not thread.poller_task or thread.poller_task.done():
+                    thread.poller_task = await create_poller_task_for_thread(bot, project, thread, telegram_queue)
 
         self._save()
 

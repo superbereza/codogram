@@ -211,21 +211,30 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
     from pathlib import Path
 
     if not thread.jsonl_path:
+        logger.warning(f"watch_thread_jsonl: no jsonl_path for thread={thread.name}")
         return
 
+    logger.info(f"thread_watcher_started: thread={thread.name}, session={thread.session_id[:8] if thread.session_id else 'None'}")
     watcher = JsonlWatcher(Path(thread.jsonl_path))
 
     try:
         async for entry in watcher.watch():
             try:
+                # Extract message ID for tracking
+                msg_id = entry.get("message", {}).get("id", "unknown")
+
                 messages = _entry_to_messages(entry)
                 if messages:
+                    text_preview = messages[0].get("text", "")[:40].replace("\n", " ")
+                    logger.info(f"message_read: msg_id={msg_id} thread={thread.name} preview='{text_preview}'")
+
                     batch = OutgoingBatch(
                         chat_id=project.chat_id,
                         thread_id=thread.thread_id,
                         messages=messages,
                     )
-                    await telegram_queue.enqueue_nowait(batch)
+                    telegram_ids = await telegram_queue.enqueue(batch)
+                    logger.info(f"message_sent: msg_id={msg_id} thread={thread.name} telegram_ids={telegram_ids}")
             except Exception as e:
                 logger.error(f"watch_thread_error: {e}")
     except asyncio.CancelledError:
