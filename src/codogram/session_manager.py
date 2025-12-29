@@ -93,7 +93,6 @@ class ThreadInfo:
     watcher_task: asyncio.Task | None = field(default=None, repr=False)
     poller_task: asyncio.Task | None = field(default=None, repr=False)
     binding_task: asyncio.Task | None = field(default=None, repr=False)
-    launch_task: asyncio.Task | None = field(default=None, repr=False)
 
     # For session binding:
     last_sent_message: str | None = None
