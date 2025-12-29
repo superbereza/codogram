@@ -49,7 +49,7 @@ async def main():
 
     # Start history watcher for session changes
     from .history_watcher import create_history_watcher
-    await create_history_watcher(bot, start_poller, start_watcher)
+    await create_history_watcher(bot, start_poller, start_watcher, telegram_queue)
 
     logger.info("History watcher started (15s polling)")
 
