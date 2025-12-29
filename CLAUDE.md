@@ -68,8 +68,7 @@ agent-tools/codogram/
 ps aux | grep codogram
 
 # View logs
-tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log
-tail -f ~/dev/personal-agent/tmp/codogram-logs/poller-sent.log
+tail -f logs/codogram.log
 
 # View config
 cat .config.json | jq

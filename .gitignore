@@ -7,3 +7,4 @@ venv/
 *.egg-info/
 docs/plans/*-logs-snapshot/
 tmp/
+logs/
