@@ -99,3 +99,22 @@ Use this ID in `ADMIN_IDS` environment variable.
 1. Bot must be admin in Telegram group (Privacy Mode)
 2. Check tmux session still running: `tmux ls`
 3. Verify chat_id matches in config
+
+### Git push fails with "Permission denied (publickey)"
+
+Claude Code runs in a separate process without access to your SSH agent. Fix with `keychain`:
+
+```bash
+# Install
+sudo apt install keychain
+
+# Add to ~/.zshrc
+echo 'eval $(keychain --eval --quiet ~/.ssh/id_ed25519)' >> ~/.zshrc
+
+# Apply
+source ~/.zshrc
+```
+
+Replace `~/.ssh/id_ed25519` with your actual key path (e.g., `~/.ssh/github_com_ED25519/id_ed25519`).
+
+Now git push will work from any terminal, including Claude Code sessions.
