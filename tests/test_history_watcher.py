@@ -10,9 +10,10 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 @pytest.mark.asyncio
-async def test_check_session_for_project_detects_change():
-    """Test that check_session_for_project detects session changes."""
-    from codogram.history_watcher import check_session_for_project
+async def test_check_session_for_thread_detects_change():
+    """Test that check_session_for_thread detects session changes."""
+    from codogram.history_watcher import check_session_for_thread
+    from codogram.session_manager import ThreadInfo
 
     bot = MagicMock()
     start_poller = AsyncMock(return_value=MagicMock())
@@ -22,46 +23,58 @@ async def test_check_session_for_project_detects_change():
     mock_project = MagicMock()
     mock_project.chat_id = 123
     mock_project.cwd = "/test/path"
-    mock_project.session_id = "old-session"
-    mock_project.watcher_task = None
+    mock_project.project_name = "test-project"
 
-    # Create a mock project_manager
-    mock_pm = MagicMock()
-    mock_pm.refresh_project_session.return_value = True  # Session changed
-    mock_pm._maybe_start_tasks = AsyncMock()
+    # Create a real thread with old session
+    thread = ThreadInfo(thread_id=None, name="main")
+    thread.session_id = "old-session"
+    thread.watcher_task = None
 
-    # Patch session_manager module where it's imported from
-    with patch('codogram.session_manager.project_manager', mock_pm):
-        await check_session_for_project(mock_project, bot, start_poller, start_watcher)
+    # Patch find_session_for_project to return a new session
+    with patch('codogram.history_watcher.find_session_for_project', return_value="new-session-id"):
+        await check_session_for_thread(mock_project, thread, bot, start_poller, start_watcher)
 
-        # Should have called refresh and _maybe_start_tasks
-        mock_pm.refresh_project_session.assert_called_once_with(mock_project)
-        mock_pm._maybe_start_tasks.assert_called_once()
+        # Session should have been cleared (waiting for new binding)
+        assert thread.session_id is None
+        assert thread.jsonl_path is None
 
 @pytest.mark.asyncio
 async def test_history_watcher_checks_tmux_and_sessions():
-    """Test that HistoryWatcher checks tmux health and session changes."""
+    """Test that HistoryWatcher checks tmux health for threads."""
     from codogram.history_watcher import HistoryWatcher
+    from codogram.session_manager import ThreadInfo
 
     bot = MagicMock()
     bot.send_message = AsyncMock()
     start_poller = AsyncMock()
     start_watcher = AsyncMock()
-    watcher = HistoryWatcher(bot, start_poller, start_watcher)
+    telegram_queue = MagicMock()
+    telegram_queue.enqueue_nowait = AsyncMock()
+    watcher = HistoryWatcher(bot, start_poller, start_watcher, telegram_queue)
+
+    # Mock thread
+    mock_thread = MagicMock(spec=ThreadInfo)
+    mock_thread.thread_id = None
+    mock_thread.name = "main"
+    mock_thread.session_id = "old-session"
+    mock_thread.watcher_task = None
+    mock_thread.poller_task = None
+    mock_thread.awaiting_new_session = False
+    mock_thread.binding_task = None
+    mock_thread.get_tmux_session.return_value = "claude-test"
 
     # Mock project
     mock_project = MagicMock()
     mock_project.chat_id = 123
     mock_project.cwd = "/test/path"
-    mock_project.tmux_session = "test-tmux"
-    mock_project.session_id = "old-session"
+    mock_project.project_name = "test"
+    mock_project.threads = {None: mock_thread}
+    # Legacy fields for cleanup check
     mock_project.watcher_task = None
     mock_project.poller_task = None
 
     mock_pm = MagicMock()
     mock_pm.projects = {"test": mock_project}
-    mock_pm._maybe_start_tasks = AsyncMock()
-    mock_pm.refresh_project_session.return_value = False  # No session change
     watcher.project_manager = mock_pm
 
     with patch('codogram.session_manager.should_cleanup_project', return_value=False):
@@ -70,9 +83,6 @@ async def test_history_watcher_checks_tmux_and_sessions():
 
             await watcher._check_for_changes()
 
-            # Should have checked tmux health
-            mock_tmux.assert_called_once_with("test-tmux", "/test/path")
-            # Should have checked for session changes
-            mock_pm.refresh_project_session.assert_called_once_with(mock_project)
-            # Should NOT have called _maybe_start_tasks since no change
-            mock_pm._maybe_start_tasks.assert_not_called()
+            # Should have checked tmux health for thread
+            mock_thread.get_tmux_session.assert_called_once_with("test")
+            mock_tmux.assert_called_once_with("claude-test", "/test/path")

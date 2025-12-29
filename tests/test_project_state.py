@@ -85,25 +85,7 @@ def test_update_from_telegram():
     asyncio.run(run())
 
 
-def test_maybe_start_tasks_needs_both():
-    """_maybe_start_tasks needs tmux_session AND chat_id for poller."""
-    pm = ProjectManager()
-
-    async def run():
-        mock_poller = AsyncMock(return_value=asyncio.current_task())
-        mock_watcher = AsyncMock(return_value=asyncio.current_task())
-
-        # Only chat_id - no poller
-        project = pm.get_or_create("test")
-        project.chat_id = -123
-        await pm._maybe_start_tasks(project, mock_poller, mock_watcher)
-        mock_poller.assert_not_called()
-
-        # Add tmux_session - poller starts
-        project.tmux_session = "claude-test"
-        await pm._maybe_start_tasks(project, mock_poller, mock_watcher)
-        mock_poller.assert_called_once()
-
-    asyncio.run(run())
+# NOTE: test_maybe_start_tasks_needs_both was removed because _maybe_start_tasks
+# is now deprecated. Tasks are started per-thread in poll_for_session_thread.
 
 
