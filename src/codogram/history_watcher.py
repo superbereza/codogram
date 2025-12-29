@@ -116,6 +116,9 @@ class HistoryWatcher:
                     thread.session_id = None
                     thread.jsonl_path = None
 
+            # After thread health checks, bind awaiting threads
+            await self._bind_awaiting_threads(project)
+
             # NOTE: Legacy project-level checks removed - all handled through threads now
 
     async def _bind_awaiting_threads(self, project: ProjectState):
