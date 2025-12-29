@@ -124,6 +124,20 @@ class TelegramQueue:
 
         except TelegramBadRequest as e:
             await self._cleanup_orphans(batch.chat_id, sent_ids)
+
+            # If parse error and we have parse_mode, retry without it
+            if "parse entities" in str(e).lower():
+                has_parse_mode = any(m.get("parse_mode") for m in batch.messages)
+                if has_parse_mode:
+                    logger.warning(
+                        f"Parse error, retrying without parse_mode: chat_id={batch.chat_id}, "
+                        f"thread_id={batch.thread_id}"
+                    )
+                    # Strip parse_mode from all messages
+                    for msg in batch.messages:
+                        msg.pop("parse_mode", None)
+                    return await self._send_batch(batch, attempt + 1)
+
             logger.error(
                 f"MESSAGE_LOST: BadRequest, chat_id={batch.chat_id}, thread_id={batch.thread_id}, "
                 f"error={e}, messages={[m.get('text', '')[:50] for m in batch.messages]}"
