@@ -208,6 +208,25 @@ async def _start_project_flow(message: Message, project: ProjectState):
     project_manager._save()
 
 
+async def _start_thread_flow(message: Message, project: ProjectState, thread: ThreadInfo):
+    """Handle /start in an existing thread - check tmux and connect or launch."""
+    tmux_name = thread.get_tmux_session(project.project_name)
+    tmux = TmuxSession(tmux_name, project.cwd)
+
+    if tmux.exists():
+        # Thread's tmux exists - show status
+        await message.answer(
+            f"Claude активен в `{tmux_name}`\n"
+            f"Подключиться: `tmux attach -t {tmux_name}`",
+            parse_mode="Markdown",
+        )
+    else:
+        # No tmux - launch Claude for this thread
+        start_poller, start_watcher = _make_task_starters(message.bot)
+        await launch_claude_in_thread(message, project, thread, start_poller, start_watcher)
+        project_manager._save()
+
+
 async def _connect_or_launch(message: Message, project: ProjectState):
     """Connect to existing tmux or offer to launch new Claude session."""
     chat_id = message.chat.id
@@ -283,20 +302,24 @@ async def cmd_start(message: Message):
     thread_id = message.message_thread_id
     args = message.text.split()[1:]  # Skip /start
 
-    # If in a topic, check for pending thread
+    # If in a topic, use thread-specific flow
     if thread_id is not None:
         project = project_manager.get_by_chat(chat_id)
         if project:
             thread = project.threads.get(thread_id)
-            if thread and thread.name == "pending":
-                # Upgrade pending thread
-                from .magic_names import get_random_magic_name
-                existing_names = {t.name for t in project.threads.values() if t.name != "pending"}
-                thread.name = get_random_magic_name(existing_names)
+            if thread:
+                if thread.name == "pending":
+                    # Upgrade pending thread
+                    from .magic_names import get_random_magic_name
+                    existing_names = {t.name for t in project.threads.values() if t.name != "pending"}
+                    thread.name = get_random_magic_name(existing_names)
 
-                start_poller, start_watcher = _make_task_starters(message.bot)
-                await launch_claude_in_thread(message, project, thread, start_poller, start_watcher)
-                project_manager._save()
+                    start_poller, start_watcher = _make_task_starters(message.bot)
+                    await launch_claude_in_thread(message, project, thread, start_poller, start_watcher)
+                    project_manager._save()
+                else:
+                    # Existing thread - check tmux and connect or launch
+                    await _start_thread_flow(message, project, thread)
                 return
 
     # Case 1: Project name provided

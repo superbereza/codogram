@@ -1,8 +1,22 @@
 import subprocess
 import time
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 
 from .logging_config import logger
+
+# Debug log for tmux send operations
+TMUX_DEBUG_LOG = Path(__file__).parent.parent.parent / "logs/tmux-send-debug.log"
+TMUX_DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _log_tmux_debug(msg: str) -> None:
+    """Append debug message to tmux send log."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    with open(TMUX_DEBUG_LOG, "a") as f:
+        f.write(f"{timestamp} {msg}\n")
+
 
 @dataclass
 class TmuxSession:
@@ -15,24 +29,55 @@ class TmuxSession:
             return  # Don't send empty messages
 
         logger.info(f"tmux_send: session={self.name} text={repr(text[:100])}")
+        _log_tmux_debug(f"{'='*60}")
+        _log_tmux_debug(f"SEND session={self.name} text={repr(text)}")
 
-        # Clear any pending input first (handles stuck multiline mode)
+        # Capture state BEFORE
+        before = self._capture_last_lines(20)
+        _log_tmux_debug(f"BEFORE:\n{before}")
+
+        # Step 1: Send C-c
+        _log_tmux_debug("[1] Sending C-c...")
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, "C-c"],
             check=True
         )
         time.sleep(0.05)
 
-        # Use shell=False for safety (no escaping needed)
+        after_cc = self._capture_last_lines(20)
+        _log_tmux_debug(f"AFTER C-c:\n{after_cc}")
+
+        # Step 2: Send text with -l (literal)
+        _log_tmux_debug(f"[2] Sending text with -l...")
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, "-l", "--", text],
             check=True
         )
-        time.sleep(0.1)  # Delay to ensure text is processed before Enter
+        time.sleep(0.1)
+
+        after_text = self._capture_last_lines(20)
+        _log_tmux_debug(f"AFTER text:\n{after_text}")
+
+        # Step 3: Send Enter
+        _log_tmux_debug("[3] Sending Enter...")
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, "Enter"],
             check=True
         )
+        time.sleep(0.2)
+
+        after_enter = self._capture_last_lines(20)
+        _log_tmux_debug(f"AFTER Enter:\n{after_enter}")
+        _log_tmux_debug(f"DONE\n")
+
+    def _capture_last_lines(self, n: int = 20) -> str:
+        """Capture last N lines from pane."""
+        result = subprocess.run(
+            ["tmux", "capture-pane", "-t", self.name, "-p", "-S", f"-{n}"],
+            capture_output=True,
+            text=True
+        )
+        return result.stdout if result.returncode == 0 else f"<capture failed: {result.stderr}>"
 
     def send_key(self, key: str) -> None:
         """Send a special key (Escape, Enter, C-c, etc.) to tmux session."""
