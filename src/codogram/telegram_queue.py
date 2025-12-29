@@ -19,9 +19,21 @@ class OutgoingBatch:
 
 
 @dataclass
-class _QueueItem:
+class EditBatch:
+    """Single message edit operation."""
+    chat_id: int
+    message_id: int
+    text: str
+    parse_mode: str | None = None
+
+
+QueueItem = OutgoingBatch | EditBatch
+
+
+@dataclass
+class _InternalQueueItem:
     """Internal queue item with result future."""
-    batch: OutgoingBatch
+    item: QueueItem
     result: asyncio.Future[list[int]] | None  # None for fire-and-forget
 
 
@@ -37,35 +49,35 @@ class TelegramQueue:
         self._workers: dict[int, asyncio.Task] = {}
         self._locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
-    async def enqueue(self, batch: OutgoingBatch) -> list[int]:
-        """Add batch to queue, wait for send, return message IDs.
+    async def enqueue(self, item: QueueItem) -> list[int]:
+        """Add item to queue, wait for completion, return message IDs.
 
         Use this when you need to track sent message IDs (e.g., for cleanup).
         """
-        chat_id = batch.chat_id
+        chat_id = item.chat_id
         result_future: asyncio.Future[list[int]] = asyncio.get_running_loop().create_future()
-        item = _QueueItem(batch=batch, result=result_future)
+        queue_item = _InternalQueueItem(item=item, result=result_future)
 
         async with self._locks[chat_id]:
             if chat_id not in self._workers or self._workers[chat_id].done():
                 self._workers[chat_id] = asyncio.create_task(self._worker(chat_id))
 
-        await self._queues[chat_id].put(item)
+        await self._queues[chat_id].put(queue_item)
         return await result_future
 
-    async def enqueue_nowait(self, batch: OutgoingBatch) -> None:
-        """Add batch to queue without waiting. Fire-and-forget.
+    async def enqueue_nowait(self, item: QueueItem) -> None:
+        """Add item to queue without waiting. Fire-and-forget.
 
         Use this when you don't need message IDs (e.g., watcher notifications).
         """
-        chat_id = batch.chat_id
-        item = _QueueItem(batch=batch, result=None)  # None for fire-and-forget
+        chat_id = item.chat_id
+        queue_item = _InternalQueueItem(item=item, result=None)
 
         async with self._locks[chat_id]:
             if chat_id not in self._workers or self._workers[chat_id].done():
                 self._workers[chat_id] = asyncio.create_task(self._worker(chat_id))
 
-        await self._queues[chat_id].put(item)
+        await self._queues[chat_id].put(queue_item)
 
     async def _worker(self, chat_id: int) -> None:
         """Process queue FIFO. Exits after 5 min idle."""
@@ -73,19 +85,25 @@ class TelegramQueue:
 
         while True:
             try:
-                item = await asyncio.wait_for(queue.get(), timeout=300)
+                queue_item = await asyncio.wait_for(queue.get(), timeout=300)
             except asyncio.TimeoutError:
                 logger.debug(f"Queue worker {chat_id} exiting (idle timeout)")
                 return
 
             try:
-                sent_ids = await self._send_batch(item.batch)
-                if item.result is not None and not item.result.done():
-                    item.result.set_result(sent_ids)
+                if isinstance(queue_item.item, OutgoingBatch):
+                    result_ids = await self._send_batch(queue_item.item)
+                elif isinstance(queue_item.item, EditBatch):
+                    result_ids = await self._edit_message(queue_item.item)
+                else:
+                    result_ids = []
+
+                if queue_item.result is not None and not queue_item.result.done():
+                    queue_item.result.set_result(result_ids)
             except Exception as e:
-                logger.error(f"Queue send failed chat_id={item.batch.chat_id}: {e}")
-                if item.result is not None and not item.result.done():
-                    item.result.set_exception(e)
+                logger.error(f"Queue operation failed chat_id={chat_id}: {e}")
+                if queue_item.result is not None and not queue_item.result.done():
+                    queue_item.result.set_exception(e)
             finally:
                 queue.task_done()
 
@@ -142,6 +160,49 @@ class TelegramQueue:
                 f"MESSAGE_LOST: BadRequest, chat_id={batch.chat_id}, thread_id={batch.thread_id}, "
                 f"error={e}, messages={[m.get('text', '')[:50] for m in batch.messages]}"
             )
+            return []
+
+    async def _edit_message(self, edit: EditBatch, attempt: int = 0) -> list[int]:
+        """Edit a single message. Returns [message_id] on success, [] on failure."""
+        MAX_ATTEMPTS = 3
+
+        if attempt >= MAX_ATTEMPTS:
+            logger.error(
+                f"EDIT_FAILED: Failed after {MAX_ATTEMPTS} attempts, "
+                f"chat_id={edit.chat_id}, message_id={edit.message_id}"
+            )
+            return []
+
+        try:
+            await self.bot.edit_message_text(
+                chat_id=edit.chat_id,
+                message_id=edit.message_id,
+                text=edit.text,
+                parse_mode=edit.parse_mode,
+            )
+            return [edit.message_id]
+
+        except TelegramRetryAfter as e:
+            logger.warning(
+                f"Rate limited edit chat_id={edit.chat_id}, "
+                f"waiting {e.retry_after}s, attempt {attempt + 1}/{MAX_ATTEMPTS}"
+            )
+            await asyncio.sleep(e.retry_after)
+            return await self._edit_message(edit, attempt + 1)
+
+        except TelegramBadRequest as e:
+            # If parse error, retry without parse_mode
+            if "parse entities" in str(e).lower() and edit.parse_mode:
+                logger.warning(f"Parse error in edit, retrying without parse_mode")
+                edit.parse_mode = None
+                return await self._edit_message(edit, attempt + 1)
+
+            # Message deleted or not found - not an error
+            if "message to edit not found" in str(e).lower():
+                logger.debug(f"Message {edit.message_id} not found, skipping edit")
+                return []
+
+            logger.warning(f"Edit failed chat_id={edit.chat_id}: {e}")
             return []
 
     async def _cleanup_orphans(self, chat_id: int, msg_ids: list[int]) -> None:
