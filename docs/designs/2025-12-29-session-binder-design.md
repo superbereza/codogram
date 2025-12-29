@@ -100,7 +100,10 @@ class SessionBinderService:
         content = self._extract_matchable_content(jsonl_path)
 
         if not content:
+            logger.debug(f"no matchable content: session={session_id[:8]}")
             return  # Пустой jsonl, попробуем позже
+
+        logger.debug(f"trying to bind session={session_id[:8]}, content={content[:50]}...")
 
         for thread in project.threads.values():
             if thread.session_id:
@@ -113,6 +116,8 @@ class SessionBinderService:
                 logger.info(f"session_bound_content: thread={thread.name}, session={session_id[:8]}")
                 await self._rebind_thread(project, thread, session_id)
                 break
+        else:
+            logger.debug(f"no match found for session={session_id[:8]}")
 
     # === Content matching ===
 
@@ -144,7 +149,11 @@ class SessionBinderService:
 
         if content.startswith("tool:"):
             # Tool call: ищем имя и часть input
-            _, tool_name, tool_input = content.split(":", 2)
+            parts = content.split(":", 2)
+            if len(parts) < 3:
+                logger.warning(f"malformed tool content: {content}")
+                return False
+            _, tool_name, tool_input = parts
             return tool_name in pane and tool_input[:50] in pane
         else:
             # Текст: substring match
@@ -177,27 +186,42 @@ class SessionBinderService:
 ### TmuxAdapter (adapters/tmux.py)
 
 ```python
-def capture_pane(self, session_name: str, lines: int = 100) -> str:
-    """Capture last N lines from tmux pane."""
+def capture_pane(self, session_name: str) -> str:
+    """Capture entire scrollback from tmux pane.
+
+    Uses -S - to get full history, not just visible area.
+    This ensures we find content even if Claude scrolled past it.
+    """
     result = subprocess.run(
-        ["tmux", "capture-pane", "-t", session_name, "-p", "-S", f"-{lines}"],
+        ["tmux", "capture-pane", "-t", session_name, "-p", "-S", "-"],
         capture_output=True, text=True
     )
-    return result.stdout if result.returncode == 0 else ""
+    if result.returncode != 0:
+        logger.debug(f"capture_pane failed: {session_name}, rc={result.returncode}")
+        return ""
+    return result.stdout
 ```
 
 ### HistoryAdapter (adapters/history.py)
 
 ```python
+from .history_reader import compute_jsonl_path  # Reuse existing function
+
 def get_project_dir(self, cwd: str) -> Path:
-    """Get project directory for jsonl files."""
+    """Get project directory for jsonl files.
+
+    Reuses normalization logic from compute_jsonl_path.
+    """
     normalized = cwd.rstrip("/") or "/"
+    while "//" in normalized:
+        normalized = normalized.replace("//", "/")
     project_hash = normalized.replace("/", "-")
     return Path.home() / ".claude" / "projects" / project_hash
 
 def read_last_assistant_entry(self, jsonl_path: Path) -> dict | None:
     """Read last assistant entry from jsonl."""
     if not jsonl_path.exists():
+        logger.debug(f"jsonl not found: {jsonl_path}")
         return None
 
     last_entry = None
@@ -209,6 +233,8 @@ def read_last_assistant_entry(self, jsonl_path: Path) -> dict | None:
                     last_entry = entry
             except json.JSONDecodeError:
                 continue
+
+    logger.debug(f"read_last_assistant_entry: {jsonl_path.name}, found={last_entry is not None}")
     return last_entry
 ```
 
@@ -296,3 +322,21 @@ def test_content_matches_tool():
 5. Интегрировать в HistoryWatcher
 6. Удалить `check_session_for_thread`
 7. Тестирование на мультичате
+
+## Изменения после ревью
+
+**v2 (2025-12-29):**
+
+1. **ValueError fix** — добавлена проверка `len(parts) < 3` в `_content_matches()` для tool calls
+
+2. **Полный scrollback** — `capture_pane()` использует `-S -` вместо `-S -100`, захватывает всю историю tmux. Это надёжнее чем матчить несколько записей.
+
+3. **Переиспользование кода** — `compute_jsonl_path()` импортируется из существующего `history_reader.py`
+
+4. **Логирование** — добавлены debug логи для отладки content matching:
+   - `no matchable content` — jsonl пустой
+   - `trying to bind` — начало поиска
+   - `session_bound_content` — успешный match
+   - `no match found` — не нашли подходящий tmux
+   - `capture_pane failed` — ошибка захвата tmux
+   - `malformed tool content` — неверный формат tool call
