@@ -26,6 +26,9 @@
 - Inline keyboard с опциями
 - Удаление сообщений после ответа
 
+### Interactive prompts
+- Уточняющие вопросы от Claude с кнопками вариантов ответа (plan mode → AskUserQuestion)
+
 ### Multi-admin support
 - ADMIN_IDS через запятую в .env
 - /my_chat_id команда для всех
