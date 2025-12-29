@@ -83,6 +83,7 @@ class TelegramQueue:
                 if item.result is not None and not item.result.done():
                     item.result.set_result(sent_ids)
             except Exception as e:
+                logger.error(f"Queue send failed chat_id={item.batch.chat_id}: {e}")
                 if item.result is not None and not item.result.done():
                     item.result.set_exception(e)
             finally:
@@ -93,7 +94,11 @@ class TelegramQueue:
         MAX_ATTEMPTS = 3
 
         if attempt >= MAX_ATTEMPTS:
-            logger.error(f"Failed to send after {MAX_ATTEMPTS} attempts, chat_id={batch.chat_id}")
+            logger.error(
+                f"MESSAGE_LOST: Failed after {MAX_ATTEMPTS} attempts, "
+                f"chat_id={batch.chat_id}, thread_id={batch.thread_id}, "
+                f"messages={[m.get('text', '')[:50] for m in batch.messages]}"
+            )
             return []
 
         sent_ids: list[int] = []
@@ -110,13 +115,19 @@ class TelegramQueue:
 
         except TelegramRetryAfter as e:
             await self._cleanup_orphans(batch.chat_id, sent_ids)
-            logger.warning(f"Rate limited chat_id={batch.chat_id}, waiting {e.retry_after}s")
+            logger.warning(
+                f"Rate limited chat_id={batch.chat_id}, thread_id={batch.thread_id}, "
+                f"waiting {e.retry_after}s, attempt {attempt + 1}/{MAX_ATTEMPTS}"
+            )
             await asyncio.sleep(e.retry_after)
             return await self._send_batch(batch, attempt + 1)
 
         except TelegramBadRequest as e:
             await self._cleanup_orphans(batch.chat_id, sent_ids)
-            logger.warning(f"BadRequest chat_id={batch.chat_id}: {e}")
+            logger.error(
+                f"MESSAGE_LOST: BadRequest, chat_id={batch.chat_id}, thread_id={batch.thread_id}, "
+                f"error={e}, messages={[m.get('text', '')[:50] for m in batch.messages]}"
+            )
             return []
 
     async def _cleanup_orphans(self, chat_id: int, msg_ids: list[int]) -> None:
