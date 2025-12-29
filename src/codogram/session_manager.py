@@ -286,7 +286,7 @@ class ProjectManager:
         """DEPRECATED: Tasks are now started per-thread in poll_for_session_thread."""
         logger.warning("_maybe_start_tasks called but is deprecated - tasks now handled per-thread")
 
-    async def restore_projects(self, bot, start_poller, start_watcher) -> None:
+    async def restore_projects(self, bot, start_poller, start_watcher, telegram_queue) -> None:
         """Restore sessions from history.jsonl after bot restart."""
         from .history_watcher import watch_thread_jsonl
 
@@ -328,12 +328,12 @@ class ProjectManager:
                         # Start watcher for this thread
                         if not thread.watcher_task or thread.watcher_task.done():
                             thread.watcher_task = asyncio.create_task(
-                                watch_thread_jsonl(bot, project, thread)
+                                watch_thread_jsonl(bot, project, thread, telegram_queue)
                             )
                         # Start poller for this thread
                         from .permission_poller import create_poller_task_for_thread
                         if not thread.poller_task or thread.poller_task.done():
-                            thread.poller_task = await create_poller_task_for_thread(bot, project, thread)
+                            thread.poller_task = await create_poller_task_for_thread(bot, project, thread, telegram_queue)
 
         self._save()
 

@@ -146,7 +146,7 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
                     )
                     await telegram_queue.enqueue_nowait(batch)
             except Exception as e:
-                logger.error("watch_thread_error", extra={"error": str(e)})
+                logger.error(f"watch_thread_error: {e}")
     except asyncio.CancelledError:
         logger.info(f"watch_thread_cancelled: thread={thread.name}")
         raise
@@ -210,7 +210,7 @@ async def poll_for_session_thread(
                 # Start thread-specific permission poller
                 from .permission_poller import create_poller_task_for_thread
                 if not thread.poller_task or thread.poller_task.done():
-                    thread.poller_task = await create_poller_task_for_thread(bot, project, thread)
+                    thread.poller_task = await create_poller_task_for_thread(bot, project, thread, telegram_queue)
 
                 logger.info(f"thread_watcher_started: thread={thread.name}, session={session_id[:8]}")
                 return

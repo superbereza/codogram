@@ -1,4 +1,11 @@
 # src/codogram/main.py
+import sys
+
+# Fix module identity: ensure 'codogram.main' and '__main__' are the same object
+# This allows other modules to import telegram_queue correctly
+if __name__ == '__main__':
+    sys.modules['codogram.main'] = sys.modules['__main__']
+
 import asyncio
 from pathlib import Path
 from aiogram import Bot, Dispatcher
@@ -45,7 +52,7 @@ async def main():
         return await create_watcher_task(bot, project, telegram_queue, send_missed)
 
     # Restore sessions from history.jsonl
-    await project_manager.restore_projects(bot, start_poller, start_watcher)
+    await project_manager.restore_projects(bot, start_poller, start_watcher, telegram_queue)
 
     # Start history watcher for session changes
     from .history_watcher import create_history_watcher
