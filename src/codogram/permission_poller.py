@@ -10,6 +10,7 @@ from aiogram import Bot
 if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
+from .telegram_queue import OutgoingBatch
 from .config import settings
 from .screen import parse_screen, PermissionPrompt
 from .keyboards import permission_keyboard
@@ -94,36 +95,31 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
             else:
                 elapsed = asyncio.get_event_loop().time() - debounce_start
                 if elapsed >= DEBOUNCE_TIME:
-                    # Send to Telegram
                     logger.debug(f"Poller DEBOUNCING→SHOWING: sending to Telegram")
                     logger.debug(f"Poller: body preview: {parsed.body[:200]}...")
                     try:
-                        content_msg_ids = []
-
-                        # Send body (description + content + question)
+                        # Build batch of body messages
+                        body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
                             for chunk in chunk_message(body_text):
-                                try:
-                                    msg = await bot.send_message(
-                                        chat_id, chunk, parse_mode="Markdown"
-                                    )
-                                except Exception:
-                                    msg = await bot.send_message(chat_id, chunk)
-                                content_msg_ids.append(msg.message_id)
+                                body_messages.append({"text": chunk, "parse_mode": "Markdown"})
 
-                        # Send options as text (buttons have character limit)
+                        # Options as text
                         options_text = "\n".join(parsed.options)
-                        try:
-                            opts_msg = await bot.send_message(chat_id, options_text)
-                            content_msg_ids.append(opts_msg.message_id)
-                        except Exception:
-                            pass
+                        body_messages.append({"text": options_text})
 
-                        kb = permission_keyboard(parsed.options, project.tmux_session)
-                        kb_msg = await bot.send_message(
-                            chat_id, "👆", reply_markup=kb
+                        # Send body through queue, get IDs for cleanup
+                        batch = OutgoingBatch(
+                            chat_id=chat_id,
+                            thread_id=None,
+                            messages=body_messages,
                         )
+                        content_msg_ids = await telegram_queue.enqueue(batch)
+
+                        # Keyboard sent directly (need to track for button handler)
+                        kb = permission_keyboard(parsed.options, project.tmux_session)
+                        kb_msg = await bot.send_message(chat_id, "👆", reply_markup=kb)
                         permission_messages[kb_msg.message_id] = content_msg_ids
 
                         state = PollerState.SHOWING
@@ -131,29 +127,13 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                         logger.debug(f"Poller SHOWING: sent {len(parsed.options)} options, kb_msg={kb_msg.message_id}")
                     except Exception as e:
                         logger.warning(f"Permission poller: send error: {e}")
-                        # Cleanup already-sent messages to avoid orphans
-                        for msg_id in content_msg_ids:
-                            try:
-                                await bot.delete_message(chat_id, msg_id)
-                            except Exception:
-                                pass
-                        content_msg_ids = []
-                        # Handle flood control - wait before retry
-                        if "retry after" in str(e).lower():
-                            try:
-                                retry_after = int(str(e).split("retry after")[1].split()[0])
-                                logger.info(f"Permission poller: flood control, waiting {retry_after}s")
-                                await asyncio.sleep(retry_after)
-                            except (ValueError, IndexError):
-                                await asyncio.sleep(5)
                         state = PollerState.IDLE
 
         elif state == PollerState.SHOWING:
             if not is_permission:
                 logger.debug("Poller SHOWING→IDLE: permission gone, cleaning up")
-                # Cleanup if messages still exist
                 if kb_msg and kb_msg.message_id in permission_messages:
-                    for msg_id in content_msg_ids:
+                    for msg_id in permission_messages[kb_msg.message_id]:
                         try:
                             await bot.delete_message(chat_id, msg_id)
                         except Exception:
@@ -170,68 +150,44 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                 content_msg_ids = []
                 kb_msg = None
             elif parsed.options != last_options or parsed.body != last_body:
-                # New question or options changed — resend messages
                 logger.debug(f"Poller SHOWING: body/options changed, resending")
                 try:
                     # Delete old messages
-                    for msg_id in content_msg_ids:
-                        try:
-                            await bot.delete_message(chat_id, msg_id)
-                        except Exception:
-                            pass
-                    if kb_msg:
+                    if kb_msg and kb_msg.message_id in permission_messages:
+                        for msg_id in permission_messages[kb_msg.message_id]:
+                            try:
+                                await bot.delete_message(chat_id, msg_id)
+                            except Exception:
+                                pass
                         try:
                             await bot.delete_message(chat_id, kb_msg.message_id)
                         except Exception:
                             pass
                         permission_messages.pop(kb_msg.message_id, None)
 
-                    # Send new body
-                    content_msg_ids = []
+                    # Build new body messages
+                    body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
                         for chunk in chunk_message(body_text):
-                            try:
-                                msg = await bot.send_message(
-                                    chat_id, chunk, parse_mode="Markdown"
-                                )
-                            except Exception:
-                                msg = await bot.send_message(chat_id, chunk)
-                            content_msg_ids.append(msg.message_id)
+                            body_messages.append({"text": chunk, "parse_mode": "Markdown"})
 
-                    # Send options + keyboard
                     options_text = "\n".join(parsed.options)
-                    try:
-                        opts_msg = await bot.send_message(chat_id, options_text)
-                        content_msg_ids.append(opts_msg.message_id)
-                    except Exception:
-                        pass
+                    body_messages.append({"text": options_text})
 
+                    # Send through queue
+                    batch = OutgoingBatch(chat_id=chat_id, thread_id=None, messages=body_messages)
+                    content_msg_ids = await telegram_queue.enqueue(batch)
+
+                    # Keyboard directly
                     kb = permission_keyboard(parsed.options, project.tmux_session)
-                    kb_msg = await bot.send_message(
-                        chat_id, "👆", reply_markup=kb
-                    )
+                    kb_msg = await bot.send_message(chat_id, "👆", reply_markup=kb)
                     permission_messages[kb_msg.message_id] = content_msg_ids
 
                     last_options = parsed.options
                     last_body = parsed.body
                 except Exception as e:
                     logger.warning(f"Poller SHOWING: resend error: {e}")
-                    # Cleanup already-sent messages
-                    for msg_id in content_msg_ids:
-                        try:
-                            await bot.delete_message(chat_id, msg_id)
-                        except Exception:
-                            pass
-                    content_msg_ids = []
-                    # Handle flood control
-                    if "retry after" in str(e).lower():
-                        try:
-                            retry_after = int(str(e).split("retry after")[1].split()[0])
-                            logger.info(f"Permission poller: flood control, waiting {retry_after}s")
-                            await asyncio.sleep(retry_after)
-                        except (ValueError, IndexError):
-                            await asyncio.sleep(5)
 
 
 async def create_poller_task_for_thread(bot: Bot, project: ProjectState, thread: ThreadInfo, telegram_queue: "TelegramQueue") -> asyncio.Task:
