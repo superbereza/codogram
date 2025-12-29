@@ -1,697 +1,358 @@
-# Session Binder Design v3
+# Session Binder Design v4
+
+> **Approach:** Telegram Commands для управления сессиями
 
 ## Проблема
 
-**Баг:** Thread session mixup — когда новая сессия появляется в одном треде (через /start, /new, /compact), другие треды ошибочно теряют свою привязку.
+**Баг:** Thread session mixup — когда новая сессия появляется в одном треде (через /new, /clear), другие треды ошибочно теряют свою привязку.
 
 **Root cause:** `check_session_for_thread()` использует `find_session_for_project(cwd)` который возвращает последнюю сессию **проекта**, а не сессию конкретного треда.
 
+**См. также:**
+- [Bug report](../bugs/2025-12-29-thread-session-mixup.md)
+- [Research: Thread Session Binding](../research/thread-session-binding-analysis.md)
+- [Research: Claude Code Files](../research/claude-code-file-structure.md)
+
+## Ключевой инсайт
+
+После исследования структуры файлов Claude Code:
+
+| Команда | Новая сессия? | Detectable? |
+|---------|---------------|-------------|
+| `/new` | ДА | history.jsonl sessionId change |
+| `/clear` | ДА | history.jsonl sessionId change |
+| `/compact` | НЕТ | summary record в session jsonl |
+
+**Вывод:** Проблема только с `/new` и `/clear`. Если эти команды выполняются через Telegram бот, бот **всегда знает** какой thread ждёт новую сессию.
+
 ## Решение
 
-Двухуровневая система binding:
+### Quick Fix (немедленно)
 
-1. **Primary: Hooks** — Claude вызывает hook при смене сессии, передаёт session_id + tmux_session
-2. **Fallback: Content matching** — для сессий без hooks, матчим контент jsonl с capture-pane
+Удалить вызов `check_session_for_thread()` в `bot.py:1388-1389`. Это остановит баг.
+
+### Long-term Solution
+
+1. **Telegram команды** `/new` и `/clear` в боте
+2. **Флаг** `awaiting_new_session` для thread
+3. **Привязка** новой сессии к ожидающему thread
 
 ## Архитектура
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         Claude                               │
-│  (SessionStart hook → session_hook.sh → HTTP POST)          │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    HookServer (adapter)                      │
-│  - Слушает на порту HOOK_SERVER_PORT                        │
-│  - Получает: session_id, cwd, tmux_session                  │
-│  - Вызывает: session_binder.bind_from_hook()                │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 SessionBinderService (service)               │
-│  - bind_from_hook(): точная привязка через hook             │
-│  - check_and_bind(): fallback через content matching        │
+│                     Telegram Bot                             │
+│                                                              │
+│  /new, /clear commands:                                     │
+│    1. Set thread.awaiting_new_session = true                │
+│    2. tmux send-keys "/new\n" (or /clear)                   │
+│    3. Wait for new session via HistoryWatcher               │
+│                                                              │
+│  on_message:                                                │
+│    - Send to tmux (NO check_session_for_thread!)            │
 └──────────────────────────┬──────────────────────────────────┘
                            │
               ┌────────────┴────────────┐
               ▼                         ▼
 ┌─────────────────────┐    ┌─────────────────────────────────┐
-│   HistoryWatcher    │    │        on_message handler       │
-│   (каждые 15 сек)   │    │   (при сообщении пользователя)  │
+│  PermissionPoller   │    │        HistoryWatcher           │
+│  (unchanged)        │    │   (every 15 sec)                │
+│                     │    │                                 │
+│                     │    │   For each thread:              │
+│                     │    │   - If awaiting_new_session     │
+│                     │    │   - Check history.jsonl         │
+│                     │    │   - Bind new session            │
 └─────────────────────┘    └─────────────────────────────────┘
 ```
 
-## Файловая структура
+## Изменения в коде
 
-```
-src/codogram/
-├── adapters/
-│   ├── __init__.py
-│   ├── hook_server.py        # HTTP сервер для hooks
-│   └── tmux.py               # capture_pane и др.
-│
-├── services/
-│   ├── __init__.py
-│   └── session_binder.py     # SessionBinderService
-│
-├── scripts/
-│   └── setup_hooks.py        # CLI для настройки hooks
-│
-└── hooks/
-    └── session_hook.sh       # Скрипт для Claude SessionStart hook
-```
+### 1. Удалить check_session_for_thread (Quick Fix)
 
-## Конфигурация
-
-**.env:**
-```bash
-# Hooks
-HOOKS_ENABLED=true           # false для тестирования без hooks
-HOOK_SERVER_PORT=8787        # Порт для hook server
-
-# Существующие
-TELEGRAM_TOKEN=...
-ADMIN_IDS=...
-```
-
-**config.py:**
-```python
-@dataclass
-class Config:
-    # ... existing ...
-
-    hooks_enabled: bool = True
-    hook_server_port: int = 8787
-
-    @classmethod
-    def from_env(cls):
-        return cls(
-            # ... existing ...
-            hooks_enabled=os.getenv("HOOKS_ENABLED", "true").lower() == "true",
-            hook_server_port=int(os.getenv("HOOK_SERVER_PORT", "8787")),
-        )
-```
-
-## Компоненты
-
-### 1. HookServer (adapters/hook_server.py)
+**Файл:** `src/codogram/bot.py`
 
 ```python
-"""HTTP server for receiving Claude session hooks."""
+# УДАЛИТЬ строки 1388-1389:
+# from .history_watcher import check_session_for_thread
+# await check_session_for_thread(project, thread, message.bot, start_poller, start_watcher)
 
-import asyncio
-from aiohttp import web
-from ..logging_config import logger
-
-
-class HookServer:
-    """Receives SessionStart hooks from Claude."""
-
-    def __init__(self, port: int, on_session_hook):
-        self.port = port
-        self.on_session_hook = on_session_hook
-        self._app = None
-        self._runner = None
-
-    async def start(self):
-        """Start the HTTP server."""
-        self._app = web.Application()
-        self._app.router.add_post('/hook/session-start', self._handle_session_start)
-
-        self._runner = web.AppRunner(self._app)
-        await self._runner.setup()
-
-        site = web.TCPSite(self._runner, '127.0.0.1', self.port)
-        await site.start()
-
-        logger.info(f"hook_server_started: port={self.port}")
-
-    async def stop(self):
-        """Stop the HTTP server."""
-        if self._runner:
-            await self._runner.cleanup()
-            logger.info("hook_server_stopped")
-
-    async def _handle_session_start(self, request: web.Request) -> web.Response:
-        """Handle SessionStart hook from Claude."""
-        try:
-            data = await request.json()
-
-            session_id = data.get('session_id')
-            cwd = data.get('cwd')
-            tmux_session = data.get('tmux_session')
-
-            if not session_id:
-                logger.warning("hook_missing_session_id")
-                return web.Response(text='missing session_id', status=400)
-
-            logger.info(f"hook_received: session={session_id[:8]}, tmux={tmux_session}, cwd={cwd}")
-
-            # Call the callback
-            await self.on_session_hook(session_id, cwd, tmux_session)
-
-            return web.Response(text='ok')
-
-        except Exception as e:
-            logger.error(f"hook_error: {e}")
-            return web.Response(text='error', status=500)
+# ЗАМЕНИТЬ на:
+else:
+    # Session binding is handled by:
+    # - /new, /clear commands (set awaiting_new_session)
+    # - HistoryWatcher (binds new sessions to awaiting threads)
+    pass
 ```
 
-### 2. session_hook.sh (hooks/session_hook.sh)
+### 2. Добавить команду /new
 
-```bash
-#!/bin/bash
-# Claude Code SessionStart hook
-# Sends session info to codogram hook server
-
-set -e
-
-# Read JSON input from Claude
-input=$(cat)
-
-# Parse fields
-session_id=$(echo "$input" | jq -r '.session_id // empty')
-cwd=$(echo "$input" | jq -r '.cwd // empty')
-
-if [ -z "$session_id" ]; then
-    exit 0
-fi
-
-# Detect tmux session name
-tmux_session=$(tmux display-message -p '#S' 2>/dev/null || echo "")
-
-# Get port from environment or use default
-HOOK_PORT="${CODOGRAM_HOOK_PORT:-8787}"
-
-# Send to hook server
-curl -s -X POST "http://127.0.0.1:${HOOK_PORT}/hook/session-start" \
-    -H "Content-Type: application/json" \
-    -d "{
-        \"session_id\": \"$session_id\",
-        \"cwd\": \"$cwd\",
-        \"tmux_session\": \"$tmux_session\"
-    }" >/dev/null 2>&1 || true
-
-exit 0
-```
-
-### 3. setup_hooks.py (scripts/setup_hooks.py)
+**Файл:** `src/codogram/bot.py`
 
 ```python
-#!/usr/bin/env python3
-"""CLI tool to configure Claude hooks for codogram."""
+@router.message(Command("new"))
+async def cmd_new(message: Message):
+    """Start new Claude session in current thread."""
+    project = project_manager.get_by_chat(message.chat.id)
+    if not project:
+        await message.answer("Проект не зарегистрирован. Используй /start")
+        return
 
-import json
-import shutil
-from pathlib import Path
+    thread_id = message.message_thread_id
+    thread = project.threads.get(thread_id)
+    if not thread:
+        await message.answer("Thread не найден")
+        return
 
+    tmux_name = thread.get_tmux_session(project.project_name)
 
-CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
-HOOK_SCRIPT = Path(__file__).parent.parent / "hooks" / "session_hook.sh"
+    # Check tmux exists
+    if not is_tmux_session_exists(tmux_name):
+        await message.answer("tmux сессия не найдена")
+        return
 
+    # Mark thread as awaiting new session
+    thread.awaiting_new_session = True
+    thread.last_sent_message = None  # Clear fingerprint
+    project_manager._save()
 
-def setup_hooks(port: int = 8787) -> bool:
-    """Add SessionStart hook to Claude settings.
+    # Send /new to tmux
+    tmux = TmuxSession(tmux_name, project.cwd)
+    tmux.send_keys("/new")
 
-    Returns True if hooks were configured, False if user declined.
-    """
-    print("=== Codogram Hooks Setup ===\n")
-
-    # Check if hook script exists
-    if not HOOK_SCRIPT.exists():
-        print(f"Error: Hook script not found at {HOOK_SCRIPT}")
-        return False
-
-    # Make hook script executable
-    HOOK_SCRIPT.chmod(0o755)
-
-    # Load existing settings
-    settings = {}
-    if CLAUDE_SETTINGS.exists():
-        with open(CLAUDE_SETTINGS) as f:
-            settings = json.load(f)
-
-    # Check if hook already configured
-    hooks = settings.get("hooks", {})
-    session_start = hooks.get("SessionStart", [])
-
-    hook_command = f'CODOGRAM_HOOK_PORT={port} {HOOK_SCRIPT}'
-
-    already_configured = any(
-        hook_command in str(h.get("hooks", []))
-        for h in session_start
-    )
-
-    if already_configured:
-        print("Hooks already configured!")
-        return True
-
-    # Show what we're going to do
-    print(f"This will add a SessionStart hook to {CLAUDE_SETTINGS}")
-    print(f"Hook command: {hook_command}")
-    print()
-
-    # Ask for confirmation
-    response = input("Proceed? [y/N]: ").strip().lower()
-    if response != 'y':
-        print("Aborted.")
-        return False
-
-    # Backup existing settings
-    if CLAUDE_SETTINGS.exists():
-        backup = CLAUDE_SETTINGS.with_suffix('.json.bak')
-        shutil.copy(CLAUDE_SETTINGS, backup)
-        print(f"Backed up existing settings to {backup}")
-
-    # Add hook
-    new_hook = {
-        "matcher": "*",
-        "hooks": [
-            {
-                "type": "command",
-                "command": hook_command
-            }
-        ]
-    }
-
-    if "hooks" not in settings:
-        settings["hooks"] = {}
-    if "SessionStart" not in settings["hooks"]:
-        settings["hooks"]["SessionStart"] = []
-
-    settings["hooks"]["SessionStart"].append(new_hook)
-
-    # Save
-    CLAUDE_SETTINGS.parent.mkdir(parents=True, exist_ok=True)
-    with open(CLAUDE_SETTINGS, 'w') as f:
-        json.dump(settings, f, indent=2)
-
-    print(f"\nHooks configured successfully!")
-    print(f"Restart any running Claude sessions for hooks to take effect.")
-    return True
-
-
-def remove_hooks() -> bool:
-    """Remove codogram hooks from Claude settings."""
-    if not CLAUDE_SETTINGS.exists():
-        print("No Claude settings found.")
-        return True
-
-    with open(CLAUDE_SETTINGS) as f:
-        settings = json.load(f)
-
-    hooks = settings.get("hooks", {})
-    session_start = hooks.get("SessionStart", [])
-
-    # Filter out codogram hooks
-    filtered = [
-        h for h in session_start
-        if "session_hook.sh" not in str(h.get("hooks", []))
-    ]
-
-    if len(filtered) == len(session_start):
-        print("No codogram hooks found.")
-        return True
-
-    settings["hooks"]["SessionStart"] = filtered
-
-    with open(CLAUDE_SETTINGS, 'w') as f:
-        json.dump(settings, f, indent=2)
-
-    print("Codogram hooks removed.")
-    return True
-
-
-if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) > 1 and sys.argv[1] == "remove":
-        remove_hooks()
-    else:
-        setup_hooks()
+    await message.answer("⏳ Создаю новую сессию...")
 ```
 
-### 4. SessionBinderService (services/session_binder.py)
+### 3. Добавить команду /clear
+
+**Файл:** `src/codogram/bot.py`
 
 ```python
-"""Session binding service with hooks and content matching fallback."""
+@router.message(Command("clear"))
+async def cmd_clear(message: Message):
+    """Clear Claude session and start fresh."""
+    project = project_manager.get_by_chat(message.chat.id)
+    if not project:
+        await message.answer("Проект не зарегистрирован. Используй /start")
+        return
 
-import asyncio
-from pathlib import Path
-from typing import TYPE_CHECKING
+    thread_id = message.message_thread_id
+    thread = project.threads.get(thread_id)
+    if not thread:
+        await message.answer("Thread не найден")
+        return
 
-from ..logging_config import logger
-from ..session_manager import ProjectState, ThreadInfo, project_manager
-from ..history_reader import compute_jsonl_path
+    tmux_name = thread.get_tmux_session(project.project_name)
 
-if TYPE_CHECKING:
-    from ..adapters.hook_server import HookServer
+    if not is_tmux_session_exists(tmux_name):
+        await message.answer("tmux сессия не найдена")
+        return
 
+    # Mark thread as awaiting new session
+    thread.awaiting_new_session = True
+    thread.last_sent_message = None
+    project_manager._save()
 
-class SessionBinderService:
-    """Binds Claude sessions to threads.
+    # Send /clear to tmux
+    tmux = TmuxSession(tmux_name, project.cwd)
+    tmux.send_keys("/clear")
 
-    Primary: Hooks (exact tmux↔session mapping)
-    Fallback: Content matching (for sessions without hooks)
-    """
-
-    def __init__(self, config, tmux_adapter, history_adapter):
-        self.config = config
-        self.tmux = tmux_adapter
-        self.history = history_adapter
-        self.hook_server: "HookServer | None" = None
-
-    async def start_hook_server(self):
-        """Start hook server if enabled."""
-        if not self.config.hooks_enabled:
-            logger.info("hooks_disabled: skipping hook server")
-            return
-
-        from ..adapters.hook_server import HookServer
-
-        self.hook_server = HookServer(
-            port=self.config.hook_server_port,
-            on_session_hook=self.bind_from_hook
-        )
-        await self.hook_server.start()
-
-    async def stop_hook_server(self):
-        """Stop hook server."""
-        if self.hook_server:
-            await self.hook_server.stop()
-
-    # === Primary: Hook-based binding ===
-
-    async def bind_from_hook(self, session_id: str, cwd: str, tmux_session: str):
-        """Bind session from hook data. Called by HookServer."""
-        logger.debug(f"bind_from_hook: session={session_id[:8]}, tmux={tmux_session}, cwd={cwd}")
-
-        # Find project by cwd
-        project = self._find_project_by_cwd(cwd)
-        if not project:
-            logger.warning(f"hook_no_project: cwd={cwd}")
-            return
-
-        # Find thread by tmux session name
-        thread = self._find_thread_by_tmux(project, tmux_session)
-        if not thread:
-            logger.warning(f"hook_no_thread: tmux={tmux_session}, project={project.project_name}")
-            return
-
-        # Check if session actually changed
-        if thread.session_id == session_id:
-            logger.debug(f"hook_same_session: {session_id[:8]}")
-            return
-
-        logger.info(f"hook_bind: project={project.project_name}, thread={thread.name}, "
-                   f"old={thread.session_id[:8] if thread.session_id else None}, new={session_id[:8]}")
-
-        await self._rebind_thread(project, thread, session_id)
-
-    def _find_project_by_cwd(self, cwd: str) -> ProjectState | None:
-        """Find project by working directory."""
-        for project in project_manager.projects.values():
-            if project.cwd == cwd:
-                return project
-        return None
-
-    def _find_thread_by_tmux(self, project: ProjectState, tmux_session: str) -> ThreadInfo | None:
-        """Find thread by tmux session name."""
-        for thread in project.threads.values():
-            expected_tmux = thread.get_tmux_session(project.project_name)
-            if expected_tmux == tmux_session:
-                return thread
-        return None
-
-    # === Fallback: Content matching ===
-
-    async def check_and_bind(self, project: ProjectState):
-        """Check for unbound sessions and try to bind via content matching.
-
-        Called by HistoryWatcher and on_message as fallback when hooks not available.
-        """
-        if self._is_multi_thread(project):
-            await self._bind_multi_thread(project)
-        else:
-            await self._bind_single_thread(project)
-
-    def _is_multi_thread(self, project: ProjectState) -> bool:
-        """Project is multi-thread if has topics (thread_id != None)."""
-        return any(t.thread_id is not None for t in project.threads.values())
-
-    async def _bind_single_thread(self, project: ProjectState):
-        """Legacy binding for single-thread projects."""
-        thread = project.threads.get(None)
-        if not thread:
-            return
-
-        new_session = self.history.find_session_for_project(project.cwd)
-
-        if new_session and new_session != thread.session_id:
-            logger.info(f"fallback_bind_single: {thread.session_id} -> {new_session}")
-            await self._rebind_thread(project, thread, new_session)
-
-    async def _bind_multi_thread(self, project: ProjectState):
-        """Content matching for multi-thread projects."""
-        unbound = self._find_unbound_sessions(project)
-
-        for session_id in unbound:
-            await self._try_bind_via_content(project, session_id)
-
-    def _find_unbound_sessions(self, project: ProjectState) -> set[str]:
-        """Find sessions not bound to any thread."""
-        project_dir = self._get_project_dir(project.cwd)
-        if not project_dir.exists():
-            return set()
-
-        all_sessions = {f.stem for f in project_dir.glob("*.jsonl")}
-        bound = {t.session_id for t in project.threads.values() if t.session_id}
-        return all_sessions - bound
-
-    def _get_project_dir(self, cwd: str) -> Path:
-        """Get project directory for jsonl files."""
-        normalized = cwd.rstrip("/") or "/"
-        while "//" in normalized:
-            normalized = normalized.replace("//", "/")
-        project_hash = normalized.replace("/", "-")
-        return Path.home() / ".claude" / "projects" / project_hash
-
-    async def _try_bind_via_content(self, project: ProjectState, session_id: str):
-        """Try to match session content with tmux capture-pane."""
-        jsonl_path = compute_jsonl_path(project.cwd, session_id)
-        content = self._extract_matchable_content(jsonl_path)
-
-        if not content:
-            logger.debug(f"fallback_no_content: session={session_id[:8]}")
-            return
-
-        logger.debug(f"fallback_trying: session={session_id[:8]}, content={content[:50]}...")
-
-        for thread in project.threads.values():
-            if thread.session_id:
-                continue  # Already bound
-
-            tmux_name = thread.get_tmux_session(project.project_name)
-            pane = self.tmux.capture_pane(tmux_name)
-
-            if self._content_matches(content, pane):
-                logger.info(f"fallback_bind_content: thread={thread.name}, session={session_id[:8]}")
-                await self._rebind_thread(project, thread, session_id)
-                break
-        else:
-            logger.debug(f"fallback_no_match: session={session_id[:8]}")
-
-    def _extract_matchable_content(self, jsonl_path: Path) -> str | None:
-        """Extract content for matching from last assistant entry."""
-        last_entry = self.history.read_last_assistant_entry(jsonl_path)
-        if not last_entry:
-            return None
-
-        content = last_entry.get("message", {}).get("content", [])
-
-        for item in content:
-            if item.get("type") == "text":
-                return item.get("text", "")[:200]
-            elif item.get("type") == "tool_use":
-                name = item.get("name", "")
-                inp = str(item.get("input", {}))[:100]
-                return f"tool:{name}:{inp}"
-
-        return None
-
-    def _content_matches(self, content: str, pane: str) -> bool:
-        """Check if content appears in tmux pane."""
-        if not content or not pane:
-            return False
-
-        if content.startswith("tool:"):
-            parts = content.split(":", 2)
-            if len(parts) < 3:
-                logger.warning(f"fallback_malformed_tool: {content}")
-                return False
-            _, tool_name, tool_input = parts
-            return tool_name in pane and tool_input[:50] in pane
-        else:
-            return content[:150] in pane
-
-    # === Rebind ===
-
-    async def _rebind_thread(self, project: ProjectState, thread: ThreadInfo, new_session_id: str):
-        """Rebind thread to new session."""
-        # Cancel old watcher
-        if thread.watcher_task:
-            thread.watcher_task.cancel()
-            thread.watcher_task = None
-
-        # Update binding
-        old_session = thread.session_id
-        thread.session_id = new_session_id
-        thread.jsonl_path = str(compute_jsonl_path(project.cwd, new_session_id))
-
-        logger.info(f"session_rebound: project={project.project_name}, thread={thread.name}, "
-                   f"old={old_session[:8] if old_session else None}, new={new_session_id[:8]}")
-
-        # Start new watcher
-        from ..history_watcher import watch_thread_jsonl
-        # Note: need to get telegram_queue from somewhere - will be injected
-        # thread.watcher_task = asyncio.create_task(watch_thread_jsonl(...))
-
-        # Save config
-        project_manager._save()
+    await message.answer("⏳ Очищаю сессию...")
 ```
 
-### 5. TmuxAdapter addition (adapters/tmux.py)
+### 4. Обновить HistoryWatcher
 
-```python
-def capture_pane(self, session_name: str) -> str:
-    """Capture entire scrollback from tmux pane.
-
-    Uses -S - to get full history, not just visible area.
-    """
-    result = subprocess.run(
-        ["tmux", "capture-pane", "-t", session_name, "-p", "-S", "-"],
-        capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        logger.debug(f"capture_pane_failed: {session_name}, rc={result.returncode}")
-        return ""
-    return result.stdout
-```
-
-## Интеграция
-
-### main.py
-
-```python
-async def main():
-    # ... existing setup ...
-
-    # Create session binder
-    from .services.session_binder import SessionBinderService
-    session_binder = SessionBinderService(config, tmux_adapter, history_adapter)
-
-    # Start hook server if enabled
-    await session_binder.start_hook_server()
-
-    # Pass to HistoryWatcher
-    history_watcher = HistoryWatcher(bot, ..., session_binder=session_binder)
-
-    # ... rest of startup ...
-
-    # On shutdown
-    await session_binder.stop_hook_server()
-```
-
-### HistoryWatcher
+**Файл:** `src/codogram/history_watcher.py`
 
 ```python
 async def _check_for_changes(self):
-    for project in self.project_manager.projects.values():
-        # ... cleanup checks ...
+    """Check for session changes and bind awaiting threads."""
+    for project in list(self.project_manager.projects.values()):
+        if not project.chat_id or not project.cwd:
+            continue
 
-        # Fallback binding (for sessions without hooks)
-        await self.session_binder.check_and_bind(project)
+        # Check tmux health (existing logic)
+        for thread in list(project.threads.values()):
+            # ... existing tmux died detection ...
+            pass
+
+        # Bind awaiting threads to new sessions
+        await self._bind_awaiting_threads(project)
+
+
+async def _bind_awaiting_threads(self, project: ProjectState):
+    """Find new sessions and bind to awaiting threads."""
+    for thread in project.threads.values():
+        if not thread.awaiting_new_session:
+            continue
+
+        # Get tmux session name for this thread
+        tmux_name = thread.get_tmux_session(project.project_name)
+
+        # Find session for this specific tmux
+        new_session = self._find_session_for_tmux(project.cwd, tmux_name)
+
+        if new_session and new_session != thread.session_id:
+            await self._bind_thread_to_session(project, thread, new_session)
+
+
+def _find_session_for_tmux(self, cwd: str, tmux_name: str) -> str | None:
+    """Find latest session that matches this tmux session.
+
+    Strategy: Check if the latest session in history.jsonl for this cwd
+    is newer than thread's current session.
+    """
+    # For now, use simple approach: latest session for project
+    # This works because each thread has its own tmux, and we only
+    # check threads with awaiting_new_session=true
+    return find_session_for_project(cwd)
+
+
+async def _bind_thread_to_session(
+    self,
+    project: ProjectState,
+    thread: ThreadInfo,
+    new_session_id: str
+):
+    """Bind thread to new session."""
+    logger.info(
+        f"session_bound: project={project.project_name}, thread={thread.name}, "
+        f"old={thread.session_id[:8] if thread.session_id else None}, "
+        f"new={new_session_id[:8]}"
+    )
+
+    # Cancel old watcher
+    if thread.watcher_task:
+        thread.watcher_task.cancel()
+        thread.watcher_task = None
+
+    # Update binding
+    thread.session_id = new_session_id
+    thread.jsonl_path = str(compute_jsonl_path(project.cwd, new_session_id))
+    thread.awaiting_new_session = False
+
+    # Start new watcher
+    thread.watcher_task = asyncio.create_task(
+        watch_thread_jsonl(None, project, thread, self.telegram_queue)
+    )
+
+    # Restart permission poller
+    if thread.poller_task:
+        thread.poller_task.cancel()
+    from .permission_poller import create_poller_task_for_thread
+    thread.poller_task = await create_poller_task_for_thread(
+        self.bot, project, thread, self.telegram_queue
+    )
+
+    # Notify user
+    from .telegram_queue import OutgoingBatch
+    batch = OutgoingBatch(
+        chat_id=project.chat_id,
+        thread_id=thread.thread_id,
+        messages=[{"text": "✅ Новая сессия создана"}],
+    )
+    await self.telegram_queue.enqueue_nowait(batch)
+
+    # Save config
+    self.project_manager._save()
 ```
 
-### on_message (handlers/messages.py)
+### 5. Добавить поле awaiting_new_session в ThreadInfo
+
+**Файл:** `src/codogram/session_manager.py`
 
 ```python
-async def on_message(message: Message, session_binder: SessionBinderService):
-    project = project_manager.get_by_chat(message.chat.id)
-    if not project:
-        return
-
-    # Check for session changes (fallback)
-    await session_binder.check_and_bind(project)
-
-    # ... rest of message handling ...
+@dataclass
+class ThreadInfo:
+    thread_id: int | None  # None for main thread
+    name: str
+    session_id: str | None = None
+    jsonl_path: str | None = None
+    awaiting_new_session: bool = False  # ADD THIS
+    last_sent_message: str | None = None
+    watcher_task: asyncio.Task | None = None
+    poller_task: asyncio.Task | None = None
+    binding_task: asyncio.Task | None = None
 ```
 
 ## Что удаляем
 
-1. **`check_session_for_thread()`** в `history_watcher.py` — заменяется на SessionBinderService
-2. Вызов `check_session_for_thread` в `bot.py` on_message
+1. **`check_session_for_thread()`** в `history_watcher.py` — больше не нужен
+2. Вызов `check_session_for_thread` в `bot.py:1388-1389`
 
 ## Что остаётся
 
-1. **`poll_for_session_thread()`** — binding по user message (для новых тредов)
-2. **`watch_thread_jsonl()`** — watcher для треда
-3. **`find_session_for_project()`** — используется в fallback для single-thread
+1. **`poll_for_session_thread()`** — для первичного binding новых threads
+2. **`watch_thread_jsonl()`** — watcher для thread
+3. **`find_session_for_project()`** — используется в `_bind_awaiting_threads`
+
+## Edge Cases
+
+### User does /new in tmux directly
+
+**Риск:** Бот не знает что thread ждёт новую сессию.
+
+**Решение:** Забить. Редкий случай. User может сделать `/start` в Telegram чтобы rebind.
+
+### Multiple threads awaiting simultaneously
+
+**Риск:** Непонятно какой thread получит сессию.
+
+**Решение:** Каждый thread имеет свой tmux. При появлении новой сессии привязываем к первому awaiting thread для этого проекта. Если нужна точность — можно добавить timestamp проверку.
 
 ## Тестирование
 
-### С hooks:
-```bash
-# 1. Setup hooks
-python -m codogram.scripts.setup_hooks
+### Ручное тестирование
 
-# 2. Restart Claude sessions
+1. Зарегистрировать проект через `/start`
+2. Создать topic и запустить там Claude
+3. Отправить `/new` в topic
+4. Проверить что:
+   - Claude создал новую сессию
+   - Бот показал "✅ Новая сессия создана"
+   - Сообщения Claude продолжают приходить
 
-# 3. Test /compact in a topic
-# Expected: immediate rebind via hook
+### Тест на mixup bug
+
+1. Иметь два topics с разными Claude сессиями
+2. Сделать `/new` в одном topic
+3. Проверить что второй topic **НЕ потерял** свою сессию
+
+## Регистрация команд
+
+**Файл:** `src/codogram/main.py`
+
+```python
+await bot.set_my_commands([
+    BotCommand(command="start", description="Start Claude / show status"),
+    BotCommand(command="new", description="Start new Claude session"),
+    BotCommand(command="clear", description="Clear and start fresh session"),
+    BotCommand(command="session_new", description="Create new Claude thread"),
+    BotCommand(command="session_close", description="Close Claude thread"),
+    BotCommand(command="restart_session", description="Restart Claude session"),
+    BotCommand(command="my_chat_id", description="Show your user ID"),
+    BotCommand(command="esc", description="Send Escape to Claude"),
+])
 ```
 
-### Без hooks (fallback):
-```bash
-# 1. Set HOOKS_ENABLED=false in .env
+## Альтернативные подходы
 
-# 2. Restart bot
+Рассмотренные, но отложенные подходы:
 
-# 3. Test /compact in a topic
-# Expected: rebind via content matching within 15 sec
-```
-
-## Rollout
-
-1. Добавить adapters/hook_server.py
-2. Добавить services/session_binder.py
-3. Добавить hooks/session_hook.sh
-4. Добавить scripts/setup_hooks.py
-5. Добавить capture_pane в tmux.py
-6. Обновить config.py с hooks settings
-7. Интегрировать в main.py
-8. Интегрировать в HistoryWatcher
-9. Удалить check_session_for_thread
-10. Тестирование с hooks
-11. Тестирование без hooks (fallback)
-12. Документация для пользователей
+- [Hooks-based approach](alternative/2025-12-29-session-binder-hooks-approach.md) — Claude SessionStart hooks + HTTP server
 
 ## Changelog
 
+**v4 (2025-12-29):**
+- Switched to Telegram commands approach
+- Removed hooks complexity
+- Added /new and /clear commands
+- Simplified HistoryWatcher logic
+
 **v3 (2025-12-29):**
-- Added hooks as primary binding mechanism
-- Content matching becomes fallback
-- Added HookServer, setup_hooks.py, session_hook.sh
-- Added configuration for enabling/disabling hooks
+- Added hooks as primary binding mechanism (SUPERSEDED)
 
 **v2 (2025-12-29):**
-- ValueError fix for tool content parsing
-- Full tmux scrollback capture (-S -)
-- Reuse compute_jsonl_path()
-- Added logging
+- Added content matching fallback (SUPERSEDED)
 
 **v1 (2025-12-29):**
-- Initial design with content matching only
+- Initial design with content matching only (SUPERSEDED)
