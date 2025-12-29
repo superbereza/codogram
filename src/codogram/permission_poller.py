@@ -3,8 +3,12 @@ import asyncio
 from enum import Enum
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from aiogram import Bot
+
+if TYPE_CHECKING:
+    from .telegram_queue import TelegramQueue
 
 from .config import settings
 from .screen import parse_screen, PermissionPrompt
@@ -26,12 +30,12 @@ class PollerState(Enum):
 SEPARATOR_SOLID = "──────────────────"
 
 
-async def create_poller_task(bot: Bot, project: ProjectState) -> asyncio.Task:
+async def create_poller_task(bot: Bot, project: ProjectState, telegram_queue: "TelegramQueue") -> asyncio.Task:
     """Create permission poller task for project."""
-    return asyncio.create_task(permission_poller_for_project(bot, project))
+    return asyncio.create_task(permission_poller_for_project(bot, project, telegram_queue))
 
 
-async def permission_poller_for_project(bot: Bot, project: ProjectState):
+async def permission_poller_for_project(bot: Bot, project: ProjectState, telegram_queue: "TelegramQueue"):
     """
     Background poller for permission prompts.
 
@@ -230,12 +234,12 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState):
                             await asyncio.sleep(5)
 
 
-async def create_poller_task_for_thread(bot: Bot, project: ProjectState, thread: ThreadInfo) -> asyncio.Task:
+async def create_poller_task_for_thread(bot: Bot, project: ProjectState, thread: ThreadInfo, telegram_queue: "TelegramQueue") -> asyncio.Task:
     """Create permission poller task for a specific thread."""
-    return asyncio.create_task(permission_poller_for_thread(bot, project, thread))
+    return asyncio.create_task(permission_poller_for_thread(bot, project, thread, telegram_queue))
 
 
-async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: ThreadInfo):
+async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: ThreadInfo, telegram_queue: "TelegramQueue"):
     """
     Background poller for permission prompts in a specific thread/topic.
 
