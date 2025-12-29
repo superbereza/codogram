@@ -92,4 +92,4 @@ cat .config.json | jq
 
 - `docs/setup.md` - Installation and setup guide
 - `docs/ONBOARDING.md` - Detailed onboarding for new Claude sessions
-- `ROADMAP.md` - Future features and improvements
+- `docs/ROADMAP.md` - Future features and improvements

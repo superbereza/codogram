@@ -12,7 +12,6 @@
 - tmux send-keys для input
 - jsonl watch для output
 - Chunking (4000 символов)
-- Статус символы (●◐✓)
 
 ### Multi-session architecture
 - Один процесс бота на несколько Claude сессий
