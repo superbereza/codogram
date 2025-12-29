@@ -10,6 +10,13 @@
 
 **Design:** [docs/designs/2025-12-29-background-launch-animation.md](../designs/2025-12-29-background-launch-animation.md)
 
+**Pre-existing infrastructure:**
+- `poll_for_session_thread` — exists in `history_watcher.py:244`
+- `create_poller_task_for_thread` — exists in `permission_poller.py:193`
+- `_make_task_starters` — exists in `bot.py:161`
+- `telegram_queue.enqueue()` — already returns `list[int]` (message IDs)
+- `history_watcher` — already uses TelegramQueue (no migration needed)
+
 ---
 
 ## Task 1: Add launch_task field to ThreadInfo
@@ -157,12 +164,14 @@ git commit -m "feat(launch_animation): add faces constants"
 
 ---
 
-## Task 4: Implement launch_with_animation function
+## Task 4: Implement launch_with_animation with monitoring
 
 **Files:**
 - Modify: `src/codogram/launch_animation.py`
 
-**Step 1: Add imports and helper**
+**NOTE:** This task includes both the main function AND the `_start_monitoring` helper to avoid py_compile errors from undefined references.
+
+**Step 1: Add imports**
 
 ```python
 import asyncio
@@ -176,16 +185,43 @@ from .telegram_queue import TelegramQueue, EditBatch
 from .tmux import TmuxSession
 ```
 
-**Step 2: Add launch_with_animation function**
+**Step 2: Add _start_monitoring helper FIRST**
+
+```python
+async def _start_monitoring(
+    bot: Bot,
+    project: ProjectState,
+    thread: ThreadInfo,
+    queue: TelegramQueue,
+):
+    """Start poller and watcher for thread after successful launch."""
+    from .history_watcher import poll_for_session_thread
+    from .permission_poller import create_poller_task_for_thread
+
+    # Start session binding (will find session and start watcher)
+    if not thread.binding_task or thread.binding_task.done():
+        thread.binding_task = asyncio.create_task(
+            poll_for_session_thread(
+                project, thread, bot,
+                None, None, queue  # start_poller/start_watcher not used
+            )
+        )
+
+    # Start permission poller
+    if not thread.poller_task or thread.poller_task.done():
+        thread.poller_task = await create_poller_task_for_thread(bot, project, thread, queue)
+```
+
+**Step 3: Add launch_with_animation function**
 
 Key points:
 - Block session discovery: `thread.awaiting_new_session = True`
 - Send status messages
 - Create tmux and run `claude`
 - Wait for ready with face animation after 3 sec
-- **Handle timeout properly**: show error message, return False
-- Start poller/watcher after success
-- Cleanup in finally block
+- **Timeout → error message, return False**
+- Start monitoring after success
+- Save state on success (not in finally — only save on actual state change)
 
 ```python
 async def launch_with_animation(
@@ -195,8 +231,6 @@ async def launch_with_animation(
     project: ProjectState,
     thread: ThreadInfo,
     queue: TelegramQueue,
-    start_poller,
-    start_watcher,
 ) -> bool:
     """Launch Claude with animated status messages."""
     tmux_name = thread.get_tmux_session(project.project_name)
@@ -273,8 +307,11 @@ async def launch_with_animation(
 
         await bot.send_message(chat_id, "✓ Claude готов!", message_thread_id=thread_id)
 
-        # 5. Start poller/watcher (Task 5 will implement this)
-        await _start_monitoring(bot, project, thread, queue, start_poller, start_watcher)
+        # 5. Start monitoring
+        await _start_monitoring(bot, project, thread, queue)
+
+        # 6. Save state on success
+        project_manager._save()
 
         return True
 
@@ -289,72 +326,23 @@ async def launch_with_animation(
     finally:
         thread.awaiting_new_session = False
         thread.launch_task = None
-        project_manager._save()
 ```
 
-**Step 3: Verify syntax**
+**Step 4: Verify syntax**
 
 Run: `python3 -m py_compile src/codogram/launch_animation.py`
 Expected: No errors
 
-**Step 4: Commit**
+**Step 5: Commit**
 
 ```bash
 git add src/codogram/launch_animation.py
-git commit -m "feat(launch_animation): implement launch_with_animation"
+git commit -m "feat(launch_animation): implement launch_with_animation with monitoring"
 ```
 
 ---
 
-## Task 5: Integrate poller/watcher startup in launch_with_animation
-
-**Files:**
-- Modify: `src/codogram/launch_animation.py`
-
-**Step 1: Add _start_monitoring helper**
-
-```python
-async def _start_monitoring(
-    bot: Bot,
-    project: ProjectState,
-    thread: ThreadInfo,
-    queue: TelegramQueue,
-    start_poller,
-    start_watcher,
-):
-    """Start poller and watcher for thread after successful launch."""
-    from .history_watcher import watch_thread_jsonl, poll_for_session_thread
-
-    # Start session binding (will find session and start watcher)
-    if not thread.binding_task or thread.binding_task.done():
-        thread.binding_task = asyncio.create_task(
-            poll_for_session_thread(
-                project, thread, bot,
-                start_poller, start_watcher, queue
-            )
-        )
-
-    # Start permission poller
-    from .permission_poller import create_poller_task_for_thread
-    if not thread.poller_task or thread.poller_task.done():
-        thread.poller_task = await create_poller_task_for_thread(bot, project, thread, queue)
-```
-
-**Step 2: Verify syntax**
-
-Run: `python3 -m py_compile src/codogram/launch_animation.py`
-Expected: No errors
-
-**Step 3: Commit**
-
-```bash
-git add src/codogram/launch_animation.py
-git commit -m "feat(launch_animation): integrate poller/watcher startup"
-```
-
----
-
-## Task 6: Update bot.py to use background launch
+## Task 5: Update bot.py to use background launch
 
 **Files:**
 - Modify: `src/codogram/bot.py`
@@ -379,8 +367,6 @@ async def on_start_launch_claude(callback: CallbackQuery):
     from .launch_animation import launch_with_animation
     from .main import telegram_queue
 
-    start_poller, start_watcher = _make_task_starters(callback.bot)
-
     thread.launch_task = asyncio.create_task(
         launch_with_animation(
             bot=callback.bot,
@@ -389,8 +375,6 @@ async def on_start_launch_claude(callback: CallbackQuery):
             project=project,
             thread=thread,
             queue=telegram_queue,
-            start_poller=start_poller,
-            start_watcher=start_watcher,
         )
     )
 
@@ -411,16 +395,21 @@ git commit -m "feat(bot): use background launch with animation"
 
 ---
 
-## Task 7: Migrate permission_poller keyboard sends to TelegramQueue
+## Task 6: Migrate permission_poller keyboard sends to TelegramQueue
 
 **Files:**
+- Modify: `src/codogram/telegram_queue.py`
 - Modify: `src/codogram/permission_poller.py`
 
-**Context:** Currently permission_poller uses TelegramQueue for content messages but `bot.send_message` directly for keyboard. This bypasses rate limiting.
+**Context:** permission_poller uses TelegramQueue for content but `bot.send_message` directly for keyboards. This bypasses rate limiting.
+
+**NOTE:** `enqueue()` already returns `list[int]` (message IDs), so KeyboardBatch will work the same way.
 
 **Step 1: Add KeyboardBatch to telegram_queue.py**
 
 ```python
+from aiogram.types import InlineKeyboardMarkup
+
 @dataclass
 class KeyboardBatch:
     """Keyboard message with reply markup."""
@@ -436,11 +425,29 @@ class KeyboardBatch:
 QueueItem = OutgoingBatch | EditBatch | KeyboardBatch
 ```
 
-**Step 3: Add _send_keyboard method and update _process_item**
+**Step 3: Add _send_keyboard method**
 
-**Step 4: Update permission_poller to use KeyboardBatch**
+```python
+async def _send_keyboard(self, batch: KeyboardBatch) -> list[int]:
+    """Send keyboard message."""
+    try:
+        msg = await self.bot.send_message(
+            batch.chat_id,
+            batch.text,
+            reply_markup=batch.reply_markup,
+            message_thread_id=batch.thread_id,
+        )
+        return [msg.message_id]
+    except Exception as e:
+        logger.error(f"keyboard_send_error: {e}")
+        return []
+```
 
-Replace:
+**Step 4: Update _process_item to handle KeyboardBatch**
+
+**Step 5: Update permission_poller**
+
+Replace (4 occurrences):
 ```python
 kb_msg = await bot.send_message(chat_id, "👆", reply_markup=kb)
 ```
@@ -456,9 +463,12 @@ kb_msg_ids = await telegram_queue.enqueue(KeyboardBatch(
 kb_msg_id = kb_msg_ids[0] if kb_msg_ids else None
 ```
 
-**Step 5: Verify and commit**
+**Step 6: Update cleanup code to use kb_msg_id instead of kb_msg.message_id**
+
+**Step 7: Verify and commit**
 
 ```bash
+python3 -m py_compile src/codogram/telegram_queue.py
 python3 -m py_compile src/codogram/permission_poller.py
 pytest tests/ -v
 git add src/codogram/telegram_queue.py src/codogram/permission_poller.py
@@ -467,7 +477,7 @@ git commit -m "refactor(poller): migrate keyboard sends to TelegramQueue"
 
 ---
 
-## Task 8: Add tests for launch_with_animation
+## Task 7: Add tests for launch_with_animation
 
 **Files:**
 - Create: `tests/test_launch_animation_function.py`
@@ -489,7 +499,7 @@ async def test_launch_blocks_concurrent_launch():
 async def test_launch_timeout_shows_error():
     """After 120s timeout, shows error message and returns False."""
     # Mock tmux.is_claude_ready() to always return False
-    # Fast-forward time or use small timeout
+    # Use monkeypatch to set short timeout
     # Verify error message sent
     # Verify returns False
 ```
@@ -500,7 +510,7 @@ async def test_launch_timeout_shows_error():
 @pytest.mark.asyncio
 async def test_launch_success_starts_monitoring():
     """Successful launch starts poller and watcher."""
-    # Mock tmux.is_claude_ready() to return True after delay
+    # Mock tmux.is_claude_ready() to return True immediately
     # Verify poller_task and binding_task are started
     # Verify returns True
 ```
@@ -515,7 +525,7 @@ git commit -m "test(launch_animation): add function tests"
 
 ---
 
-## Task 9: Manual testing and fixes
+## Task 8: Manual testing and fixes
 
 **Step 1: Run full test suite**
 
@@ -538,7 +548,7 @@ Expected: All tests PASS
 
 ---
 
-## Task 10: Cleanup
+## Task 9: Cleanup
 
 **Step 1: Remove unused code**
 
@@ -562,10 +572,14 @@ git commit -m "chore: cleanup old launch code"
 | 1 | Add launch_task to ThreadInfo | TODO |
 | 2 | Add EditBatch to TelegramQueue | TODO |
 | 3 | Create launch_animation with FACES | TODO |
-| 4 | Implement launch_with_animation | TODO |
-| 5 | Integrate poller/watcher startup | TODO |
-| 6 | Update bot.py to use animation | TODO |
-| 7 | Migrate poller keyboards to queue | TODO |
-| 8 | Add tests for launch_with_animation | TODO |
-| 9 | Manual testing and fixes | TODO |
-| 10 | Cleanup | TODO |
+| 4 | Implement launch_with_animation + _start_monitoring | TODO |
+| 5 | Update bot.py to use animation | TODO |
+| 6 | Migrate poller keyboards to queue | TODO |
+| 7 | Add tests for launch_with_animation | TODO |
+| 8 | Manual testing and fixes | TODO |
+| 9 | Cleanup | TODO |
+
+**Notes:**
+- Tasks reduced from 10 to 9 by merging Task 4+5
+- `history_watcher` already uses TelegramQueue — no migration needed
+- `project_manager._save()` is the existing pattern in codebase (not ideal but consistent)
