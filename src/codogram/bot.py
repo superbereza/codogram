@@ -159,18 +159,20 @@ async def show_status(message: Message, project: ProjectState):
     await message.answer("\n".join(status_lines), parse_mode="Markdown")
 
 def _make_task_starters(bot):
-    """Create task starter functions for poller and watcher.
+    """Create task starter functions with bot and queue bound.
 
     Returns:
         (start_poller, start_watcher) - async functions to start tasks
     """
+    from .main import telegram_queue
+
     async def start_poller(p: ProjectState) -> asyncio.Task:
         from .permission_poller import create_poller_task
-        return await create_poller_task(bot, p)
+        return await create_poller_task(bot, p, telegram_queue)
 
     async def start_watcher(p: ProjectState, send_missed: bool = False) -> asyncio.Task:
         from .watcher import create_watcher_task
-        return await create_watcher_task(bot, p, send_missed)
+        return await create_watcher_task(bot, p, telegram_queue, send_missed)
 
     return start_poller, start_watcher
 
@@ -1369,6 +1371,7 @@ async def on_message(message: Message):
     if thread.session_id is None:
         # No session bound - use session binding (match by user message)
         from .history_watcher import poll_for_session_thread
+        from .main import telegram_queue
 
         thread.last_sent_message = message.text
 
@@ -1376,7 +1379,7 @@ async def on_message(message: Message):
         if not thread.binding_task or thread.binding_task.done():
             logger.debug(f"Starting binding task for thread {thread.name}")
             thread.binding_task = asyncio.create_task(
-                poll_for_session_thread(project, thread, message.bot, start_poller, start_watcher)
+                poll_for_session_thread(project, thread, message.bot, start_poller, start_watcher, telegram_queue)
             )
         else:
             logger.debug(f"Binding task already running for thread {thread.name}")
