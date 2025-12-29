@@ -3,9 +3,9 @@
 #
 # Verifies that all messages read from Claude jsonl were delivered to Telegram.
 #
-# Logging started: 2025-12-29 18:38 UTC+3
-# Commit: 90590fc feat(watcher): add message delivery tracking logs
-# https://github.com/superbereza/codogram/commit/90590fc
+# Logging started: 2025-12-29 18:46 UTC+3 (after fix c838273)
+# Commit: c838273 fix(watcher): use hash for message tracking ID
+# https://github.com/superbereza/codogram/commit/c838273
 
 LOG_FILE="${1:-logs/codogram.log}"
 
