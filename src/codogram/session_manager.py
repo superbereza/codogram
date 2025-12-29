@@ -169,6 +169,7 @@ class ProjectManager:
                         name=thread_data.get("name", "main"),
                         session_id=thread_data.get("session_id"),
                         jsonl_path=thread_data.get("jsonl_path"),
+                        awaiting_new_session=thread_data.get("awaiting_new_session", False),
                     )
 
                 # Migrate legacy → threads[None] if not already present
@@ -203,6 +204,7 @@ class ProjectManager:
                         "name": t.name,
                         "session_id": t.session_id,
                         "jsonl_path": t.jsonl_path,
+                        "awaiting_new_session": t.awaiting_new_session,
                     }
                     for tid, t in p.threads.items()
                 }
