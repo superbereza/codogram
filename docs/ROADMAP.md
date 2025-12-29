@@ -63,6 +63,14 @@
 - enqueue() возвращает message IDs для cleanup
 - enqueue_nowait() для fire-and-forget
 
+### Project initialization wizard
+Интерактивный выбор способа инициализации проекта при `/start`:
+- **Existing local repo** — подключиться к существующему git репозиторию
+- **Clone from GitHub** — `git clone <url>` + подключение
+- **New repo** — `git init` + `gh repo create` + подключение
+- Inline кнопки для выбора варианта
+- Автосоздание tmux сессии в выбранной директории
+
 ## Bugs
 
 ### Thread session mixup
@@ -93,14 +101,6 @@
 - `🚀 Claude запущен в claude-codogram-sublime`
 - `Подключиться: tmux attach -t claude-codogram-sublime`
 - Анпинить предыдущее при рестарте
-
-### Project initialization wizard
-Интерактивный выбор способа инициализации проекта при `/start`:
-- **Existing local repo** — подключиться к существующему git репозиторию
-- **Clone from GitHub** — `git clone <url>` + подключение
-- **New repo** — `git init` + `gh repo create` + подключение
-- Inline кнопки для выбора варианта
-- Автосоздание tmux сессии в выбранной директории
 
 ### Session switching UI
 Улучшения для multi-session:
