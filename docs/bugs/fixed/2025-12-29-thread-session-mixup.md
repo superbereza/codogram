@@ -2,7 +2,21 @@
 
 **Date:** 2025-12-29
 **Severity:** High
-**Status:** Open
+**Status:** Fixed
+
+## Resolution
+
+**Fixed by:** [Session Binder Telegram Commands](../plans/2025-12-29-session-binder-telegram-commands.md)
+
+**Fix summary:**
+- Removed `check_session_for_thread` — the function that incorrectly detected session changes
+- Added explicit `/new` and `/clear` Telegram commands with `awaiting_new_session` flag
+- Added `_bind_awaiting_threads` that only binds threads explicitly waiting for new session
+- Now threads maintain independent session bindings; new session in one thread doesn't affect others
+
+**Commits:** `8998627`, `79992b0`, `7d212e0`, `04f0e2f`, `5d7f65a`, `4db681b`, `505b844`
+
+---
 
 ## Summary
 
