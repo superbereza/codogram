@@ -4,7 +4,10 @@ import asyncio
 from enum import Enum
 from dataclasses import dataclass
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncIterator, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .telegram_queue import TelegramQueue
 from aiogram import Bot
 from .chunker import chunk_message
 from .logging_config import logger
@@ -231,3 +234,76 @@ async def send_entry_to_telegram(
                 f"● {entry.tool_name}",
                 message_thread_id=message_thread_id,
             )
+
+
+async def create_watcher_task(
+    bot: Bot,
+    project,
+    telegram_queue: "TelegramQueue",
+    send_missed: bool = False,
+) -> asyncio.Task:
+    """Create jsonl watcher task for project's main thread.
+
+    This is a compatibility shim - actual watching is done per-thread
+    via watch_thread_jsonl in history_watcher.py.
+    """
+    from .session_manager import ProjectState
+
+    if not isinstance(project, ProjectState):
+        raise TypeError("project must be ProjectState")
+
+    # Get or create main thread
+    main_thread = project.get_or_create_thread(None, "main")
+
+    if not main_thread.jsonl_path:
+        # No session yet, return a no-op task
+        async def noop():
+            pass
+        return asyncio.create_task(noop())
+
+    # Create watcher for main thread
+    return asyncio.create_task(
+        _watch_with_queue(bot, project, main_thread, telegram_queue)
+    )
+
+
+async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "TelegramQueue"):
+    """Watch jsonl and send entries through queue."""
+    from .telegram_queue import OutgoingBatch
+    from pathlib import Path
+
+    if not thread.jsonl_path:
+        return
+
+    watcher = JsonlWatcher(Path(thread.jsonl_path))
+
+    try:
+        async for entry in watcher.watch():
+            try:
+                messages = _entry_to_messages(entry)
+                if messages:
+                    batch = OutgoingBatch(
+                        chat_id=project.chat_id,
+                        thread_id=thread.thread_id,
+                        messages=messages,
+                    )
+                    await telegram_queue.enqueue_nowait(batch)
+            except Exception as e:
+                logger.warning(f"watch_with_queue error: {e}")
+    except asyncio.CancelledError:
+        raise
+
+
+def _entry_to_messages(entry: ParsedEntry) -> list[dict]:
+    """Convert ParsedEntry to list of message dicts for queue."""
+    messages = []
+
+    if entry.content_type == ContentType.TEXT:
+        for chunk in chunk_message(entry.text):
+            messages.append({"text": f"● {chunk}", "parse_mode": "Markdown"})
+
+    elif entry.content_type == ContentType.TOOL_USE:
+        text = format_tool_use(entry.tool_name, entry.tool_input)
+        messages.append({"text": text, "parse_mode": "Markdown"})
+
+    return messages
