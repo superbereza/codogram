@@ -302,11 +302,15 @@ async def cmd_start(message: Message):
     thread_id = message.message_thread_id
     args = message.text.split()[1:]  # Skip /start
 
+    logger.info(f"cmd_start: chat_id={chat_id} thread_id={thread_id} args={args}")
+
     # If in a topic, use thread-specific flow
     if thread_id is not None:
         project = project_manager.get_by_chat(chat_id)
+        logger.debug(f"cmd_start: topic mode, project={project.project_name if project else None}")
         if project:
             thread = project.threads.get(thread_id)
+            logger.debug(f"cmd_start: thread={thread}")
             if thread:
                 if thread.name == "pending":
                     # Upgrade pending thread
@@ -992,13 +996,47 @@ async def cmd_restart_session(message: Message):
     if not is_admin(message.from_user.id):
         return
 
-    project = project_manager.get_by_chat(message.chat.id)
-    if not project or not project.tmux_session:
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
         await message.answer("Нет активной сессии для перезапуска.")
         return
 
+    # Determine tmux session name
+    if thread_id is not None:
+        thread = project.threads.get(thread_id)
+        if thread:
+            tmux_name = thread.get_tmux_session(project.project_name)
+        else:
+            await message.answer("Нет активной сессии для перезапуска.")
+            return
+    else:
+        # Main thread or legacy
+        thread = project.threads.get(None)
+        if thread:
+            tmux_name = thread.get_tmux_session(project.project_name)
+        elif project.tmux_session:
+            tmux_name = project.tmux_session
+        else:
+            await message.answer("Нет активной сессии для перезапуска.")
+            return
+
+    # Check if tmux exists
+    if not is_tmux_session_exists(tmux_name):
+        await message.answer("Нет активной сессии для перезапуска.")
+        return
+
+    # Store state for confirm callback
+    _start_state[chat_id] = {
+        "state": "restart_confirm",
+        "tmux_name": tmux_name,
+        "thread_id": thread_id,
+    }
+
     await message.answer(
-        f"Перезапустить сессию `{project.tmux_session}`?",
+        f"Перезапустить сессию `{tmux_name}`?",
         reply_markup=restart_confirm_keyboard(),
         parse_mode="Markdown",
     )
@@ -1010,39 +1048,78 @@ async def on_restart_confirm(callback: CallbackQuery):
         await callback.answer("Not authorized")
         return
 
-    project = project_manager.get_by_chat(callback.message.chat.id)
+    chat_id = callback.message.chat.id
+    state = _start_state.get(chat_id)
+
+    if not state or state.get("state") != "restart_confirm":
+        await callback.answer("Сессия истекла")
+        return
+
+    tmux_name = state.get("tmux_name")
+    thread_id = state.get("thread_id")
+    _start_state.pop(chat_id, None)
+
+    project = project_manager.get_by_chat(chat_id)
     if not project:
         await callback.answer("Сессия не найдена")
         return
 
-    # Stop tasks
-    # Stop poller task
-    if project.poller_task and not project.poller_task.done():
-        project.poller_task.cancel()
-        try:
-            await project.poller_task
-        except asyncio.CancelledError:
-            pass
-        project.poller_task = None
+    # Get thread if in topic
+    thread = None
+    if thread_id is not None:
+        thread = project.threads.get(thread_id)
+    else:
+        thread = project.threads.get(None)
 
-    # Stop watcher task
-    if project.watcher_task and not project.watcher_task.done():
-        project.watcher_task.cancel()
-        try:
-            await project.watcher_task
-        except asyncio.CancelledError:
-            pass
-        project.watcher_task = None
+    # Stop thread tasks
+    if thread:
+        if thread.poller_task and not thread.poller_task.done():
+            thread.poller_task.cancel()
+            try:
+                await thread.poller_task
+            except asyncio.CancelledError:
+                pass
+            thread.poller_task = None
+
+        if thread.watcher_task and not thread.watcher_task.done():
+            thread.watcher_task.cancel()
+            try:
+                await thread.watcher_task
+            except asyncio.CancelledError:
+                pass
+            thread.watcher_task = None
+
+        # Clear thread session data
+        thread.session_id = None
+        thread.jsonl_path = None
+    else:
+        # Legacy: stop project-level tasks
+        if project.poller_task and not project.poller_task.done():
+            project.poller_task.cancel()
+            try:
+                await project.poller_task
+            except asyncio.CancelledError:
+                pass
+            project.poller_task = None
+
+        if project.watcher_task and not project.watcher_task.done():
+            project.watcher_task.cancel()
+            try:
+                await project.watcher_task
+            except asyncio.CancelledError:
+                pass
+            project.watcher_task = None
+
+        # Clear project session data
+        project.session_id = None
+        project.jsonl_path = None
+        project.tmux_session = None
 
     # Kill tmux if exists
-    if project.tmux_session and is_tmux_session_exists(project.tmux_session):
+    if tmux_name and is_tmux_session_exists(tmux_name):
         import subprocess
-        subprocess.run(["tmux", "kill-session", "-t", project.tmux_session], capture_output=True)
+        subprocess.run(["tmux", "kill-session", "-t", tmux_name], capture_output=True)
 
-    # Clear session data
-    project.session_id = None
-    project.jsonl_path = None
-    project.tmux_session = None
     project_manager._save()
 
     await callback.message.edit_text("Сессия остановлена. Используй /start для запуска.")
