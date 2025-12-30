@@ -17,6 +17,23 @@
 - `telegram_queue.enqueue()` — already returns `list[int]` (message IDs)
 - `history_watcher` — already uses TelegramQueue (no migration needed)
 
+**Architecture notes (resolved during review):**
+
+1. **Why poller starts immediately, but watcher doesn't:**
+   - Poller works with tmux directly (doesn't need session_id)
+   - Watcher needs session_id + jsonl_path (set during binding)
+   - Binding requires `last_sent_message` (set when user sends first message)
+
+2. **Why we don't start binding_task in launch_with_animation:**
+   - `poll_for_session_thread` requires `thread.last_sent_message` (line 265)
+   - On fresh launch, `last_sent_message = None` → function returns immediately
+   - Binding happens naturally when user sends first message (bot.py:1430-1437)
+
+3. **No poller duplication:**
+   - Both `_start_monitoring` and `poll_for_session_thread` check:
+     `if not thread.poller_task or thread.poller_task.done():`
+   - If poller already running, second start is skipped
+
 ---
 
 ## Task 1: Add launch_task field to ThreadInfo
@@ -194,22 +211,27 @@ async def _start_monitoring(
     thread: ThreadInfo,
     queue: TelegramQueue,
 ):
-    """Start poller and watcher for thread after successful launch."""
-    from .history_watcher import poll_for_session_thread
+    """Start poller after successful Claude launch.
+
+    NOTE: We only start poller here, NOT binding_task/watcher because:
+    - poll_for_session_thread requires last_sent_message (line 265)
+    - On fresh launch, last_sent_message = None → returns immediately
+    - Binding happens when user sends first message (bot.py:1430-1437)
+    - poll_for_session_thread will start watcher when session is found
+
+    Poller can start immediately because it works with tmux directly,
+    doesn't need session_id or jsonl_path.
+
+    No duplication risk: poll_for_session_thread checks
+    `if not thread.poller_task or thread.poller_task.done():`
+    before starting poller (history_watcher.py:301).
+    """
     from .permission_poller import create_poller_task_for_thread
 
-    # Start session binding (will find session and start watcher)
-    if not thread.binding_task or thread.binding_task.done():
-        thread.binding_task = asyncio.create_task(
-            poll_for_session_thread(
-                project, thread, bot,
-                None, None, queue  # start_poller/start_watcher not used
-            )
-        )
-
-    # Start permission poller
     if not thread.poller_task or thread.poller_task.done():
-        thread.poller_task = await create_poller_task_for_thread(bot, project, thread, queue)
+        thread.poller_task = await create_poller_task_for_thread(
+            bot, project, thread, queue
+        )
 ```
 
 **Step 3: Add launch_with_animation function**
@@ -220,7 +242,7 @@ Key points:
 - Create tmux and run `claude`
 - Wait for ready with face animation after 3 sec
 - **Timeout → error message, return False**
-- Start monitoring after success
+- Start poller only (watcher starts later via user message → binding)
 - Save state on success (not in finally — only save on actual state change)
 
 ```python
@@ -583,3 +605,8 @@ git commit -m "chore: cleanup old launch code"
 - Tasks reduced from 10 to 9 by merging Task 4+5
 - `history_watcher` already uses TelegramQueue — no migration needed
 - `project_manager._save()` is the existing pattern in codebase (not ideal but consistent)
+
+**Architectural decisions (see header for details):**
+- `_start_monitoring` starts only poller, not binding_task
+- Watcher starts later when user sends first message (triggers binding)
+- No poller duplication due to guards in both places
