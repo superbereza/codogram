@@ -175,3 +175,51 @@ def test_config_loads_threads(tmp_path, monkeypatch):
     assert project.threads[None].name == "main"
     assert 12345 in project.threads
     assert project.threads[12345].name == "mystic"
+
+
+# Tests for start_requested_at field
+def test_thread_info_start_requested_at_default():
+    """Test start_requested_at defaults to None."""
+    from codogram.session_manager import ThreadInfo
+
+    thread = ThreadInfo(thread_id=123, name="test")
+    assert thread.start_requested_at is None
+
+
+def test_thread_info_start_requested_at_assignment():
+    """Test start_requested_at can be set."""
+    from codogram.session_manager import ThreadInfo
+
+    thread = ThreadInfo(thread_id=123, name="test")
+    thread.start_requested_at = 1703847600.123
+    assert thread.start_requested_at == 1703847600.123
+
+
+def test_start_requested_at_persistence(tmp_path, monkeypatch):
+    """Test start_requested_at survives save/load cycle."""
+    from codogram.session_manager import ProjectManager, ThreadInfo
+    from codogram import config
+
+    # Use temp config file
+    config_file = tmp_path / ".config.json"
+    monkeypatch.setattr(config, 'CONFIG_PATH', config_file)
+
+    # Create manager and add project with thread
+    pm = ProjectManager()
+    project = pm.get_or_create("test-project")
+    project.chat_id = 12345
+    project.cwd = "/test/path"
+
+    thread = project.get_or_create_thread(100, "test-thread")
+    thread.start_requested_at = 1703847600.5
+    thread.awaiting_new_session = True
+
+    pm._save()
+
+    # Create new manager (simulates restart)
+    pm2 = ProjectManager()
+    project2 = pm2.projects.get("test-project")
+    thread2 = project2.threads.get(100)
+
+    assert thread2.start_requested_at == 1703847600.5
+    assert thread2.awaiting_new_session is True

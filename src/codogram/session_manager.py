@@ -98,6 +98,8 @@ class ThreadInfo:
     # For session binding:
     last_sent_message: str | None = None
     awaiting_new_session: bool = False
+    # For session binding race condition fix:
+    start_requested_at: float | None = None
 
     def get_tmux_session(self, project_name: str) -> str:
         """Get tmux session name for this thread."""
@@ -171,6 +173,7 @@ class ProjectManager:
                         session_id=thread_data.get("session_id"),
                         jsonl_path=thread_data.get("jsonl_path"),
                         awaiting_new_session=thread_data.get("awaiting_new_session", False),
+                        start_requested_at=thread_data.get("start_requested_at"),
                     )
 
                 # Migrate legacy → threads[None] if not already present
@@ -206,6 +209,7 @@ class ProjectManager:
                         "session_id": t.session_id,
                         "jsonl_path": t.jsonl_path,
                         "awaiting_new_session": t.awaiting_new_session,
+                        "start_requested_at": t.start_requested_at,
                     }
                     for tid, t in p.threads.items()
                 }
