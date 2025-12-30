@@ -76,17 +76,17 @@ async def launch_with_animation(
         thread.start_requested_at = time.time()
 
         # 1. Create tmux
-        await bot.send_message(chat_id, "Создаю tmux сессию...", message_thread_id=thread_id)
+        await bot.send_message(chat_id, "Creating tmux session...", message_thread_id=thread_id)
 
         if not tmux.exists():
             tmux.create()
 
         # 2. Launch Claude
-        await bot.send_message(chat_id, "Запускаю Claude...", message_thread_id=thread_id)
+        await bot.send_message(chat_id, "Starting Claude...", message_thread_id=thread_id)
         tmux.send("claude")
 
         # 3. Wait for ready with animation
-        await bot.send_message(chat_id, "Жду готовность Claude...", message_thread_id=thread_id)
+        await bot.send_message(chat_id, "Waiting for Claude...", message_thread_id=thread_id)
 
         start_time = time.time()
         face_msg = None
@@ -108,7 +108,7 @@ async def launch_with_animation(
                     except Exception:
                         pass
                 await bot.send_message(
-                    chat_id, "❌ Таймаут: Claude не запустился за 2 минуты",
+                    chat_id, "❌ Timeout: Claude didn't start in 2 minutes",
                     message_thread_id=thread_id
                 )
                 return False
@@ -148,7 +148,7 @@ async def launch_with_animation(
 
         await bot.send_message(
             chat_id,
-            f"✓ Claude готов!\nПодключиться: `tmux attach -t {tmux_name}`",
+            f"✓ Claude ready!\nAttach: `tmux attach -t {tmux_name}`",
             parse_mode="Markdown",
             message_thread_id=thread_id
         )
@@ -164,7 +164,7 @@ async def launch_with_animation(
     except Exception as e:
         logger.error(f"launch_error: {e}")
         try:
-            await bot.send_message(chat_id, f"❌ Ошибка запуска: {e}", message_thread_id=thread_id)
+            await bot.send_message(chat_id, f"❌ Launch error: {e}", message_thread_id=thread_id)
         except Exception:
             pass
         return False
