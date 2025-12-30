@@ -2,7 +2,7 @@
 import json
 import tempfile
 from pathlib import Path
-from codogram.history_reader import find_session_for_project, reset_history_cache, compute_jsonl_path
+from codogram.history_reader import find_session_for_project, reset_history_cache, compute_jsonl_path, get_session_creation_time
 
 def test_find_session_for_project():
     reset_history_cache()  # Clean state
@@ -135,3 +135,55 @@ def test_compute_jsonl_path_symlink_not_resolved():
     # Claude uses raw cwd, not resolved path
     result = compute_jsonl_path("/home/user/link-to-project", "abc")
     assert "-home-user-link-to-project" in str(result)
+
+
+def test_get_session_creation_time():
+    """Test reading session creation time from first entry timestamp."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jsonl_path = Path(tmpdir) / "test-session.jsonl"
+        timestamp = 1703847600.123  # Fixed timestamp for test
+
+        with open(jsonl_path, 'w') as f:
+            f.write(json.dumps({"type": "system", "timestamp": timestamp}) + "\n")
+            f.write(json.dumps({"type": "user", "timestamp": timestamp + 1}) + "\n")
+
+        result = get_session_creation_time(jsonl_path)
+        assert result == timestamp
+
+
+def test_get_session_creation_time_missing_file():
+    """Return 0 for missing file."""
+    result = get_session_creation_time(Path("/nonexistent/path.jsonl"))
+    assert result == 0
+
+
+def test_get_session_creation_time_empty_file():
+    """Return 0 for empty file."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jsonl_path = Path(tmpdir) / "empty.jsonl"
+        jsonl_path.touch()
+
+        result = get_session_creation_time(jsonl_path)
+        assert result == 0
+
+
+def test_get_session_creation_time_no_timestamp():
+    """Return 0 if first entry has no timestamp field."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jsonl_path = Path(tmpdir) / "no-ts.jsonl"
+        with open(jsonl_path, 'w') as f:
+            f.write(json.dumps({"type": "system"}) + "\n")
+
+        result = get_session_creation_time(jsonl_path)
+        assert result == 0
+
+
+def test_get_session_creation_time_malformed_json():
+    """Return 0 for malformed JSON."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jsonl_path = Path(tmpdir) / "bad.jsonl"
+        with open(jsonl_path, 'w') as f:
+            f.write("not valid json\n")
+
+        result = get_session_creation_time(jsonl_path)
+        assert result == 0

@@ -97,6 +97,30 @@ def reset_history_cache() -> None:
     _session_cache = {}
 
 
+def get_session_creation_time(jsonl_path: Path) -> float:
+    """Get timestamp of first entry in session jsonl.
+
+    This is more reliable than st_mtime/st_ctime because:
+    - st_mtime updates on every write
+    - st_ctime is inode change time, not creation time (Linux)
+    - First entry timestamp IS the session creation time
+
+    Returns 0 if file doesn't exist, is empty, or can't be read.
+    """
+    if not jsonl_path.exists():
+        return 0
+
+    try:
+        with open(jsonl_path, 'r') as f:
+            first_line = f.readline()
+            if first_line.strip():
+                entry = json.loads(first_line)
+                return entry.get("timestamp", 0)
+        return 0
+    except (json.JSONDecodeError, OSError):
+        return 0
+
+
 def get_last_user_message_from_jsonl(jsonl_path: Path) -> str | None:
     """Read the last user message from a session jsonl file."""
     if not jsonl_path.exists():
