@@ -9,3 +9,4 @@ venv/
 docs/plans/*-logs-snapshot/
 tmp/
 logs/
+.worktrees/
