@@ -34,8 +34,8 @@ async def main():
     from aiogram.types import BotCommand
     await bot.set_my_commands([
         BotCommand(command="start", description="Start Claude / show status"),
-        BotCommand(command="new", description="Start new Claude session"),
-        BotCommand(command="clear", description="Clear and start fresh session"),
+        BotCommand(command="new", description="Start new Claude session (/clear)"),
+        # /clear intentionally not in menu - same as /new
         BotCommand(command="session_new", description="Create new Claude thread"),
         BotCommand(command="session_close", description="Close Claude thread (use in topic)"),
         BotCommand(command="restart_session", description="Restart Claude session"),
