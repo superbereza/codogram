@@ -27,6 +27,23 @@ class PollerState(Enum):
 # Separator for Telegram display
 SEPARATOR_SOLID = "────────────"
 
+# Crash detection signatures
+CRASH_SIGNATURES = [
+    "panicked at",
+    "fatal runtime error",
+    "core dumped",
+    "SIGSEGV",
+    "SIGABRT",
+]
+
+
+def _detect_crash(screen: str) -> str | None:
+    """Detect if Claude has crashed. Returns crash reason or None."""
+    for sig in CRASH_SIGNATURES:
+        if sig in screen:
+            return sig
+    return None
+
 
 async def create_poller_task(bot: Bot, project: ProjectState, telegram_queue: "TelegramQueue") -> asyncio.Task:
     """Create permission poller task for project."""
@@ -65,6 +82,21 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
         except Exception as e:
             logger.warning(f"Permission poller: capture error: {e}")
             continue
+
+        # Crash detection
+        crash_reason = _detect_crash(screen)
+        if crash_reason:
+            logger.error(f"Permission poller: Claude crashed! Reason: {crash_reason}")
+            try:
+                batch = OutgoingBatch(
+                    chat_id=chat_id,
+                    thread_id=None,
+                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "Markdown"}],
+                )
+                await telegram_queue.enqueue_nowait(batch)
+            except Exception:
+                pass
+            return  # Exit poller
 
         is_permission = isinstance(parsed, PermissionPrompt)
 
@@ -238,6 +270,21 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
         except Exception as e:
             logger.warning(f"Thread poller {thread.name}: capture error: {e}")
             continue
+
+        # Crash detection
+        crash_reason = _detect_crash(screen)
+        if crash_reason:
+            logger.error(f"Thread poller {thread.name}: Claude crashed! Reason: {crash_reason}")
+            try:
+                batch = OutgoingBatch(
+                    chat_id=chat_id,
+                    thread_id=thread_id,
+                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "Markdown"}],
+                )
+                await telegram_queue.enqueue_nowait(batch)
+            except Exception:
+                pass
+            return  # Exit poller
 
         is_permission = isinstance(parsed, PermissionPrompt)
 
