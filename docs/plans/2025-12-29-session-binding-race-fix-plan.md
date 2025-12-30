@@ -4,7 +4,7 @@
 
 **Goal:** Fix race condition where new thread can bind to wrong session during /start
 
-**Architecture:** Filter sessions by creation time - only consider sessions created AFTER /start was pressed. Uses first entry timestamp from jsonl (more reliable than st_mtime/st_ctime).
+**Architecture:** Filter sessions by creation time - only consider sessions created AFTER /start was pressed. Two binding paths exist and BOTH must be fixed.
 
 **Tech Stack:** Python, asyncio, JSON
 
@@ -12,55 +12,120 @@
 
 ---
 
+## Layer-Based Refactoring Compatibility
+
+This plan modifies files that will be restructured in [bot-refactoring](../designs/2025-12-27-bot-refactoring/00-overview.md):
+
+| Current Location | After Refactoring | Notes |
+|------------------|-------------------|-------|
+| `history_reader.py` | `adapters/history.py` | `get_session_creation_time` is adapter function |
+| `session_manager.py:ThreadInfo` | `domain/models.py` | `start_requested_at` is domain field |
+| `history_watcher.py` | Not touched (separate task) | No conflicts |
+| `bot.py:launch_claude_in_thread` | `services/launch.py` | Changes migrate with function |
+
+---
+
+## Background: Two Binding Paths
+
+There are TWO code paths that bind sessions to threads:
+
+1. **`poll_for_session_thread`** (history_watcher.py:244)
+   - Called when: `thread.session_id is None` and user sends message
+   - Uses: `find_session_by_user_message()` - matches by message text
+   - Trigger: bot.py:1436
+
+2. **`_bind_awaiting_threads`** (history_watcher.py:124)
+   - Called when: `thread.awaiting_new_session = True`
+   - Uses: `find_session_for_project()` - gets latest session
+   - Trigger: `/new`, `/clear` commands, `/start` in thread
+
+**BOTH paths must filter by session creation time!**
+
+---
+
 ### Task 1: Add `get_session_creation_time` function
 
 **Files:**
-- Modify: `src/codogram/history_reader.py:100-131` (after `get_last_user_message_from_jsonl`)
+- Modify: `src/codogram/history_reader.py` (after line 131)
 - Test: `tests/test_history_reader.py`
 
-**Step 1: Write the failing test**
+**Step 1: Write tests**
 
 Add to `tests/test_history_reader.py`:
 
 ```python
 import time
-from codogram.history_reader import get_session_creation_time
 
 def test_get_session_creation_time():
     """Test reading session creation time from first entry timestamp."""
+    from codogram.history_reader import get_session_creation_time
+
     with tempfile.TemporaryDirectory() as tmpdir:
         jsonl_path = Path(tmpdir) / "test-session.jsonl"
+        timestamp = 1703847600.123  # Fixed timestamp for test
 
-        # Create jsonl with timestamp
-        now = time.time()
         with open(jsonl_path, 'w') as f:
-            f.write(json.dumps({"type": "system", "timestamp": now}) + "\n")
-            f.write(json.dumps({"type": "user", "timestamp": now + 1}) + "\n")
+            f.write(json.dumps({"type": "system", "timestamp": timestamp}) + "\n")
+            f.write(json.dumps({"type": "user", "timestamp": timestamp + 1}) + "\n")
 
         result = get_session_creation_time(jsonl_path)
-        assert result == now
+        assert result == timestamp
+
 
 def test_get_session_creation_time_missing_file():
     """Return 0 for missing file."""
+    from codogram.history_reader import get_session_creation_time
+
     result = get_session_creation_time(Path("/nonexistent/path.jsonl"))
     assert result == 0
 
+
 def test_get_session_creation_time_empty_file():
     """Return 0 for empty file."""
+    from codogram.history_reader import get_session_creation_time
+
     with tempfile.TemporaryDirectory() as tmpdir:
         jsonl_path = Path(tmpdir) / "empty.jsonl"
         jsonl_path.touch()
 
         result = get_session_creation_time(jsonl_path)
         assert result == 0
+
+
+def test_get_session_creation_time_no_timestamp():
+    """Return 0 if first entry has no timestamp field."""
+    from codogram.history_reader import get_session_creation_time
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jsonl_path = Path(tmpdir) / "no-ts.jsonl"
+        with open(jsonl_path, 'w') as f:
+            f.write(json.dumps({"type": "system"}) + "\n")
+
+        result = get_session_creation_time(jsonl_path)
+        assert result == 0
+
+
+def test_get_session_creation_time_malformed_json():
+    """Return 0 for malformed JSON."""
+    from codogram.history_reader import get_session_creation_time
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jsonl_path = Path(tmpdir) / "bad.jsonl"
+        with open(jsonl_path, 'w') as f:
+            f.write("not valid json\n")
+
+        result = get_session_creation_time(jsonl_path)
+        assert result == 0
 ```
 
-**Step 2: Run test to verify it fails**
+**Step 2: Run tests to verify they fail**
 
-Run: `pytest tests/test_history_reader.py::test_get_session_creation_time -v`
+```bash
+pytest tests/test_history_reader.py::test_get_session_creation_time -v
+```
 Expected: FAIL with "cannot import name 'get_session_creation_time'"
 
-**Step 3: Write minimal implementation**
+**Step 3: Implement**
 
 Add to `src/codogram/history_reader.py` after `get_last_user_message_from_jsonl`:
 
@@ -73,7 +138,7 @@ def get_session_creation_time(jsonl_path: Path) -> float:
     - st_ctime is inode change time, not creation time (Linux)
     - First entry timestamp IS the session creation time
 
-    Returns 0 if file doesn't exist or can't be read.
+    Returns 0 if file doesn't exist, is empty, or can't be read.
     """
     if not jsonl_path.exists():
         return 0
@@ -85,14 +150,16 @@ def get_session_creation_time(jsonl_path: Path) -> float:
                 entry = json.loads(first_line)
                 return entry.get("timestamp", 0)
         return 0
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         return 0
 ```
 
-**Step 4: Run test to verify it passes**
+**Step 4: Run all tests**
 
-Run: `pytest tests/test_history_reader.py::test_get_session_creation_time tests/test_history_reader.py::test_get_session_creation_time_missing_file tests/test_history_reader.py::test_get_session_creation_time_empty_file -v`
-Expected: PASS
+```bash
+pytest tests/test_history_reader.py -v -k "get_session_creation_time"
+```
+Expected: 5 tests PASS
 
 **Step 5: Commit**
 
@@ -103,186 +170,183 @@ git commit -m "feat(history): add get_session_creation_time function"
 
 ---
 
-### Task 2: Add `start_requested_at` field to ThreadInfo
+### Task 2: Add `start_requested_at` field to ThreadInfo with persistence
 
 **Files:**
-- Modify: `src/codogram/session_manager.py:82-99` (ThreadInfo dataclass)
-- Modify: `src/codogram/session_manager.py:165-173` (_load_projects)
-- Modify: `src/codogram/session_manager.py:202-210` (_save)
+- Modify: `src/codogram/session_manager.py:99` (ThreadInfo)
+- Modify: `src/codogram/session_manager.py:172` (_load_projects)
+- Modify: `src/codogram/session_manager.py:208` (_save)
 - Test: `tests/test_session_manager.py`
 
-**Step 1: Write the failing test**
+**Step 1: Write tests**
 
 Add to `tests/test_session_manager.py`:
 
 ```python
-def test_thread_info_start_requested_at():
-    """Test start_requested_at field exists and defaults to None."""
+def test_thread_info_start_requested_at_default():
+    """Test start_requested_at defaults to None."""
     from codogram.session_manager import ThreadInfo
 
     thread = ThreadInfo(thread_id=123, name="test")
     assert thread.start_requested_at is None
 
-    thread.start_requested_at = 1234567890.5
-    assert thread.start_requested_at == 1234567890.5
+
+def test_thread_info_start_requested_at_assignment():
+    """Test start_requested_at can be set."""
+    from codogram.session_manager import ThreadInfo
+
+    thread = ThreadInfo(thread_id=123, name="test")
+    thread.start_requested_at = 1703847600.123
+    assert thread.start_requested_at == 1703847600.123
+
+
+def test_start_requested_at_persistence(tmp_path, monkeypatch):
+    """Test start_requested_at survives save/load cycle."""
+    from codogram.session_manager import ProjectManager, ThreadInfo
+    from codogram import config
+
+    # Use temp config file
+    config_file = tmp_path / ".config.json"
+    monkeypatch.setattr(config, 'CONFIG_PATH', config_file)
+
+    # Create manager and add project with thread
+    pm = ProjectManager()
+    project = pm.get_or_create("test-project")
+    project.chat_id = 12345
+    project.cwd = "/test/path"
+
+    thread = project.get_or_create_thread(100, "test-thread")
+    thread.start_requested_at = 1703847600.5
+    thread.awaiting_new_session = True
+
+    pm._save()
+
+    # Create new manager (simulates restart)
+    pm2 = ProjectManager()
+    project2 = pm2.projects.get("test-project")
+    thread2 = project2.threads.get(100)
+
+    assert thread2.start_requested_at == 1703847600.5
+    assert thread2.awaiting_new_session is True
 ```
 
-**Step 2: Run test to verify it fails**
+**Step 2: Run tests to verify they fail**
 
-Run: `pytest tests/test_session_manager.py::test_thread_info_start_requested_at -v`
+```bash
+pytest tests/test_session_manager.py::test_thread_info_start_requested_at_default -v
+```
 Expected: FAIL with "no attribute 'start_requested_at'"
 
-**Step 3: Write minimal implementation**
+**Step 3: Implement**
 
-Modify `src/codogram/session_manager.py`:
+In `src/codogram/session_manager.py`:
 
-In `ThreadInfo` dataclass (around line 98-99), add after `awaiting_new_session`:
+**3a.** Add field to ThreadInfo (after line 99, after `awaiting_new_session`):
 
 ```python
     # For session binding race condition fix:
-    start_requested_at: float | None = None  # time.time() when /start was pressed
+    start_requested_at: float | None = None
 ```
 
-In `_load_projects` (around line 172), add to ThreadInfo creation:
+**3b.** Load in `_load_projects` (around line 172, add to ThreadInfo creation):
 
 ```python
                         start_requested_at=thread_data.get("start_requested_at"),
 ```
 
-In `_save` (around line 208), add to thread dict:
+**3c.** Save in `_save` (around line 208, add to thread dict):
 
 ```python
                         "start_requested_at": t.start_requested_at,
 ```
 
-**Step 4: Run test to verify it passes**
+**Step 4: Run all tests**
 
-Run: `pytest tests/test_session_manager.py::test_thread_info_start_requested_at -v`
-Expected: PASS
+```bash
+pytest tests/test_session_manager.py -v -k "start_requested_at"
+```
+Expected: 3 tests PASS
 
 **Step 5: Commit**
 
 ```bash
 git add src/codogram/session_manager.py tests/test_session_manager.py
-git commit -m "feat(session): add start_requested_at field to ThreadInfo"
+git commit -m "feat(session): add start_requested_at field with persistence"
 ```
 
 ---
 
-### Task 3: Add `created_after` parameter to `find_session_by_user_message`
+### Task 3: Add `created_after` to `find_session_by_user_message`
 
 **Files:**
-- Modify: `src/codogram/history_reader.py:152-178` (find_session_by_user_message)
+- Modify: `src/codogram/history_reader.py:152-178`
 - Test: `tests/test_history_reader.py`
 
-**Step 1: Write the failing test**
+**Step 1: Write test**
 
 Add to `tests/test_history_reader.py`:
 
 ```python
-def test_find_session_by_user_message_created_after():
+def test_find_session_by_user_message_filters_by_created_after():
     """Test that created_after filters out old sessions."""
-    from codogram.history_reader import find_session_by_user_message, get_session_creation_time
+    from codogram.history_reader import find_session_by_user_message
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create fake project directory structure
-        project_dir = Path(tmpdir) / ".claude" / "projects" / "-test-project"
+        # Create project directory structure
+        project_dir = Path(tmpdir) / ".claude" / "projects" / "-test-cwd"
         project_dir.mkdir(parents=True)
 
-        now = time.time()
-
-        # Old session (created 10 seconds ago)
+        # Old session (created at t=100)
         old_session = project_dir / "old-session.jsonl"
         with open(old_session, 'w') as f:
-            f.write(json.dumps({"type": "system", "timestamp": now - 10}) + "\n")
+            f.write(json.dumps({"type": "system", "timestamp": 100}) + "\n")
             f.write(json.dumps({"type": "user", "message": {"content": "Hello"}}) + "\n")
 
-        # New session (created 2 seconds ago)
+        # New session (created at t=200)
         new_session = project_dir / "new-session.jsonl"
         with open(new_session, 'w') as f:
-            f.write(json.dumps({"type": "system", "timestamp": now - 2}) + "\n")
+            f.write(json.dumps({"type": "system", "timestamp": 200}) + "\n")
             f.write(json.dumps({"type": "user", "message": {"content": "Hello"}}) + "\n")
 
-        # Monkeypatch Path.home() to use our temp dir
-        import codogram.history_reader as hr
-        original_compute = hr.compute_jsonl_path
+        # Patch Path.home to use our temp directory
+        original_home = Path.home
 
-        def mock_compute_jsonl_path(cwd, session_id):
-            return project_dir / f"{session_id}.jsonl"
+        def mock_home():
+            return Path(tmpdir)
 
-        # We need to test by creating the directory structure manually
-        # and calling with created_after parameter
+        Path.home = staticmethod(mock_home)
 
-        # Without created_after: should find newest by mtime (new-session)
-        # With created_after=now-5: should find new-session (created at now-2 > now-5)
-        # With created_after=now-1: should find nothing (both sessions too old)
+        try:
+            # Without filter: should find new-session (newest by mtime)
+            result = find_session_by_user_message("/test/cwd", "Hello")
+            assert result is not None
+            session_id, _ = result
+            assert session_id == "new-session"
 
-        # For this test, we'll verify the parameter is accepted
-        # Full integration test would require more setup
-        pass  # Placeholder - see integration test below
+            # With created_after=150: should find new-session (created at 200 > 150)
+            result = find_session_by_user_message("/test/cwd", "Hello", created_after=150)
+            assert result is not None
+            session_id, _ = result
+            assert session_id == "new-session"
 
+            # With created_after=250: should find nothing (both too old)
+            result = find_session_by_user_message("/test/cwd", "Hello", created_after=250)
+            assert result is None
 
-def test_find_session_by_user_message_created_after_integration():
-    """Integration test: created_after filters old sessions."""
-    from codogram.history_reader import find_session_by_user_message
-    from unittest.mock import patch
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Setup: create project directory
-        project_hash = "-test-cwd"
-        project_dir = Path(tmpdir) / project_hash
-        project_dir.mkdir(parents=True)
-
-        now = time.time()
-
-        # Old session
-        old_jsonl = project_dir / "old-session.jsonl"
-        with open(old_jsonl, 'w') as f:
-            f.write(json.dumps({"type": "system", "timestamp": now - 100}) + "\n")
-            f.write(json.dumps({"type": "user", "message": {"content": "Hello world"}}) + "\n")
-
-        # New session
-        new_jsonl = project_dir / "new-session.jsonl"
-        with open(new_jsonl, 'w') as f:
-            f.write(json.dumps({"type": "system", "timestamp": now - 5}) + "\n")
-            f.write(json.dumps({"type": "user", "message": {"content": "Hello world"}}) + "\n")
-
-        # Patch to use our temp directory
-        with patch('codogram.history_reader.Path.home', return_value=Path(tmpdir).parent):
-            # Compute what the cwd should be to get our project_dir
-            # cwd -> normalize -> replace "/" with "-" -> project_hash
-            # So cwd="/test/cwd" -> "-test-cwd"
-            cwd = "/test/cwd"
-
-            # Re-create directory with correct path
-            correct_project_dir = Path(tmpdir) / ".claude" / "projects" / "-test-cwd"
-            correct_project_dir.mkdir(parents=True, exist_ok=True)
-
-            # Move files
-            import shutil
-            for f in project_dir.glob("*.jsonl"):
-                shutil.copy(f, correct_project_dir / f.name)
-
-            with patch('codogram.history_reader.Path.home', return_value=Path(tmpdir)):
-                # With created_after=now-50: only new-session qualifies
-                result = find_session_by_user_message(cwd, "Hello world", created_after=now - 50)
-                if result:
-                    session_id, path = result
-                    assert session_id == "new-session"
-
-                # With created_after=now-1: neither qualifies
-                result = find_session_by_user_message(cwd, "Hello world", created_after=now - 1)
-                assert result is None
+        finally:
+            Path.home = original_home
 ```
 
 **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/test_history_reader.py::test_find_session_by_user_message_created_after_integration -v`
-Expected: FAIL with "got an unexpected keyword argument 'created_after'"
+```bash
+pytest tests/test_history_reader.py::test_find_session_by_user_message_filters_by_created_after -v
+```
+Expected: FAIL with "unexpected keyword argument 'created_after'"
 
-**Step 3: Write minimal implementation**
+**Step 3: Implement**
 
-Modify `src/codogram/history_reader.py`, function `find_session_by_user_message`:
+Modify `find_session_by_user_message` in `src/codogram/history_reader.py`:
 
 ```python
 def find_session_by_user_message(
@@ -297,8 +361,8 @@ def find_session_by_user_message(
     Args:
         cwd: Project working directory
         user_message: Last user message to match
-        created_after: If set, only consider sessions created after this timestamp
-                       (used to prevent binding to old sessions during /start race)
+        created_after: Only consider sessions created after this timestamp.
+                       Used to prevent binding to old sessions during /start.
 
     Returns (session_id, jsonl_path) or None if not found.
     """
@@ -331,9 +395,11 @@ def find_session_by_user_message(
     return None
 ```
 
-**Step 4: Run test to verify it passes**
+**Step 4: Run test**
 
-Run: `pytest tests/test_history_reader.py::test_find_session_by_user_message_created_after_integration -v`
+```bash
+pytest tests/test_history_reader.py::test_find_session_by_user_message_filters_by_created_after -v
+```
 Expected: PASS
 
 **Step 5: Commit**
@@ -345,20 +411,20 @@ git commit -m "feat(history): add created_after filter to find_session_by_user_m
 
 ---
 
-### Task 4: Use `created_after` in `poll_for_session_thread`
+### Task 4: Fix Path 1 - `poll_for_session_thread`
 
 **Files:**
-- Modify: `src/codogram/history_watcher.py:278-282` (find_session_by_user_message call)
+- Modify: `src/codogram/history_watcher.py:281`
 
-**Step 1: Locate the code**
+**Step 1: Locate**
 
-In `poll_for_session_thread`, find the call to `find_session_by_user_message` (around line 281):
+Find the call to `find_session_by_user_message` in `poll_for_session_thread` (line 281):
 
 ```python
 result = find_session_by_user_message(project.cwd, thread.last_sent_message)
 ```
 
-**Step 2: Modify to pass `created_after`**
+**Step 2: Modify**
 
 Change to:
 
@@ -370,57 +436,149 @@ result = find_session_by_user_message(
 )
 ```
 
-**Step 3: Clear `start_requested_at` after successful bind**
+**Step 3: Clear after bind**
 
-After `thread.awaiting_new_session = False` (around line 291), add:
+After successful binding (around line 291), add clearing after `thread.awaiting_new_session = False`:
 
 ```python
 thread.start_requested_at = None
-project_manager._save()
 ```
 
-**Step 4: Run existing tests to ensure no regression**
+**Step 4: Run tests**
 
-Run: `pytest tests/test_history_watcher.py -v`
+```bash
+pytest tests/test_history_watcher.py -v
+```
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
 git add src/codogram/history_watcher.py
-git commit -m "feat(watcher): use created_after filter in poll_for_session_thread"
+git commit -m "fix(watcher): filter by created_after in poll_for_session_thread"
 ```
 
 ---
 
-### Task 5: Set `start_requested_at` in `/start` flow
+### Task 5: Fix Path 2 - `_bind_awaiting_threads`
 
 **Files:**
-- Modify: `src/codogram/bot.py:520-523` (launch_claude_in_thread)
+- Modify: `src/codogram/history_watcher.py:124-146`
 
-**Step 1: Locate the code**
+**Step 1: Locate**
 
-In `launch_claude_in_thread`, find where `awaiting_new_session` is set (around line 522):
+Find `_bind_awaiting_threads` method (line 124).
+
+**Step 2: Add creation time filter**
+
+Add import at top of method and filter before binding:
 
 ```python
-# Block HistoryWatcher from grabbing old session during startup
-thread.awaiting_new_session = True
+async def _bind_awaiting_threads(self, project: ProjectState):
+    """Find new sessions and bind to awaiting threads.
+
+    NOTE: Binds only ONE thread per cycle to prevent race condition where
+    multiple awaiting threads bind to the same session.
+    """
+    from .history_reader import find_session_for_project, compute_jsonl_path, get_session_creation_time
+
+    # Get latest session once
+    new_session = find_session_for_project(project.cwd)
+    if not new_session:
+        return
+
+    # Find first awaiting thread that can bind to this session
+    for thread in project.threads.values():
+        if not thread.awaiting_new_session:
+            continue
+        if thread.session_id == new_session:
+            continue  # Already has this session
+
+        # Filter by creation time to prevent race condition
+        if thread.start_requested_at:
+            jsonl_path = compute_jsonl_path(project.cwd, new_session)
+            session_created = get_session_creation_time(jsonl_path)
+            if session_created < thread.start_requested_at:
+                logger.debug(
+                    f"skip_old_session: thread={thread.name}, "
+                    f"session_created={session_created}, start_requested={thread.start_requested_at}"
+                )
+                continue  # Session created before /start — skip
+
+        # Bind ONE thread and exit - next cycle will handle others
+        await self._bind_thread_to_session(project, thread, new_session)
+        return
 ```
 
-**Step 2: Add `start_requested_at`**
+**Step 3: Run tests**
 
-Add after `thread.awaiting_new_session = True`:
+```bash
+pytest tests/test_history_watcher.py -v
+```
+Expected: PASS
+
+**Step 4: Commit**
+
+```bash
+git add src/codogram/history_watcher.py
+git commit -m "fix(watcher): filter by created_after in _bind_awaiting_threads"
+```
+
+---
+
+### Task 6: Clear `start_requested_at` in `_bind_thread_to_session`
+
+**Files:**
+- Modify: `src/codogram/history_watcher.py:171`
+
+**Step 1: Locate**
+
+In `_bind_thread_to_session`, find where `awaiting_new_session` is cleared (line 171):
+
+```python
+thread.awaiting_new_session = False
+```
+
+**Step 2: Add clearing**
+
+Add after that line:
+
+```python
+thread.start_requested_at = None
+```
+
+**Step 3: Commit**
+
+```bash
+git add src/codogram/history_watcher.py
+git commit -m "fix(watcher): clear start_requested_at in _bind_thread_to_session"
+```
+
+---
+
+### Task 7: Set `start_requested_at` in `/start` flow
+
+**Files:**
+- Modify: `src/codogram/bot.py:1-10` (imports)
+- Modify: `src/codogram/bot.py:522` (launch_claude_in_thread)
+
+**Step 1: Add import**
+
+Add `import time` at top of `bot.py` (around line 3, after `from pathlib import Path`):
 
 ```python
 import time
+```
+
+**Step 2: Set timestamp**
+
+In `launch_claude_in_thread`, after `thread.awaiting_new_session = True` (line 522):
+
+```python
 thread.start_requested_at = time.time()
 ```
 
-**Step 3: Run bot manually to verify**
-
-Start bot and test /start in a thread. Check logs for session binding.
-
-**Step 4: Commit**
+**Step 3: Commit**
 
 ```bash
 git add src/codogram/bot.py
@@ -429,49 +587,31 @@ git commit -m "feat(bot): set start_requested_at when launching Claude"
 
 ---
 
-### Task 6: Clear `start_requested_at` in `_bind_thread_to_session`
+### Task 8: Run all tests
 
-**Files:**
-- Modify: `src/codogram/history_watcher.py:168-171` (_bind_thread_to_session)
-
-**Step 1: Locate the code**
-
-In `_bind_thread_to_session`, find where `awaiting_new_session` is cleared (around line 171):
-
-```python
-thread.awaiting_new_session = False
-```
-
-**Step 2: Add clearing of `start_requested_at`**
-
-Add after `thread.awaiting_new_session = False`:
-
-```python
-thread.start_requested_at = None
-```
-
-**Step 3: Run all tests**
-
-Run: `pytest tests/ -v`
-Expected: All PASS
-
-**Step 4: Commit**
+**Step 1: Run full test suite**
 
 ```bash
-git add src/codogram/history_watcher.py
-git commit -m "fix(watcher): clear start_requested_at after binding"
+pytest tests/ -v
 ```
+Expected: All PASS
+
+**Step 2: Fix any failures**
+
+If any tests fail, fix them before proceeding.
+
+**Step 3: Commit fixes if any**
 
 ---
 
-### Task 7: Update bug report status
+### Task 9: Update bug report and move to fixed
 
 **Files:**
 - Modify: `docs/bugs/2025-12-29-session-binding-race-condition.md`
 
-**Step 1: Update status and add resolution**
+**Step 1: Update status**
 
-Change `Status: Open` to `Status: Fixed` and add resolution section after Summary:
+Change `Status: Open` to `Status: Fixed` and add resolution after Summary:
 
 ```markdown
 ## Resolution
@@ -479,17 +619,19 @@ Change `Status: Open` to `Status: Fixed` and add resolution section after Summar
 **Fixed by:** [session-binding-race-fix](../designs/2025-12-29-session-binding-race-fix.md)
 
 **Fix summary:**
-- Added `start_requested_at` timestamp to ThreadInfo
-- `find_session_by_user_message` now filters sessions by creation time
-- Only sessions created AFTER /start are considered for binding
-- Uses first entry timestamp from jsonl (reliable session creation time)
+- Added `start_requested_at` timestamp to ThreadInfo (persisted)
+- Added `get_session_creation_time()` to read first entry timestamp from jsonl
+- `find_session_by_user_message()` now accepts `created_after` filter
+- Both binding paths (`poll_for_session_thread` and `_bind_awaiting_threads`) now filter by creation time
+- Only sessions created AFTER /start are considered
 
-**Commits:** (list commit hashes after implementation)
+**Commits:** (add after implementation)
 ```
 
 **Step 2: Move to fixed folder**
 
 ```bash
+mkdir -p docs/bugs/fixed
 mv docs/bugs/2025-12-29-session-binding-race-condition.md docs/bugs/fixed/
 ```
 
@@ -502,7 +644,7 @@ git commit -m "docs: mark session binding race condition as fixed"
 
 ---
 
-### Task 8: Manual testing
+### Task 10: Manual testing
 
 **Step 1: Restart bot**
 
@@ -514,8 +656,8 @@ git commit -m "docs: mark session binding race condition as fixed"
 
 1. Have Thread A running with active Claude session
 2. Press /start in new Thread B
-3. Send same message text to Thread B that exists in Thread A
-4. Verify Thread B gets its OWN session, not Thread A's
+3. Send SAME message text to Thread B that exists in Thread A
+4. Verify Thread B waits for its OWN session (doesn't steal Thread A's)
 
 **Step 3: Verify in config**
 
@@ -523,10 +665,17 @@ git commit -m "docs: mark session binding race condition as fixed"
 cat .config.json | jq '.projects.codogram.threads'
 ```
 
-Confirm different session_ids for different threads.
+Check that each thread has unique session_id.
 
-**Step 4: Test edge cases**
+**Step 4: Test /new command**
 
-- /start in old thread (should still work)
-- /new command (should still work with awaiting_new_session)
-- Bot restart during binding (should preserve start_requested_at)
+1. In existing thread, run /new
+2. Verify new session is bound correctly
+3. Verify old session is not reused
+
+**Step 5: Test bot restart during binding**
+
+1. Press /start in new thread
+2. Immediately restart bot: `./restart.sh`
+3. Verify `start_requested_at` is preserved in config
+4. Send message — should bind to correct session
