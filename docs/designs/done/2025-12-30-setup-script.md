@@ -32,17 +32,56 @@
 
 ## Интерактивный селектор
 
-Стрелками выбор, Space toggle, Enter подтверждение:
+Числа для toggle, работает везде (включая Docker):
 
 ```
 ==> Select what to install:
-    ↑/↓: move, Space: toggle, Enter: confirm
+    Enter numbers to toggle, 'a' for all, 'n' for none, Enter when done
 
-  ▸ [✓] python3 — required, Python >= 3.10
-    [✓] tmux — required, terminal multiplexer
-    [ ] git — optional, version control
-    [✓] claude — required, Claude Code CLI
+  [✓] 1) python3 — required, Python >= 3.10
+  [✓] 2) tmux — required, terminal multiplexer
+  [ ] 3) git — optional, version control
+  [✓] 4) claude — required, Claude Code CLI
+
+Toggle (1-4), [a]ll, [n]one, Enter to confirm:
 ```
+
+### Почему не стрелки?
+
+Arrow-key selector с `read -rsn1` не работает в Docker и некоторых терминалах.
+
+### Очистка экрана при redraw
+
+Проблема: строки могут переноситься в узких терминалах (58 cols в tmux).
+
+**Неработающие подходы:**
+- `\033[s` / `\033[u` (cursor save/restore) — нестабильно
+- Фиксированное кол-во строк — не учитывает переносы
+
+**Решение:** вычисляем реальное количество строк:
+
+```bash
+local cols=$(tput cols 2>/dev/null || echo 80)
+local lines_to_clear=2  # prompt + empty line
+
+for ((i=0; i<count; i++)); do
+    local line_text="  [x] $((i+1))) ${_options[$i]} — ${_descriptions[$i]}"
+    local line_len=${#line_text}
+    local rows=$(( (line_len + cols - 1) / cols ))  # ceiling division
+    lines_to_clear=$((lines_to_clear + rows))
+done
+
+# Очищаем снизу вверх
+for ((i=0; i<lines_to_clear; i++)); do
+    printf "\e[2K\r\e[1A"  # clear line, CR, move up
+done
+printf "\e[2K\r"
+```
+
+### ANSI sequences
+- `\e[2K` — очистить всю строку
+- `\r` — carriage return (курсор в колонку 0)
+- `\e[1A` — курсор вверх на 1 строку
 
 ## Особенности
 
@@ -78,6 +117,57 @@ What would you like to do?
 - Проверка директории (pyproject.toml)
 - Не ломаем системный Python на macOS
 - Спрашиваем перед перезаписью .env
+
+### venv валидация
+
+Проверяем И python И pip — pip имеет hardcoded shebang:
+```bash
+if ./venv/bin/python3 --version > /dev/null 2>&1 && \
+   ./venv/bin/pip --version > /dev/null 2>&1; then
+    print_success "Virtual environment already exists"
+else
+    # Recreate if either is broken
+fi
+```
+
+Это важно когда venv примонтирован с другой машины (Docker).
+
+### sudo handling
+
+В Docker обычно уже root, sudo не нужен:
+```bash
+if [[ $EUID -eq 0 ]]; then
+    SUDO=""
+else
+    SUDO="sudo -E"
+fi
+
+$SUDO apt-get install -y ...
+```
+
+### run_with_progress
+
+Скрываем verbose output, показываем только на ошибку:
+```bash
+run_with_progress() {
+    local msg="$1"; shift
+    local tmp_out=$(mktemp)
+    printf "  ⏳ ${msg}..."
+    if "$@" > "$tmp_out" 2>&1; then
+        printf "\r...\r"
+        print_success "$msg"
+    else
+        print_error "$msg"
+        tail -10 "$tmp_out"
+    fi
+    rm -f "$tmp_out"
+}
+```
+
+### apt noninteractive
+```bash
+export DEBIAN_FRONTEND=noninteractive
+```
 
 ## Flow
 

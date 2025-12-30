@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     telegram_token: str
     admin_ids: str  # Comma-separated list of admin user IDs
     base_dir: str  # e.g. /home/user/dev
+    log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR
 
     def get_admin_ids(self) -> set[int]:
         """Parse admin_ids string into set of ints."""

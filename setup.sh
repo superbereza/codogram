@@ -167,6 +167,13 @@ if [[ "$OS" == "linux" ]]; then
     export DEBIAN_FRONTEND=noninteractive
 fi
 
+# Use sudo only if not root
+if [[ $EUID -eq 0 ]]; then
+    SUDO=""
+else
+    SUDO="$SUDO"
+fi
+
 echo -e "${GREEN}"
 echo "╔═══════════════════════════════════════╗"
 echo "║         Codogram Setup Script         ║"
@@ -362,11 +369,11 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
                 ;;
             python3)
                 if [[ "$OS" == "linux" ]]; then
-                    run_with_progress "Updating apt" sudo -E apt-get update
-                    run_with_progress "Installing software-properties-common" sudo -E apt-get install -y software-properties-common
-                    run_with_progress "Adding deadsnakes PPA" sudo -E add-apt-repository -y ppa:deadsnakes/ppa
-                    run_with_progress "Updating apt" sudo -E apt-get update
-                    run_with_progress "Installing Python 3.12" sudo -E apt-get install -y python3.12 python3.12-venv
+                    run_with_progress "Updating apt" $SUDO apt-get update
+                    run_with_progress "Installing software-properties-common" $SUDO apt-get install -y software-properties-common
+                    run_with_progress "Adding deadsnakes PPA" $SUDO add-apt-repository -y ppa:deadsnakes/ppa
+                    run_with_progress "Updating apt" $SUDO apt-get update
+                    run_with_progress "Installing Python 3.12" $SUDO apt-get install -y python3.12 python3.12-venv
                     # Create python3 symlink if needed
                     if ! command -v python3 &> /dev/null; then
                         sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
@@ -391,21 +398,21 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
                 ;;
             tmux)
                 if [[ "$OS" == "linux" ]]; then
-                    run_with_progress "Installing tmux" sudo -E apt-get install -y tmux
+                    run_with_progress "Installing tmux" $SUDO apt-get install -y tmux
                 else
                     run_with_progress "Installing tmux" brew install tmux
                 fi
                 ;;
             git)
                 if [[ "$OS" == "linux" ]]; then
-                    run_with_progress "Installing git" sudo -E apt-get install -y git
+                    run_with_progress "Installing git" $SUDO apt-get install -y git
                 else
                     run_with_progress "Installing git" brew install git
                 fi
                 ;;
             gh)
                 if [[ "$OS" == "linux" ]]; then
-                    run_with_progress "Installing gh" sudo -E apt-get install -y gh
+                    run_with_progress "Installing gh" $SUDO apt-get install -y gh
                 else
                     run_with_progress "Installing gh" brew install gh
                 fi
