@@ -97,13 +97,33 @@ def reset_history_cache() -> None:
     _session_cache = {}
 
 
+def _parse_timestamp(ts: str | float | None) -> float:
+    """Parse timestamp from jsonl entry (ISO string or Unix float)."""
+    if ts is None:
+        return 0
+    if isinstance(ts, (int, float)):
+        return float(ts)
+    if isinstance(ts, str):
+        # ISO format: "2025-12-29T23:27:59.407Z"
+        from datetime import datetime
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            return dt.timestamp()
+        except ValueError:
+            return 0
+    return 0
+
+
 def get_session_creation_time(jsonl_path: Path) -> float:
-    """Get timestamp of first entry in session jsonl.
+    """Get timestamp of first user/assistant entry in session jsonl.
 
     This is more reliable than st_mtime/st_ctime because:
     - st_mtime updates on every write
     - st_ctime is inode change time, not creation time (Linux)
     - First entry timestamp IS the session creation time
+
+    Skips file-history-snapshot entries (no top-level timestamp).
+    Parses ISO timestamps like "2025-12-29T23:27:59.407Z".
 
     Returns 0 if file doesn't exist, is empty, or can't be read.
     """
@@ -112,10 +132,13 @@ def get_session_creation_time(jsonl_path: Path) -> float:
 
     try:
         with open(jsonl_path, 'r') as f:
-            first_line = f.readline()
-            if first_line.strip():
-                entry = json.loads(first_line)
-                return entry.get("timestamp", 0)
+            for line in f:
+                if not line.strip():
+                    continue
+                entry = json.loads(line)
+                ts = entry.get("timestamp")
+                if ts:
+                    return _parse_timestamp(ts)
         return 0
     except (json.JSONDecodeError, OSError):
         return 0

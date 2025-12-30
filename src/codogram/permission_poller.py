@@ -25,7 +25,7 @@ class PollerState(Enum):
 
 
 # Separator for Telegram display
-SEPARATOR_SOLID = "──────────────────"
+SEPARATOR_SOLID = "────────────"
 
 
 async def create_poller_task(bot: Bot, project: ProjectState, telegram_queue: "TelegramQueue") -> asyncio.Task:

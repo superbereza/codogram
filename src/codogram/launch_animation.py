@@ -108,7 +108,7 @@ async def launch_with_animation(
                     except Exception:
                         pass
                 await bot.send_message(
-                    chat_id, "❌ Timeout: Claude didn't start in 2 minutes",
+                    chat_id, "✕ Timeout: Claude didn't start in 2 minutes",
                     message_thread_id=thread_id
                 )
                 return False
@@ -148,7 +148,7 @@ async def launch_with_animation(
 
         await bot.send_message(
             chat_id,
-            f"✓ Claude ready!\nAttach: `tmux attach -t {tmux_name}`",
+            f"✓ Claude ready!\n\nAttach: `tmux attach -t {tmux_name}`",
             parse_mode="Markdown",
             message_thread_id=thread_id
         )
@@ -164,7 +164,7 @@ async def launch_with_animation(
     except Exception as e:
         logger.error(f"launch_error: {e}")
         try:
-            await bot.send_message(chat_id, f"❌ Launch error: {e}", message_thread_id=thread_id)
+            await bot.send_message(chat_id, f"✕ Launch error: {e}", message_thread_id=thread_id)
         except Exception:
             pass
         return False

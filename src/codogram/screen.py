@@ -18,7 +18,7 @@ class Idle:
 ScreenState = PermissionPrompt | ToolProgress | Idle
 
 # Separators for display
-SEPARATOR_DASHED = "- " * 15
+SEPARATOR_DASHED = " " + "- " * 18
 
 def parse_screen(output: str) -> ScreenState:
     """Parse tmux capture-pane output to detect state."""
