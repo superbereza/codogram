@@ -106,7 +106,7 @@ class HistoryWatcher:
                         batch = OutgoingBatch(
                             chat_id=project.chat_id,
                             thread_id=thread.thread_id,
-                            messages=[{"text": f"`[!]` Claude session closed: {thread.name}"}],
+                            messages=[{"text": f"`[!]` Claude session closed: {thread.name}", "parse_mode": "Markdown"}],
                         )
                         await self.telegram_queue.enqueue_nowait(batch)
                     except Exception:
@@ -224,7 +224,7 @@ class HistoryWatcher:
             batch = OutgoingBatch(
                 chat_id=project.chat_id,
                 thread_id=thread.thread_id,
-                messages=[{"text": "`[v]` New session bound"}],
+                messages=[{"text": "`[v]` New session bound", "parse_mode": "Markdown"}],
             )
             # Fire-and-forget notification
             await self.telegram_queue.enqueue_nowait(batch)
@@ -357,7 +357,7 @@ async def poll_for_session_thread(
         batch = OutgoingBatch(
             chat_id=project.chat_id,
             thread_id=thread.thread_id,
-            messages=[{"text": "`[!]` Session not found. Make sure Claude is running."}],
+            messages=[{"text": "`[!]` Session not found. Make sure Claude is running.", "parse_mode": "Markdown"}],
         )
         await telegram_queue.enqueue_nowait(batch)
     except Exception:

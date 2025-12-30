@@ -202,7 +202,7 @@ async def _start_project_flow(message: Message, project: ProjectState):
             "path": path,
         }
         await message.answer(
-            f"Директория `{path}` не найдена.\n\nЧто делать?",
+            f"Directory `{path}` not found.\n\nWhat to do?",
             reply_markup=dir_not_found_keyboard(),
             parse_mode="Markdown",
         )
@@ -252,11 +252,11 @@ async def _connect_or_launch(message: Message, project: ProjectState):
                 "path": cwd,
             }
             await message.answer(
-                f"Claude не запущен в `{cwd}`.\n\nЗапустить?",
+                f"Claude not running in `{cwd}`.\n\nLaunch?",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [
-                        InlineKeyboardButton(text="Да, запустить", callback_data="start:launch_claude"),
-                        InlineKeyboardButton(text="Нет", callback_data="start:cancel"),
+                        InlineKeyboardButton(text="Yes, launch", callback_data="start:launch_claude"),
+                        InlineKeyboardButton(text="No", callback_data="start:cancel"),
                     ]
                 ]),
                 parse_mode="Markdown",
@@ -346,7 +346,7 @@ async def cmd_start(message: Message):
         project_name = args[0]
         if not is_valid_project_name(project_name):
             await message.answer(
-                "Имя проекта может содержать только буквы, цифры, `-` и `_`.",
+                "Project name can only contain letters, digits, `-` and `_`.",
                 parse_mode="Markdown",
             )
             return
@@ -381,7 +381,7 @@ async def cmd_start(message: Message):
     # Fallback: ask for project name (private chat or invalid title)
     _start_state[chat_id] = {"state": "awaiting_project_name"}
     await message.answer(
-        "Отправь имя проекта (например: `my-project`):",
+        "Send project name (e.g. `my-project`):",
         parse_mode="Markdown",
     )
 
@@ -400,7 +400,7 @@ async def launch_claude_in_thread(
     """
     # Race protection: check if launch already in progress
     if thread.launch_task and not thread.launch_task.done():
-        await message.answer("Запуск уже идёт...")
+        await message.answer("Launch already in progress...")
         return False
 
     from .launch_animation import launch_with_animation
@@ -431,29 +431,29 @@ async def on_session_close(message: Message):
     thread_id = message.message_thread_id
 
     if thread_id is None:
-        await message.answer("Эту команду можно использовать только в топике")
+        await message.answer("This command can only be used in a topic")
         return
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await message.answer("Проект не найден")
+        await message.answer("Project not found")
         return
 
     thread = project.threads.get(thread_id)
     if not thread:
-        await message.answer("Этот топик не связан с Claude сессией")
+        await message.answer("This topic is not linked to a Claude session")
         return
 
     # Confirmation
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="Да, закрыть", callback_data=f"session_close:{thread_id}"),
-            InlineKeyboardButton(text="Отмена", callback_data="session_close:cancel"),
+            InlineKeyboardButton(text="Yes, close", callback_data=f"session_close:{thread_id}"),
+            InlineKeyboardButton(text="Cancel", callback_data="session_close:cancel"),
         ]
     ])
     await message.answer(
-        f"Закрыть тред '{thread.name}'?\n"
-        "Топик и tmux сессия будут удалены.",
+        f"Close thread '{thread.name}'?\n"
+        "Topic and tmux session will be deleted.",
         reply_markup=keyboard
     )
 
@@ -467,7 +467,7 @@ async def on_session_close_callback(callback: CallbackQuery):
 
     data = callback.data.split(":")[1]
     if data == "cancel":
-        await callback.message.edit_text("Отменено")
+        await callback.message.edit_text("Cancelled")
         await callback.answer()
         return
 
@@ -475,12 +475,12 @@ async def on_session_close_callback(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await callback.answer("Проект не найден")
+        await callback.answer("Project not found")
         return
 
     thread = project.threads.get(thread_id)
     if not thread:
-        await callback.answer("Тред не найден")
+        await callback.answer("Thread not found")
         return
 
     # Stop tasks
@@ -500,7 +500,7 @@ async def on_session_close_callback(callback: CallbackQuery):
     try:
         await callback.bot.delete_forum_topic(chat_id, thread_id)
     except Exception as e:
-        await callback.message.edit_text(f"Ошибка удаления топика: {e}")
+        await callback.message.edit_text(f"Error deleting topic: {e}")
         await callback.answer()
         return
 
@@ -508,7 +508,7 @@ async def on_session_close_callback(callback: CallbackQuery):
     del project.threads[thread_id]
     project_manager._save()
 
-    await callback.answer("Тред закрыт")
+    await callback.answer("Thread closed")
 
 
 @router.message(Command("session_new"))
@@ -520,13 +520,13 @@ async def on_session_new(message: Message):
     chat_id = message.chat.id
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await message.answer("Проект не найден. Сначала используй /start")
+        await message.answer("Project not found. Use /start first")
         return
 
     # Check if chat supports topics
     chat = await message.bot.get_chat(chat_id)
     if not chat.is_forum:
-        await message.answer("Этот чат не поддерживает топики. Включите Topics в настройках группы.")
+        await message.answer("This chat doesn't support topics. Enable Topics in group settings.")
         return
 
     # Parse optional name from command
@@ -536,7 +536,7 @@ async def on_session_new(message: Message):
         name = args[1].strip().lower()
         # Validate name
         if not name.replace("-", "").replace("_", "").isalnum():
-            await message.answer("Имя должно содержать только буквы, цифры, - и _")
+            await message.answer("Name can only contain letters, digits, - and _")
             return
     else:
         # Get existing thread names to exclude
@@ -546,14 +546,14 @@ async def on_session_new(message: Message):
     # Check if name already exists
     for thread in project.threads.values():
         if thread.name == name:
-            await message.answer(f"Тред с именем '{name}' уже существует")
+            await message.answer(f"Thread with name '{name}' already exists")
             return
 
     # Create Telegram topic
     try:
         topic = await message.bot.create_forum_topic(chat_id, name.capitalize())
     except Exception as e:
-        await message.answer(f"Ошибка создания топика: {e}")
+        await message.answer(f"Error creating topic: {e}")
         return
 
     # Create ThreadInfo
@@ -580,25 +580,25 @@ async def on_start_create_dir(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
-        await callback.answer("Сессия истекла, начни заново с /start")
+        await callback.answer("Session expired, start again with /start")
         return
 
     # Create directory
     result = create_project_directory(state["path"])
     if not result.success:
-        await callback.message.edit_text(f"Ошибка создания директории: {result.error}")
+        await callback.message.edit_text(f"Error creating directory: {result.error}")
         await callback.answer()
         return
 
     # Ask about git
     state["state"] = "awaiting_git_choice"
     await callback.message.edit_text(
-        f"Директория `{state['path']}` создана.\n\n"
-        f"**Настроить гит?**\n\n"
-        f"• `git init` — локальный репозиторий\n"
-        f"• `git init + gh repo create` — создать и на GitHub\n"
-        f"• `git clone` — клонировать существующий\n"
-        f"• Без гита — пустая папка",
+        f"Directory `{state['path']}` created.\n\n"
+        f"**Setup git?**\n\n"
+        f"• `git init` — local repository\n"
+        f"• `git init + gh repo create` — create on GitHub\n"
+        f"• `git clone` — clone existing\n"
+        f"• No git — empty folder",
         reply_markup=git_setup_keyboard(),
         parse_mode="Markdown",
     )
@@ -615,11 +615,11 @@ async def on_start_custom_path(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
-        await callback.answer("Сессия истекла")
+        await callback.answer("Session expired")
         return
 
     state["state"] = "awaiting_custom_path"
-    await callback.message.edit_text("Отправь путь к директории проекта:")
+    await callback.message.edit_text("Send project directory path:")
     await callback.answer()
 
 
@@ -633,14 +633,14 @@ async def on_start_git_init(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
-        await callback.answer("Сессия истекла")
+        await callback.answer("Session expired")
         return
 
     result = git_init(state["path"])
     if not result.success:
-        await callback.message.edit_text(f"Ошибка git init: {result.error}")
+        await callback.message.edit_text(f"Error git init: {result.error}")
     else:
-        await callback.message.edit_text("Git инициализирован. Запускаю Claude...")
+        await callback.message.edit_text("Git initialized. Launching Claude...")
 
         # Get or create project
         project = project_manager.get_or_create(state["project"])
@@ -678,12 +678,12 @@ async def on_start_git_gh(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
-        await callback.answer("Сессия истекла")
+        await callback.answer("Session expired")
         return
 
     state["state"] = "awaiting_gh_visibility"
     await callback.message.edit_text(
-        "Видимость репозитория?",
+        "Repository visibility?",
         reply_markup=git_visibility_keyboard(),
     )
     await callback.answer()
@@ -699,17 +699,17 @@ async def on_start_gh_visibility(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
-        await callback.answer("Сессия истекла")
+        await callback.answer("Session expired")
         return
 
     private = callback.data == "start:gh_private"
-    await callback.message.edit_text("Создаю репозиторий на GitHub...")
+    await callback.message.edit_text("Creating GitHub repository...")
 
     result = git_init_with_github(state["path"], private=private)
     if not result.success:
-        await callback.message.edit_text(f"Ошибка: {result.error}")
+        await callback.message.edit_text(f"Error: {result.error}")
     else:
-        await callback.message.edit_text("Репозиторий создан. Запускаю Claude...")
+        await callback.message.edit_text("Repository created. Launching Claude...")
 
         # Get or create project
         project = project_manager.get_or_create(state["project"])
@@ -747,12 +747,12 @@ async def on_start_git_clone(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
-        await callback.answer("Сессия истекла")
+        await callback.answer("Session expired")
         return
 
     state["state"] = "awaiting_clone_url"
     await callback.message.edit_text(
-        "Отправь ссылку на репозиторий:\n"
+        "Send repository URL:\n"
         "• SSH: `git@github.com:user/repo.git`\n"
         "• HTTPS: `https://github.com/user/repo.git`",
         parse_mode="Markdown",
@@ -770,10 +770,10 @@ async def on_start_no_git(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
-        await callback.answer("Сессия истекла")
+        await callback.answer("Session expired")
         return
 
-    await callback.message.edit_text("Запускаю Claude...")
+    await callback.message.edit_text("Launching Claude...")
 
     # Get or create project
     project = project_manager.get_or_create(state["project"])
@@ -846,19 +846,19 @@ async def _send_session_command(message: Message, command: str, status_text: str
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await message.answer("Проект не зарегистрирован. Используй /start")
+        await message.answer("Project not registered. Use /start")
         return False
 
     thread_id = message.message_thread_id
     thread = project.threads.get(thread_id)
     if not thread:
-        await message.answer("Thread не найден. Используй /start")
+        await message.answer("Thread not found. Use /start")
         return False
 
     tmux_name = thread.get_tmux_session(project.project_name)
 
     if not is_tmux_session_exists(tmux_name):
-        await message.answer("tmux сессия не найдена. Запусти Claude в терминале.")
+        await message.answer("tmux session not found. Start Claude in terminal.")
         return False
 
     # NOTE: Do NOT cancel watcher here - let it continue watching old session.
@@ -882,13 +882,13 @@ async def _send_session_command(message: Message, command: str, status_text: str
 @router.message(Command("new"))
 async def cmd_new(message: Message):
     """Start new Claude session in current thread."""
-    await _send_session_command(message, "/new", "⏳ Создаю новую сессию...")
+    await _send_session_command(message, "/new", "`[~]` Creating new session...")
 
 
 @router.message(Command("clear"))
 async def cmd_clear(message: Message):
     """Clear Claude session and start fresh."""
-    await _send_session_command(message, "/clear", "⏳ Очищаю сессию...")
+    await _send_session_command(message, "/clear", "`[~]` Clearing session...")
 
 
 @router.message(Command("restart_session"))
@@ -901,7 +901,7 @@ async def cmd_restart_session(message: Message):
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await message.answer("Нет активной сессии для перезапуска.")
+        await message.answer("No active session to restart.")
         return
 
     # Determine tmux session name
@@ -910,7 +910,7 @@ async def cmd_restart_session(message: Message):
         if thread:
             tmux_name = thread.get_tmux_session(project.project_name)
         else:
-            await message.answer("Нет активной сессии для перезапуска.")
+            await message.answer("No active session to restart.")
             return
     else:
         # Main thread or legacy
@@ -920,12 +920,12 @@ async def cmd_restart_session(message: Message):
         elif project.tmux_session:
             tmux_name = project.tmux_session
         else:
-            await message.answer("Нет активной сессии для перезапуска.")
+            await message.answer("No active session to restart.")
             return
 
     # Check if tmux exists
     if not is_tmux_session_exists(tmux_name):
-        await message.answer("Нет активной сессии для перезапуска.")
+        await message.answer("No active session to restart.")
         return
 
     # Store state for confirm callback
@@ -936,7 +936,7 @@ async def cmd_restart_session(message: Message):
     }
 
     await message.answer(
-        f"Перезапустить сессию `{tmux_name}`?",
+        f"Restart session `{tmux_name}`?",
         reply_markup=restart_confirm_keyboard(),
         parse_mode="Markdown",
     )
@@ -952,7 +952,7 @@ async def on_restart_confirm(callback: CallbackQuery):
     state = _start_state.get(chat_id)
 
     if not state or state.get("state") != "restart_confirm":
-        await callback.answer("Сессия истекла")
+        await callback.answer("Session expired")
         return
 
     tmux_name = state.get("tmux_name")
@@ -961,7 +961,7 @@ async def on_restart_confirm(callback: CallbackQuery):
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await callback.answer("Сессия не найдена")
+        await callback.answer("Session not found")
         return
 
     # Get thread if in topic
@@ -1022,13 +1022,13 @@ async def on_restart_confirm(callback: CallbackQuery):
 
     project_manager._save()
 
-    await callback.message.edit_text("Сессия остановлена. Используй /start для запуска.")
+    await callback.message.edit_text("Session stopped. Use /start to launch.")
     await callback.answer()
 
 
 @router.callback_query(F.data == "restart:cancel")
 async def on_restart_cancel(callback: CallbackQuery):
-    await callback.message.edit_text("Отменено.")
+    await callback.message.edit_text("Cancelled.")
     await callback.answer()
 
 
@@ -1107,7 +1107,7 @@ async def on_tmux_selected(callback: CallbackQuery):
     project = project_manager.get_or_create(project_name)
     project.tmux_session = tmux_session
 
-    await callback.message.edit_text(f"Подключено к tmux: `{tmux_session}`", parse_mode="Markdown")
+    await callback.message.edit_text(f"Connected to tmux: `{tmux_session}`", parse_mode="Markdown")
     await callback.answer()
 
     # Refresh session and start tasks
@@ -1133,7 +1133,7 @@ async def on_start_launch_claude(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
-        await callback.answer("Сессия истекла, начни заново с /start")
+        await callback.answer("Session expired, start again with /start")
         return
 
     project = project_manager.get_or_create(state["project"])
@@ -1145,7 +1145,7 @@ async def on_start_launch_claude(callback: CallbackQuery):
 
     # Race protection: check if launch already in progress
     if thread.launch_task and not thread.launch_task.done():
-        await callback.answer("Запуск уже идёт...")
+        await callback.answer("Launch already in progress...")
         return
 
     await callback.answer()
@@ -1173,7 +1173,7 @@ async def on_start_cancel(callback: CallbackQuery):
     """Handle cancel button."""
     chat_id = callback.message.chat.id
     _start_state.pop(chat_id, None)
-    await callback.message.edit_text("Отменено.")
+    await callback.message.edit_text("Cancelled.")
     await callback.answer()
 
 
@@ -1207,7 +1207,7 @@ async def on_message(message: Message):
             project_name = message.text.strip()
             if not project_name or not is_valid_project_name(project_name):
                 await message.answer(
-                    "Имя проекта может содержать только буквы, цифры, `-` и `_`.",
+                    "Project name can only contain letters, digits, `-` and `_`.",
                     parse_mode="Markdown",
                 )
                 return
@@ -1223,7 +1223,7 @@ async def on_message(message: Message):
             # User sent custom path
             path = message.text.strip()
             if not Path(path).expanduser().is_dir():
-                await message.answer(f"Директория `{path}` не существует.", parse_mode="Markdown")
+                await message.answer(f"Directory `{path}` does not exist.", parse_mode="Markdown")
                 return
 
             # Get or create project and save path
@@ -1255,11 +1255,11 @@ async def on_message(message: Message):
         elif state["state"] == "awaiting_clone_url":
             # User sent clone URL
             url = message.text.strip()
-            await message.answer("Клонирую репозиторий...")
+            await message.answer("Cloning repository...")
 
             result = git_clone(state["path"], url)
             if not result.success:
-                await message.answer(f"Ошибка клонирования: {result.error}")
+                await message.answer(f"Clone error: {result.error}")
                 return
 
             # Get or create project
@@ -1301,7 +1301,7 @@ async def on_message(message: Message):
         thread = ThreadInfo(thread_id=thread_id, name="pending")
         project.threads[thread_id] = thread
         project_manager._save()
-        await message.answer("Используй /start или /session_new для подключения Claude к этому топику")
+        await message.answer("Use /start or /session_new to connect Claude to this topic")
         return
 
     # For thread_id=None (General/Private/Simple), auto-create "main" thread if missing
@@ -1350,4 +1350,4 @@ async def on_message(message: Message):
         # No active session - only respond in group chats
         logger.warning(f"no_tmux_session: project={project.project_name}")
         if message.chat.id < 0:  # Negative IDs are groups/channels
-            await message.answer("Нет активной сессии Claude. Используй /start для запуска.")
+            await message.answer("No active Claude session. Use /start to launch.")
