@@ -96,6 +96,15 @@
 
 ## Backlog
 
+### Migrate strings to strings.py
+Перенести все захардкоженные строки в `src/codogram/strings.py`:
+- bot.py — основной объём (~50 строк)
+- launch_animation.py — статусы запуска
+- history_watcher.py — уведомления
+- keyboards.py — кнопки
+- start_flow.py — кнопки wizard'а
+- См. `docs/specs/tone-of-voice.md` для гайдлайнов
+
 ### Auto-accept mode
 Автоматическое разрешение всех permission prompts:
 - `/auto_accept_mode on|off` команда для включения/выключения
