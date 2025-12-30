@@ -73,6 +73,7 @@ async def launch_with_animation(
 
     try:
         thread.awaiting_new_session = True
+        thread.start_requested_at = time.time()
 
         # 1. Create tmux
         await bot.send_message(chat_id, "Создаю tmux сессию...", message_thread_id=thread_id)
