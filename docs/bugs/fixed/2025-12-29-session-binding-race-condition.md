@@ -2,7 +2,28 @@
 
 **Date:** 2025-12-29
 **Severity:** High
-**Status:** Open
+**Status:** Fixed
+
+## Resolution
+
+**Fixed by:** [session-binding-race-fix](../designs/2025-12-29-session-binding-race-fix.md)
+
+**Fix summary:**
+- Added `start_requested_at` timestamp to ThreadInfo (persisted)
+- Added `get_session_creation_time()` to read first entry timestamp from jsonl
+- `find_session_by_user_message()` now accepts `created_after` filter
+- Both binding paths (`poll_for_session_thread` and `_bind_awaiting_threads`) now filter by creation time
+- Only sessions created AFTER /start are considered
+
+**Commits:**
+- `6f9ab3f` feat(history): add get_session_creation_time function
+- `e7f2099` feat(session): add start_requested_at field with persistence
+- `bf83fe9` feat(history): add created_after filter to find_session_by_user_message
+- `23b9c65` fix(watcher): filter by created_after in poll_for_session_thread
+- `3d71643` fix(watcher): filter by created_after in _bind_awaiting_threads
+- `7803247` fix(watcher): clear start_requested_at in _bind_thread_to_session
+- `1847384` feat(launch_animation): set start_requested_at when launching Claude
+- `ce66532` feat(bot): set start_requested_at in /new and /clear
 
 ## Summary
 
