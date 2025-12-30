@@ -68,6 +68,13 @@ cp .env.example .env
 2. Send `/start` or `/start project_name` to the bot in Telegram
 3. Done! Permission prompts will appear in the chat
 
+### Update
+
+```bash
+git pull
+./restart.sh
+```
+
 ## Commands
 
 | Command | Description |
