@@ -287,54 +287,44 @@ git commit -m "feat(session): add start_requested_at field with persistence"
 Add to `tests/test_history_reader.py`:
 
 ```python
-def test_find_session_by_user_message_filters_by_created_after():
+def test_find_session_by_user_message_filters_by_created_after(tmp_path, monkeypatch):
     """Test that created_after filters out old sessions."""
     from codogram.history_reader import find_session_by_user_message
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Create project directory structure
-        project_dir = Path(tmpdir) / ".claude" / "projects" / "-test-cwd"
-        project_dir.mkdir(parents=True)
+    # Create project directory structure
+    project_dir = tmp_path / ".claude" / "projects" / "-test-cwd"
+    project_dir.mkdir(parents=True)
 
-        # Old session (created at t=100)
-        old_session = project_dir / "old-session.jsonl"
-        with open(old_session, 'w') as f:
-            f.write(json.dumps({"type": "system", "timestamp": 100}) + "\n")
-            f.write(json.dumps({"type": "user", "message": {"content": "Hello"}}) + "\n")
+    # Old session (created at t=100)
+    old_session = project_dir / "old-session.jsonl"
+    with open(old_session, 'w') as f:
+        f.write(json.dumps({"type": "system", "timestamp": 100}) + "\n")
+        f.write(json.dumps({"type": "user", "message": {"content": "Hello"}}) + "\n")
 
-        # New session (created at t=200)
-        new_session = project_dir / "new-session.jsonl"
-        with open(new_session, 'w') as f:
-            f.write(json.dumps({"type": "system", "timestamp": 200}) + "\n")
-            f.write(json.dumps({"type": "user", "message": {"content": "Hello"}}) + "\n")
+    # New session (created at t=200)
+    new_session = project_dir / "new-session.jsonl"
+    with open(new_session, 'w') as f:
+        f.write(json.dumps({"type": "system", "timestamp": 200}) + "\n")
+        f.write(json.dumps({"type": "user", "message": {"content": "Hello"}}) + "\n")
 
-        # Patch Path.home to use our temp directory
-        original_home = Path.home
+    # Patch Path.home using monkeypatch (proper pytest way)
+    monkeypatch.setattr(Path, 'home', lambda: tmp_path)
 
-        def mock_home():
-            return Path(tmpdir)
+    # Without filter: should find new-session (newest by mtime)
+    result = find_session_by_user_message("/test/cwd", "Hello")
+    assert result is not None
+    session_id, _ = result
+    assert session_id == "new-session"
 
-        Path.home = staticmethod(mock_home)
+    # With created_after=150: should find new-session (created at 200 > 150)
+    result = find_session_by_user_message("/test/cwd", "Hello", created_after=150)
+    assert result is not None
+    session_id, _ = result
+    assert session_id == "new-session"
 
-        try:
-            # Without filter: should find new-session (newest by mtime)
-            result = find_session_by_user_message("/test/cwd", "Hello")
-            assert result is not None
-            session_id, _ = result
-            assert session_id == "new-session"
-
-            # With created_after=150: should find new-session (created at 200 > 150)
-            result = find_session_by_user_message("/test/cwd", "Hello", created_after=150)
-            assert result is not None
-            session_id, _ = result
-            assert session_id == "new-session"
-
-            # With created_after=250: should find nothing (both too old)
-            result = find_session_by_user_message("/test/cwd", "Hello", created_after=250)
-            assert result is None
-
-        finally:
-            Path.home = original_home
+    # With created_after=250: should find nothing (both too old)
+    result = find_session_by_user_message("/test/cwd", "Hello", created_after=250)
+    assert result is None
 ```
 
 **Step 2: Run test to verify it fails**
@@ -587,7 +577,54 @@ git commit -m "feat(bot): set start_requested_at when launching Claude"
 
 ---
 
-### Task 8: Run all tests
+### Task 8: Set `start_requested_at` in `/new` and `/clear`
+
+**Files:**
+- Modify: `src/codogram/bot.py` (_send_session_command helper)
+
+**Background:**
+
+`/new` and `/clear` commands also set `awaiting_new_session = True` via `_send_session_command`. Without setting `start_requested_at`, the time filter in `_bind_awaiting_threads` will be skipped (because `if thread.start_requested_at:` is False).
+
+**Step 1: Locate _send_session_command**
+
+Find the helper function that handles both /new and /clear:
+
+```python
+async def _send_session_command(message: Message, command: str, status_text: str) -> bool:
+    ...
+    thread.awaiting_new_session = True
+    thread.last_sent_message = None
+    project_manager._save()
+    ...
+```
+
+**Step 2: Add start_requested_at**
+
+After `thread.awaiting_new_session = True`, add:
+
+```python
+thread.start_requested_at = time.time()
+```
+
+Full context:
+```python
+thread.awaiting_new_session = True
+thread.start_requested_at = time.time()  # ADD THIS
+thread.last_sent_message = None
+project_manager._save()
+```
+
+**Step 3: Commit**
+
+```bash
+git add src/codogram/bot.py
+git commit -m "feat(bot): set start_requested_at in /new and /clear"
+```
+
+---
+
+### Task 9: Run all tests
 
 **Step 1: Run full test suite**
 
@@ -604,7 +641,7 @@ If any tests fail, fix them before proceeding.
 
 ---
 
-### Task 9: Update bug report and move to fixed
+### Task 10: Update bug report and move to fixed
 
 **Files:**
 - Modify: `docs/bugs/2025-12-29-session-binding-race-condition.md`
@@ -644,7 +681,7 @@ git commit -m "docs: mark session binding race condition as fixed"
 
 ---
 
-### Task 10: Manual testing
+### Task 11: Manual testing
 
 **Step 1: Restart bot**
 
@@ -679,3 +716,31 @@ Check that each thread has unique session_id.
 2. Immediately restart bot: `./restart.sh`
 3. Verify `start_requested_at` is preserved in config
 4. Send message — should bind to correct session
+
+---
+
+## Known Limitations
+
+### Multiple threads awaiting simultaneously
+
+If two threads are both awaiting new sessions (`awaiting_new_session=True`) and a new session appears, BOTH may bind to the same session because `find_session_for_project()` returns only the latest session.
+
+**Scenario:**
+```
+Thread A: /start at 10:00, awaiting, start_requested_at=10:00
+Thread B: /start at 10:05, awaiting, start_requested_at=10:05
+Session X: created at 10:01 (for Thread A)
+Session Y: created at 10:06 (for Thread B)
+
+Cycle 1: find_session_for_project → Y (latest)
+         Thread A: 10:06 > 10:00 → bind A to Y ❌
+Cycle 2: Thread B: 10:06 > 10:05 → bind B to Y ❌
+
+Result: Both bound to Y, Session X orphaned.
+```
+
+**This is a separate bug**, not addressed by this plan. The current plan fixes the race condition where a thread binds to an OLD session (created BEFORE /start).
+
+**Workaround:** Avoid running /start in multiple threads simultaneously.
+
+**Future fix:** Use unique binding tokens or track expected session per thread.
