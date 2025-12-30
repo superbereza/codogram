@@ -1,8 +1,9 @@
 # Session Binding Race Condition Fix
 
 **Date:** 2025-12-29
-**Status:** Proposed
-**Bug:** [session-binding-race-condition](../bugs/2025-12-29-session-binding-race-condition.md)
+**Status:** Implemented
+**Bug:** [session-binding-race-condition](../bugs/fixed/2025-12-29-session-binding-race-condition.md)
+**Plan:** [implementation-plan](../plans/done/2025-12-29-session-binding-race-fix-plan.md)
 
 ## Problem
 

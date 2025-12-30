@@ -6,7 +6,8 @@
 
 ## Resolution
 
-**Fixed by:** [session-binding-race-fix](../designs/2025-12-29-session-binding-race-fix.md)
+**Fixed by:** [session-binding-race-fix](../designs/done/2025-12-29-session-binding-race-fix.md)
+**Plan:** [implementation-plan](../plans/done/2025-12-29-session-binding-race-fix-plan.md)
 
 **Fix summary:**
 - Added `start_requested_at` timestamp to ThreadInfo (persisted)

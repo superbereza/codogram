@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python, asyncio, JSON
 
-**Design:** [session-binding-race-fix](../designs/2025-12-29-session-binding-race-fix.md)
+**Design:** [session-binding-race-fix](../designs/done/2025-12-29-session-binding-race-fix.md)
 
 ---
 
