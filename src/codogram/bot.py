@@ -428,8 +428,8 @@ async def launch_claude_in_thread(
     return True
 
 
-@router.message(Command("session_close"))
-async def on_session_close(message: Message):
+@router.message(Command("thread_delete"))
+async def cmd_thread_delete(message: Message):
     """Close current thread and its Claude session."""
     if not is_admin(message.from_user.id):
         return
@@ -454,19 +454,19 @@ async def on_session_close(message: Message):
     # Confirmation
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="Yes, close", callback_data=f"session_close:{thread_id}"),
-            InlineKeyboardButton(text="Cancel", callback_data="session_close:cancel"),
+            InlineKeyboardButton(text="Yes, delete", callback_data=f"thread_delete:{thread_id}"),
+            InlineKeyboardButton(text="Cancel", callback_data="thread_delete:cancel"),
         ]
     ])
     await message.answer(
-        f"Close thread '{thread.name}'?\n"
+        f"Delete thread '{thread.name}'?\n"
         "Topic and tmux session will be deleted.",
         reply_markup=keyboard
     )
 
 
-@router.callback_query(F.data.startswith("session_close:"))
-async def on_session_close_callback(callback: CallbackQuery):
+@router.callback_query(F.data.startswith("thread_delete:"))
+async def on_thread_delete_callback(callback: CallbackQuery):
     """Handle thread close confirmation."""
     if not is_admin(callback.from_user.id):
         await callback.answer("Not authorized")
@@ -518,8 +518,8 @@ async def on_session_close_callback(callback: CallbackQuery):
     await callback.answer("Thread closed")
 
 
-@router.message(Command("session_new"))
-async def on_session_new(message: Message):
+@router.message(Command("thread_create"))
+async def cmd_thread_create(message: Message):
     """Create a new thread (topic) with its own Claude session."""
     if not is_admin(message.from_user.id):
         return
@@ -843,7 +843,7 @@ async def cmd_resume(message: Message):
         # In a topic - resume not supported
         await message.answer(
             "`[!]` /resume not supported in multi-session mode.\n"
-            "Use /session_new for a new session.",
+            "Use /thread_create for a new thread.",
             parse_mode="Markdown"
         )
     else:
@@ -910,8 +910,8 @@ async def cmd_clear(message: Message):
     await _send_session_command(message, "/clear", "`[~]` Clearing session...")
 
 
-@router.message(Command("restart_session"))
-async def cmd_restart_session(message: Message):
+@router.message(Command("restart"))
+async def cmd_restart(message: Message):
     if not is_admin(message.from_user.id):
         return
 
@@ -1320,7 +1320,7 @@ async def on_message(message: Message):
         thread = ThreadInfo(thread_id=thread_id, name="pending")
         project.threads[thread_id] = thread
         project_manager._save()
-        await message.answer("Use /start or /session_new to connect Claude to this topic")
+        await message.answer("Use /start or /thread_create to connect Claude to this topic")
         return
 
     # For thread_id=None (General/Private/Simple), auto-create "main" thread if missing

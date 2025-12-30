@@ -36,9 +36,9 @@ async def main():
         BotCommand(command="start", description="Start Claude / show status"),
         BotCommand(command="new", description="Start new Claude session (/clear)"),
         # /clear intentionally not in menu - same as /new
-        BotCommand(command="session_new", description="Create new Claude thread"),
-        BotCommand(command="session_close", description="Close Claude thread (use in topic)"),
-        BotCommand(command="restart_session", description="Restart Claude session"),
+        BotCommand(command="thread_create", description="Create new Claude thread"),
+        BotCommand(command="thread_delete", description="Delete Claude thread (in topic)"),
+        BotCommand(command="restart", description="Kill and restart Claude tmux"),
         BotCommand(command="my_chat_id", description="Show your user ID"),
         BotCommand(command="esc", description="Send Escape to Claude"),
         # /resume intentionally not in menu - just responds "not supported" if someone tries it
