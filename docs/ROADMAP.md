@@ -87,14 +87,22 @@
 - Настройка .env (токен бота, admin ID)
 - См. [docs/designs/done/2025-12-30-setup-script.md](designs/done/2025-12-30-setup-script.md)
 
-## MLP (Minimum Lovable Product)
-
-Блокеры для open source релиза:
-
-- [x] LICENSE файл (GPL v3)
-- [ ] GitHub Actions workflow для тестов
+### Open source release
+- LICENSE файл (GPL v3)
+- Репозиторий публичный
 
 ## Backlog
+
+### Bot refactoring
+Рефакторинг архитектуры бота — слоёная структура:
+- handlers → services → domain → adapters
+- Убрать дублирование кода
+- Очистить deprecated поля
+- См. [docs/designs/2025-12-27-bot-refactoring/](designs/2025-12-27-bot-refactoring/)
+
+### GitHub Actions CI
+- Workflow для запуска тестов на PR
+- pytest + type checking
 
 ### Migrate strings to strings.py
 Перенести все захардкоженные строки в `src/codogram/strings.py`:
