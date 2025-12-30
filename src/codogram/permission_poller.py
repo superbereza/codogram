@@ -10,7 +10,7 @@ from aiogram import Bot
 if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
-from .telegram_queue import OutgoingBatch
+from .telegram_queue import OutgoingBatch, KeyboardBatch
 from .config import settings
 from .screen import parse_screen, PermissionPrompt
 from .keyboards import permission_keyboard
@@ -54,7 +54,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
     last_options = None
     last_body = None
     content_msg_ids: list[int] = []
-    kb_msg = None
+    kb_msg_id: int | None = None
 
     DEBOUNCE_TIME = 0.5
     POLL_INTERVAL = 0.5
@@ -117,14 +117,21 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                         )
                         content_msg_ids = await telegram_queue.enqueue(batch)
 
-                        # Keyboard sent directly (need to track for button handler)
+                        # Keyboard through queue (rate limited)
                         kb = permission_keyboard(parsed.options, project.tmux_session)
-                        kb_msg = await bot.send_message(chat_id, "👆", reply_markup=kb)
-                        permission_messages[kb_msg.message_id] = content_msg_ids
+                        kb_msg_ids = await telegram_queue.enqueue(KeyboardBatch(
+                            chat_id=chat_id,
+                            text="👆",
+                            reply_markup=kb,
+                            thread_id=None,
+                        ))
+                        kb_msg_id = kb_msg_ids[0] if kb_msg_ids else None
+                        if kb_msg_id:
+                            permission_messages[kb_msg_id] = content_msg_ids
 
                         state = PollerState.SHOWING
                         last_body = parsed.body
-                        logger.debug(f"Poller SHOWING: sent {len(parsed.options)} options, kb_msg={kb_msg.message_id}")
+                        logger.debug(f"Poller SHOWING: sent {len(parsed.options)} options, kb_msg={kb_msg_id}")
                     except Exception as e:
                         logger.warning(f"Permission poller: send error: {e}")
                         state = PollerState.IDLE
@@ -132,38 +139,38 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
         elif state == PollerState.SHOWING:
             if not is_permission:
                 logger.debug("Poller SHOWING→IDLE: permission gone, cleaning up")
-                if kb_msg and kb_msg.message_id in permission_messages:
-                    for msg_id in permission_messages[kb_msg.message_id]:
+                if kb_msg_id and kb_msg_id in permission_messages:
+                    for msg_id in permission_messages[kb_msg_id]:
                         try:
                             await bot.delete_message(chat_id, msg_id)
                         except Exception:
                             pass
                     try:
-                        await bot.delete_message(chat_id, kb_msg.message_id)
+                        await bot.delete_message(chat_id, kb_msg_id)
                     except Exception:
                         pass
-                    permission_messages.pop(kb_msg.message_id, None)
+                    permission_messages.pop(kb_msg_id, None)
 
                 state = PollerState.IDLE
                 last_options = None
                 last_body = None
                 content_msg_ids = []
-                kb_msg = None
+                kb_msg_id = None
             elif parsed.options != last_options or parsed.body != last_body:
                 logger.debug(f"Poller SHOWING: body/options changed, resending")
                 try:
                     # Delete old messages
-                    if kb_msg and kb_msg.message_id in permission_messages:
-                        for msg_id in permission_messages[kb_msg.message_id]:
+                    if kb_msg_id and kb_msg_id in permission_messages:
+                        for msg_id in permission_messages[kb_msg_id]:
                             try:
                                 await bot.delete_message(chat_id, msg_id)
                             except Exception:
                                 pass
                         try:
-                            await bot.delete_message(chat_id, kb_msg.message_id)
+                            await bot.delete_message(chat_id, kb_msg_id)
                         except Exception:
                             pass
-                        permission_messages.pop(kb_msg.message_id, None)
+                        permission_messages.pop(kb_msg_id, None)
 
                     # Build new body messages
                     body_messages = []
@@ -179,10 +186,17 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                     batch = OutgoingBatch(chat_id=chat_id, thread_id=None, messages=body_messages)
                     content_msg_ids = await telegram_queue.enqueue(batch)
 
-                    # Keyboard directly
+                    # Keyboard through queue (rate limited)
                     kb = permission_keyboard(parsed.options, project.tmux_session)
-                    kb_msg = await bot.send_message(chat_id, "👆", reply_markup=kb)
-                    permission_messages[kb_msg.message_id] = content_msg_ids
+                    kb_msg_ids = await telegram_queue.enqueue(KeyboardBatch(
+                        chat_id=chat_id,
+                        text="👆",
+                        reply_markup=kb,
+                        thread_id=None,
+                    ))
+                    kb_msg_id = kb_msg_ids[0] if kb_msg_ids else None
+                    if kb_msg_id:
+                        permission_messages[kb_msg_id] = content_msg_ids
 
                     last_options = parsed.options
                     last_body = parsed.body
@@ -213,7 +227,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
     last_options = None
     last_body = None
     content_msg_ids: list[int] = []
-    kb_msg = None
+    kb_msg_id: int | None = None
 
     DEBOUNCE_TIME = 0.5
     POLL_INTERVAL = 0.5
@@ -268,16 +282,21 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                         )
                         content_msg_ids = await telegram_queue.enqueue(batch)
 
-                        # Keyboard sent directly (need to track for button handler)
+                        # Keyboard through queue (rate limited)
                         kb = permission_keyboard(parsed.options, tmux_name)
-                        kb_msg = await bot.send_message(
-                            chat_id, "👆", reply_markup=kb, message_thread_id=thread_id
-                        )
-                        permission_messages[kb_msg.message_id] = content_msg_ids
+                        kb_msg_ids = await telegram_queue.enqueue(KeyboardBatch(
+                            chat_id=chat_id,
+                            text="👆",
+                            reply_markup=kb,
+                            thread_id=thread_id,
+                        ))
+                        kb_msg_id = kb_msg_ids[0] if kb_msg_ids else None
+                        if kb_msg_id:
+                            permission_messages[kb_msg_id] = content_msg_ids
 
                         state = PollerState.SHOWING
                         last_body = parsed.body
-                        logger.debug(f"Thread poller {thread.name} SHOWING: sent {len(parsed.options)} options, kb_msg={kb_msg.message_id}")
+                        logger.debug(f"Thread poller {thread.name} SHOWING: sent {len(parsed.options)} options, kb_msg={kb_msg_id}")
                     except Exception as e:
                         logger.warning(f"Thread poller {thread.name}: send error: {e}")
                         state = PollerState.IDLE
@@ -285,38 +304,38 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
         elif state == PollerState.SHOWING:
             if not is_permission:
                 logger.debug(f"Thread poller {thread.name} SHOWING→IDLE: cleanup")
-                if kb_msg and kb_msg.message_id in permission_messages:
-                    for msg_id in permission_messages[kb_msg.message_id]:
+                if kb_msg_id and kb_msg_id in permission_messages:
+                    for msg_id in permission_messages[kb_msg_id]:
                         try:
                             await bot.delete_message(chat_id, msg_id)
                         except Exception:
                             pass
                     try:
-                        await bot.delete_message(chat_id, kb_msg.message_id)
+                        await bot.delete_message(chat_id, kb_msg_id)
                     except Exception:
                         pass
-                    permission_messages.pop(kb_msg.message_id, None)
+                    permission_messages.pop(kb_msg_id, None)
 
                 state = PollerState.IDLE
                 last_options = None
                 last_body = None
                 content_msg_ids = []
-                kb_msg = None
+                kb_msg_id = None
             elif parsed.options != last_options or parsed.body != last_body:
                 logger.debug(f"Thread poller {thread.name} SHOWING: resending")
                 try:
                     # Delete old messages
-                    if kb_msg and kb_msg.message_id in permission_messages:
-                        for msg_id in permission_messages[kb_msg.message_id]:
+                    if kb_msg_id and kb_msg_id in permission_messages:
+                        for msg_id in permission_messages[kb_msg_id]:
                             try:
                                 await bot.delete_message(chat_id, msg_id)
                             except Exception:
                                 pass
                         try:
-                            await bot.delete_message(chat_id, kb_msg.message_id)
+                            await bot.delete_message(chat_id, kb_msg_id)
                         except Exception:
                             pass
-                        permission_messages.pop(kb_msg.message_id, None)
+                        permission_messages.pop(kb_msg_id, None)
 
                     # Build new body messages
                     body_messages = []
@@ -332,12 +351,17 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                     batch = OutgoingBatch(chat_id=chat_id, thread_id=thread_id, messages=body_messages)
                     content_msg_ids = await telegram_queue.enqueue(batch)
 
-                    # Keyboard directly
+                    # Keyboard through queue (rate limited)
                     kb = permission_keyboard(parsed.options, tmux_name)
-                    kb_msg = await bot.send_message(
-                        chat_id, "👆", reply_markup=kb, message_thread_id=thread_id
-                    )
-                    permission_messages[kb_msg.message_id] = content_msg_ids
+                    kb_msg_ids = await telegram_queue.enqueue(KeyboardBatch(
+                        chat_id=chat_id,
+                        text="👆",
+                        reply_markup=kb,
+                        thread_id=thread_id,
+                    ))
+                    kb_msg_id = kb_msg_ids[0] if kb_msg_ids else None
+                    if kb_msg_id:
+                        permission_messages[kb_msg_id] = content_msg_ids
 
                     last_options = parsed.options
                     last_body = parsed.body
