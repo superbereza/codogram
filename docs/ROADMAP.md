@@ -78,6 +78,15 @@
 - Решение: Session Binder — `/new`, `/clear` команды + `awaiting_new_session` флаг
 - См. [docs/bugs/fixed/2025-12-29-session-binding-race-condition.md](bugs/fixed/2025-12-29-session-binding-race-condition.md)
 
+### Interactive setup script
+- `./setup.sh` — интерактивная установка зависимостей
+- Определение ОС (Linux/macOS)
+- Интерактивный селектор с ↑/↓ + Space + Enter
+- Проверка и установка: python3, brew (macOS), tmux, git, gh, claude
+- Создание venv, pip install
+- Настройка .env (токен бота, admin ID)
+- См. [docs/designs/done/2025-12-30-setup-script.md](designs/done/2025-12-30-setup-script.md)
+
 ## Backlog
 
 ### Auto-accept mode
@@ -102,12 +111,6 @@
 - `🚀 Claude запущен в claude-codogram-sublime`
 - `Подключиться: tmux attach -t claude-codogram-sublime`
 - Анпинить предыдущее при рестарте
-
-### Session switching UI
-Улучшения для multi-session:
-- Inline кнопки для переключения между топиками
-- `/sessions` — список активных сессий
-- Быстрое переключение без перехода в топик
 
 ### Activity indicators
 Отображение что Claude думает/работает:
