@@ -87,18 +87,18 @@ async def send_with_retry(
 def get_session_for_chat(chat_id: int) -> TmuxSession | None:
     """Get TmuxSession for chat_id (main thread)."""
     project = project_manager.get_by_chat(chat_id)
-    if not project:
+    if not project or not project.cwd:
         return None
 
     # Try threads[None] first (unified path)
     thread = project.threads.get(None)
     if thread:
         tmux_name = thread.get_tmux_session(project.project_name)
-        return TmuxSession(tmux_name, project.cwd or "/tmp")
+        return TmuxSession(tmux_name, project.cwd)
 
     # Legacy fallback
     if project.tmux_session:
-        return TmuxSession(project.tmux_session, project.cwd or "/tmp")
+        return TmuxSession(project.tmux_session, project.cwd)
 
     return None
 
@@ -830,8 +830,12 @@ async def cmd_esc(message: Message):
     if not thread:
         return
 
+    if not project.cwd:
+        logger.error(f"esc: project {project.project_name} has no cwd")
+        return
+
     tmux_name = thread.get_tmux_session(project.project_name)
-    tmux = TmuxSession(tmux_name, project.cwd or "/tmp")
+    tmux = TmuxSession(tmux_name, project.cwd)
     tmux.send_key("Escape")
 
 
@@ -1073,8 +1077,12 @@ async def on_permission_callback(callback: CallbackQuery):
         await callback.answer("Session not found")
         return
 
+    if not project.cwd:
+        await callback.answer("Project has no cwd")
+        return
+
     # Protection: tmux no longer exists
-    tmux = TmuxSession(tmux_session, project.cwd or "/tmp")
+    tmux = TmuxSession(tmux_session, project.cwd)
     if not tmux.exists():
         await callback.answer("Tmux session closed")
         return
