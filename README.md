@@ -30,7 +30,7 @@ Telegram bot for managing Claude Code sessions from your phone.
 ### Option 1: Automatic setup (recommended)
 
 ```bash
-git clone https://github.com/yourusername/codogram.git
+git clone https://github.com/superbereza/codogram.git
 cd codogram
 ./setup.sh
 ```
@@ -45,7 +45,7 @@ The script will:
 ### Option 2: Manual setup
 
 ```bash
-git clone https://github.com/yourusername/codogram.git
+git clone https://github.com/superbereza/codogram.git
 cd codogram
 
 python3 -m venv venv
@@ -101,6 +101,10 @@ git pull
 - One Claude per tmux session (split panes not supported)
 - cwd is fixed at `/start` (cd not tracked)
 - Session detection delay up to 15 seconds
+
+## Contact
+
+Questions, ideas, bugs? Write to [@superbereza](https://t.me/superbereza) on Telegram.
 
 ## License
 

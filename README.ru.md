@@ -30,7 +30,7 @@ Telegram бот для управления Claude Code сессиями с те
 ### Вариант 1: Автоматическая установка (рекомендуется)
 
 ```bash
-git clone https://github.com/yourusername/codogram.git
+git clone https://github.com/superbereza/codogram.git
 cd codogram
 ./setup.sh
 ```
@@ -45,7 +45,7 @@ cd codogram
 ### Вариант 2: Ручная установка
 
 ```bash
-git clone https://github.com/yourusername/codogram.git
+git clone https://github.com/superbereza/codogram.git
 cd codogram
 
 python3 -m venv venv
@@ -101,6 +101,10 @@ git pull
 - Один Claude на tmux сессию (split panes не поддерживаются)
 - cwd фиксируется при `/start` (cd не отслеживается)
 - Обнаружение сессий с задержкой до 15 сек
+
+## Контакт
+
+Вопросы, идеи, баги? Пиши [@superbereza](https://t.me/superbereza) в Telegram.
 
 ## License
 
