@@ -30,99 +30,115 @@ print_error() {
     echo -e "${RED}✗${NC} $1"
 }
 
-# Interactive multi-select with arrow keys
+# Run command with progress indicator (hides verbose output)
+# Usage: run_with_progress "message" command args...
+run_with_progress() {
+    local msg="$1"
+    shift
+    local tmp_out=$(mktemp)
+
+    printf "  ⏳ ${msg}..."
+
+    if "$@" > "$tmp_out" 2>&1; then
+        printf "\r                                                  \r"
+        print_success "$msg"
+        rm -f "$tmp_out"
+        return 0
+    else
+        local exit_code=$?
+        printf "\r                                                  \r"
+        print_error "$msg"
+        echo -e "${DIM}Output:${NC}"
+        tail -10 "$tmp_out"
+        rm -f "$tmp_out"
+        return $exit_code
+    fi
+}
+
+# Interactive multi-select using bash select (works everywhere)
 # Usage: multiselect "prompt" result_array options_array descriptions_array
 multiselect() {
     local prompt="$1"
     local -n _result=$2
     local -n _options=$3
     local -n _descriptions=$4
-
-    local selected=()
-    local cursor=0
     local count=${#_options[@]}
 
+    echo -e "\n${BLUE}==>${NC} $prompt"
+    echo -e "${DIM}    Enter numbers to toggle, 'a' for all, 'n' for none, Enter when done${NC}\n"
+
     # Initialize all as selected
+    local selected=()
     for ((i=0; i<count; i++)); do
         selected+=("true")
     done
 
-    # Hide cursor
-    tput civis
-
-    # Print prompt
-    echo -e "\n${BLUE}==>${NC} $prompt"
-    echo -e "${DIM}    ↑/↓: move, Space: toggle, Enter: confirm${NC}\n"
-
-    # Draw initial menu
+    # Show initial state
     for ((i=0; i<count; i++)); do
         if [[ "${selected[$i]}" == "true" ]]; then
-            if [[ $i -eq $cursor ]]; then
-                echo -e "  ${CYAN}▸${NC} ${GREEN}[✓]${NC} ${BOLD}${_options[$i]}${NC} ${DIM}— ${_descriptions[$i]}${NC}"
-            else
-                echo -e "    ${GREEN}[✓]${NC} ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
-            fi
+            echo -e "  ${GREEN}[✓]${NC} $((i+1))) ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
         else
-            if [[ $i -eq $cursor ]]; then
-                echo -e "  ${CYAN}▸${NC} [ ] ${BOLD}${_options[$i]}${NC} ${DIM}— ${_descriptions[$i]}${NC}"
-            else
-                echo -e "    [ ] ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
-            fi
+            echo -e "  [ ] $((i+1))) ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
         fi
     done
 
-    # Handle input
     while true; do
-        read -rsn1 key
+        echo ""
+        read -p "Toggle (1-$count), [a]ll, [n]one, Enter to confirm: " choice
 
-        # Arrow keys send escape sequences
-        if [[ $key == $'\x1b' ]]; then
-            read -rsn2 key
-            case $key in
-                '[A') # Up
-                    ((cursor > 0)) && ((cursor--))
-                    ;;
-                '[B') # Down
-                    ((cursor < count-1)) && ((cursor++))
-                    ;;
-            esac
-        elif [[ $key == ' ' ]]; then
-            # Toggle selection
-            if [[ "${selected[$cursor]}" == "true" ]]; then
-                selected[$cursor]="false"
-            else
-                selected[$cursor]="true"
-            fi
-        elif [[ $key == '' ]]; then
-            # Enter - confirm
-            break
-        fi
+        case "$choice" in
+            [1-9]|[1-9][0-9])
+                local idx=$((choice - 1))
+                if [[ $idx -ge 0 && $idx -lt $count ]]; then
+                    if [[ "${selected[$idx]}" == "true" ]]; then
+                        selected[$idx]="false"
+                    else
+                        selected[$idx]="true"
+                    fi
+                fi
+                ;;
+            a|A)
+                for ((i=0; i<count; i++)); do
+                    selected[$i]="true"
+                done
+                ;;
+            n|N)
+                for ((i=0; i<count; i++)); do
+                    selected[$i]="false"
+                done
+                ;;
+            d|D|"")
+                break
+                ;;
+        esac
 
-        # Redraw menu (move cursor up and clear)
+        # Calculate actual terminal lines to clear (accounting for wrapping)
+        local cols=$(tput cols 2>/dev/null || echo 80)
+        local lines_to_clear=2  # prompt + empty line
+
         for ((i=0; i<count; i++)); do
-            tput cuu1
-            tput el
+            # Approximate line length (without ANSI codes)
+            local line_text="  [x] $((i+1))) ${_options[$i]} — ${_descriptions[$i]}"
+            local line_len=${#line_text}
+            # Ceiling division: how many terminal rows this line takes
+            local rows=$(( (line_len + cols - 1) / cols ))
+            lines_to_clear=$((lines_to_clear + rows))
         done
 
+        for ((i=0; i<lines_to_clear; i++)); do
+            printf "\e[2K\r\e[1A"
+        done
+        printf "\e[2K\r"
+
+        # Redraw options
         for ((i=0; i<count; i++)); do
             if [[ "${selected[$i]}" == "true" ]]; then
-                if [[ $i -eq $cursor ]]; then
-                    echo -e "  ${CYAN}▸${NC} ${GREEN}[✓]${NC} ${BOLD}${_options[$i]}${NC} ${DIM}— ${_descriptions[$i]}${NC}"
-                else
-                    echo -e "    ${GREEN}[✓]${NC} ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
-                fi
+                echo -e "  ${GREEN}[✓]${NC} $((i+1))) ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
             else
-                if [[ $i -eq $cursor ]]; then
-                    echo -e "  ${CYAN}▸${NC} [ ] ${BOLD}${_options[$i]}${NC} ${DIM}— ${_descriptions[$i]}${NC}"
-                else
-                    echo -e "    [ ] ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
-                fi
+                echo -e "  [ ] $((i+1))) ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
             fi
         done
     done
-
-    # Show cursor
-    tput cnorm
 
     # Build result
     _result=()
@@ -145,6 +161,11 @@ detect_os() {
 }
 
 OS=$(detect_os)
+
+# Disable interactive prompts for apt on Linux
+if [[ "$OS" == "linux" ]]; then
+    export DEBIAN_FRONTEND=noninteractive
+fi
 
 echo -e "${GREEN}"
 echo "╔═══════════════════════════════════════╗"
@@ -341,18 +362,15 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
                 ;;
             python3)
                 if [[ "$OS" == "linux" ]]; then
-                    print_step "Installing Python..."
-                    print_step "Adding deadsnakes PPA..."
-                    sudo apt update
-                    sudo apt install -y software-properties-common
-                    sudo add-apt-repository -y ppa:deadsnakes/ppa
-                    sudo apt update
-                    sudo apt install -y python3.12 python3.12-venv
+                    run_with_progress "Updating apt" sudo -E apt-get update
+                    run_with_progress "Installing software-properties-common" sudo -E apt-get install -y software-properties-common
+                    run_with_progress "Adding deadsnakes PPA" sudo -E add-apt-repository -y ppa:deadsnakes/ppa
+                    run_with_progress "Updating apt" sudo -E apt-get update
+                    run_with_progress "Installing Python 3.12" sudo -E apt-get install -y python3.12 python3.12-venv
                     # Create python3 symlink if needed
                     if ! command -v python3 &> /dev/null; then
                         sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
                     fi
-                    print_success "Python installed"
                 else
                     # macOS - don't auto-install, show warning once
                     echo ""
@@ -372,42 +390,37 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
                 fi
                 ;;
             tmux)
-                print_step "Installing tmux..."
                 if [[ "$OS" == "linux" ]]; then
-                    sudo apt install -y tmux
+                    run_with_progress "Installing tmux" sudo -E apt-get install -y tmux
                 else
-                    brew install tmux
+                    run_with_progress "Installing tmux" brew install tmux
                 fi
-                print_success "tmux installed"
                 ;;
             git)
-                print_step "Installing git..."
                 if [[ "$OS" == "linux" ]]; then
-                    sudo apt install -y git
+                    run_with_progress "Installing git" sudo -E apt-get install -y git
                 else
-                    brew install git
+                    run_with_progress "Installing git" brew install git
                 fi
-                print_success "git installed"
                 ;;
             gh)
-                print_step "Installing GitHub CLI..."
                 if [[ "$OS" == "linux" ]]; then
-                    sudo apt install -y gh
+                    run_with_progress "Installing gh" sudo -E apt-get install -y gh
                 else
-                    brew install gh
+                    run_with_progress "Installing gh" brew install gh
                 fi
-                print_success "gh installed"
                 echo ""
                 print_warning "Don't forget to authenticate later:"
                 echo -e "    ${YELLOW}gh auth login${NC}"
                 echo ""
                 ;;
             claude)
-                print_step "Installing Claude Code CLI..."
-                if curl -fsSL https://claude.ai/install.sh | bash; then
-                    print_success "Claude Code installed"
+                if run_with_progress "Installing Claude Code CLI" bash -c "curl -fsSL https://claude.ai/install.sh | bash"; then
+                    echo ""
+                    print_warning "Don't forget to authenticate later:"
+                    echo -e "    ${YELLOW}claude${NC}  (follow the login prompts)"
+                    echo ""
                 else
-                    print_error "Failed to install Claude Code"
                     echo ""
                     echo "  Try manually:"
                     echo -e "    ${YELLOW}curl -fsSL https://claude.ai/install.sh | bash${NC}"
@@ -524,15 +537,20 @@ if [[ ! -d "venv" ]]; then
     $PYTHON_CMD -m venv venv
     print_success "Virtual environment created (using $PYTHON_CMD)"
 else
-    print_success "Virtual environment already exists"
+    # Check if existing venv is valid (both python and pip must work)
+    if ./venv/bin/python3 --version > /dev/null 2>&1 && ./venv/bin/pip --version > /dev/null 2>&1; then
+        print_success "Virtual environment already exists"
+    else
+        print_warning "Virtual environment broken, recreating..."
+        rm -rf venv
+        $PYTHON_CMD -m venv venv
+        print_success "Virtual environment recreated"
+    fi
 fi
 
-# Activate venv and install dependencies
-print_step "Installing Python dependencies..."
-source venv/bin/activate
-pip install -q --upgrade pip
-pip install -q -e .
-print_success "Dependencies installed"
+# Install dependencies using venv pip directly
+run_with_progress "Upgrading pip" ./venv/bin/pip install --upgrade pip
+run_with_progress "Installing dependencies" ./venv/bin/pip install -e .
 
 # Configure .env
 print_step "Configuring environment..."
@@ -576,10 +594,14 @@ if [[ -z "$SKIP_ENV" ]]; then
         exit 1
     fi
 
+    # Base directory is parent of codogram
+    BASE_DIR="$(cd .. && pwd)"
+
     # Create .env
     cat > .env << EOF
 TELEGRAM_TOKEN=$TELEGRAM_TOKEN
 ADMIN_IDS=$ADMIN_ID
+BASE_DIR=$BASE_DIR
 LOG_LEVEL=INFO
 EOF
 
