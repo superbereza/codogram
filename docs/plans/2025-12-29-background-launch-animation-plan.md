@@ -530,10 +530,11 @@ async def test_launch_timeout_shows_error():
 
 ```python
 @pytest.mark.asyncio
-async def test_launch_success_starts_monitoring():
-    """Successful launch starts poller and watcher."""
+async def test_launch_success_starts_poller():
+    """Successful launch starts poller only."""
     # Mock tmux.is_claude_ready() to return True immediately
-    # Verify poller_task and binding_task are started
+    # Verify poller_task is started
+    # Verify binding_task is NOT started (happens on first user message)
     # Verify returns True
 ```
 
