@@ -53,18 +53,17 @@
 - tmux died detection с уведомлением в топик
 - /resume блокировка в мультисессионном режиме
 
+### Telegram Rate Limiter
+- TelegramQueue класс с FIFO очередью для предотвращения 429 (flood control)
+- OutgoingBatch для группировки сообщений
+- enqueue() возвращает message IDs для cleanup
+- enqueue_nowait() для fire-and-forget
+- Retry без parse_mode при Markdown ошибках
+
 ### Security improvements
 - shell=False во всех subprocess calls (предотвращает shell injection)
 - Валидация project name (только alphanumeric, dash, underscore)
 - Unified logging через python logging module
-
-### Telegram Rate Limiter
-- FIFO очередь для предотвращения flood control (429)
-- TelegramQueue класс с воркером на каждый chat_id
-- Atomic batch sending (body + keyboard вместе)
-- Orphan cleanup при ошибках
-- enqueue() возвращает message IDs для cleanup
-- enqueue_nowait() для fire-and-forget
 
 ### Project initialization wizard
 Интерактивный выбор способа инициализации проекта при `/start`:
