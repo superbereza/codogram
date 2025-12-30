@@ -73,11 +73,10 @@
 - Inline кнопки для выбора варианта
 - Автосоздание tmux сессии в выбранной директории
 
-## Bugs
-
-### Thread session mixup
-При создании новой сессии в одном топике, другие топики теряют привязку к своей сессии.
-- См. [docs/bugs/2025-12-29-thread-session-mixup.md](bugs/2025-12-29-thread-session-mixup.md)
+### Thread session mixup fix
+- Баг: при создании новой сессии в одном топике, другие топики теряли привязку
+- Решение: Session Binder — `/new`, `/clear` команды + `awaiting_new_session` флаг
+- См. [docs/bugs/fixed/2025-12-29-session-binding-race-condition.md](bugs/fixed/2025-12-29-session-binding-race-condition.md)
 
 ## Backlog
 
