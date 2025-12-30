@@ -146,7 +146,12 @@ async def launch_with_animation(
             except Exception:
                 pass
 
-        await bot.send_message(chat_id, "✓ Claude готов!", message_thread_id=thread_id)
+        await bot.send_message(
+            chat_id,
+            f"✓ Claude готов!\nПодключиться: `tmux attach -t {tmux_name}`",
+            parse_mode="Markdown",
+            message_thread_id=thread_id
+        )
 
         # 5. Start monitoring
         await _start_monitoring(bot, project, thread, queue)
