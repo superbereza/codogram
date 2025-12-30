@@ -16,7 +16,7 @@ def permission_keyboard(options: list[str], tmux_session: str) -> InlineKeyboard
     Example:
         >>> options = ["1. Yes", "2. Yes, allow all", "3. No"]
         >>> keyboard = permission_keyboard(options, "claude-myproject")
-        >>> # Creates buttons: "Yes", "Yes, allow all", "No", "❌ Cancel"
+        >>> # Creates buttons: "Yes", "Yes, allow all", "No", "✕ Cancel"
     """
     buttons = []
 
@@ -31,7 +31,7 @@ def permission_keyboard(options: list[str], tmux_session: str) -> InlineKeyboard
 
     # Always add Esc button
     buttons.append([InlineKeyboardButton(
-        text="❌ Cancel",
+        text="✕ Cancel",
         callback_data=f"perm:esc:{tmux_session}"
     )])
 
