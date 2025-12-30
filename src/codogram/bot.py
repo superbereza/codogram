@@ -818,9 +818,21 @@ async def cmd_esc(message: Message):
     if not is_admin(message.from_user.id):
         return
 
-    tmux = get_session_for_chat(message.chat.id)
-    if tmux:
-        tmux.send_key("Escape")
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        return
+
+    # Get correct thread (topic or main)
+    thread = project.threads.get(thread_id)
+    if not thread:
+        return
+
+    tmux_name = thread.get_tmux_session(project.project_name)
+    tmux = TmuxSession(tmux_name, project.cwd or "/tmp")
+    tmux.send_key("Escape")
 
 
 @router.message(Command("resume"))
