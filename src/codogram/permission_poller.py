@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
 from .telegram_queue import OutgoingBatch, KeyboardBatch
-from .screen import parse_screen, PermissionPrompt
+from .screen import parse_screen, PermissionPrompt, is_claude_ready
 from .keyboards import permission_keyboard
 from .chunker import chunk_message
 from .state import permission_messages
@@ -43,10 +43,15 @@ SHELL_PROMPTS = ["➜", "$ ", "# ", "❯ "]
 def _detect_crash(screen: str) -> str | None:
     """Detect if Claude has crashed. Returns crash reason or None.
 
-    Only triggers if:
-    1. Crash signature found in LAST 15 lines (not scrollback)
-    2. AND shell prompt visible (Claude exited to shell)
+    Only triggers if ALL conditions met:
+    1. Claude UI NOT visible (is_claude_ready = False)
+    2. Shell prompt visible (Claude exited to shell)
+    3. Crash signature in LAST 15 lines (not scrollback)
     """
+    # If Claude UI is visible, definitely not crashed
+    if is_claude_ready(screen):
+        return None
+
     lines = screen.split("\n")
     last_lines = "\n".join(lines[-15:])  # Only check last 15 lines
 
