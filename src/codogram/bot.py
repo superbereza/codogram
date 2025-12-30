@@ -141,10 +141,10 @@ def is_claude_running(project: ProjectState) -> bool:
 async def show_status(message: Message, project: ProjectState):
     """Show status of active Claude session."""
     status_lines = [
-        f"**Claude активен**",
+        f"**Claude active**",
         f"",
-        f"Проект: `{project.project_name}`",
-        f"Путь: `{project.cwd}`",
+        f"Project: `{project.project_name}`",
+        f"Path: `{project.cwd}`",
         f"Tmux: `{project.tmux_session}`",
     ]
 
@@ -153,7 +153,7 @@ async def show_status(message: Message, project: ProjectState):
 
     status_lines.extend([
         "",
-        f"Подключиться: `tmux attach -t {project.tmux_session}`",
+        f"Attach: `tmux attach -t {project.tmux_session}`",
     ])
 
     await message.answer("\n".join(status_lines), parse_mode="Markdown")
@@ -218,8 +218,8 @@ async def _start_thread_flow(message: Message, project: ProjectState, thread: Th
     if tmux.exists():
         # Thread's tmux exists - show status
         await message.answer(
-            f"Claude активен в `{tmux_name}`\n"
-            f"Подключиться: `tmux attach -t {tmux_name}`",
+            f"Claude active in `{tmux_name}`\n\n"
+            f"Attach: `tmux attach -t {tmux_name}`",
             parse_mode="Markdown",
         )
     else:
@@ -284,8 +284,8 @@ async def _connect_or_launch(message: Message, project: ProjectState):
 
     await send_with_retry(
         message,
-        f"Claude запущен в `{project.tmux_session}`\n"
-        f"Подключиться: `tmux attach -t {project.tmux_session}`",
+        f"Claude running in `{project.tmux_session}`\n\n"
+        f"Attach: `tmux attach -t {project.tmux_session}`",
     )
 
 
@@ -823,14 +823,16 @@ async def cmd_resume(message: Message):
     if thread_id is not None:
         # In a topic - resume not supported
         await message.answer(
-            "⚠️ /resume не поддерживается в мультисессионном режиме.\n"
-            "Используйте /session_new для новой сессии."
+            "`[!]` /resume not supported in multi-session mode.\n"
+            "Use /session_new for a new session.",
+            parse_mode="Markdown"
         )
     else:
         # In private/general - just inform
         await message.answer(
-            "⚠️ /resume не поддерживается.\n"
-            "Используйте /start для подключения к существующей сессии."
+            "`[!]` /resume not supported.\n"
+            "Use /start to connect to existing session.",
+            parse_mode="Markdown"
         )
 
 
@@ -1116,8 +1118,8 @@ async def on_tmux_selected(callback: CallbackQuery):
 
     await send_with_retry(
         callback.message,
-        f"Claude запущен в `{project.tmux_session}`\n"
-        f"Подключиться: `tmux attach -t {project.tmux_session}`",
+        f"Claude running in `{project.tmux_session}`\n\n"
+        f"Attach: `tmux attach -t {project.tmux_session}`",
     )
 
 

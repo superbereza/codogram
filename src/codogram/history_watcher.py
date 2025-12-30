@@ -106,7 +106,7 @@ class HistoryWatcher:
                         batch = OutgoingBatch(
                             chat_id=project.chat_id,
                             thread_id=thread.thread_id,
-                            messages=[{"text": f"⚠️ Claude session closed: {thread.name}"}],
+                            messages=[{"text": f"`[!]` Claude session closed: {thread.name}"}],
                         )
                         await self.telegram_queue.enqueue_nowait(batch)
                     except Exception:
@@ -124,37 +124,60 @@ class HistoryWatcher:
     async def _bind_awaiting_threads(self, project: ProjectState):
         """Find new sessions and bind to awaiting threads.
 
+        Scans ALL sessions in project directory, sorted by creation time.
+        This ensures we find sessions created after /start even if older
+        sessions are more active.
+
         NOTE: Binds only ONE thread per cycle to prevent race condition where
         multiple awaiting threads bind to the same session.
         """
-        from .history_reader import find_session_for_project, compute_jsonl_path, get_session_creation_time
+        from .history_reader import get_session_creation_time
+        from pathlib import Path
 
-        # Get latest session once
-        new_session = find_session_for_project(project.cwd)
-        if not new_session:
+        # Find all sessions for this project, sorted by creation time (newest first)
+        project_dir = self._get_project_sessions_dir(project.cwd)
+        if not project_dir.exists():
             return
 
-        # Find first awaiting thread that can bind to this session
+        sessions = []
+        for jsonl_path in project_dir.glob("*.jsonl"):
+            if jsonl_path.name.startswith("agent-"):
+                continue  # Skip agent sessions
+            created = get_session_creation_time(jsonl_path)
+            sessions.append((jsonl_path.stem, created))
+
+        if not sessions:
+            return
+
+        # Sort by creation time, newest first
+        sessions.sort(key=lambda x: x[1], reverse=True)
+
+        # Find first awaiting thread that can bind to a valid session
         for thread in project.threads.values():
             if not thread.awaiting_new_session:
                 continue
-            if thread.session_id == new_session:
-                continue  # Already has this session
 
-            # Filter by creation time to prevent race condition
-            if thread.start_requested_at:
-                jsonl_path = compute_jsonl_path(project.cwd, new_session)
-                session_created = get_session_creation_time(jsonl_path)
-                if session_created < thread.start_requested_at:
-                    logger.debug(
-                        f"skip_old_session: thread={thread.name}, "
-                        f"session_created={session_created}, start_requested={thread.start_requested_at}"
-                    )
+            # Find a session created after start_requested_at
+            for session_id, session_created in sessions:
+                if thread.session_id == session_id:
+                    continue  # Already has this session
+
+                # Filter by creation time to prevent race condition
+                if thread.start_requested_at and session_created < thread.start_requested_at:
                     continue  # Session created before /start — skip
 
-            # Bind ONE thread and exit - next cycle will handle others
-            await self._bind_thread_to_session(project, thread, new_session)
-            return
+                # Found a valid session, bind and exit
+                await self._bind_thread_to_session(project, thread, session_id)
+                return
+
+    def _get_project_sessions_dir(self, cwd: str) -> "Path":
+        """Get the directory containing session jsonl files for a project."""
+        from pathlib import Path
+        normalized = cwd.rstrip("/") or "/"
+        while "//" in normalized:
+            normalized = normalized.replace("//", "/")
+        project_hash = normalized.replace("/", "-")
+        return Path.home() / ".claude" / "projects" / project_hash
 
     async def _bind_thread_to_session(
         self,
@@ -201,7 +224,7 @@ class HistoryWatcher:
             batch = OutgoingBatch(
                 chat_id=project.chat_id,
                 thread_id=thread.thread_id,
-                messages=[{"text": "✅ Новая сессия создана"}],
+                messages=[{"text": "`[v]` New session bound"}],
             )
             # Fire-and-forget notification
             await self.telegram_queue.enqueue_nowait(batch)
@@ -334,7 +357,7 @@ async def poll_for_session_thread(
         batch = OutgoingBatch(
             chat_id=project.chat_id,
             thread_id=thread.thread_id,
-            messages=[{"text": "⚠️ Сессия не обнаружена. Проверьте что Claude запущен."}],
+            messages=[{"text": "`[!]` Session not found. Make sure Claude is running."}],
         )
         await telegram_queue.enqueue_nowait(batch)
     except Exception:

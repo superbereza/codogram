@@ -76,17 +76,17 @@ async def launch_with_animation(
         thread.start_requested_at = time.time()
 
         # 1. Create tmux
-        await bot.send_message(chat_id, "Creating tmux session...", message_thread_id=thread_id)
+        await bot.send_message(chat_id, "`[~]` Creating tmux session...", message_thread_id=thread_id, parse_mode="Markdown")
 
         if not tmux.exists():
             tmux.create()
 
         # 2. Launch Claude
-        await bot.send_message(chat_id, "Starting Claude...", message_thread_id=thread_id)
+        await bot.send_message(chat_id, "`[~]` Starting Claude...", message_thread_id=thread_id, parse_mode="Markdown")
         tmux.send("claude")
 
         # 3. Wait for ready with animation
-        await bot.send_message(chat_id, "Waiting for Claude...", message_thread_id=thread_id)
+        await bot.send_message(chat_id, "`[~]` Waiting for Claude...", message_thread_id=thread_id, parse_mode="Markdown")
 
         start_time = time.time()
         face_msg = None
@@ -108,8 +108,9 @@ async def launch_with_animation(
                     except Exception:
                         pass
                 await bot.send_message(
-                    chat_id, "✕ Timeout: Claude didn't start in 2 minutes",
-                    message_thread_id=thread_id
+                    chat_id, "`[x]` Timeout: Claude didn't start in 2 minutes",
+                    message_thread_id=thread_id,
+                    parse_mode="Markdown"
                 )
                 return False
 
@@ -148,7 +149,7 @@ async def launch_with_animation(
 
         await bot.send_message(
             chat_id,
-            f"✓ Claude ready!\n\nAttach: `tmux attach -t {tmux_name}`",
+            f"`[v]` Claude ready\n\nAttach: `tmux attach -t {tmux_name}`",
             parse_mode="Markdown",
             message_thread_id=thread_id
         )
@@ -164,7 +165,7 @@ async def launch_with_animation(
     except Exception as e:
         logger.error(f"launch_error: {e}")
         try:
-            await bot.send_message(chat_id, f"✕ Launch error: {e}", message_thread_id=thread_id)
+            await bot.send_message(chat_id, f"`[x]` Launch error: {e}", message_thread_id=thread_id, parse_mode="Markdown")
         except Exception:
             pass
         return False

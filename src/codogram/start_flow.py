@@ -6,8 +6,8 @@ def dir_not_found_keyboard() -> InlineKeyboardMarkup:
     """Keyboard for when directory not found."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="Создать", callback_data="start:create_dir"),
-            InlineKeyboardButton(text="Указать другую", callback_data="start:custom_path"),
+            InlineKeyboardButton(text="Create", callback_data="start:create_dir"),
+            InlineKeyboardButton(text="Different path", callback_data="start:custom_path"),
         ]
     ])
 
@@ -18,7 +18,7 @@ def git_setup_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="git init", callback_data="start:git_init")],
         [InlineKeyboardButton(text="git init + gh repo create", callback_data="start:git_gh")],
         [InlineKeyboardButton(text="git clone", callback_data="start:git_clone")],
-        [InlineKeyboardButton(text="Без гита", callback_data="start:no_git")],
+        [InlineKeyboardButton(text="No git", callback_data="start:no_git")],
     ])
 
 
@@ -36,7 +36,7 @@ def restart_confirm_keyboard() -> InlineKeyboardMarkup:
     """Keyboard for restart confirmation."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="Да, перезапустить", callback_data="restart:confirm"),
-            InlineKeyboardButton(text="Отмена", callback_data="restart:cancel"),
+            InlineKeyboardButton(text="Yes, restart", callback_data="restart:confirm"),
+            InlineKeyboardButton(text="Cancel", callback_data="restart:cancel"),
         ]
     ])
