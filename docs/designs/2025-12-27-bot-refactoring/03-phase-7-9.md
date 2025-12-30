@@ -595,197 +595,149 @@ def register_handlers(dp: Dispatcher):
 
 ---
 
-## Фаза 9: Вынести handlers/sessions.py
+## Фаза 9: Вынести handlers для thread и session управления
 
-**Цель:** Handlers для управления сессиями
+> **Обновлено 2025-12-30:** Разделено на 9a (threads) и 9b (sessions). Команды переименованы.
+
+**Цель:** Handlers для управления threads и sessions
 
 ### Шаги
 
-#### 9.1 handlers/sessions.py
+#### 9a.1 handlers/threads.py (NEW)
 
 ```python
-import asyncio
+"""Thread management: create and delete forum topics."""
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
 from ..session_manager import project_manager, ThreadInfo
-from ..adapters.tmux import TmuxAdapter
+from ..magic_names import get_random_magic_name
+
+router = Router()
+
+@router.message(Command("thread_create"))
+async def cmd_thread_create(message: Message):
+    """Create a new thread (topic) with its own Claude session."""
+    # ... same logic as old session_new ...
+
+@router.message(Command("thread_delete"))
+async def cmd_thread_delete(message: Message):
+    """Delete current thread and its Claude session."""
+    # ... same logic as old session_close ...
+
+@router.callback_query(F.data.startswith("thread_delete:"))
+async def on_thread_delete_callback(callback: CallbackQuery):
+    # ... handle confirmation ...
+```
+
+---
+
+#### 9b.1 handlers/sessions.py
+
+```python
+"""Session management: /new, /clear, /restart, /esc, /resume."""
+import asyncio
+import time
+from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.filters import Command
+
+from ..session_manager import project_manager
+from ..tmux import TmuxSession
 from ..project_launcher import is_tmux_session_exists
 
 router = Router()
 
-# ===== /session_new =====
+# ===== Helper =====
 
-@router.message(Command("session_new"))
-async def cmd_session_new(message: Message):
-    """Create new thread with Claude session."""
-    chat_id = message.chat.id
-    project = project_manager.get_by_chat(chat_id)
-
-    if not project:
-        await message.answer("Проект не найден. Сначала /start")
-        return
-
-    chat = await message.bot.get_chat(chat_id)
-    if not chat.is_forum:
-        await message.answer("Чат не поддерживает топики.")
-        return
-
-    # Parse name
-    from ..magic_names import get_random_magic_name
-    args = message.text.split(maxsplit=1)
-    if len(args) > 1:
-        name = args[1].strip().lower()
-        if not name.replace("-", "").replace("_", "").isalnum():
-            await message.answer("Имя должно содержать только буквы, цифры, - и _")
-            return
-    else:
-        existing = {t.name for t in project.threads.values() if t.name != "pending"}
-        name = get_random_magic_name(existing)
-
-    # Check duplicate
-    for thread in project.threads.values():
-        if thread.name == name:
-            await message.answer(f"Тред '{name}' уже существует")
-            return
-
-    # Create topic
-    try:
-        topic = await message.bot.create_forum_topic(chat_id, name.capitalize())
-    except Exception as e:
-        await message.answer(f"Ошибка: {e}")
-        return
-
-    # Create ThreadInfo and launch
-    thread = ThreadInfo(thread_id=topic.message_thread_id, name=name)
-    project.threads[topic.message_thread_id] = thread
-    project_manager._save()
-
-# ===== /session_close =====
-
-@router.message(Command("session_close"))
-async def cmd_session_close(message: Message):
-    """Close current thread."""
-    if message.message_thread_id is None:
-        await message.answer("Только в топике")
-        return
-
+async def _send_session_command(message: Message, command: str, status_text: str) -> bool:
+    """Common logic for /new and /clear commands."""
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await message.answer("Проект не найден")
-        return
+        await message.answer("Project not registered. Use /start")
+        return False
 
     thread = project.threads.get(message.message_thread_id)
     if not thread:
-        await message.answer("Топик не связан с сессией")
-        return
+        await message.answer("Thread not found. Use /start")
+        return False
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="Да", callback_data=f"session_close:{message.message_thread_id}"),
-        InlineKeyboardButton(text="Отмена", callback_data="session_close:cancel"),
-    ]])
-    await message.answer(f"Закрыть '{thread.name}'?", reply_markup=keyboard)
-
-@router.callback_query(F.data.startswith("session_close:"))
-async def on_session_close(callback: CallbackQuery):
-    data = callback.data.split(":")[1]
-
-    if data == "cancel":
-        await callback.message.edit_text("Отменено")
-        await callback.answer()
-        return
-
-    thread_id = int(data)
-    project = project_manager.get_by_chat(callback.message.chat.id)
-    thread = project.threads.get(thread_id)
-
-    # Stop tasks
-    for task in [thread.watcher_task, thread.poller_task, thread.binding_task]:
-        if task:
-            task.cancel()
-
-    # Kill tmux
-    import subprocess
     tmux_name = thread.get_tmux_session(project.project_name)
-    subprocess.run(["tmux", "kill-session", "-t", tmux_name], capture_output=True)
+    if not is_tmux_session_exists(tmux_name):
+        await message.answer("tmux session not found.")
+        return False
 
-    # Delete topic
-    try:
-        await callback.bot.delete_forum_topic(callback.message.chat.id, thread_id)
-    except Exception as e:
-        await callback.message.edit_text(f"Ошибка: {e}")
-        await callback.answer()
-        return
-
-    del project.threads[thread_id]
+    # Mark as awaiting new session
+    thread.awaiting_new_session = True
+    thread.start_requested_at = time.time()
+    thread.last_sent_message = None
     project_manager._save()
-    await callback.answer("Закрыто")
 
-# ===== /restart_session =====
+    # Send command to tmux
+    tmux = TmuxSession(tmux_name, project.cwd)
+    tmux.send_keys(command)
 
-@router.message(Command("restart_session"))
-async def cmd_restart_session(message: Message):
-    project = project_manager.get_by_chat(message.chat.id)
-    if not project or not project.tmux_session:
-        await message.answer("Нет активной сессии")
-        return
+    await message.answer(status_text)
+    return True
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="Да", callback_data="restart:confirm"),
-        InlineKeyboardButton(text="Отмена", callback_data="restart:cancel"),
-    ]])
-    await message.answer(
-        f"Перезапустить `{project.tmux_session}`?",
-        reply_markup=keyboard,
-        parse_mode="Markdown",
-    )
+# ===== /new =====
+
+@router.message(Command("new"))
+async def cmd_new(message: Message):
+    """Start new Claude session in current thread."""
+    await _send_session_command(message, "/new", "`[~]` Creating new session...")
+
+# ===== /clear =====
+
+@router.message(Command("clear"))
+async def cmd_clear(message: Message):
+    """Clear Claude session and start fresh."""
+    await _send_session_command(message, "/clear", "`[~]` Clearing session...")
+
+# ===== /restart =====
+
+@router.message(Command("restart"))
+async def cmd_restart(message: Message):
+    """Restart Claude session - kill tmux and require /start."""
+    # ... get thread, show confirmation keyboard ...
 
 @router.callback_query(F.data == "restart:confirm")
 async def on_restart_confirm(callback: CallbackQuery):
-    project = project_manager.get_by_chat(callback.message.chat.id)
-
-    # Stop tasks
-    for task in [project.poller_task, project.watcher_task]:
-        if task and not task.done():
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-
-    # Kill tmux
-    if project.tmux_session and is_tmux_session_exists(project.tmux_session):
-        import subprocess
-        subprocess.run(
-            ["tmux", "kill-session", "-t", project.tmux_session],
-            capture_output=True,
-        )
-
-    # Clear state
-    project.session_id = None
-    project.jsonl_path = None
-    project.tmux_session = None
-    project.poller_task = None
-    project.watcher_task = None
-    project_manager._save()
-
-    await callback.message.edit_text("Остановлено. /start для запуска.")
-    await callback.answer()
+    # ... stop tasks, kill tmux, clear state ...
 
 @router.callback_query(F.data == "restart:cancel")
 async def on_restart_cancel(callback: CallbackQuery):
-    await callback.message.edit_text("Отменено.")
+    await callback.message.edit_text("Cancelled.")
     await callback.answer()
 
 # ===== /esc =====
 
 @router.message(Command("esc"))
 async def cmd_esc(message: Message):
+    """Send Escape to current thread's tmux."""
     project = project_manager.get_by_chat(message.chat.id)
-    if project and project.tmux_session:
-        tmux = TmuxAdapter(project.tmux_session, project.cwd or "/tmp")
-        tmux.send_key("Escape")
+    if not project:
+        return
+
+    thread = project.threads.get(message.message_thread_id)
+    if not thread:
+        return
+
+    tmux_name = thread.get_tmux_session(project.project_name)
+    tmux = TmuxSession(tmux_name, project.cwd or "/tmp")
+    tmux.send_key("Escape")
+
+# ===== /resume =====
+
+@router.message(Command("resume"))
+async def cmd_resume(message: Message):
+    """Not supported in multi-session mode."""
+    await message.answer(
+        "`[!]` /resume not supported.\n"
+        "Use /start to connect or /thread_create for new thread.",
+        parse_mode="Markdown"
+    )
 ```
 
 #### 9.2 handlers/public.py
@@ -806,11 +758,11 @@ async def cmd_my_chat_id(message: Message):
     )
 ```
 
-#### 9.3 handlers/__init__.py (обновлённый)
+#### 9c handlers/__init__.py (обновлённый)
 
 ```python
 from aiogram import Dispatcher, Router
-from . import permissions, start, sessions, public
+from . import permissions, start, threads, sessions, public
 from ..middleware.admin import AdminMiddleware
 
 def register_handlers(dp: Dispatcher):
@@ -822,23 +774,37 @@ def register_handlers(dp: Dispatcher):
     admin_router.message.middleware(AdminMiddleware())
     admin_router.callback_query.middleware(AdminMiddleware())
 
-    admin_router.include_router(permissions.router)
     admin_router.include_router(start.router)
-    admin_router.include_router(sessions.router)
+    admin_router.include_router(threads.router)     # /thread_create, /thread_delete
+    admin_router.include_router(sessions.router)    # /new, /clear, /restart, /esc
+    admin_router.include_router(permissions.router)
 
     dp.include_router(admin_router)
 ```
 
-### Чеклист
+### Чеклист (актуализирован 2025-12-30)
 
-- [ ] handlers/sessions.py содержит все session commands
+**9a handlers/threads.py:**
+- [ ] `/thread_create` — создание топика + Claude
+- [ ] `/thread_delete` — удаление топика + tmux
+- [ ] Confirmation callbacks
+
+**9b handlers/sessions.py:**
+- [ ] `/new` — новая сессия Claude
+- [ ] `/clear` — очистка сессии
+- [ ] `/restart` — перезапуск (kill tmux)
+- [ ] `/esc` — отправка Escape
+- [ ] `/resume` — сообщение "not supported"
+
+**Общее:**
 - [ ] handlers/public.py для /my_chat_id
 - [ ] AdminMiddleware правильно применяется
-- [ ] bot.py уменьшился ещё на ~200 строк
-- [ ] E2E: /session_new, /session_close, /restart_session работают
+- [ ] bot.py уменьшился на ~300 строк
+- [ ] E2E: все команды работают
 
 ### Definition of Done
 
-- Все session handlers вынесены
-- Public vs Admin handlers разделены
+- Thread handlers в handlers/threads.py
+- Session handlers в handlers/sessions.py
+- Public handlers без admin check
 - В bot.py остаётся только on_message()
