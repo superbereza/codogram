@@ -36,11 +36,28 @@ CRASH_SIGNATURES = [
     "SIGABRT",
 ]
 
+# Shell prompts indicating Claude exited
+SHELL_PROMPTS = ["➜", "$ ", "# ", "❯ "]
+
 
 def _detect_crash(screen: str) -> str | None:
-    """Detect if Claude has crashed. Returns crash reason or None."""
+    """Detect if Claude has crashed. Returns crash reason or None.
+
+    Only triggers if:
+    1. Crash signature found in LAST 15 lines (not scrollback)
+    2. AND shell prompt visible (Claude exited to shell)
+    """
+    lines = screen.split("\n")
+    last_lines = "\n".join(lines[-15:])  # Only check last 15 lines
+
+    # Must have shell prompt (Claude exited)
+    has_shell = any(p in last_lines for p in SHELL_PROMPTS)
+    if not has_shell:
+        return None
+
+    # Check for crash signatures in last lines only
     for sig in CRASH_SIGNATURES:
-        if sig in screen:
+        if sig in last_lines:
             return sig
     return None
 
