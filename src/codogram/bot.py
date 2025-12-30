@@ -2,6 +2,7 @@
 from pathlib import Path
 import asyncio
 import re
+import time
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -864,6 +865,7 @@ async def _send_session_command(message: Message, command: str, status_text: str
 
     # Mark thread as awaiting new session
     thread.awaiting_new_session = True
+    thread.start_requested_at = time.time()
     thread.last_sent_message = None
     project_manager._save()
 
