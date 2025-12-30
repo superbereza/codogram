@@ -138,6 +138,13 @@
 - Количество background tasks
 - Парсить из tmux capture-pane статус бар
 - Формат: "Mode: Accept edits | Background: 3 tasks"
+- **Hardware stats** — график CPU/RAM использования
+
+### Thread create UX
+Улучшить `/thread_create`:
+- Без аргумента → показать кнопки с вариантами имён (magic names)
+- Или поле ввода "Введите название"
+- Убрать необходимость вводить имя в той же строке
 
 ### /shift_tab command
 Команда для переключения режима approval:
