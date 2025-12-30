@@ -313,6 +313,7 @@ async def poll_for_session_thread(
     while time.time() - start_time < BINDING_TIMEOUT:
         try:
             # Scan ALL sessions for this cwd to find one with matching user message
+            # Uses mtime filter to support both new and resumed sessions
             result = find_session_by_user_message(
                 project.cwd,
                 thread.last_sent_message,

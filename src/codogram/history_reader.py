@@ -208,8 +208,8 @@ def find_session_by_user_message(
     Args:
         cwd: Project working directory
         user_message: Last user message to match
-        created_after: Only consider sessions created after this timestamp.
-                       Used to prevent binding to old sessions during /start.
+        created_after: Only consider sessions MODIFIED after this timestamp.
+                       Supports both new sessions and resumed sessions.
 
     Returns (session_id, jsonl_path) or None if not found.
     """
@@ -228,11 +228,12 @@ def find_session_by_user_message(
     jsonl_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
 
     for jsonl_path in jsonl_files:
-        # Filter by creation time if specified
+        # Filter by modification time if specified
+        # Uses mtime (not creation time) to support resumed sessions
         if created_after is not None:
-            session_created = get_session_creation_time(jsonl_path)
-            if session_created < created_after:
-                continue  # Session created before /start - skip
+            session_mtime = jsonl_path.stat().st_mtime
+            if session_mtime < created_after:
+                continue  # Session not modified since /start - skip
 
         last_msg = get_last_user_message_from_jsonl(jsonl_path)
         if last_msg == user_message:
