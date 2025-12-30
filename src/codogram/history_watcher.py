@@ -127,7 +127,7 @@ class HistoryWatcher:
         NOTE: Binds only ONE thread per cycle to prevent race condition where
         multiple awaiting threads bind to the same session.
         """
-        from .history_reader import find_session_for_project
+        from .history_reader import find_session_for_project, compute_jsonl_path, get_session_creation_time
 
         # Get latest session once
         new_session = find_session_for_project(project.cwd)
@@ -140,6 +140,17 @@ class HistoryWatcher:
                 continue
             if thread.session_id == new_session:
                 continue  # Already has this session
+
+            # Filter by creation time to prevent race condition
+            if thread.start_requested_at:
+                jsonl_path = compute_jsonl_path(project.cwd, new_session)
+                session_created = get_session_creation_time(jsonl_path)
+                if session_created < thread.start_requested_at:
+                    logger.debug(
+                        f"skip_old_session: thread={thread.name}, "
+                        f"session_created={session_created}, start_requested={thread.start_requested_at}"
+                    )
+                    continue  # Session created before /start — skip
 
             # Bind ONE thread and exit - next cycle will handle others
             await self._bind_thread_to_session(project, thread, new_session)
