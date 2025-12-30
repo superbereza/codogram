@@ -1,8 +1,6 @@
 """Background permission poller - independent of jsonl watcher."""
 import asyncio
 from enum import Enum
-from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from aiogram import Bot
@@ -11,7 +9,6 @@ if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
 from .telegram_queue import OutgoingBatch, KeyboardBatch
-from .config import settings
 from .screen import parse_screen, PermissionPrompt
 from .keyboards import permission_keyboard
 from .chunker import chunk_message
