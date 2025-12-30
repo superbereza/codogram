@@ -1,15 +1,14 @@
 # src/codogram/config.py
 import json
 from pathlib import Path
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env")
+
     telegram_token: str
     admin_ids: str  # Comma-separated list of admin user IDs
     base_dir: str  # e.g. /home/user/dev
-
-    class Config:
-        env_file = ".env"
 
     def get_admin_ids(self) -> set[int]:
         """Parse admin_ids string into set of ints."""

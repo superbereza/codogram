@@ -87,6 +87,13 @@
 - Настройка .env (токен бота, admin ID)
 - См. [docs/designs/done/2025-12-30-setup-script.md](designs/done/2025-12-30-setup-script.md)
 
+## MLP (Minimum Lovable Product)
+
+Блокеры для open source релиза:
+
+- [x] LICENSE файл (GPL v3)
+- [ ] GitHub Actions workflow для тестов
+
 ## Backlog
 
 ### Auto-accept mode
