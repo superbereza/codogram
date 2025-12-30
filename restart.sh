@@ -12,10 +12,10 @@ done
 pkill -9 -f "codogram.main" 2>/dev/null
 sleep 0.5
 
-source /home/superbereza/dev/codogram/venv/bin/activate
+source ./venv/bin/activate
 
 # Ensure logs directory exists
-mkdir -p /home/superbereza/dev/codogram/logs
+mkdir -p ./logs
 
-PYTHONUNBUFFERED=1 nohup python -m codogram.main >> /home/superbereza/dev/codogram/logs/codogram.log 2>&1 &
+PYTHONUNBUFFERED=1 nohup python -m codogram.main >> ./logs/codogram.log 2>&1 &
 echo "Bot restarted (pid $!)"
