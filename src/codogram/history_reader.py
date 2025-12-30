@@ -173,10 +173,21 @@ def compute_jsonl_path(cwd: str, session_id: str) -> Path:
     return Path.home() / ".claude" / "projects" / project_hash / f"{session_id}.jsonl"
 
 
-def find_session_by_user_message(cwd: str, user_message: str) -> tuple[str, Path] | None:
+def find_session_by_user_message(
+    cwd: str,
+    user_message: str,
+    created_after: float | None = None,
+) -> tuple[str, Path] | None:
     """Find session that contains the given user message.
 
     Scans ALL session jsonl files for a cwd (not just the latest).
+
+    Args:
+        cwd: Project working directory
+        user_message: Last user message to match
+        created_after: Only consider sessions created after this timestamp.
+                       Used to prevent binding to old sessions during /start.
+
     Returns (session_id, jsonl_path) or None if not found.
     """
     # Compute project directory
@@ -194,6 +205,12 @@ def find_session_by_user_message(cwd: str, user_message: str) -> tuple[str, Path
     jsonl_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
 
     for jsonl_path in jsonl_files:
+        # Filter by creation time if specified
+        if created_after is not None:
+            session_created = get_session_creation_time(jsonl_path)
+            if session_created < created_after:
+                continue  # Session created before /start - skip
+
         last_msg = get_last_user_message_from_jsonl(jsonl_path)
         if last_msg == user_message:
             session_id = jsonl_path.stem

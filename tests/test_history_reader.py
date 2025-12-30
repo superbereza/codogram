@@ -187,3 +187,48 @@ def test_get_session_creation_time_malformed_json():
 
         result = get_session_creation_time(jsonl_path)
         assert result == 0
+
+
+def test_find_session_by_user_message_filters_by_created_after(tmp_path, monkeypatch):
+    """Test that created_after filters out old sessions."""
+    import os
+    from codogram.history_reader import find_session_by_user_message
+
+    # Create project directory structure
+    project_dir = tmp_path / ".claude" / "projects" / "-test-cwd"
+    project_dir.mkdir(parents=True)
+
+    # Old session (created at t=100)
+    old_session = project_dir / "old-session.jsonl"
+    with open(old_session, 'w') as f:
+        f.write(json.dumps({"type": "system", "timestamp": 100}) + "\n")
+        f.write(json.dumps({"type": "user", "message": {"content": "Hello"}}) + "\n")
+    # Set mtime to old time (ensure it's sorted as "older")
+    os.utime(old_session, (100, 100))
+
+    # New session (created at t=200)
+    new_session = project_dir / "new-session.jsonl"
+    with open(new_session, 'w') as f:
+        f.write(json.dumps({"type": "system", "timestamp": 200}) + "\n")
+        f.write(json.dumps({"type": "user", "message": {"content": "Hello"}}) + "\n")
+    # Set mtime to newer time (ensure it's sorted as "newer")
+    os.utime(new_session, (200, 200))
+
+    # Patch Path.home using monkeypatch (proper pytest way)
+    monkeypatch.setattr(Path, 'home', lambda: tmp_path)
+
+    # Without filter: should find new-session (newest by mtime)
+    result = find_session_by_user_message("/test/cwd", "Hello")
+    assert result is not None
+    session_id, _ = result
+    assert session_id == "new-session"
+
+    # With created_after=150: should find new-session (created at 200 > 150)
+    result = find_session_by_user_message("/test/cwd", "Hello", created_after=150)
+    assert result is not None
+    session_id, _ = result
+    assert session_id == "new-session"
+
+    # With created_after=250: should find nothing (both too old)
+    result = find_session_by_user_message("/test/cwd", "Hello", created_after=250)
+    assert result is None
