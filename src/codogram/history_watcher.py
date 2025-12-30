@@ -278,7 +278,11 @@ async def poll_for_session_thread(
     while time.time() - start_time < BINDING_TIMEOUT:
         try:
             # Scan ALL sessions for this cwd to find one with matching user message
-            result = find_session_by_user_message(project.cwd, thread.last_sent_message)
+            result = find_session_by_user_message(
+                project.cwd,
+                thread.last_sent_message,
+                created_after=thread.start_requested_at,
+            )
             logger.debug(f"poll_for_session_thread: search result={result is not None}")
 
             if result:
@@ -289,6 +293,7 @@ async def poll_for_session_thread(
                 thread.session_id = session_id
                 thread.jsonl_path = str(jsonl_path)
                 thread.awaiting_new_session = False
+                thread.start_requested_at = None
 
                 # Start thread-specific watcher
                 if not thread.watcher_task or thread.watcher_task.done():
