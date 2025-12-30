@@ -94,6 +94,11 @@ async def launch_with_animation(
         while not tmux.is_claude_ready():
             elapsed = time.time() - start_time
 
+            # Debug: log what we see in tmux every 10 seconds
+            if int(elapsed) % 10 == 0 and int(elapsed) > 0:
+                pane_content = tmux.capture_pane()
+                logger.debug(f"launch_wait: elapsed={elapsed:.0f}s, pane_preview={pane_content[-200:] if pane_content else 'empty'}")
+
             # Timeout check FIRST
             if elapsed > 120:
                 if face_msg:

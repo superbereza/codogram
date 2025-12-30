@@ -130,21 +130,30 @@ def _check_tool_progress(output: str) -> ScreenState:
 def is_claude_ready(output: str) -> bool:
     """Check if Claude UI is loaded and ready for input.
 
-    Returns True if:
-    - Claude Code UI box is visible (╭─── Claude Code)
-    - Shows "? for shortcuts" (ready for input)
+    Multiple detection strategies (any match = ready):
+    1. Input area: two solid lines (────) — most stable
+    2. "> Try" prompt suggestion
+    3. "? for shortcuts" indicator
     """
     if not output:
         return False
 
-    # Check for Claude Code UI header
-    has_ui = "Claude Code" in output and "╭" in output
+    # Strategy 1: Input area - two horizontal lines (most stable)
+    # The input box has ──────── above and below
+    lines = output.split('\n')
+    solid_line_count = 0
+    for line in lines:
+        if '─' * 10 in line:
+            solid_line_count += 1
+            if solid_line_count >= 2:
+                return True
 
-    # Check for ready indicators
-    ready_indicators = [
-        "? for shortcuts",
-        "> Try",  # Prompt suggestion
-    ]
-    has_ready = any(indicator in output for indicator in ready_indicators)
+    # Strategy 2: "> Try" prompt
+    if "> Try" in output:
+        return True
 
-    return has_ui and has_ready
+    # Strategy 3: "? for shortcuts"
+    if "? for shortcuts" in output:
+        return True
+
+    return False
