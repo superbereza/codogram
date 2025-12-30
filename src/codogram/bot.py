@@ -16,7 +16,6 @@ from .logging_config import logger
 from .project_launcher import (
     resolve_project_path,
     is_tmux_session_exists,
-    create_tmux_with_claude,
     create_project_directory,
     git_init,
     git_init_with_github,
@@ -386,125 +385,6 @@ async def cmd_start(message: Message):
     )
 
 
-async def launch_claude_new(message: Message, project: ProjectState, start_poller, start_watcher):
-    """Launch Claude in tmux session using new ProjectState."""
-    import subprocess
-
-    # Ensure main thread exists
-    thread = project.get_or_create_thread(None, "main")
-
-    convention = f"claude-{project.project_name}"
-
-    # Block session discovery during startup
-    thread.awaiting_new_session = True
-    project.awaiting_new_session = True  # Also set legacy for backward compat
-
-    # Wait before showing anything
-    await asyncio.sleep(3.0)
-
-    # Case 1: Our tmux exists - reuse
-    if project.tmux_session == convention and is_tmux_session_exists(convention):
-        subprocess.run(["tmux", "send-keys", "-t", convention, "claude", "Enter"], capture_output=True)
-    # Case 2: Foreign tmux - create new alongside
-    elif project.tmux_session and project.tmux_session != convention and is_tmux_session_exists(project.tmux_session):
-        result = create_tmux_with_claude(convention, project.cwd)
-        if not result.success:
-            await message.answer(f"Ошибка запуска: {result.error}")
-            return
-        project.tmux_session = convention
-    # Case 3: No tmux - create
-    else:
-        result = create_tmux_with_claude(convention, project.cwd)
-        if not result.success:
-            await message.answer(f"Ошибка запуска: {result.error}")
-            return
-        project.tmux_session = convention
-
-    # Start animation
-    tmux = TmuxSession(project.tmux_session, project.cwd)
-    status_msg = await message.answer("`[._.]`", parse_mode="Markdown")
-
-    # Doom-guy frustration animation
-    faces = [
-        # Sleeping / waking up
-        "[._.]",
-        "[._.]",
-        "[-_-]",
-        "[-_-]",
-        "[.o.]",
-        "[o_o]",
-        # Alert, waiting
-        "[o_o]",
-        "[◉_◉]",
-        "[◉_◉]",
-        "[◉_◉]",
-        # Getting tense
-        "[◉︿◉]",
-        "[◉~◉]",
-        "[°_°]",
-        "[°_°]",
-        # Confusion
-        "[°□°]",
-        "[°□°]",
-        # Frustration builds
-        "[ಠ_ಠ]",
-        "[ಠ_ಠ]",
-        "[ಠ︿ಠ]",
-        "[ಠ益ಠ]",
-        # Panic
-        "[>_<]",
-        "[>︿<]",
-        "[>△<]",
-        # Overload
-        "[×_×]",
-        "[×_×]",
-        "[✖_✖]",
-        "[✖益✖]",
-        # Death
-        "[☠_☠]",
-        "[☠_☠]",
-        # Restart
-        "[._.]",
-    ]
-
-    frame = 0
-    for _ in range(60):  # max 60 seconds
-        if tmux.is_claude_ready():
-            break
-        face = faces[frame % len(faces)]
-        try:
-            await status_msg.edit_text(f"`{face}`", parse_mode="Markdown")
-        except Exception:
-            pass  # Ignore flood control
-        await asyncio.sleep(1.5)  # 1.5s between frames - safe for Telegram
-        frame += 1
-
-    # Extra delay to ensure Claude's input is truly ready
-    await asyncio.sleep(1.0)
-
-    # Happy face when ready
-    try:
-        await status_msg.edit_text("`[≖‿≖] Ready!`", parse_mode="Markdown")
-        await asyncio.sleep(1.0)
-    except Exception:
-        pass
-
-    # Delete status message
-    try:
-        await status_msg.delete()
-    except Exception:
-        pass
-
-    await project_manager._maybe_start_tasks(project, start_poller, start_watcher)
-    project_manager._save()
-
-    await send_with_retry(
-        message,
-        f"Claude запущен в `{project.tmux_session}`\n"
-        f"Подключиться: `tmux attach -t {project.tmux_session}`",
-    )
-
-
 async def launch_claude_in_thread(
     message: Message,
     project: ProjectState,
@@ -515,113 +395,28 @@ async def launch_claude_in_thread(
     """Launch Claude for a specific thread (topic).
 
     Returns True if successful, False otherwise.
+    Uses background launch with animation.
     """
-    tmux_name = thread.get_tmux_session(project.project_name)
-
-    # Block HistoryWatcher from grabbing old session during startup
-    thread.awaiting_new_session = True
-
-    # Wait before showing anything
-    await asyncio.sleep(3.0)
-
-    # Create tmux session with Claude
-    result = create_tmux_with_claude(tmux_name, project.cwd)
-    if not result.success:
-        await message.bot.send_message(
-            message.chat.id,
-            f"Ошибка запуска Claude: {result.error}",
-            message_thread_id=thread.thread_id,
-        )
+    # Race protection: check if launch already in progress
+    if thread.launch_task and not thread.launch_task.done():
+        await message.answer("Запуск уже идёт...")
         return False
 
-    # Start animation in the topic
-    tmux = TmuxSession(tmux_name, project.cwd)
-    status_msg = await message.bot.send_message(
-        message.chat.id,
-        "`[._.]`",
-        parse_mode="Markdown",
-        message_thread_id=thread.thread_id,
+    from .launch_animation import launch_with_animation
+    from .main import telegram_queue
+
+    thread.launch_task = asyncio.create_task(
+        launch_with_animation(
+            bot=message.bot,
+            chat_id=message.chat.id,
+            thread_id=thread.thread_id,
+            project=project,
+            thread=thread,
+            queue=telegram_queue,
+        )
     )
 
-    # Doom-guy frustration animation
-    faces = [
-        # Sleeping / waking up
-        "[._.]",
-        "[._.]",
-        "[-_-]",
-        "[-_-]",
-        "[.o.]",
-        "[o_o]",
-        # Alert, waiting
-        "[o_o]",
-        "[◉_◉]",
-        "[◉_◉]",
-        "[◉_◉]",
-        # Getting tense
-        "[◉︿◉]",
-        "[◉~◉]",
-        "[°_°]",
-        "[°_°]",
-        # Confusion
-        "[°□°]",
-        "[°□°]",
-        # Frustration builds
-        "[ಠ_ಠ]",
-        "[ಠ_ಠ]",
-        "[ಠ︿ಠ]",
-        "[ಠ益ಠ]",
-        # Panic
-        "[>_<]",
-        "[>︿<]",
-        "[>△<]",
-        # Overload
-        "[×_×]",
-        "[×_×]",
-        "[✖_✖]",
-        "[✖益✖]",
-        # Death
-        "[☠_☠]",
-        "[☠_☠]",
-        # Restart
-        "[._.]",
-    ]
-
-    frame = 0
-    for _ in range(60):  # max 60 seconds
-        if tmux.is_claude_ready():
-            break
-        face = faces[frame % len(faces)]
-        try:
-            await status_msg.edit_text(f"`{face}`", parse_mode="Markdown")
-        except Exception:
-            pass  # Ignore flood control
-        await asyncio.sleep(1.5)  # 1.5s between frames - safe for Telegram
-        frame += 1
-
-    # Extra delay to ensure Claude's input is truly ready
-    await asyncio.sleep(1.0)
-
-    # Happy face when ready
-    try:
-        await status_msg.edit_text("`[≖‿≖] Ready!`", parse_mode="Markdown")
-        await asyncio.sleep(1.0)
-    except Exception:
-        pass
-
-    # Delete status message
-    try:
-        await status_msg.delete()
-    except Exception:
-        pass
-
-    # TODO: Start thread-specific tasks (for now we don't have thread-level polling)
-
-    await send_with_retry(
-        message,
-        f"🚀 Claude запущен в `{tmux_name}`\n"
-        f"Подключиться: `tmux attach -t {tmux_name}`",
-        message_thread_id=thread.thread_id,
-    )
+    project_manager._save()
     return True
 
 
@@ -850,8 +645,23 @@ async def on_start_git_init(callback: CallbackQuery):
         project = project_manager.get_or_create(state["project"])
         project.cwd = state["path"]
 
-        start_poller, start_watcher = _make_task_starters(callback.bot)
-        await launch_claude_new(callback.message, project, start_poller, start_watcher)
+        # Use background launch with animation
+        thread = project.get_or_create_thread(None, "main")
+        if not (thread.launch_task and not thread.launch_task.done()):
+            from .launch_animation import launch_with_animation
+            from .main import telegram_queue
+
+            thread.launch_task = asyncio.create_task(
+                launch_with_animation(
+                    bot=callback.bot,
+                    chat_id=chat_id,
+                    thread_id=None,
+                    project=project,
+                    thread=thread,
+                    queue=telegram_queue,
+                )
+            )
+            project_manager._save()
 
     _start_state.pop(chat_id, None)
     await callback.answer()
@@ -904,8 +714,23 @@ async def on_start_gh_visibility(callback: CallbackQuery):
         project = project_manager.get_or_create(state["project"])
         project.cwd = state["path"]
 
-        start_poller, start_watcher = _make_task_starters(callback.bot)
-        await launch_claude_new(callback.message, project, start_poller, start_watcher)
+        # Use background launch with animation
+        thread = project.get_or_create_thread(None, "main")
+        if not (thread.launch_task and not thread.launch_task.done()):
+            from .launch_animation import launch_with_animation
+            from .main import telegram_queue
+
+            thread.launch_task = asyncio.create_task(
+                launch_with_animation(
+                    bot=callback.bot,
+                    chat_id=chat_id,
+                    thread_id=None,
+                    project=project,
+                    thread=thread,
+                    queue=telegram_queue,
+                )
+            )
+            project_manager._save()
 
     _start_state.pop(chat_id, None)
     await callback.answer()
@@ -953,8 +778,23 @@ async def on_start_no_git(callback: CallbackQuery):
     project = project_manager.get_or_create(state["project"])
     project.cwd = state["path"]
 
-    start_poller, start_watcher = _make_task_starters(callback.bot)
-    await launch_claude_new(callback.message, project, start_poller, start_watcher)
+    # Use background launch with animation
+    thread = project.get_or_create_thread(None, "main")
+    if not (thread.launch_task and not thread.launch_task.done()):
+        from .launch_animation import launch_with_animation
+        from .main import telegram_queue
+
+        thread.launch_task = asyncio.create_task(
+            launch_with_animation(
+                bot=callback.bot,
+                chat_id=chat_id,
+                thread_id=None,
+                project=project,
+                thread=thread,
+                queue=telegram_queue,
+            )
+        )
+        project_manager._save()
 
     _start_state.pop(chat_id, None)
     await callback.answer()
@@ -1292,17 +1132,36 @@ async def on_start_launch_claude(callback: CallbackQuery):
         await callback.answer("Сессия истекла, начни заново с /start")
         return
 
-    await callback.answer()  # Answer immediately to avoid timeout
-    await callback.message.edit_text("Запускаю Claude...")
-
     project = project_manager.get_or_create(state["project"])
     project.chat_id = chat_id
     project.cwd = state["path"]
 
-    start_poller, start_watcher = _make_task_starters(callback.bot)
-    await launch_claude_new(callback.message, project, start_poller, start_watcher)
+    # Get or create main thread
+    thread = project.get_or_create_thread(None, "main")
 
+    # Race protection: check if launch already in progress
+    if thread.launch_task and not thread.launch_task.done():
+        await callback.answer("Запуск уже идёт...")
+        return
+
+    await callback.answer()
     _start_state.pop(chat_id, None)
+
+    from .launch_animation import launch_with_animation
+    from .main import telegram_queue
+
+    thread.launch_task = asyncio.create_task(
+        launch_with_animation(
+            bot=callback.bot,
+            chat_id=chat_id,
+            thread_id=None,
+            project=project,
+            thread=thread,
+            queue=telegram_queue,
+        )
+    )
+
+    project_manager._save()
 
 
 @router.callback_query(F.data == "start:cancel")
@@ -1367,11 +1226,26 @@ async def on_message(message: Message):
             project = project_manager.get_or_create(state["project"])
             project.chat_id = chat_id
             project.cwd = str(Path(path).expanduser())
-            project_manager._save()
 
-            start_poller, start_watcher = _make_task_starters(message.bot)
+            # Use background launch with animation
+            thread = project.get_or_create_thread(None, "main")
             _start_state.pop(chat_id, None)
-            await launch_claude_new(message, project, start_poller, start_watcher)
+
+            if not (thread.launch_task and not thread.launch_task.done()):
+                from .launch_animation import launch_with_animation
+                from .main import telegram_queue
+
+                thread.launch_task = asyncio.create_task(
+                    launch_with_animation(
+                        bot=message.bot,
+                        chat_id=chat_id,
+                        thread_id=None,
+                        project=project,
+                        thread=thread,
+                        queue=telegram_queue,
+                    )
+                )
+                project_manager._save()
             return
 
         elif state["state"] == "awaiting_clone_url":
@@ -1388,9 +1262,25 @@ async def on_message(message: Message):
             project = project_manager.get_or_create(state["project"])
             project.cwd = state["path"]
 
-            start_poller, start_watcher = _make_task_starters(message.bot)
+            # Use background launch with animation
+            thread = project.get_or_create_thread(None, "main")
             _start_state.pop(chat_id, None)
-            await launch_claude_new(message, project, start_poller, start_watcher)
+
+            if not (thread.launch_task and not thread.launch_task.done()):
+                from .launch_animation import launch_with_animation
+                from .main import telegram_queue
+
+                thread.launch_task = asyncio.create_task(
+                    launch_with_animation(
+                        bot=message.bot,
+                        chat_id=chat_id,
+                        thread_id=None,
+                        project=project,
+                        thread=thread,
+                        queue=telegram_queue,
+                    )
+                )
+                project_manager._save()
             return
 
     # Normal message - route through threads (unified path)
