@@ -21,7 +21,8 @@ This plan modifies files that will be restructured in [bot-refactoring](../desig
 | `history_reader.py` | `adapters/history.py` | `get_session_creation_time` is adapter function |
 | `session_manager.py:ThreadInfo` | `domain/models.py` | `start_requested_at` is domain field |
 | `history_watcher.py` | Not touched (separate task) | No conflicts |
-| `bot.py:launch_claude_in_thread` | `services/launch.py` | Changes migrate with function |
+| `launch_animation.py` | `services/launch.py` | Already extracted, changes stay |
+| `bot.py:_send_session_command` | `handlers/sessions.py` | Changes migrate with function |
 
 ---
 
@@ -549,30 +550,35 @@ git commit -m "fix(watcher): clear start_requested_at in _bind_thread_to_session
 ### Task 7: Set `start_requested_at` in `/start` flow
 
 **Files:**
-- Modify: `src/codogram/bot.py:1-10` (imports)
-- Modify: `src/codogram/bot.py:522` (launch_claude_in_thread)
+- Modify: `src/codogram/launch_animation.py:75`
 
-**Step 1: Add import**
+**NOTE:** `launch_animation.py` already has `import time` (line 5).
 
-Add `import time` at top of `bot.py` (around line 3, after `from pathlib import Path`):
+**Step 1: Set timestamp in launch_with_animation**
 
-```python
-import time
-```
-
-**Step 2: Set timestamp**
-
-In `launch_claude_in_thread`, after `thread.awaiting_new_session = True` (line 522):
+In `launch_with_animation`, after `thread.awaiting_new_session = True` (line 75):
 
 ```python
 thread.start_requested_at = time.time()
 ```
 
+Full context:
+```python
+try:
+    thread.awaiting_new_session = True
+    thread.start_requested_at = time.time()  # ADD THIS
+```
+
+**Step 2: Verify syntax**
+
+Run: `python3 -m py_compile src/codogram/launch_animation.py`
+Expected: No errors
+
 **Step 3: Commit**
 
 ```bash
-git add src/codogram/bot.py
-git commit -m "feat(bot): set start_requested_at when launching Claude"
+git add src/codogram/launch_animation.py
+git commit -m "feat(launch_animation): set start_requested_at when launching Claude"
 ```
 
 ---
@@ -580,26 +586,31 @@ git commit -m "feat(bot): set start_requested_at when launching Claude"
 ### Task 8: Set `start_requested_at` in `/new` and `/clear`
 
 **Files:**
-- Modify: `src/codogram/bot.py` (_send_session_command helper)
+- Modify: `src/codogram/bot.py:3` (imports)
+- Modify: `src/codogram/bot.py:866` (_send_session_command)
 
 **Background:**
 
 `/new` and `/clear` commands also set `awaiting_new_session = True` via `_send_session_command`. Without setting `start_requested_at`, the time filter in `_bind_awaiting_threads` will be skipped (because `if thread.start_requested_at:` is False).
 
-**Step 1: Locate _send_session_command**
+**Step 1: Add import time**
 
-Find the helper function that handles both /new and /clear:
+Add `import time` at top of `bot.py` (around line 3, after `from pathlib import Path`):
 
 ```python
-async def _send_session_command(message: Message, command: str, status_text: str) -> bool:
-    ...
-    thread.awaiting_new_session = True
-    thread.last_sent_message = None
-    project_manager._save()
-    ...
+import time
 ```
 
-**Step 2: Add start_requested_at**
+**Step 2: Locate _send_session_command (around line 866)**
+
+```python
+# Mark thread as awaiting new session
+thread.awaiting_new_session = True
+thread.last_sent_message = None
+project_manager._save()
+```
+
+**Step 3: Add start_requested_at**
 
 After `thread.awaiting_new_session = True`, add:
 
@@ -609,13 +620,19 @@ thread.start_requested_at = time.time()
 
 Full context:
 ```python
+# Mark thread as awaiting new session
 thread.awaiting_new_session = True
 thread.start_requested_at = time.time()  # ADD THIS
 thread.last_sent_message = None
 project_manager._save()
 ```
 
-**Step 3: Commit**
+**Step 4: Verify syntax**
+
+Run: `python3 -m py_compile src/codogram/bot.py`
+Expected: No errors
+
+**Step 5: Commit**
 
 ```bash
 git add src/codogram/bot.py
