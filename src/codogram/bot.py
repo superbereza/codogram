@@ -363,7 +363,14 @@ async def cmd_start(message: Message):
         return
 
     if project:
-        await _start_project_flow(message, project)
+        if project.cwd and Path(project.cwd).is_dir():
+            # cwd exists - use thread flow (respects naming convention)
+            thread = project.get_or_create_thread(None, "main")
+            await _start_thread_flow(message, project, thread)
+            project_manager._save()
+        else:
+            # cwd doesn't exist - need setup
+            await _start_project_flow(message, project)
         return
 
     # Case 3: New chat - use chat title as project name
