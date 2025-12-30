@@ -180,6 +180,7 @@ class HistoryWatcher:
         thread.session_id = new_session_id
         thread.jsonl_path = str(compute_jsonl_path(project.cwd, new_session_id))
         thread.awaiting_new_session = False
+        thread.start_requested_at = None
 
         # Start new watcher
         thread.watcher_task = asyncio.create_task(
