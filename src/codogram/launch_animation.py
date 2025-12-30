@@ -85,6 +85,9 @@ async def launch_with_animation(
         await bot.send_message(chat_id, "`[~]` Starting Claude...", message_thread_id=thread_id, parse_mode="Markdown")
         tmux.send("claude")
 
+        # 2.5. Start poller early to catch trust prompts during startup
+        await _start_monitoring(bot, project, thread, queue)
+
         # 3. Wait for ready with animation
         await bot.send_message(chat_id, "`[~]` Waiting for Claude...", message_thread_id=thread_id, parse_mode="Markdown")
 
@@ -122,11 +125,11 @@ async def launch_with_animation(
                     message_thread_id=thread_id
                 )
                 face_idx = 1
-            elif face_msg and face_idx < len(FACES):
+            elif face_msg:
                 await queue.enqueue(EditBatch(
                     chat_id=chat_id,
                     message_id=face_msg.message_id,
-                    text=f"`{FACES[face_idx]}`",
+                    text=f"`{FACES[face_idx % len(FACES)]}`",
                     parse_mode="Markdown",
                 ))
                 face_idx += 1
