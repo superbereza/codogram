@@ -223,3 +223,24 @@ def test_start_requested_at_persistence(tmp_path, monkeypatch):
 
     assert thread2.start_requested_at == 1703847600.5
     assert thread2.awaiting_new_session is True
+
+
+# Tests for worktree fields
+def test_thread_info_has_worktree_fields():
+    from codogram.session_manager import ThreadInfo
+
+    thread = ThreadInfo(thread_id=123, name="auth")
+    assert thread.worktree_path is None
+    assert thread.base_branch is None
+    assert thread.archived is False
+
+    thread_with_worktree = ThreadInfo(
+        thread_id=456,
+        name="feature",
+        worktree_path="/dev/project-feature",
+        base_branch="main",
+        archived=True
+    )
+    assert thread_with_worktree.worktree_path == "/dev/project-feature"
+    assert thread_with_worktree.base_branch == "main"
+    assert thread_with_worktree.archived is True

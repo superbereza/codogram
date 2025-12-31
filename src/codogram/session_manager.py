@@ -101,6 +101,11 @@ class ThreadInfo:
     # For session binding race condition fix:
     start_requested_at: float | None = None
 
+    # Worktree support:
+    worktree_path: str | None = None   # None = main repo directory
+    base_branch: str | None = None     # Branch this worktree was created from
+    archived: bool = False             # True = topic closed after /branch_finish
+
     def get_tmux_session(self, project_name: str) -> str:
         """Get tmux session name for this thread."""
         if self.name == "main":
