@@ -7,7 +7,6 @@ import time
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
-from aiogram.exceptions import TelegramRetryAfter
 
 from .config import settings
 from .session_manager import project_manager, ProjectState, ThreadInfo
@@ -30,6 +29,7 @@ from .start_flow import (
 )
 from .tmux_selector import create_tmux_selection_keyboard
 from .domain.validators import is_valid_project_name
+from .adapters.telegram import send_with_retry
 
 # Conversation state: chat_id -> {"state": str, "project": str, "path": str, ...}
 _start_state: dict[int, dict] = {}
@@ -49,33 +49,6 @@ def get_admin_ids() -> set[int]:
 def is_admin(user_id: int) -> bool:
     """Check if user is admin."""
     return user_id in get_admin_ids()
-
-
-async def send_with_retry(
-    message: Message,
-    text: str,
-    parse_mode: str = "Markdown",
-    retries: int = 3,
-    message_thread_id: int | None = None,
-) -> bool:
-    """Send message with retry on rate limit."""
-    for attempt in range(retries):
-        try:
-            if message_thread_id is not None:
-                await message.bot.send_message(
-                    message.chat.id,
-                    text,
-                    parse_mode=parse_mode,
-                    message_thread_id=message_thread_id,
-                )
-            else:
-                await message.answer(text, parse_mode=parse_mode)
-            return True
-        except TelegramRetryAfter as e:
-            logger.warning(f"Rate limited, retrying in {e.retry_after}s (attempt {attempt + 1}/{retries})")
-            await asyncio.sleep(e.retry_after + 1)
-    logger.error("Failed to send message after retries")
-    return False
 
 
 def get_session_for_chat(chat_id: int) -> TmuxSession | None:
@@ -277,7 +250,8 @@ async def _connect_or_launch(message: Message, project: ProjectState):
     project_manager._save()
 
     await send_with_retry(
-        message,
+        message.bot,
+        message.chat.id,
         f"Claude running in `{project.tmux_session}`\n\n"
         f"Attach: `tmux attach -t {project.tmux_session}`",
     )
@@ -1138,7 +1112,8 @@ async def on_tmux_selected(callback: CallbackQuery):
     project_manager._save()
 
     await send_with_retry(
-        callback.message,
+        callback.bot,
+        callback.message.chat.id,
         f"Claude running in `{project.tmux_session}`\n\n"
         f"Attach: `tmux attach -t {project.tmux_session}`",
     )
