@@ -29,6 +29,7 @@ from .start_flow import (
     restart_confirm_keyboard,
 )
 from .tmux_selector import create_tmux_selection_keyboard
+from .domain.validators import is_valid_project_name
 
 # Conversation state: chat_id -> {"state": str, "project": str, "path": str, ...}
 _start_state: dict[int, dict] = {}
@@ -48,13 +49,6 @@ def get_admin_ids() -> set[int]:
 def is_admin(user_id: int) -> bool:
     """Check if user is admin."""
     return user_id in get_admin_ids()
-
-def is_valid_project_name(name: str) -> bool:
-    """Check if project name is valid.
-
-    Valid names contain only: letters, digits, dash, underscore.
-    """
-    return bool(re.match(r'^[a-zA-Z0-9_-]+$', name))
 
 
 async def send_with_retry(
