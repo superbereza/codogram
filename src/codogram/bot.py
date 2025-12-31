@@ -556,25 +556,19 @@ async def cmd_thread_create(message: Message):
             await message.answer(f"Thread with name '{name}' already exists")
             return
 
-    # Create Telegram topic
-    try:
-        topic = await message.bot.create_forum_topic(chat_id, name.capitalize())
-    except Exception as e:
-        await message.answer(f"Error creating topic: {e}")
-        return
+    # Use launch service to create topic + ThreadInfo + launch Claude
+    from .services.launch import create_thread_with_session
 
-    # Create ThreadInfo
-    thread = ThreadInfo(thread_id=topic.message_thread_id, name=name)
-    project.threads[topic.message_thread_id] = thread
-
-    # Launch Claude
-    start_poller, start_watcher = _make_task_starters(message.bot)
-    success = await launch_claude_in_thread(
-        message, project, thread, start_poller, start_watcher
+    thread = await create_thread_with_session(
+        bot=message.bot,
+        chat_id=chat_id,
+        project=project,
+        name=name,
     )
 
-    if success:
-        project_manager._save()
+    if not thread:
+        await message.answer("Error creating topic")
+        return
 
 
 @router.callback_query(F.data == "start:create_dir")
