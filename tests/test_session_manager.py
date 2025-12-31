@@ -244,3 +244,67 @@ def test_thread_info_has_worktree_fields():
     assert thread_with_worktree.worktree_path == "/dev/project-feature"
     assert thread_with_worktree.base_branch == "main"
     assert thread_with_worktree.archived is True
+
+
+def test_worktree_fields_persist_to_config(tmp_path, monkeypatch):
+    """Test worktree fields are saved to config file."""
+    import json
+    from codogram import config
+    from codogram.session_manager import ProjectManager, ThreadInfo
+
+    config_file = tmp_path / ".config.json"
+    monkeypatch.setattr(config, "CONFIG_PATH", config_file)
+
+    pm = ProjectManager()
+    project = pm.get_or_create("test-project")
+    project.chat_id = 123
+    project.cwd = "/dev/test-project"
+
+    thread = project.get_or_create_thread(456, "auth")
+    thread.worktree_path = "/dev/test-project-auth"
+    thread.base_branch = "main"
+    thread.archived = True
+
+    pm._save()
+
+    saved = json.loads(config_file.read_text())
+    thread_data = saved["projects"]["test-project"]["threads"]["456"]
+    assert thread_data["worktree_path"] == "/dev/test-project-auth"
+    assert thread_data["base_branch"] == "main"
+    assert thread_data["archived"] is True
+
+
+def test_worktree_fields_load_from_config(tmp_path, monkeypatch):
+    """Test worktree fields are loaded from config file."""
+    import json
+    from codogram import config
+
+    config_data = {
+        "projects": {
+            "test-project": {
+                "chat_id": 123,
+                "cwd": "/dev/test-project",
+                "threads": {
+                    "456": {
+                        "name": "auth",
+                        "worktree_path": "/dev/test-project-auth",
+                        "base_branch": "main",
+                        "archived": True
+                    }
+                }
+            }
+        }
+    }
+
+    config_file = tmp_path / ".config.json"
+    config_file.write_text(json.dumps(config_data))
+    monkeypatch.setattr(config, "CONFIG_PATH", config_file)
+
+    from codogram.session_manager import ProjectManager
+    pm = ProjectManager()
+    project = pm.projects.get("test-project")
+    thread = project.get_thread(456)
+
+    assert thread.worktree_path == "/dev/test-project-auth"
+    assert thread.base_branch == "main"
+    assert thread.archived is True

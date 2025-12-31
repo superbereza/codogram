@@ -179,6 +179,9 @@ class ProjectManager:
                         jsonl_path=thread_data.get("jsonl_path"),
                         awaiting_new_session=thread_data.get("awaiting_new_session", False),
                         start_requested_at=thread_data.get("start_requested_at"),
+                        worktree_path=thread_data.get("worktree_path"),
+                        base_branch=thread_data.get("base_branch"),
+                        archived=thread_data.get("archived", False),
                     )
 
                 # Migrate legacy → threads[None] if not already present
@@ -208,16 +211,24 @@ class ProjectManager:
 
             # Save all threads with full state
             if p.threads:
-                project_data["threads"] = {
-                    str(tid) if tid is not None else "null": {
+                threads_dict = {}
+                for tid, t in p.threads.items():
+                    thread_data = {
                         "name": t.name,
                         "session_id": t.session_id,
                         "jsonl_path": t.jsonl_path,
                         "awaiting_new_session": t.awaiting_new_session,
                         "start_requested_at": t.start_requested_at,
                     }
-                    for tid, t in p.threads.items()
-                }
+                    # Worktree fields - only save if set
+                    if t.worktree_path:
+                        thread_data["worktree_path"] = t.worktree_path
+                    if t.base_branch:
+                        thread_data["base_branch"] = t.base_branch
+                    if t.archived:
+                        thread_data["archived"] = t.archived
+                    threads_dict[str(tid) if tid is not None else "null"] = thread_data
+                project_data["threads"] = threads_dict
             projects_data[name] = project_data
         self._config["projects"] = projects_data
         self._config.pop("sessions", None)
