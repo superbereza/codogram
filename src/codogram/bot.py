@@ -361,6 +361,13 @@ async def cmd_start(message: Message):
                 parse_mode="Markdown",
             )
             return
+        if len(project_name) > 35:
+            await message.answer(
+                "`[!]` Project name too long (max 35 chars). "
+                "Rename group or use /register_dir with shorter name.",
+                parse_mode="Markdown",
+            )
+            return
         project = project_manager.get_or_create(project_name)
         project.chat_id = chat_id
         await _start_project_flow(message, project)
@@ -391,6 +398,13 @@ async def cmd_start(message: Message):
         sanitized = re.sub(r'[^a-zA-Z0-9_-]', '-', chat_title)
         sanitized = re.sub(r'-+', '-', sanitized).strip('-')  # Collapse multiple dashes
         if sanitized and is_valid_project_name(sanitized):
+            if len(sanitized) > 35:
+                await message.answer(
+                    "`[!]` Project name too long (max 35 chars). "
+                    "Rename group or use /register_dir with shorter name.",
+                    parse_mode="Markdown",
+                )
+                return
             project = project_manager.get_or_create(sanitized)
             project.chat_id = chat_id
             await _start_project_flow(message, project)
@@ -1758,6 +1772,13 @@ async def on_message(message: Message):
             if not project_name or not is_valid_project_name(project_name):
                 await message.answer(
                     "Project name can only contain letters, digits, `-` and `_`.",
+                    parse_mode="Markdown",
+                )
+                return
+            if len(project_name) > 35:
+                await message.answer(
+                    "`[!]` Project name too long (max 35 chars). "
+                    "Rename group or use /register_dir with shorter name.",
                     parse_mode="Markdown",
                 )
                 return
