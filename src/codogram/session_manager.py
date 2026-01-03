@@ -107,6 +107,9 @@ class ThreadInfo:
     base_branch: str | None = None     # Branch this worktree was created from
     archived: bool = False             # True = topic closed after /branch_finish
 
+    # Auto-accept permissions:
+    auto_accept: bool = False          # True = auto-accept permission prompts
+
     def get_tmux_session(self, project_name: str) -> str:
         """Get tmux session name for this thread."""
         if self.name == "main":
@@ -123,6 +126,9 @@ class ProjectState:
 
     # Multi-thread support: thread_id -> ThreadInfo
     threads: dict[int | None, ThreadInfo] = field(default_factory=dict)
+
+    # Auto-accept permissions (project-wide default):
+    auto_accept: bool = False
 
     # DEPRECATED: Legacy fields kept for backward compatibility with old configs.
     # All new code should use threads[None] for main thread.
@@ -168,6 +174,7 @@ class ProjectManager:
                 # New format: dict with chat_id and cwd
                 project.chat_id = data.get("chat_id")
                 project.cwd = data.get("cwd")
+                project.auto_accept = data.get("auto_accept", False)
 
                 # Load explicit threads first
                 threads_data = data.get("threads", {})
@@ -187,6 +194,7 @@ class ProjectManager:
                         worktree_path=thread_data.get("worktree_path"),
                         base_branch=thread_data.get("base_branch"),
                         archived=thread_data.get("archived", False),
+                        auto_accept=thread_data.get("auto_accept", False),
                     )
 
                 # Migrate legacy → threads[None] if not already present
@@ -206,7 +214,7 @@ class ProjectManager:
         for name, p in self.projects.items():
             if p.chat_id is None:
                 continue
-            project_data = {"chat_id": p.chat_id, "cwd": p.cwd}
+            project_data = {"chat_id": p.chat_id, "cwd": p.cwd, "auto_accept": p.auto_accept}
 
             # Backward compat: duplicate threads[None] to legacy fields
             if None in p.threads:
@@ -233,6 +241,8 @@ class ProjectManager:
                         thread_data["base_branch"] = t.base_branch
                     if t.archived:
                         thread_data["archived"] = t.archived
+                    if t.auto_accept:
+                        thread_data["auto_accept"] = t.auto_accept
                     threads_dict[str(tid) if tid is not None else "null"] = thread_data
                 project_data["threads"] = threads_dict
             projects_data[name] = project_data
