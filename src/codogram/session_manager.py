@@ -84,6 +84,7 @@ class ThreadInfo:
     """State for a single thread (topic) within a project."""
     thread_id: int | None  # None = General topic
     name: str              # mystic, arcane, user-provided, or "main"
+    topic_name: str | None = None  # Telegram topic name for debugging
 
     # Runtime state (from history.jsonl):
     session_id: str | None = None
@@ -100,6 +101,11 @@ class ThreadInfo:
     awaiting_new_session: bool = False
     # For session binding race condition fix:
     start_requested_at: float | None = None
+
+    # Worktree support:
+    worktree_path: str | None = None   # None = main repo directory
+    base_branch: str | None = None     # Branch this worktree was created from
+    archived: bool = False             # True = topic closed after /branch_finish
 
     def get_tmux_session(self, project_name: str) -> str:
         """Get tmux session name for this thread."""
@@ -165,15 +171,22 @@ class ProjectManager:
 
                 # Load explicit threads first
                 threads_data = data.get("threads", {})
+                logger.debug(f"_load_projects: {project_name} has {len(threads_data)} threads")
                 for tid_str, thread_data in threads_data.items():
                     tid = None if tid_str == "null" else int(tid_str)
+                    thread_name = thread_data.get("name", "main")
+                    logger.debug(f"_load_projects: loading thread tid={tid} name={thread_name}")
                     project.threads[tid] = ThreadInfo(
                         thread_id=tid,
-                        name=thread_data.get("name", "main"),
+                        name=thread_name,
+                        topic_name=thread_data.get("topic_name"),
                         session_id=thread_data.get("session_id"),
                         jsonl_path=thread_data.get("jsonl_path"),
                         awaiting_new_session=thread_data.get("awaiting_new_session", False),
                         start_requested_at=thread_data.get("start_requested_at"),
+                        worktree_path=thread_data.get("worktree_path"),
+                        base_branch=thread_data.get("base_branch"),
+                        archived=thread_data.get("archived", False),
                     )
 
                 # Migrate legacy → threads[None] if not already present
@@ -203,16 +216,25 @@ class ProjectManager:
 
             # Save all threads with full state
             if p.threads:
-                project_data["threads"] = {
-                    str(tid) if tid is not None else "null": {
+                threads_dict = {}
+                for tid, t in p.threads.items():
+                    thread_data = {
                         "name": t.name,
+                        "topic_name": t.topic_name,
                         "session_id": t.session_id,
                         "jsonl_path": t.jsonl_path,
                         "awaiting_new_session": t.awaiting_new_session,
                         "start_requested_at": t.start_requested_at,
                     }
-                    for tid, t in p.threads.items()
-                }
+                    # Worktree fields - only save if set
+                    if t.worktree_path:
+                        thread_data["worktree_path"] = t.worktree_path
+                    if t.base_branch:
+                        thread_data["base_branch"] = t.base_branch
+                    if t.archived:
+                        thread_data["archived"] = t.archived
+                    threads_dict[str(tid) if tid is not None else "null"] = thread_data
+                project_data["threads"] = threads_dict
             projects_data[name] = project_data
         self._config["projects"] = projects_data
         self._config.pop("sessions", None)
@@ -296,6 +318,10 @@ class ProjectManager:
     async def restore_projects(self, bot, start_poller, start_watcher, telegram_queue) -> None:
         """Restore sessions from history.jsonl after bot restart."""
         from .history_watcher import watch_thread_jsonl
+
+        # DEBUG: Log what we have at restore time
+        for pname, p in self.projects.items():
+            logger.info(f"restore_debug: project={pname} threads={len(p.threads)} names={[t.name for t in p.threads.values()]}")
 
         for project in list(self.projects.values()):
             if not project.chat_id or not project.cwd:

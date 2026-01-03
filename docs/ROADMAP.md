@@ -87,6 +87,14 @@
 - Настройка .env (токен бота, admin ID)
 - См. [docs/designs/done/2025-12-30-setup-script.md](designs/done/2025-12-30-setup-script.md)
 
+### Git worktree isolation
+Изолированные ветки с отдельными директориями:
+- `/branch_create [name]` — создать worktree + топик + Claude сессию
+- `/branch_finish` — смержить ветку, удалить worktree и топик
+- Unified thread-first flow: топик создаётся первым, статусы идут в него
+- Magic names с suffix fallback (arcane-2, arcane-3...)
+- См. [docs/designs/done/2025-12-30-git-worktree-support.md](designs/done/2025-12-30-git-worktree-support.md)
+
 ### Open source release
 - LICENSE файл (GPL v3)
 - Репозиторий публичный

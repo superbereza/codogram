@@ -38,6 +38,8 @@ async def main():
         # /clear intentionally not in menu - same as /new
         BotCommand(command="thread_create", description="Create new Claude thread"),
         BotCommand(command="thread_delete", description="Delete Claude thread (in topic)"),
+        BotCommand(command="branch_create", description="Create isolated git worktree + thread"),
+        BotCommand(command="branch_finish", description="Merge branch and cleanup worktree"),
         BotCommand(command="restart", description="Kill and restart Claude tmux"),
         BotCommand(command="my_chat_id", description="Show your user ID"),
         BotCommand(command="esc", description="Send Escape to Claude"),

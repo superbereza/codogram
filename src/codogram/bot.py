@@ -50,6 +50,15 @@ def is_admin(user_id: int) -> bool:
     """Check if user is admin."""
     return user_id in get_admin_ids()
 
+async def require_forum_group(message: Message) -> bool:
+    """Check if message is from a forum group. Returns False and sends error if not."""
+    if message.chat.type == "private":
+        await message.answer("`[!]` This command requires a group with topics.", parse_mode="Markdown")
+        return False
+    if not message.chat.is_forum:
+        await message.answer("`[!]` Topics required. Enable in group settings -> Topics", parse_mode="Markdown")
+        return False
+    return True
 
 def get_session_for_chat(chat_id: int) -> TmuxSession | None:
     """Get TmuxSession for chat_id (main thread)."""
@@ -318,6 +327,13 @@ async def cmd_start(message: Message):
                 parse_mode="Markdown",
             )
             return
+        if len(project_name) > 35:
+            await message.answer(
+                "`[!]` Project name too long (max 35 chars). "
+                "Rename group or use /register_dir with shorter name.",
+                parse_mode="Markdown",
+            )
+            return
         project = project_manager.get_or_create(project_name)
         project.chat_id = chat_id
         await _start_project_flow(message, project)
@@ -348,6 +364,13 @@ async def cmd_start(message: Message):
         sanitized = re.sub(r'[^a-zA-Z0-9_-]', '-', chat_title)
         sanitized = re.sub(r'-+', '-', sanitized).strip('-')  # Collapse multiple dashes
         if sanitized and is_valid_project_name(sanitized):
+            if len(sanitized) > 35:
+                await message.answer(
+                    "`[!]` Project name too long (max 35 chars). "
+                    "Rename group or use /register_dir with shorter name.",
+                    parse_mode="Markdown",
+                )
+                return
             project = project_manager.get_or_create(sanitized)
             project.chat_id = chat_id
             await _start_project_flow(message, project)
@@ -492,16 +515,13 @@ async def cmd_thread_create(message: Message):
     if not is_admin(message.from_user.id):
         return
 
+    if not await require_forum_group(message):
+        return
+
     chat_id = message.chat.id
     project = project_manager.get_by_chat(chat_id)
     if not project:
         await message.answer("Project not found. Use /start first")
-        return
-
-    # Check if chat supports topics
-    chat = await message.bot.get_chat(chat_id)
-    if not chat.is_forum:
-        await message.answer("This chat doesn't support topics. Enable Topics in group settings.")
         return
 
     # Parse optional name from command
@@ -524,25 +544,47 @@ async def cmd_thread_create(message: Message):
             await message.answer(f"Thread with name '{name}' already exists")
             return
 
-    # Create Telegram topic
-    try:
-        topic = await message.bot.create_forum_topic(chat_id, name.capitalize())
-    except Exception as e:
-        await message.answer(f"Error creating topic: {e}")
+    # Check for non-worktree threads and warn user about /branch_create
+    non_worktree_threads = [
+        t for t in project.threads.values()
+        if t.thread_id is not None and t.worktree_path is None and not t.archived
+    ]
+
+    if non_worktree_threads:
+        # Store pending thread name for confirmation
+        _start_state[chat_id] = {
+            "state": "thread_create_pending",
+            "name": name,
+        }
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Create new git worktree", callback_data="branch_create_redirect")],
+            [InlineKeyboardButton(text="Create in main anyway", callback_data="thread_create_confirm")],
+            [InlineKeyboardButton(text="[x] Cancel", callback_data="cancel")]
+        ])
+        await message.answer(
+            "You already have a topic working in the main directory.\n\n"
+            "Creating another one means both Claude sessions will edit the same files, "
+            "which may cause conflicts.\n\n"
+            "*Recommendation:* use git worktree — each topic gets "
+            "an isolated copy of the repository.",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
         return
 
-    # Create ThreadInfo
-    thread = ThreadInfo(thread_id=topic.message_thread_id, name=name)
-    project.threads[topic.message_thread_id] = thread
+    # Use launch service to create topic + ThreadInfo + launch Claude
+    from .services.launch import create_thread_with_session
 
-    # Launch Claude
-    start_poller, start_watcher = _make_task_starters(message.bot)
-    success = await launch_claude_in_thread(
-        message, project, thread, start_poller, start_watcher
+    thread = await create_thread_with_session(
+        bot=message.bot,
+        chat_id=chat_id,
+        project=project,
+        name=name,
     )
 
-    if success:
-        project_manager._save()
+    if not thread:
+        await message.answer("Error creating topic")
+        return
 
 
 @router.callback_query(F.data == "start:create_dir")
@@ -776,10 +818,496 @@ async def on_start_no_git(callback: CallbackQuery):
     await callback.answer()
 
 
+@router.message(Command("branch_create"))
+async def cmd_branch_create(message: Message):
+    """Create a new worktree branch with isolated Claude session."""
+    if not is_admin(message.from_user.id):
+        return
+
+    if not await require_forum_group(message):
+        return
+
+    project = project_manager.get_by_chat(message.chat.id)
+    if not project:
+        await message.answer("`[!]` Project not registered. Use /start first.", parse_mode="Markdown")
+        return
+
+    # Check git repo
+    from .git_utils import is_git_repo
+    if not is_git_repo(Path(project.cwd)):
+        await message.answer("`[x]` Git repository required for /branch_create", parse_mode="Markdown")
+        return
+
+    # Parse name argument
+    args = message.text.split(maxsplit=1)
+    branch_name = args[1] if len(args) > 1 else None
+
+    # Generate magic name if not provided
+    if not branch_name:
+        from .magic_names import get_random_magic_name
+        existing_names = {t.name for t in project.threads.values()}
+        branch_name = get_random_magic_name(existing_names)
+
+    # Sanitize branch name
+    from .git_utils import sanitize_branch_name, max_branch_name_length, has_uncommitted_changes, get_default_branch
+    branch_name = sanitize_branch_name(branch_name)
+
+    # Check length
+    max_len = max_branch_name_length(project.project_name)
+    if len(branch_name) > max_len:
+        await message.answer(f"`[x]` Name too long (max {max_len} chars for this project)", parse_mode="Markdown")
+        return
+
+    # Get default branch
+    default_branch = get_default_branch(Path(project.cwd))
+
+    # Check if creating from worktree topic or main
+    current_thread = project.threads.get(message.message_thread_id)
+    if current_thread and current_thread.worktree_path:
+        # From worktree topic - show base branch selection
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=f"From {default_branch}", callback_data=f"bc_base:{branch_name}:{default_branch}")],
+            [InlineKeyboardButton(text=f"From {current_thread.name}", callback_data=f"bc_base:{branch_name}:{current_thread.name}")],
+            [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
+        ])
+        await message.answer("Create branch from:", reply_markup=keyboard)
+        return
+
+    # From main - check uncommitted changes
+    if has_uncommitted_changes(Path(project.cwd)):
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Create clean (from last commit)", callback_data=f"bc_create:{branch_name}:{default_branch}")],
+            [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
+            [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
+        ])
+        await message.answer("`[!]` Uncommitted changes detected", reply_markup=keyboard, parse_mode="Markdown")
+        return
+
+    # No uncommitted changes - create directly
+    await _do_branch_create(message, project, branch_name, default_branch)
+
+
+@router.callback_query(F.data.startswith("bc_base:"))
+async def cb_branch_create_base(callback: CallbackQuery):
+    """Handle base branch selection for branch_create."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    _, branch_name, base_branch = callback.data.split(":")
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    # Check uncommitted in selected base
+    from .git_utils import has_uncommitted_changes, get_default_branch
+    base_path = project.cwd
+    if base_branch != get_default_branch(Path(project.cwd)):
+        # Find worktree path for this branch
+        for t in project.threads.values():
+            if t.name == base_branch and t.worktree_path:
+                base_path = t.worktree_path
+                break
+
+    if has_uncommitted_changes(Path(base_path)):
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Create from last commit", callback_data=f"bc_create:{branch_name}:{base_branch}")],
+            [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
+            [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
+        ])
+        await callback.message.edit_text(f"`[!]` Uncommitted changes in {base_branch}", reply_markup=keyboard, parse_mode="Markdown")
+        return
+
+    await callback.message.delete()
+    await _do_branch_create(callback.message, project, branch_name, base_branch)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("bc_create:"))
+async def cb_branch_create_do(callback: CallbackQuery):
+    """Create branch from last commit."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    _, branch_name, base_branch = callback.data.split(":")
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    await callback.message.delete()
+    await _do_branch_create(callback.message, project, branch_name, base_branch)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("bc_commit:"))
+async def cb_branch_create_commit(callback: CallbackQuery):
+    """Send commit request to Claude."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    _, branch_name = callback.data.split(":")
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    thread = project.threads.get(callback.message.message_thread_id)
+
+    if thread:
+        tmux_name = thread.get_tmux_session(project.project_name)
+        tmux = TmuxSession(tmux_name, project.cwd)
+        if tmux.exists():
+            tmux.send("Commit current changes in logical chunks with descriptive messages.")
+
+    await callback.message.edit_text(
+        "`[~]` Sent: \"Commit current changes in logical chunks with descriptive messages.\"\n\n"
+        f"Run `/branch_create {branch_name}` again after commit.",
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "cancel")
+async def cb_cancel(callback: CallbackQuery):
+    """Handle generic cancel button."""
+    chat_id = callback.message.chat.id
+    _start_state.pop(chat_id, None)
+    await callback.message.edit_text("Cancelled.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "thread_create_confirm")
+async def cb_thread_create_confirm(callback: CallbackQuery):
+    """Handle thread_create confirmation (create in main anyway)."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    chat_id = callback.message.chat.id
+    state = _start_state.get(chat_id)
+
+    if not state or state.get("state") != "thread_create_pending":
+        await callback.answer("Session expired")
+        return
+
+    name = state.get("name")
+    _start_state.pop(chat_id, None)
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    await callback.message.delete()
+
+    # Use launch service to create topic + ThreadInfo + launch Claude
+    from .services.launch import create_thread_with_session
+
+    thread = await create_thread_with_session(
+        bot=callback.bot,
+        chat_id=chat_id,
+        project=project,
+        name=name,
+    )
+
+    if not thread:
+        await callback.bot.send_message(chat_id, "Error creating topic")
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "branch_create_redirect")
+async def cb_branch_create_redirect(callback: CallbackQuery):
+    """Handle redirect to /branch_create."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    chat_id = callback.message.chat.id
+    _start_state.pop(chat_id, None)
+
+    await callback.message.edit_text(
+        "Use `/branch_create` or `/branch_create <name>` to create isolated worktree branch.",
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.message(Command("branch_finish"))
+async def cmd_branch_finish(message: Message):
+    """Finish branch: merge and cleanup worktree."""
+    if not is_admin(message.from_user.id):
+        return
+
+    if not await require_forum_group(message):
+        return
+
+    thread_id = message.message_thread_id
+    project = project_manager.get_by_chat(message.chat.id)
+
+    if not project:
+        await message.answer("`[!]` Project not registered.", parse_mode="Markdown")
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread or not thread.worktree_path:
+        await message.answer("`[!]` /branch_finish only works in worktree topics. Use /thread_close for this topic.", parse_mode="Markdown")
+        return
+
+    # Check uncommitted changes
+    from .git_utils import has_uncommitted_changes, branch_exists, get_default_branch
+    worktree_path = Path(thread.worktree_path)
+
+    if worktree_path.exists() and has_uncommitted_changes(worktree_path):
+        await message.answer("`[!]` Uncommitted changes. Commit or stash first.", parse_mode="Markdown")
+        return
+
+    # Build keyboard
+    default_branch = get_default_branch(Path(project.cwd))
+    buttons = [[InlineKeyboardButton(text=f"Merge -> {default_branch}", callback_data=f"bf_merge:{thread_id}:{default_branch}")]]
+
+    # Add base_branch option if it exists and is different
+    if thread.base_branch and thread.base_branch != default_branch:
+        if branch_exists(Path(project.cwd), thread.base_branch):
+            buttons.append([InlineKeyboardButton(text=f"Merge -> {thread.base_branch}", callback_data=f"bf_merge:{thread_id}:{thread.base_branch}")])
+
+    buttons.append([InlineKeyboardButton(text="[!!] Delete without merge", callback_data=f"bf_delete:{thread_id}")])
+    buttons.append([InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await message.answer(f"Finish `{thread.name}` branch:", reply_markup=keyboard, parse_mode="Markdown")
+
+
+@router.callback_query(F.data.startswith("bf_merge:"))
+async def cb_branch_finish_merge_confirm(callback: CallbackQuery):
+    """Show merge confirmation."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    parts = callback.data.split(":")
+    thread_id = int(parts[1])
+    target_branch = parts[2]
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await callback.answer("Thread not found")
+        return
+
+    # Check target has no uncommitted changes
+    from .git_utils import has_uncommitted_changes
+    if has_uncommitted_changes(Path(project.cwd)):
+        await callback.message.edit_text("`[!]` Uncommitted changes in target directory. Commit or stash first.", parse_mode="Markdown")
+        await callback.answer()
+        return
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Yes, finish", callback_data=f"bf_do_merge:{thread_id}:{target_branch}")],
+        [InlineKeyboardButton(text="[x] Cancel", callback_data="cancel")]
+    ])
+
+    await callback.message.edit_text(
+        f"Merge `{thread.name}` -> `{target_branch}` will:\n"
+        "- Merge branch and push\n"
+        "- Close tmux session\n"
+        f"- Delete {thread.worktree_path}\n"
+        "- Archive topic\n\n"
+        "Continue?",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("bf_do_merge:"))
+async def cb_branch_finish_do_merge(callback: CallbackQuery):
+    """Execute merge and cleanup."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    parts = callback.data.split(":")
+    thread_id = int(parts[1])
+    target_branch = parts[2]
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await callback.answer("Thread not found")
+        return
+
+    await callback.message.edit_text(f"`[~]` Merging {thread.name} -> {target_branch}...", parse_mode="Markdown")
+    await callback.answer()
+
+    from .worktree import merge_branch, push_branch
+
+    main_repo = Path(project.cwd)
+    branch_name = thread.name
+
+    # Merge
+    result = merge_branch(main_repo, branch_name, target_branch)
+    if not result.success:
+        if "conflicts" in result.error.lower():
+            await callback.message.edit_text("`[!]` Merge conflicts. Resolve and run /branch_finish again.", parse_mode="Markdown")
+        else:
+            await callback.message.edit_text(f"`[x]` Merge failed: {result.error}", parse_mode="Markdown")
+        return
+
+    # Push (optional, don't fail on error)
+    push_result = push_branch(main_repo, target_branch)
+    push_warning = "" if push_result.success else "\n`[!]` Push failed. Run `git push` manually."
+
+    # Cleanup
+    await _do_branch_cleanup(callback.message, project, thread, force=False)
+
+    await callback.message.edit_text(f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}", parse_mode="Markdown")
+
+
+@router.callback_query(F.data.startswith("bf_delete:"))
+async def cb_branch_finish_delete_confirm(callback: CallbackQuery):
+    """Show delete confirmation."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    parts = callback.data.split(":")
+    thread_id = int(parts[1])
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await callback.answer("Thread not found")
+        return
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Yes, delete", callback_data=f"bf_do_delete:{thread_id}")],
+        [InlineKeyboardButton(text="[x] Cancel", callback_data="cancel")]
+    ])
+
+    await callback.message.edit_text(
+        f"`[!]` Delete branch `{thread.name}` WITHOUT merging?\n\n"
+        "This will:\n"
+        "- Close tmux session\n"
+        f"- Delete {thread.worktree_path}\n"
+        f"- Delete branch `{thread.name}`\n"
+        "- Archive topic\n\n"
+        "All uncommitted work will be LOST.",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("bf_do_delete:"))
+async def cb_branch_finish_do_delete(callback: CallbackQuery):
+    """Execute delete without merge."""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Not authorized")
+        return
+
+    parts = callback.data.split(":")
+    thread_id = int(parts[1])
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await callback.answer("Thread not found")
+        return
+
+    await callback.message.edit_text(f"`[~]` Deleting {thread.name}...", parse_mode="Markdown")
+    await callback.answer()
+
+    await _do_branch_cleanup(callback.message, project, thread, force=True)
+
+    await callback.message.edit_text(f"`[v]` Branch {thread.name} deleted", parse_mode="Markdown")
+
+
+async def _do_branch_cleanup(message: Message, project: ProjectState, thread: ThreadInfo, force: bool):
+    """Clean up worktree, tmux, and archive topic."""
+    import subprocess
+    from .worktree import remove_worktree
+
+    main_repo = Path(project.cwd)
+    worktree_path = Path(thread.worktree_path) if thread.worktree_path else None
+    branch_name = thread.name
+
+    # Cancel background tasks
+    if thread.watcher_task:
+        thread.watcher_task.cancel()
+    if thread.poller_task:
+        thread.poller_task.cancel()
+    if thread.binding_task:
+        thread.binding_task.cancel()
+
+    # Kill tmux
+    tmux_name = thread.get_tmux_session(project.project_name)
+    subprocess.run(["tmux", "kill-session", "-t", tmux_name], capture_output=True)
+
+    # Remove worktree and branch
+    if worktree_path:
+        remove_worktree(main_repo, worktree_path, branch_name, delete_branch=True, force=force)
+
+    # Archive topic
+    try:
+        await message.bot.close_forum_topic(message.chat.id, thread.thread_id)
+        await message.bot.edit_forum_topic(message.chat.id, thread.thread_id, icon_custom_emoji_id="5357315181649076022")  # archive folder icon
+    except Exception:
+        pass  # Topic may already be closed
+
+    # Update thread state
+    thread.archived = True
+    thread.worktree_path = None
+    thread.session_id = None
+    project_manager._save()
+
+
+async def _do_branch_create(message: Message, project: ProjectState, branch_name: str, base_branch: str):
+    """Create topic + worktree + launch Claude using unified service."""
+    from .services.launch import create_thread_with_session
+
+    # Unified flow: topic created first, then worktree, then Claude
+    # All status messages go to the new topic
+    thread = await create_thread_with_session(
+        bot=message.bot,
+        chat_id=message.chat.id,
+        project=project,
+        name=branch_name,
+        create_worktree=True,
+        base_branch=base_branch,
+    )
+
+    if not thread:
+        # Error already reported in the topic by the service
+        await message.answer("`[x]` Branch creation failed. Check the new topic for details.", parse_mode="Markdown")
+
+
 @router.message(Command("my_chat_id"))
 async def cmd_my_chat_id(message: Message):
     """Show user's chat ID - available to everyone."""
-    await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`", parse_mode="Markdown")
+    thread_id = message.message_thread_id
+    thread_info = f"\nThread ID: `{thread_id}`" if thread_id else "\nThread ID: None (General)"
+    await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`{thread_info}", parse_mode="Markdown")
 
 @router.message(Command("esc"))
 async def cmd_esc(message: Message):
@@ -1204,6 +1732,13 @@ async def on_message(message: Message):
             if not project_name or not is_valid_project_name(project_name):
                 await message.answer(
                     "Project name can only contain letters, digits, `-` and `_`.",
+                    parse_mode="Markdown",
+                )
+                return
+            if len(project_name) > 35:
+                await message.answer(
+                    "`[!]` Project name too long (max 35 chars). "
+                    "Rename group or use /register_dir with shorter name.",
                     parse_mode="Markdown",
                 )
                 return

@@ -709,12 +709,15 @@ git commit -m "feat(magic_names): add suffix fallback when all names taken"
 
 ---
 
-## Task 6: Create services/launch.py with shared thread creation logic
+## Task 6: Create services/launch.py with unified thread-first launch flow
 
 **Files:**
 - Create: `src/codogram/services/__init__.py`
 - Create: `src/codogram/services/launch.py`
 - Modify: `src/codogram/bot.py` (use new service)
+
+**Architecture Decision:** Topic is created FIRST, then worktree (if requested), then Claude.
+All status messages go to the new topic.
 
 **Step 1: Create services directory**
 
@@ -723,18 +726,19 @@ mkdir -p src/codogram/services
 touch src/codogram/services/__init__.py
 ```
 
-**Step 2: Create launch.py with shared logic**
+**Step 2: Create launch.py with unified flow**
 
 ```python
 # src/codogram/services/launch.py
 """Launch service for creating threads with Claude sessions."""
+import asyncio
 from pathlib import Path
 
 from aiogram import Bot
-from aiogram.types import Message
 
 from ..session_manager import ProjectState, ThreadInfo, project_manager
 from ..launch_animation import launch_with_animation
+from ..logging_config import logger
 
 
 async def create_thread_with_session(
@@ -742,62 +746,68 @@ async def create_thread_with_session(
     chat_id: int,
     project: ProjectState,
     name: str,
-    worktree_path: str | None = None,
+    create_worktree: bool = False,
     base_branch: str | None = None,
 ) -> ThreadInfo | None:
     """
-    Create Telegram topic + ThreadInfo + launch Claude.
+    Create Telegram topic + ThreadInfo + (optionally) worktree + launch Claude.
 
-    Used by both /thread_create and /branch_create.
+    Unified entry point for /thread_create and /branch_create.
+    Topic is created FIRST, so all status messages go to the new topic.
     """
-    # Create Telegram topic
+    # 1. Create Telegram topic FIRST
     try:
         topic = await bot.create_forum_topic(chat_id, name.capitalize())
     except Exception as e:
+        logger.error(f"Failed to create forum topic: {e}")
         return None
 
     thread_id = topic.message_thread_id
-
-    # Create ThreadInfo
-    thread = ThreadInfo(thread_id=thread_id, name=name)
-    thread.worktree_path = worktree_path
+    thread = ThreadInfo(thread_id=thread_id, name=name, topic_name=name.capitalize())
     thread.base_branch = base_branch
     project.threads[thread_id] = thread
     project_manager._save()
 
-    # Determine cwd for Claude
-    cwd = worktree_path if worktree_path else project.cwd
+    # 2. Create worktree if requested (status messages go to new topic)
+    if create_worktree:
+        worktree_path = await _create_worktree_with_status(
+            bot, chat_id, thread_id, project, name, base_branch
+        )
+        if worktree_path is None:
+            return None  # Error already reported in topic
+        thread.worktree_path = worktree_path
+        project_manager._save()
 
-    # Launch Claude with animation
-    from .._make_task_starters import make_task_starters  # TODO: move to services
-    start_poller, start_watcher = make_task_starters(bot)
-
-    tmux_name = thread.get_tmux_session(project.project_name)
-
-    await launch_with_animation(
-        bot=bot,
-        chat_id=chat_id,
-        thread_id=thread_id,
-        project=project,
-        thread=thread,
-        tmux_name=tmux_name,
-        cwd=Path(cwd),
-        start_poller=start_poller,
-        start_watcher=start_watcher,
+    # 3. Launch Claude with animation
+    from ..main import telegram_queue
+    thread.launch_task = asyncio.create_task(
+        launch_with_animation(
+            bot=bot, chat_id=chat_id, thread_id=thread_id,
+            project=project, thread=thread, queue=telegram_queue,
+        )
     )
 
     return thread
+
+
+async def _create_worktree_with_status(...) -> str | None:
+    """Create git worktree with status messages in the topic."""
+    # Status: "[~] Creating branch `name` from `base`..."
+    # Create worktree
+    # Status: "[v] Worktree: /path/..."
+    ...
 ```
 
-**Step 3: Update thread_create to use service**
+**Step 3: Update bot.py handlers**
 
-Refactor `cmd_thread_create` in bot.py to call `create_thread_with_session`.
+`/thread_create` calls: `create_thread_with_session(create_worktree=False)`
+`/branch_create` calls: `create_thread_with_session(create_worktree=True, base_branch=...)`
 
 **Step 4: Commit**
 
 ```bash
 git add src/codogram/services/
-git commit -m "refactor: extract create_thread_with_session to services/launch.py"
+git commit -m "refactor: unified thread-first launch in services/launch.py"
 ```
 
 ---
