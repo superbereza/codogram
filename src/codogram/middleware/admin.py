@@ -53,18 +53,16 @@ class AdminMiddleware(BaseMiddleware):
 
     async def _reject_non_admin(self, event: TelegramObject, user_id: int):
         """Send rejection message with user's ID."""
-        message = (
-            f"Вы не админ.\n"
-            f"Ваш ID: `{user_id}`\n"
-            f"Попросите добавить в ADMIN_IDS"
-        )
-
         if hasattr(event, 'reply'):
-            # Message
-            await event.reply(message, parse_mode="Markdown")
+            # Message - markdown with status indicator
+            await event.reply(
+                f"`[x]` Not admin. Your ID: `{user_id}`\n"
+                f"Add to ADMIN\\_IDS in .env",
+                parse_mode="Markdown"
+            )
         elif hasattr(event, 'answer'):
-            # CallbackQuery - popup
+            # CallbackQuery - popup (no markdown, shorter)
             await event.answer(
-                f"Вы не админ. Ваш ID: {user_id}",
+                f"[x] Not admin. Your ID: {user_id}",
                 show_alert=True
             )

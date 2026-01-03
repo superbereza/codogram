@@ -56,8 +56,9 @@ class TestAdminMiddleware:
         handler.assert_not_called()
         assert result is None
         event.reply.assert_called_once()
-        # Check message contains user ID
+        # Check message follows tone-of-voice: [x] prefix + ID
         call_args = event.reply.call_args[0][0]
+        assert "[x]" in call_args
         assert "999" in call_args
 
     @pytest.mark.asyncio
@@ -75,8 +76,9 @@ class TestAdminMiddleware:
         handler.assert_not_called()
         event.answer.assert_called_once()
         assert event.answer.call_args[1].get('show_alert') is True
-        # Check ID is in message
+        # Check message follows tone-of-voice: [x] prefix + ID
         call_args = event.answer.call_args[0][0]
+        assert "[x]" in call_args
         assert "999" in call_args
 
     @pytest.mark.asyncio
