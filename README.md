@@ -10,6 +10,7 @@ Telegram bot for managing Claude Code sessions from your phone.
 - **Send messages** — type in Telegram, text goes to Claude
 - **Tool calls** — see what Claude is doing in real-time
 - **Multi-session** — multiple projects, each in its own topic
+- **Git worktrees** — isolated branches with separate directories
 
 ## How it works
 
@@ -84,6 +85,10 @@ git pull
 | `/stop` | Disconnect project |
 | `/status` | Show status |
 | `/my_chat_id` | Get your chat ID |
+| `/thread_create` | Create new topic with Claude session |
+| `/branch_create` | Create git worktree + topic (isolated branch) |
+| `/branch_create <name>` | Create worktree with specific branch name |
+| `/branch_finish` | Merge branch and cleanup worktree |
 
 ## Requirements
 
