@@ -99,6 +99,14 @@
 - LICENSE файл (GPL v3)
 - Репозиторий публичный
 
+### Auto-accept mode
+Автоматическое подтверждение permission prompts:
+- `/auto_accept on|off` команда для включения/выключения
+- Per-thread/per-project настройки
+- Пропускает session-wide permissions ("allow all", "for session")
+- Уведомления через TelegramQueue
+- `/settings` для просмотра текущих настроек
+
 ## Backlog
 
 ### Bot refactoring
@@ -120,18 +128,6 @@
 - keyboards.py — кнопки
 - start_flow.py — кнопки wizard'а
 - См. `docs/specs/tone-of-voice.md` для гайдлайнов
-
-### Auto-accept mode
-Автоматическое разрешение всех permission prompts:
-- `/auto_accept_mode on|off` команда для включения/выключения
-- Поле `auto_accept` в ProjectState (per-project setting)
-- Когда включено: автоматически отвечает "y" на все permission prompts
-- **Обязательно:** вести лог авто-разрешенных запросов
-  - Логировать только запросы на действие (не ответы на вопросы)
-  - Формат: timestamp, project, tool_name, arguments summary
-  - Уровень: INFO в общий лог
-- UI: показывать статус в /status
-- Безопасность: только для доверенных проектов
 
 ### Voice → Whisper
 Голосовые сообщения через Whisper transcription:
