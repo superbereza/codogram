@@ -1,6 +1,6 @@
 # Git Worktree Support Design
 
-**Status:** Design
+**Status:** Implemented
 **Date:** 2025-12-30
 
 ## Problem
@@ -24,7 +24,8 @@ Each topic (except General) gets its own git worktree:
 
 ### `/branch_create [name]`
 
-Creates worktree + branch + topic + tmux + Claude session.
+Creates topic FIRST, then worktree + branch + tmux + Claude session.
+All status messages appear in the new topic.
 
 **Flow:**
 
@@ -64,13 +65,36 @@ Creates worktree + branch + topic + tmux + Claude session.
 - `name` provided → use as topic name, branch name, directory suffix
 - `name` not provided → magic name (arcane, mystic, celestial...)
 
-**Note:** `/branch_create` works independently of current Claude session. It creates everything from scratch (worktree, topic, tmux, Claude). No need to have Claude running first.
+**Note:** `/branch_create` works independently of current Claude session. It creates everything from scratch (topic, worktree, tmux, Claude). No need to have Claude running first.
 
-**Result:**
+**Unified Launch Flow (thread-first):**
+
+Topic is created FIRST so all status messages go to the new topic:
+
 ```
-`[v]` Branch auth created
+services/launch.py::create_thread_with_session(create_worktree=True)
+    │
+    ├── 1. Create Telegram topic
+    │
+    ├── 2. Create git branch + worktree
+    │      └── Status: "[~] Creating branch `auth` from `main`..."
+    │      └── Status: "[v] Worktree: /path/to/project-auth"
+    │
+    └── 3. launch_with_animation()
+           └── Status: "[~] Creating tmux session..."
+           └── Status: "[~] Starting Claude..."
+           └── Status: "[v] Claude ready"
+```
 
-Worktree: /dev/project-auth
+**Result (in new topic):**
+```
+[~] Creating branch `auth` from `main`...
+[v] Worktree: /dev/project-auth
+[~] Creating tmux session...
+[~] Starting Claude...
+[animation faces]
+[v] Claude ready
+
 Attach: `tmux attach -t claude-project-auth`
 ```
 
