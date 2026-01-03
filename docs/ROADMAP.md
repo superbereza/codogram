@@ -101,11 +101,18 @@
 
 ### Auto-accept mode
 Автоматическое подтверждение permission prompts:
-- `/auto_accept on|off` команда для включения/выключения
+- `/auto_accept` — toggle on/off
+- `/auto_accept reset all` — сбросить все настройки
 - Per-thread/per-project настройки
 - Пропускает session-wide permissions ("allow all", "for session")
 - Уведомления через TelegramQueue
-- `/settings` для просмотра текущих настроек
+- `/settings` и `/help` команды
+
+### Queue-level chunking
+Централизованное чанкование сообщений в TelegramQueue:
+- Сообщения >4000 символов автоматически разбиваются
+- Убрано дублирование кода из watcher.py и permission_poller.py
+- См. [docs/designs/done/2026-01-03-queue-level-chunking.md](designs/done/2026-01-03-queue-level-chunking.md)
 
 ## Backlog
 

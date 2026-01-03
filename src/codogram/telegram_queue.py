@@ -172,7 +172,9 @@ class TelegramQueue:
         for msg in batch.messages:
             text = msg.get("text", "")
             if len(text) > 4000:
-                for chunk in chunk_message(text):
+                chunks = chunk_message(text)
+                logger.debug(f"Chunking message: {len(text)} chars -> {len(chunks)} chunks")
+                for chunk in chunks:
                     expanded_messages.append({**msg, "text": chunk})
             else:
                 expanded_messages.append(msg)
