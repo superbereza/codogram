@@ -1369,6 +1369,40 @@ async def cmd_esc(message: Message):
     tmux.send_key("Escape")
 
 
+@router.message(Command("settings"))
+async def cmd_settings(message: Message):
+    """Show current settings."""
+    if not is_admin(message.from_user.id):
+        return
+
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await message.answer("No project. Use /start first.")
+        return
+
+    thread = None
+    if thread_id and project.threads:
+        thread = project.threads.get(thread_id)
+
+    if thread:
+        auto_status = "⚡ ON" if thread.auto_accept else "OFF"
+        text = (
+            f"**Settings** (thread `{thread.name}`)\n\n"
+            f"Auto-accept: {auto_status}"
+        )
+    else:
+        auto_status = "⚡ ON" if project.auto_accept else "OFF"
+        text = (
+            f"**Settings** (`{project.project_name}`)\n\n"
+            f"Auto-accept: {auto_status}"
+        )
+
+    await message.answer(text, parse_mode="Markdown")
+
+
 @router.message(Command("auto_accept"))
 async def cmd_auto_accept(message: Message):
     """Toggle auto-accept: /auto_accept on|off"""
