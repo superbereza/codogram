@@ -13,6 +13,7 @@ from aiogram import Bot, Dispatcher
 from .config import settings
 from .bot import router
 from .middleware.admin import AdminMiddleware
+from .handlers import register_handlers
 from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 from .logging_config import setup_logging, logger
@@ -35,6 +36,10 @@ async def main():
     dp.message.middleware(AdminMiddleware())
     dp.callback_query.middleware(AdminMiddleware())
 
+    # Register handler routers (all protected by AdminMiddleware)
+    register_handlers(dp)
+
+    # Main router
     dp.include_router(router)
 
     from aiogram.types import BotCommand
