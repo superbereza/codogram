@@ -1,11 +1,11 @@
 # Bot.py Refactoring Design
 
-> **Статус:** План актуализирован 2025-12-30
+> **Статус:** План актуализирован 2025-01-03
 
 ## Проблема
 
 `bot.py` — **1361 строка** (было 1273), God Object:
-- 10 команд: `/start`, `/thread_create`, `/thread_delete`, `/my_chat_id`, `/esc`, `/resume`, `/new`, `/clear`, `/restart`
+- 10 команд: `/start`, `/thread_create`, `/thread_delete`, `/get_debug_ids`, `/esc`, `/resume`, `/new`, `/clear`, `/restart`
 - ~15 callback-хендлеров
 - FSM-состояние через `_start_state` dict
 - Хелперы (admin check, validation, retry, task starters)
@@ -32,10 +32,9 @@ src/codogram/
 │   ├── __init__.py           # register_handlers()
 │   ├── start.py              # /start + callbacks
 │   ├── threads.py            # /thread_create, /thread_delete
-│   ├── sessions.py           # /new, /clear, /restart, /esc, /resume
+│   ├── sessions.py           # /new, /clear, /restart, /esc, /resume, /get_debug_ids
 │   ├── permissions.py        # permission Yes/No/Esc
-│   ├── messages.py           # on_message routing
-│   └── public.py             # /my_chat_id (без admin check)
+│   └── messages.py           # on_message routing
 │
 ├── services/
 │   ├── __init__.py
@@ -82,7 +81,8 @@ src/codogram/
 | Валидаторы | `domain/validators.py` | Валидация — domain concern |
 | FSM | aiogram `StatesGroup` в `domain/states.py` | Встроенное решение, типизация, timeout |
 | DI | Middleware injection | Явные зависимости, тестируемость |
-| Admin check | `middleware/admin.py` | Убрать boilerplate из каждого handler |
+| Admin check | `middleware/admin.py` на **Dispatcher** | Глобальная защита ВСЕХ роутеров. Не-админы получают свой ID автоматически |
+| /my_chat_id | Переименован в `/get_debug_ids` | Только для админов. Не-админы получают ID из middleware rejection |
 
 ## Принципы
 
@@ -106,7 +106,7 @@ src/codogram/
 | 396-428 | `launch_claude_in_thread()` | services/launch.py (использует launch_animation.py) |
 | 431-577 | `/thread_delete`, `/thread_create` + callbacks | handlers/threads.py |
 | 580-808 | start flow callbacks (git, clone, etc.) | handlers/start.py |
-| 811-814 | `/my_chat_id` | handlers/public.py |
+| 811-814 | `/get_debug_ids` (бывший /my_chat_id) | handlers/sessions.py |
 | 816-823 | `/esc` | handlers/sessions.py |
 | 826-843 | `/resume` | handlers/sessions.py |
 | 846-898 | `_send_session_command()`, `/new`, `/clear` | handlers/sessions.py |
@@ -119,7 +119,7 @@ src/codogram/
 ## Экономия
 
 **Было:** 1 файл × 1361 строка
-**Стало:** 15+ файлов × 50-180 строк каждый
+**Стало:** 14+ файлов × 50-180 строк каждый
 
 **Ожидаемая экономия ~350 строк:**
 - Удаление дублей launch_with_animation вызовов (~60 строк, 6 мест)

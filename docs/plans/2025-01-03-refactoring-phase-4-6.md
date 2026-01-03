@@ -2,23 +2,76 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Extract AdminMiddleware, verify launch logic, and create first handler module (permissions).
+**Goal:** Extract AdminMiddleware (global protection), verify launch logic, and create first handler module (permissions).
 
-**Architecture:** Middleware on main router (not dispatcher!) handles admin check. Handlers are thin routers delegating to services.
+**Architecture:** Global middleware on Dispatcher protects ALL routers. Handlers are thin routers delegating to services.
 
 **Tech Stack:** Python 3.11+, aiogram 3.x middleware, pytest
 
 **Design Doc:** `docs/designs/2025-12-27-bot-refactoring/02-phase-4-6.md`
 
+**Key Decision:** Middleware on `dp` (not `router`) — protects everything, no need for is_admin checks in handlers.
+
 **Current State:**
 - `launch_animation.py` already exists with `launch_with_animation()`
 - 30 admin checks (`if not is_admin(...)`) scattered in bot.py
-- `/my_chat_id` is the only public command (no admin check)
 - `is_admin()` and `get_admin_ids()` defined in bot.py (lines 42-51)
 
 ---
 
-## Phase 4: Extract middleware/admin.py
+## Phase 4: Extract middleware/admin.py (Global Protection)
+
+### Task 4.0: Migrate keyboards.py to keyboards/ directory
+
+> **Background:** Phase 1-3 skipped keyboards/ creation due to conflict with existing keyboards.py.
+> Now we migrate it to proper structure.
+
+**Files:**
+- Move: `src/codogram/keyboards.py` → `src/codogram/keyboards/permissions.py`
+- Create: `src/codogram/keyboards/__init__.py`
+
+**Step 1: Create keyboards directory and move file**
+
+```bash
+mkdir -p src/codogram/keyboards
+mv src/codogram/keyboards.py src/codogram/keyboards/permissions.py
+```
+
+**Step 2: Create keyboards/__init__.py with re-export**
+
+```python
+"""Keyboard builders for Telegram bot."""
+from .permissions import permission_keyboard
+
+__all__ = ["permission_keyboard"]
+```
+
+**Step 3: Verify imports still work**
+
+```bash
+python -c "from codogram.keyboards import permission_keyboard; print('OK')"
+```
+
+Expected: `OK` (existing imports `from .keyboards import permission_keyboard` still work)
+
+**Step 4: Run tests**
+
+```bash
+PYTHONPATH=src pytest tests/ -v --tb=short
+```
+
+Expected: All tests PASS
+
+**Step 5: Commit**
+
+```bash
+git add src/codogram/keyboards/
+git commit -m "refactor: migrate keyboards.py to keyboards/ directory
+
+Prepares for additional keyboard modules (start_flow, etc.)"
+```
+
+---
 
 ### Task 4.1: Create middleware/admin.py with tests
 
@@ -69,11 +122,12 @@ class TestAdminMiddleware:
         assert result == "result"
 
     @pytest.mark.asyncio
-    async def test_non_admin_blocked(self):
-        """Non-admin users are silently blocked."""
+    async def test_non_admin_message_blocked_with_id(self):
+        """Non-admin Message users are blocked and receive their ID."""
         middleware = AdminMiddleware()
         handler = AsyncMock()
         event = Mock()
+        event.reply = AsyncMock()
         data = {"event_from_user": Mock(id=999)}
 
         with patch("codogram.middleware.admin.get_admin_ids", return_value={123}):
@@ -81,10 +135,33 @@ class TestAdminMiddleware:
 
         handler.assert_not_called()
         assert result is None
+        event.reply.assert_called_once()
+        # Check message contains user ID
+        call_args = event.reply.call_args[0][0]
+        assert "999" in call_args
 
     @pytest.mark.asyncio
-    async def test_no_user_blocked(self):
-        """Events without user are blocked."""
+    async def test_non_admin_callback_gets_alert(self):
+        """Non-admin CallbackQuery gets show_alert popup with ID."""
+        middleware = AdminMiddleware()
+        handler = AsyncMock()
+        event = Mock(spec=['answer'])  # CallbackQuery-like
+        event.answer = AsyncMock()
+        data = {"event_from_user": Mock(id=999)}
+
+        with patch("codogram.middleware.admin.get_admin_ids", return_value={123}):
+            result = await middleware(handler, event, data)
+
+        handler.assert_not_called()
+        event.answer.assert_called_once()
+        assert event.answer.call_args[1].get('show_alert') is True
+        # Check ID is in message
+        call_args = event.answer.call_args[0][0]
+        assert "999" in call_args
+
+    @pytest.mark.asyncio
+    async def test_no_user_blocked_silently(self):
+        """Events without user are blocked silently."""
         middleware = AdminMiddleware()
         handler = AsyncMock()
         event = Mock()
@@ -94,6 +171,12 @@ class TestAdminMiddleware:
 
         handler.assert_not_called()
         assert result is None
+
+    def test_empty_admin_ids_blocks_everyone(self):
+        """Empty ADMIN_IDS blocks all users."""
+        with patch("codogram.middleware.admin.get_admin_ids", return_value=set()):
+            assert is_admin(123) is False
+            assert is_admin(0) is False
 ```
 
 **Step 2: Run test to verify it fails**
@@ -109,7 +192,7 @@ Expected: FAIL with `ModuleNotFoundError`
 Create `src/codogram/middleware/admin.py`:
 
 ```python
-"""Admin middleware - restrict handlers to admin users."""
+"""Admin middleware - global protection for all handlers."""
 from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
@@ -135,13 +218,13 @@ def is_admin(user_id: int) -> bool:
 
 
 class AdminMiddleware(BaseMiddleware):
-    """Skip handlers for non-admin users.
+    """Block non-admins globally. Shows their ID automatically.
 
-    Silently ignores all events from non-admin users.
+    Register on Dispatcher level (protects ALL routers):
+        dp.message.middleware(AdminMiddleware())
+        dp.callback_query.middleware(AdminMiddleware())
 
-    IMPORTANT: Register on router, NOT dispatcher!
-    - router.message.middleware(AdminMiddleware()) ✓
-    - dp.message.middleware(AdminMiddleware()) ✗ (blocks ALL routers)
+    Non-admins receive their ID automatically - no /my_chat_id needed.
     """
 
     async def __call__(
@@ -152,10 +235,33 @@ class AdminMiddleware(BaseMiddleware):
     ) -> Any:
         user: User | None = data.get("event_from_user")
 
-        if user is None or not is_admin(user.id):
-            return None  # Silently ignore non-admins
+        if user is None:
+            return None
 
-        return await handler(event, data)
+        if is_admin(user.id):
+            return await handler(event, data)
+
+        # Non-admin: show helpful message with their ID
+        await self._reject_non_admin(event, user.id)
+        return None
+
+    async def _reject_non_admin(self, event: TelegramObject, user_id: int):
+        """Send rejection message with user's ID."""
+        message = (
+            f"Вы не админ.\n"
+            f"Ваш ID: `{user_id}`\n"
+            f"Попросите добавить в ADMIN_IDS"
+        )
+
+        if hasattr(event, 'answer'):
+            # CallbackQuery - popup
+            await event.answer(
+                f"Вы не админ. Ваш ID: {user_id}",
+                show_alert=True
+            )
+        elif hasattr(event, 'reply'):
+            # Message
+            await event.reply(message, parse_mode="Markdown")
 ```
 
 **Step 4: Run test to verify it passes**
@@ -164,16 +270,16 @@ class AdminMiddleware(BaseMiddleware):
 PYTHONPATH=src pytest tests/test_admin_middleware.py -v
 ```
 
-Expected: All 5 tests PASS
+Expected: All 6 tests PASS
 
 **Step 5: Commit**
 
 ```bash
 git add src/codogram/middleware/admin.py tests/test_admin_middleware.py
-git commit -m "feat(middleware): add AdminMiddleware
+git commit -m "feat(middleware): add global AdminMiddleware
 
-Silently blocks non-admin users from handlers.
-Must be registered on router, not dispatcher."
+Blocks non-admins with helpful message showing their ID.
+Register on Dispatcher level to protect ALL routers."
 ```
 
 ---
@@ -209,40 +315,33 @@ git commit -m "refactor(middleware): export public API from __init__"
 
 ---
 
-### Task 4.3: Create handlers/public.py for /my_chat_id
+### Task 4.3: Register middleware on DISPATCHER in main.py
 
 **Files:**
-- Create: `src/codogram/handlers/public.py`
+- Modify: `src/codogram/main.py`
 
-**Step 1: Create public router**
+> **CRITICAL:** Middleware on `dp`, not `router`!
+> - `dp.message.middleware()` — protects ALL routers ✓
+> - `router.message.middleware()` — only that router ✗
 
-Create `src/codogram/handlers/public.py`:
+**Step 1: Add middleware import and registration**
 
+Add import at top:
 ```python
-"""Public handlers - available to all users (no admin check)."""
-from aiogram import Router
-from aiogram.filters import Command
-from aiogram.types import Message
-
-router = Router(name="public")
-
-
-@router.message(Command("my_chat_id"))
-async def cmd_my_chat_id(message: Message):
-    """Show user's chat ID - available to everyone."""
-    thread_id = message.message_thread_id
-    thread_info = f"\nThread ID: `{thread_id}`" if thread_id else "\nThread ID: None (General)"
-    await message.answer(
-        f"Your user ID: `{message.from_user.id}`\n"
-        f"This chat ID: `{message.chat.id}`{thread_info}",
-        parse_mode="Markdown",
-    )
+from .middleware.admin import AdminMiddleware
 ```
 
-**Step 2: Verify import**
+After `dp = Dispatcher()`, add:
+```python
+# Global admin check - protects ALL routers
+dp.message.middleware(AdminMiddleware())
+dp.callback_query.middleware(AdminMiddleware())
+```
+
+**Step 2: Verify no circular imports**
 
 ```bash
-python -c "from codogram.handlers.public import router; print('OK')"
+python -c "from codogram.main import main; print('OK')"
 ```
 
 Expected: `OK`
@@ -250,75 +349,21 @@ Expected: `OK`
 **Step 3: Commit**
 
 ```bash
-git add src/codogram/handlers/public.py
-git commit -m "feat(handlers): add public router for /my_chat_id
+git add src/codogram/main.py
+git commit -m "refactor(main): register AdminMiddleware on Dispatcher
 
-Public commands available to all users, not just admins."
+IMPORTANT: Middleware on dp level protects ALL routers globally.
+Non-admins receive their ID automatically."
 ```
 
 ---
 
-### Task 4.4: Register middleware on ROUTER (not dispatcher) in main.py
-
-**Files:**
-- Modify: `src/codogram/main.py`
-- Modify: `src/codogram/bot.py` (add middleware to router)
-
-> **CRITICAL:** Middleware must be on `router`, not `dp`!
-> - `dp.message.middleware()` applies to ALL routers (breaks public_router)
-> - `router.message.middleware()` applies only to main router ✓
-
-**Step 1: Add middleware to router in bot.py**
-
-At the top of `src/codogram/bot.py`, after `router = Router()`:
-
-```python
-from .middleware.admin import AdminMiddleware
-
-router = Router()
-
-# Admin middleware - only for this router, not public handlers
-router.message.middleware(AdminMiddleware())
-router.callback_query.middleware(AdminMiddleware())
-```
-
-**Step 2: Update main.py to include public router**
-
-Add import:
-```python
-from .handlers.public import router as public_router
-```
-
-Before `dp.include_router(router)`, add:
-```python
-# Public router FIRST (no middleware, available to all)
-dp.include_router(public_router)
-```
-
-**Step 3: Verify circular imports don't occur**
-
-```bash
-python -c "from codogram.bot import router; from codogram.handlers.public import router as pr; print('OK')"
-```
-
-Expected: `OK`
-
-**Step 4: Commit**
-
-```bash
-git add src/codogram/bot.py src/codogram/main.py
-git commit -m "refactor: register AdminMiddleware on router, not dispatcher
-
-IMPORTANT: Middleware on router level only affects that router.
-public_router remains accessible to all users."
-```
-
----
-
-### Task 4.5: Remove admin checks AND is_admin function from bot.py
+### Task 4.4: Remove admin checks AND is_admin function from bot.py
 
 **Files:**
 - Modify: `src/codogram/bot.py`
+
+> **Scope:** Exactly 30 admin checks to remove.
 
 **Step 1: List all admin check locations**
 
@@ -326,7 +371,7 @@ public_router remains accessible to all users."
 grep -n "if not is_admin" src/codogram/bot.py | cut -d: -f1 | tr '\n' ' '
 ```
 
-Note all line numbers (approximately 30 locations).
+Expected: 30 line numbers.
 
 **Step 2: Remove each admin check block**
 
@@ -343,11 +388,7 @@ Or for callbacks:
         return
 ```
 
-**Step 3: Remove /my_chat_id handler (moved to handlers/public.py)**
-
-Delete the `cmd_my_chat_id` function from bot.py (around line 1305-1310).
-
-**Step 4: Remove is_admin and get_admin_ids from bot.py**
+**Step 3: Remove is_admin and get_admin_ids from bot.py**
 
 Delete these functions (around lines 42-51):
 ```python
@@ -368,7 +409,7 @@ def is_admin(user_id: int) -> bool:
 > **Note:** If `get_admin_ids` is used elsewhere in bot.py (e.g., logging),
 > import it from middleware: `from .middleware.admin import get_admin_ids`
 
-**Step 5: Verify cleanup complete**
+**Step 4: Verify cleanup complete**
 
 ```bash
 # No admin checks remaining
@@ -380,7 +421,7 @@ grep -c "def is_admin" src/codogram/bot.py
 # Expected: 0
 ```
 
-**Step 6: Run tests**
+**Step 5: Run tests**
 
 ```bash
 PYTHONPATH=src pytest tests/ -v --tb=short
@@ -388,15 +429,69 @@ PYTHONPATH=src pytest tests/ -v --tb=short
 
 Expected: All tests PASS
 
-**Step 7: Commit**
+**Step 6: Commit**
 
 ```bash
 git add src/codogram/bot.py
 git commit -m "refactor(bot): remove admin checks and is_admin function
 
-- Removed 30 'if not is_admin()' blocks (middleware handles this)
+- Removed ~30 'if not is_admin()' blocks (middleware handles this)
 - Removed is_admin/get_admin_ids (moved to middleware/admin.py)
-- Removed /my_chat_id (moved to handlers/public.py)"
+- All handlers now protected by global AdminMiddleware"
+```
+
+---
+
+### Task 4.5: Rename /my_chat_id to /get_debug_ids
+
+**Files:**
+- Modify: `src/codogram/bot.py`
+- Modify: `src/codogram/main.py` (bot commands list)
+
+**Step 1: Find and rename handler in bot.py**
+
+```bash
+grep -n "my_chat_id" src/codogram/bot.py
+```
+
+Change handler from:
+```python
+@router.message(Command("my_chat_id"))
+async def cmd_my_chat_id(message: Message):
+```
+
+To:
+```python
+@router.message(Command("get_debug_ids"))
+async def cmd_get_debug_ids(message: Message):
+    """Show debug IDs - admin only (protected by middleware)."""
+```
+
+**Step 2: Update bot commands in main.py**
+
+Find `BotCommand(command="my_chat_id"` and change to:
+```python
+BotCommand(command="get_debug_ids", description="Show debug IDs (admin only)"),
+```
+
+**Step 3: Verify**
+
+```bash
+grep "my_chat_id" src/codogram/bot.py src/codogram/main.py
+# Expected: nothing (all renamed)
+
+grep "get_debug_ids" src/codogram/bot.py src/codogram/main.py
+# Expected: 2 matches (handler + command)
+```
+
+**Step 4: Commit**
+
+```bash
+git add src/codogram/bot.py src/codogram/main.py
+git commit -m "refactor: rename /my_chat_id to /get_debug_ids
+
+Now admin-only (middleware protects). Non-admins get their ID
+automatically from middleware rejection message."
 ```
 
 ---
@@ -407,17 +502,16 @@ git commit -m "refactor(bot): remove admin checks and is_admin function
 
 > Skip if no .env available in worktree. These tests require running bot.
 
-- [ ] Non-admin sends `/start` → nothing happens (silently ignored)
-- [ ] Non-admin sends `/my_chat_id` → receives response with IDs
+- [ ] Non-admin sends any message → receives "Вы не админ. Ваш ID: ..."
+- [ ] Non-admin presses any button → receives popup with ID
 - [ ] Admin sends `/start` → normal flow works
-- [ ] Admin sends `/my_chat_id` → receives response with IDs
+- [ ] Admin sends `/get_debug_ids` → receives debug info
 
 ---
 
 ## Phase 5: services/launch.py (Status Check)
 
 > **Note:** `launch_animation.py` already exists with `launch_with_animation()`.
-> The `launch_claude_in_thread()` in bot.py is a thin wrapper (~30 lines).
 > This phase verifies no further work is needed.
 
 ### Task 5.1: Verify launch implementation is complete
@@ -461,6 +555,9 @@ No duplication found - no further refactoring needed."
 
 ## Phase 6: Extract handlers/permissions.py
 
+> **Important:** Middleware on dp already protects ALL routers.
+> No need for is_admin check in handlers!
+
 ### Task 6.1: Create handlers/permissions.py with tests
 
 **Files:**
@@ -472,7 +569,10 @@ No duplication found - no further refactoring needed."
 Create `tests/test_permission_handler.py`:
 
 ```python
-"""Tests for permission handler."""
+"""Tests for permission handler.
+
+Note: Admin check is done by global middleware, not tested here.
+"""
 import pytest
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -607,7 +707,10 @@ router = Router(name="permissions")
 
 @router.callback_query(F.data.startswith("perm:"))
 async def on_permission_callback(callback: CallbackQuery):
-    """Handle permission button press (Yes/No/Esc)."""
+    """Handle permission button press (Yes/No/Esc).
+
+    Note: Admin check done by global AdminMiddleware on dp level.
+    """
     # Parse callback data: perm:{action}:{tmux_session}
     parts = callback.data.split(":", 2)
     if len(parts) < 3:
@@ -671,7 +774,7 @@ async def _cleanup_permission_messages(callback: CallbackQuery):
 PYTHONPATH=src pytest tests/test_permission_handler.py -v
 ```
 
-Expected: All 7 tests PASS
+Expected: All 6 tests PASS
 
 **Step 5: Commit**
 
@@ -680,7 +783,8 @@ git add src/codogram/handlers/permissions.py tests/test_permission_handler.py
 git commit -m "feat(handlers): add permissions handler
 
 Extracted from bot.py with full test coverage.
-Handles Yes/No/Esc buttons for Claude permission prompts."
+Handles Yes/No/Esc buttons for Claude permission prompts.
+Admin check handled by global middleware."
 ```
 
 ---
@@ -697,20 +801,14 @@ Handles Yes/No/Esc buttons for Claude permission prompts."
 from aiogram import Dispatcher
 
 from . import permissions
-from . import public
 
 
 def register_handlers(dp: Dispatcher):
-    """Register all handlers with the dispatcher.
+    """Register all handler routers.
 
-    Order matters:
-    1. public.router - no middleware, available to all
-    2. permissions.router - uses AdminMiddleware from main router
+    Note: All routers are protected by AdminMiddleware on dp level.
+    No need to add middleware to individual routers.
     """
-    # Public router (no middleware) - must be first
-    dp.include_router(public.router)
-
-    # Permission handlers (protected by main router's middleware)
     dp.include_router(permissions.router)
 ```
 
@@ -736,26 +834,19 @@ git commit -m "refactor(handlers): add register_handlers function"
 **Files:**
 - Modify: `src/codogram/main.py`
 
-**Step 1: Replace manual router registration**
+**Step 1: Add handler registration**
 
-Remove:
-```python
-from .handlers.public import router as public_router
-...
-dp.include_router(public_router)
-```
-
-Add:
+Add import:
 ```python
 from .handlers import register_handlers
 ```
 
-And in setup, before `dp.include_router(router)`:
+After middleware setup, before `dp.include_router(router)`:
 ```python
-# Register handler routers (public, permissions, etc.)
+# Register handler routers (all protected by AdminMiddleware)
 register_handlers(dp)
 
-# Main router with AdminMiddleware
+# Main router
 dp.include_router(router)
 ```
 
@@ -797,10 +888,10 @@ Delete `on_permission_callback` function and its helper `_cleanup_permission_mes
 **Step 3: Verify handler removed**
 
 ```bash
-grep -c "perm:" src/codogram/bot.py
+grep -c "@router.callback_query.*perm:" src/codogram/bot.py
 ```
 
-Expected: 0
+Expected: 0 (handler removed; keyboard builder is in keyboards.py, not bot.py)
 
 **Step 4: Run all tests**
 
@@ -858,9 +949,12 @@ test $(grep -c "if not is_admin" src/codogram/bot.py) -eq 0 && echo "OK: No admi
 test $(grep -c "def is_admin" src/codogram/bot.py) -eq 0 && echo "OK: No local is_admin"
 
 # 5. No permission handler in bot.py
-test $(grep -c "perm:" src/codogram/bot.py) -eq 0 && echo "OK: No perm handler"
+test $(grep -c "@router.callback_query.*perm:" src/codogram/bot.py) -eq 0 && echo "OK: No perm handler"
 
-# 6. Bot starts (or fails on .env only)
+# 6. Command renamed
+grep -q "get_debug_ids" src/codogram/bot.py && echo "OK: Command renamed"
+
+# 7. Bot starts (or fails on .env only)
 timeout 5 python -m codogram.main 2>&1 | grep -q "validation error\|Starting" && echo "OK: Bot loads"
 ```
 
@@ -869,11 +963,12 @@ timeout 5 python -m codogram.main 2>&1 | grep -q "validation error\|Starting" &&
 ```bash
 git commit --allow-empty -m "refactor: complete phases 4-6 of bot.py refactoring
 
-Phase 4: AdminMiddleware
+Phase 4: Global AdminMiddleware
 - Created middleware/admin.py with is_admin, get_admin_ids
-- Registered on router (not dispatcher!) to preserve public handlers
+- Registered on DISPATCHER (not router!) - protects ALL routers
+- Non-admins receive their ID automatically
 - Removed 30 boilerplate admin checks from bot.py
-- Moved /my_chat_id to handlers/public.py
+- Renamed /my_chat_id to /get_debug_ids (admin only)
 
 Phase 5: services/launch (verified)
 - launch_animation.py already handles all launch logic
@@ -882,7 +977,8 @@ Phase 5: services/launch (verified)
 Phase 6: handlers/permissions
 - Extracted permission callbacks to handlers/permissions.py
 - Added register_handlers() for handler management
-- 7 unit tests for permission handler
+- NO is_admin checks needed (middleware protects all)
+- 6 unit tests for permission handler
 
 bot.py reduced by ~120 lines."
 ```
@@ -893,27 +989,27 @@ bot.py reduced by ~120 lines."
 
 | File | Action | Lines |
 |------|--------|-------|
-| `src/codogram/middleware/admin.py` | Create | ~45 |
+| `src/codogram/keyboards/permissions.py` | Move from keyboards.py | ~40 |
+| `src/codogram/keyboards/__init__.py` | Create | ~5 |
+| `src/codogram/middleware/admin.py` | Create | ~60 |
 | `src/codogram/middleware/__init__.py` | Modify | ~5 |
-| `src/codogram/handlers/public.py` | Create | ~20 |
 | `src/codogram/handlers/permissions.py` | Create | ~55 |
-| `src/codogram/handlers/__init__.py` | Modify | ~18 |
-| `src/codogram/main.py` | Modify | ~8 |
+| `src/codogram/handlers/__init__.py` | Modify | ~12 |
+| `src/codogram/main.py` | Modify | ~10 |
 | `src/codogram/bot.py` | Modify | -120 |
-| `tests/test_admin_middleware.py` | Create | ~55 |
-| `tests/test_permission_handler.py` | Create | ~95 |
+| `tests/test_admin_middleware.py` | Create | ~70 |
+| `tests/test_permission_handler.py` | Create | ~85 |
 
-**Total:** 6 new files, 3 modified, ~300 lines added, ~120 removed from bot.py
+**Total:** 6 new files, 4 modified, ~340 lines added, ~120 removed from bot.py
 
 ---
 
-## Key Fixes Applied
+## Key Decisions
 
-| Issue | Fix |
-|-------|-----|
-| Middleware on `dp` blocks all routers | Register on `router`, not `dp` |
-| Duplicate `is_admin` in bot.py | Remove from bot.py, use from middleware |
-| Empty test for escape | Full test with assertion |
-| No E2E checklist | Added Task 4.6 and 6.5 |
-| Circular import risk | Added verification steps |
-| Phase 5 unclear | Clarified as verification-only |
+| Decision | Rationale |
+|----------|-----------|
+| Middleware on `dp` (not `router`) | Protects ALL routers globally, no inheritance issues |
+| Non-admins get ID automatically | No need for /my_chat_id public command |
+| /my_chat_id → /get_debug_ids | Admin-only debug command |
+| No is_admin in handlers | Middleware already checked - DRY |
+| No handlers/public.py | All handlers protected by default |

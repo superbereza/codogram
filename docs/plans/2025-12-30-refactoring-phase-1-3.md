@@ -23,7 +23,8 @@
 - Create: `src/codogram/adapters/__init__.py`
 - Create: `src/codogram/middleware/__init__.py`
 
-> **Note:** `keyboards/` not created — conflicts with existing `keyboards.py`. Will migrate in later phase.
+> **Note:** `keyboards/` not created — conflicts with existing `keyboards.py`.
+> Migration: Phase 4, Task 4.0 (`keyboards.py` → `keyboards/permissions.py`)
 
 **Step 1: Create directories with __init__.py**
 
