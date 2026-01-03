@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Extract AdminMiddleware, move launch logic to services, and create first handler module (permissions).
+**Goal:** Extract AdminMiddleware, verify launch logic, and create first handler module (permissions).
 
-**Architecture:** Middleware handles cross-cutting admin check. LaunchService wraps existing launch_animation.py. Handlers are thin routers delegating to services.
+**Architecture:** Middleware on main router (not dispatcher!) handles admin check. Handlers are thin routers delegating to services.
 
 **Tech Stack:** Python 3.11+, aiogram 3.x middleware, pytest
 
@@ -14,6 +14,7 @@
 - `launch_animation.py` already exists with `launch_with_animation()`
 - 30 admin checks (`if not is_admin(...)`) scattered in bot.py
 - `/my_chat_id` is the only public command (no admin check)
+- `is_admin()` and `get_admin_ids()` defined in bot.py (lines 42-51)
 
 ---
 
@@ -137,7 +138,10 @@ class AdminMiddleware(BaseMiddleware):
     """Skip handlers for non-admin users.
 
     Silently ignores all events from non-admin users.
-    Use a separate router without this middleware for public commands.
+
+    IMPORTANT: Register on router, NOT dispatcher!
+    - router.message.middleware(AdminMiddleware()) ✓
+    - dp.message.middleware(AdminMiddleware()) ✗ (blocks ALL routers)
     """
 
     async def __call__(
@@ -169,7 +173,7 @@ git add src/codogram/middleware/admin.py tests/test_admin_middleware.py
 git commit -m "feat(middleware): add AdminMiddleware
 
 Silently blocks non-admin users from handlers.
-Use separate router for public commands like /my_chat_id."
+Must be registered on router, not dispatcher."
 ```
 
 ---
@@ -191,7 +195,7 @@ __all__ = ["AdminMiddleware", "is_admin", "get_admin_ids"]
 **Step 2: Verify import**
 
 ```bash
-python -c "from codogram.middleware import AdminMiddleware; print('OK')"
+python -c "from codogram.middleware import AdminMiddleware, is_admin; print('OK')"
 ```
 
 Expected: `OK`
@@ -254,70 +258,75 @@ Public commands available to all users, not just admins."
 
 ---
 
-### Task 4.4: Register middleware and public router in main.py
+### Task 4.4: Register middleware on ROUTER (not dispatcher) in main.py
 
 **Files:**
 - Modify: `src/codogram/main.py`
+- Modify: `src/codogram/bot.py` (add middleware to router)
 
-**Step 1: Find current router registration**
+> **CRITICAL:** Middleware must be on `router`, not `dp`!
+> - `dp.message.middleware()` applies to ALL routers (breaks public_router)
+> - `router.message.middleware()` applies only to main router ✓
 
-```bash
-grep -n "include_router\|router" src/codogram/main.py
-```
+**Step 1: Add middleware to router in bot.py**
 
-**Step 2: Add middleware and public router**
+At the top of `src/codogram/bot.py`, after `router = Router()`:
 
-Add imports:
 ```python
 from .middleware.admin import AdminMiddleware
+
+router = Router()
+
+# Admin middleware - only for this router, not public handlers
+router.message.middleware(AdminMiddleware())
+router.callback_query.middleware(AdminMiddleware())
+```
+
+**Step 2: Update main.py to include public router**
+
+Add import:
+```python
 from .handlers.public import router as public_router
 ```
 
-In setup function, add:
+Before `dp.include_router(router)`, add:
 ```python
-# Public router FIRST (no middleware)
+# Public router FIRST (no middleware, available to all)
 dp.include_router(public_router)
-
-# Admin middleware for main router
-dp.message.middleware(AdminMiddleware())
-dp.callback_query.middleware(AdminMiddleware())
-
-# Main router (protected by middleware)
-dp.include_router(router)
 ```
 
-**Step 3: Verify bot starts**
+**Step 3: Verify circular imports don't occur**
 
 ```bash
-timeout 5 python -m codogram.main || true
+python -c "from codogram.bot import router; from codogram.handlers.public import router as pr; print('OK')"
 ```
 
-Expected: Bot starts (or fails on .env, not on import)
+Expected: `OK`
 
 **Step 4: Commit**
 
 ```bash
-git add src/codogram/main.py
-git commit -m "refactor(main): register AdminMiddleware and public router
+git add src/codogram/bot.py src/codogram/main.py
+git commit -m "refactor: register AdminMiddleware on router, not dispatcher
 
-- Public router registered first (no middleware)
-- AdminMiddleware protects all other handlers"
+IMPORTANT: Middleware on router level only affects that router.
+public_router remains accessible to all users."
 ```
 
 ---
 
-### Task 4.5: Remove admin checks from bot.py
+### Task 4.5: Remove admin checks AND is_admin function from bot.py
 
 **Files:**
 - Modify: `src/codogram/bot.py`
 
-**Step 1: Find all admin checks**
+**Step 1: List all admin check locations**
 
 ```bash
-grep -n "if not is_admin" src/codogram/bot.py
+grep -n "if not is_admin" src/codogram/bot.py | cut -d: -f1 | tr '\n' ' '
 ```
 
-Expected: ~30 matches
+Note all line numbers (approximately 30 locations).
 
 **Step 2: Remove each admin check block**
 
@@ -336,20 +345,40 @@ Or for callbacks:
 
 **Step 3: Remove /my_chat_id handler (moved to handlers/public.py)**
 
-Delete the `cmd_my_chat_id` function from bot.py.
+Delete the `cmd_my_chat_id` function from bot.py (around line 1305-1310).
 
-**Step 4: Update imports in bot.py**
+**Step 4: Remove is_admin and get_admin_ids from bot.py**
 
-Remove `is_admin` from local usage (it's now used by middleware).
-Keep `get_admin_ids` if still needed elsewhere, or import from middleware.
+Delete these functions (around lines 42-51):
+```python
+_admin_ids: set[int] | None = None
 
-**Step 5: Verify no admin checks remain**
+def get_admin_ids() -> set[int]:
+    """Get admin IDs (cached)."""
+    global _admin_ids
+    if _admin_ids is None:
+        _admin_ids = settings.get_admin_ids()
+    return _admin_ids
 
-```bash
-grep -c "if not is_admin" src/codogram/bot.py
+def is_admin(user_id: int) -> bool:
+    """Check if user is admin."""
+    return user_id in get_admin_ids()
 ```
 
-Expected: 0
+> **Note:** If `get_admin_ids` is used elsewhere in bot.py (e.g., logging),
+> import it from middleware: `from .middleware.admin import get_admin_ids`
+
+**Step 5: Verify cleanup complete**
+
+```bash
+# No admin checks remaining
+grep -c "if not is_admin" src/codogram/bot.py
+# Expected: 0
+
+# No local is_admin function
+grep -c "def is_admin" src/codogram/bot.py
+# Expected: 0
+```
 
 **Step 6: Run tests**
 
@@ -363,49 +392,69 @@ Expected: All tests PASS
 
 ```bash
 git add src/codogram/bot.py
-git commit -m "refactor(bot): remove admin checks (handled by middleware)
+git commit -m "refactor(bot): remove admin checks and is_admin function
 
-Removed 30 'if not is_admin()' blocks.
-/my_chat_id moved to handlers/public.py."
+- Removed 30 'if not is_admin()' blocks (middleware handles this)
+- Removed is_admin/get_admin_ids (moved to middleware/admin.py)
+- Removed /my_chat_id (moved to handlers/public.py)"
 ```
+
+---
+
+### Task 4.6: E2E Verification for Phase 4
+
+**Manual testing checklist:**
+
+> Skip if no .env available in worktree. These tests require running bot.
+
+- [ ] Non-admin sends `/start` → nothing happens (silently ignored)
+- [ ] Non-admin sends `/my_chat_id` → receives response with IDs
+- [ ] Admin sends `/start` → normal flow works
+- [ ] Admin sends `/my_chat_id` → receives response with IDs
 
 ---
 
 ## Phase 5: services/launch.py (Status Check)
 
 > **Note:** `launch_animation.py` already exists with `launch_with_animation()`.
-> The `launch_claude_in_thread()` in bot.py is now a thin wrapper.
-> Phase 5 may only need minor cleanup.
+> The `launch_claude_in_thread()` in bot.py is a thin wrapper (~30 lines).
+> This phase verifies no further work is needed.
 
-### Task 5.1: Review current launch implementation
+### Task 5.1: Verify launch implementation is complete
 
-**Step 1: Check if duplication exists**
+**Step 1: Check no animation duplication in bot.py**
 
 ```bash
-grep -c "ANIMATION_FACES\|FACES" src/codogram/bot.py src/codogram/launch_animation.py
+grep -c "FACES\|ANIMATION" src/codogram/bot.py
 ```
 
-If `bot.py` has no animation code: Phase 5 is DONE.
-If duplication exists: Continue to Task 5.2.
+Expected: 0 (all animation code is in launch_animation.py)
 
-**Step 2: Verify launch_with_animation is used**
+**Step 2: Verify launch_with_animation is used everywhere**
 
 ```bash
 grep -n "launch_with_animation" src/codogram/bot.py
 ```
 
-Expected: Multiple imports/calls, no inline animation logic.
+Expected: Only imports and calls, no inline animation logic.
 
-**Step 3: Document status**
-
-If Phase 5 is complete, commit a note:
+**Step 3: Check launch_claude_in_thread is a thin wrapper**
 
 ```bash
-git commit --allow-empty -m "docs: Phase 5 (services/launch) already implemented
+wc -l src/codogram/bot.py | head -1
+grep -n "async def launch_claude_in_thread" src/codogram/bot.py
+```
+
+If function is ~30 lines and just delegates to `launch_with_animation`: Phase 5 DONE.
+
+**Step 4: Document status**
+
+```bash
+git commit --allow-empty -m "docs: Phase 5 (services/launch) verified complete
 
 launch_animation.py contains launch_with_animation().
-launch_claude_in_thread() is a thin wrapper.
-No further work needed."
+launch_claude_in_thread() is a thin wrapper (~30 lines).
+No duplication found - no further refactoring needed."
 ```
 
 ---
@@ -462,10 +511,28 @@ class TestPermissionCallback:
                     await on_permission_callback(mock_callback)
 
         mock_tmux.send_key.assert_called_with("y")
+        mock_callback.answer.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    async def test_permission_no(self, mock_callback):
+        """No button sends 'n' to tmux."""
+        mock_callback.data = "perm:n:claude-test"
+        mock_project = Mock(cwd="/tmp/test")
+        mock_tmux = Mock()
+        mock_tmux.exists.return_value = True
+
+        with patch("codogram.handlers.permissions.project_manager") as pm:
+            pm.get_by_tmux.return_value = mock_project
+            with patch("codogram.handlers.permissions.TmuxSession") as ts:
+                ts.return_value = mock_tmux
+                with patch("codogram.handlers.permissions.permission_messages", {456: []}):
+                    await on_permission_callback(mock_callback)
+
+        mock_tmux.send_key.assert_called_with("n")
 
     @pytest.mark.asyncio
     async def test_permission_escape(self, mock_callback):
-        """Esc button sends Escape to tmux."""
+        """Esc button sends Escape key to tmux."""
         mock_callback.data = "perm:esc:claude-test"
         mock_project = Mock(cwd="/tmp/test")
         mock_tmux = Mock()
@@ -497,6 +564,21 @@ class TestPermissionCallback:
         await on_permission_callback(mock_callback)
 
         mock_callback.answer.assert_called_with("Invalid callback format")
+
+    @pytest.mark.asyncio
+    async def test_permission_tmux_closed(self, mock_callback):
+        """Returns error if tmux session no longer exists."""
+        mock_project = Mock(cwd="/tmp/test")
+        mock_tmux = Mock()
+        mock_tmux.exists.return_value = False  # Tmux closed
+
+        with patch("codogram.handlers.permissions.project_manager") as pm:
+            pm.get_by_tmux.return_value = mock_project
+            with patch("codogram.handlers.permissions.TmuxSession") as ts:
+                ts.return_value = mock_tmux
+                await on_permission_callback(mock_callback)
+
+        mock_callback.answer.assert_called_with("Tmux session closed")
 ```
 
 **Step 2: Run test to verify it fails**
@@ -589,7 +671,7 @@ async def _cleanup_permission_messages(callback: CallbackQuery):
 PYTHONPATH=src pytest tests/test_permission_handler.py -v
 ```
 
-Expected: All 4 tests PASS
+Expected: All 7 tests PASS
 
 **Step 5: Commit**
 
@@ -619,15 +701,20 @@ from . import public
 
 
 def register_handlers(dp: Dispatcher):
-    """Register all handlers with the dispatcher."""
+    """Register all handlers with the dispatcher.
+
+    Order matters:
+    1. public.router - no middleware, available to all
+    2. permissions.router - uses AdminMiddleware from main router
+    """
     # Public router (no middleware) - must be first
     dp.include_router(public.router)
 
-    # Protected routers (AdminMiddleware applies)
+    # Permission handlers (protected by main router's middleware)
     dp.include_router(permissions.router)
 ```
 
-**Step 2: Verify import**
+**Step 2: Verify import (checks for circular imports)**
 
 ```bash
 python -c "from codogram.handlers import register_handlers; print('OK')"
@@ -651,18 +738,25 @@ git commit -m "refactor(handlers): add register_handlers function"
 
 **Step 1: Replace manual router registration**
 
-Replace:
+Remove:
 ```python
 from .handlers.public import router as public_router
 ...
 dp.include_router(public_router)
 ```
 
-With:
+Add:
 ```python
 from .handlers import register_handlers
-...
+```
+
+And in setup, before `dp.include_router(router)`:
+```python
+# Register handler routers (public, permissions, etc.)
 register_handlers(dp)
+
+# Main router with AdminMiddleware
+dp.include_router(router)
 ```
 
 **Step 2: Verify bot starts**
@@ -671,11 +765,13 @@ register_handlers(dp)
 timeout 5 python -m codogram.main || true
 ```
 
+Expected: Starts or fails on .env (not import error)
+
 **Step 3: Commit**
 
 ```bash
 git add src/codogram/main.py
-git commit -m "refactor(main): use register_handlers instead of manual registration"
+git commit -m "refactor(main): use register_handlers for handler routers"
 ```
 
 ---
@@ -685,25 +781,26 @@ git commit -m "refactor(main): use register_handlers instead of manual registrat
 **Files:**
 - Modify: `src/codogram/bot.py`
 
-**Step 1: Find permission handler in bot.py**
+**Step 1: Find permission handler location**
 
 ```bash
-grep -n "perm:" src/codogram/bot.py
+grep -n "@router.callback_query(F.data.startswith(\"perm:\")" src/codogram/bot.py
 ```
 
 Expected: Around line 1554
 
 **Step 2: Remove the handler**
 
-Delete `on_permission_callback` function from bot.py (approximately lines 1554-1609).
+Delete `on_permission_callback` function and its helper `_cleanup_permission_messages`
+(if it exists as separate function) from bot.py. Approximately lines 1554-1609.
 
-**Step 3: Verify no duplicate**
+**Step 3: Verify handler removed**
 
 ```bash
 grep -c "perm:" src/codogram/bot.py
 ```
 
-Expected: 0 (handler moved to handlers/permissions.py)
+Expected: 0
 
 **Step 4: Run all tests**
 
@@ -724,26 +821,47 @@ First handler extraction complete. ~55 lines removed."
 
 ---
 
-## Phase 4-6 Complete: Verification
+### Task 6.5: E2E Verification for Phase 6
 
-### Final Checklist
+**Manual testing checklist:**
+
+> Skip if no .env available in worktree.
+
+- [ ] Start Claude session
+- [ ] Wait for permission prompt to appear
+- [ ] Press "Yes" button → Claude receives 'y', continues
+- [ ] Trigger another prompt, press "No" → Claude receives 'n'
+- [ ] Trigger another prompt, press "✕" (Esc) → Claude receives Escape
+
+---
+
+## Phase 4-6 Complete: Final Verification
+
+### Automated Checklist
 
 ```bash
 # 1. All tests pass
 PYTHONPATH=src pytest tests/ -v
 
-# 2. Middleware works
-python -c "from codogram.middleware import AdminMiddleware; print('OK')"
+# 2. No circular imports
+python -c "
+from codogram.middleware import AdminMiddleware, is_admin
+from codogram.handlers import register_handlers
+from codogram.bot import router
+print('All imports OK')
+"
 
-# 3. Handlers work
-python -c "from codogram.handlers import register_handlers; print('OK')"
+# 3. No admin checks in bot.py
+test $(grep -c "if not is_admin" src/codogram/bot.py) -eq 0 && echo "OK: No admin checks"
 
-# 4. No admin checks in bot.py
-grep -c "if not is_admin" src/codogram/bot.py
-# Expected: 0
+# 4. No local is_admin in bot.py
+test $(grep -c "def is_admin" src/codogram/bot.py) -eq 0 && echo "OK: No local is_admin"
 
-# 5. Bot starts
-timeout 5 python -m codogram.main || true
+# 5. No permission handler in bot.py
+test $(grep -c "perm:" src/codogram/bot.py) -eq 0 && echo "OK: No perm handler"
+
+# 6. Bot starts (or fails on .env only)
+timeout 5 python -m codogram.main 2>&1 | grep -q "validation error\|Starting" && echo "OK: Bot loads"
 ```
 
 ### Summary Commit
@@ -751,11 +869,22 @@ timeout 5 python -m codogram.main || true
 ```bash
 git commit --allow-empty -m "refactor: complete phases 4-6 of bot.py refactoring
 
-- Phase 4: AdminMiddleware removes 30 boilerplate admin checks
-- Phase 5: Verified launch_animation.py already handles launch logic
-- Phase 6: handlers/permissions.py - first handler extracted
+Phase 4: AdminMiddleware
+- Created middleware/admin.py with is_admin, get_admin_ids
+- Registered on router (not dispatcher!) to preserve public handlers
+- Removed 30 boilerplate admin checks from bot.py
+- Moved /my_chat_id to handlers/public.py
 
-bot.py reduced by ~100 lines."
+Phase 5: services/launch (verified)
+- launch_animation.py already handles all launch logic
+- launch_claude_in_thread is thin wrapper, no changes needed
+
+Phase 6: handlers/permissions
+- Extracted permission callbacks to handlers/permissions.py
+- Added register_handlers() for handler management
+- 7 unit tests for permission handler
+
+bot.py reduced by ~120 lines."
 ```
 
 ---
@@ -764,14 +893,27 @@ bot.py reduced by ~100 lines."
 
 | File | Action | Lines |
 |------|--------|-------|
-| `src/codogram/middleware/admin.py` | Create | ~40 |
+| `src/codogram/middleware/admin.py` | Create | ~45 |
 | `src/codogram/middleware/__init__.py` | Modify | ~5 |
 | `src/codogram/handlers/public.py` | Create | ~20 |
 | `src/codogram/handlers/permissions.py` | Create | ~55 |
-| `src/codogram/handlers/__init__.py` | Modify | ~15 |
-| `src/codogram/main.py` | Modify | ~10 |
-| `src/codogram/bot.py` | Modify | -100 |
-| `tests/test_admin_middleware.py` | Create | ~50 |
-| `tests/test_permission_handler.py` | Create | ~60 |
+| `src/codogram/handlers/__init__.py` | Modify | ~18 |
+| `src/codogram/main.py` | Modify | ~8 |
+| `src/codogram/bot.py` | Modify | -120 |
+| `tests/test_admin_middleware.py` | Create | ~55 |
+| `tests/test_permission_handler.py` | Create | ~95 |
 
-**Total:** 6 new files, 3 modified, ~245 lines added, ~100 removed from bot.py
+**Total:** 6 new files, 3 modified, ~300 lines added, ~120 removed from bot.py
+
+---
+
+## Key Fixes Applied
+
+| Issue | Fix |
+|-------|-----|
+| Middleware on `dp` blocks all routers | Register on `router`, not `dp` |
+| Duplicate `is_admin` in bot.py | Remove from bot.py, use from middleware |
+| Empty test for escape | Full test with assertion |
+| No E2E checklist | Added Task 4.6 and 6.5 |
+| Circular import risk | Added verification steps |
+| Phase 5 unclear | Clarified as verification-only |
