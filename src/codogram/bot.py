@@ -11,7 +11,6 @@ from aiogram.filters import Command
 from .config import settings
 from .session_manager import project_manager, ProjectState, ThreadInfo
 from .tmux import TmuxSession
-from .state import permission_messages
 from .logging_config import logger
 from .project_launcher import (
     resolve_project_path,
@@ -1438,60 +1437,6 @@ async def on_restart_confirm(callback: CallbackQuery):
 @router.callback_query(F.data == "restart:cancel")
 async def on_restart_cancel(callback: CallbackQuery):
     await callback.message.edit_text("Cancelled.")
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("perm:"))
-async def on_permission_callback(callback: CallbackQuery):
-    """Handle permission button press."""
-    # Parse callback data: perm:{action}:{tmux_session}
-    parts = callback.data.split(":", 2)
-    if len(parts) < 3:
-        await callback.answer("Invalid callback format")
-        return
-
-    action = parts[1]
-    tmux_session = parts[2]
-
-    # Protection: project not found
-    project = project_manager.get_by_tmux(tmux_session)
-    if not project:
-        await callback.answer("Session not found")
-        return
-
-    if not project.cwd:
-        await callback.answer("Project has no cwd")
-        return
-
-    # Protection: tmux no longer exists
-    tmux = TmuxSession(tmux_session, project.cwd)
-    if not tmux.exists():
-        await callback.answer("Tmux session closed")
-        return
-
-    chat_id = callback.message.chat.id
-    kb_msg_id = callback.message.message_id
-
-    # Delete content messages
-    content_ids = permission_messages.pop(kb_msg_id, [])
-    for msg_id in content_ids:
-        try:
-            await callback.bot.delete_message(chat_id, msg_id)
-        except Exception:
-            pass
-
-    # Delete keyboard message
-    try:
-        await callback.message.delete()
-    except Exception:
-        pass
-
-    # Send key to tmux
-    if action == "esc":
-        tmux.send_key("Escape")
-    else:
-        tmux.send_key(action)
-
     await callback.answer()
 
 
