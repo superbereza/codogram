@@ -213,54 +213,55 @@ if thread.auto_accept:
 
 Toggle auto-accept in current context:
 
+- `/auto_accept` — toggle on/off for current context (thread or project)
+- `/auto_accept reset all` — reset project and all threads to off
+
 ```python
 @router.message(Command("auto_accept"))
 async def cmd_auto_accept(message: Message):
-    """Toggle auto-accept: /auto_accept on|off"""
+    """Toggle auto-accept or reset all."""
     if not is_admin(message.from_user.id):
         return
 
     chat_id = message.chat.id
-    thread_id = message.message_thread_id  # None if not in topic
+    thread_id = message.message_thread_id
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
         await message.answer("No project. Use /start first.")
         return
 
-    # Determine target: thread or project
     thread = None
     if thread_id and project.threads:
-        thread = project.threads.get(str(thread_id))
+        thread = project.threads.get(thread_id)
 
     args = (message.text or "").split()[1:]
 
-    if not args:
-        # Show status
-        enabled = thread.auto_accept if thread else project.auto_accept
-        target = f"thread `{thread.name}`" if thread else f"project `{project.project_name}`"
-        status = "ON ⚡" if enabled else "OFF"
-        await message.answer(f"Auto-accept for {target}: **{status}**", parse_mode="Markdown")
+    # /auto_accept reset all - reset all to off
+    if len(args) >= 2 and args[0].lower() == "reset" and args[1].lower() == "all":
+        project.auto_accept = False
+        if project.threads:
+            for t in project.threads.values():
+                t.auto_accept = False
+        project_manager._save()
+        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="Markdown")
         return
 
-    mode = args[0].lower()
-    if mode == "on":
-        if thread:
-            thread.auto_accept = True
-        else:
-            project.auto_accept = True
-        project_manager.save()
-        await message.answer("⚡ Auto-accept **ON**", parse_mode="Markdown")
-    elif mode == "off":
-        if thread:
-            thread.auto_accept = False
-        else:
-            project.auto_accept = False
-        project_manager.save()
-        await message.answer("Auto-accept **OFF**", parse_mode="Markdown")
+    # /auto_accept - toggle current context
+    if thread:
+        thread.auto_accept = not thread.auto_accept
+        status = "⚡ ON" if thread.auto_accept else "OFF"
+        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="Markdown")
     else:
-        await message.answer("Usage: `/auto_accept on|off`", parse_mode="Markdown")
+        project.auto_accept = not project.auto_accept
+        status = "⚡ ON" if project.auto_accept else "OFF"
+        await message.answer(f"Auto-accept: **{status}**", parse_mode="Markdown")
+    project_manager._save()
 ```
+
+### /help
+
+Show available commands (includes auto-accept section).
 
 ### /settings
 
@@ -414,10 +415,11 @@ async def test_try_auto_accept_empty_body():
 
 ### Manual Testing Checklist
 
-- [ ] `/auto_accept` — shows status
-- [ ] `/auto_accept on` — enables
-- [ ] `/auto_accept off` — disables
+- [ ] `/auto_accept` — toggles on (first call)
+- [ ] `/auto_accept` — toggles off (second call)
+- [ ] `/auto_accept reset all` — resets project and all threads to off
 - [ ] `/settings` — shows auto-accept status
+- [ ] `/help` — shows all commands including auto-accept
 - [ ] Prompt with "Yes" — auto-accepted, notification in chat
 - [ ] Prompt with "Allow for session" — NOT auto-accepted, keyboard shown
 - [ ] Choice question — keyboard (manual)

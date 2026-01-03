@@ -315,10 +315,13 @@ git commit -m "feat(auto-accept): integrate into permission pollers"
 
 **Step 1: Add command handler**
 
+- `/auto_accept` — toggle on/off for current context
+- `/auto_accept reset all` — reset project and all threads to off
+
 ```python
 @router.message(Command("auto_accept"))
 async def cmd_auto_accept(message: Message):
-    """Toggle auto-accept: /auto_accept on|off"""
+    """Toggle auto-accept or reset all."""
     if not is_admin(message.from_user.id):
         return
 
@@ -332,34 +335,30 @@ async def cmd_auto_accept(message: Message):
 
     thread = None
     if thread_id and project.threads:
-        thread = project.threads.get(str(thread_id))
+        thread = project.threads.get(thread_id)
 
     args = (message.text or "").split()[1:]
 
-    if not args:
-        enabled = thread.auto_accept if thread else project.auto_accept
-        target = f"thread `{thread.name}`" if thread else f"project `{project.project_name}`"
-        status = "ON ⚡" if enabled else "OFF"
-        await message.answer(f"Auto-accept for {target}: **{status}**", parse_mode="Markdown")
+    # /auto_accept reset all - reset all to off
+    if len(args) >= 2 and args[0].lower() == "reset" and args[1].lower() == "all":
+        project.auto_accept = False
+        if project.threads:
+            for t in project.threads.values():
+                t.auto_accept = False
+        project_manager._save()
+        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="Markdown")
         return
 
-    mode = args[0].lower()
-    if mode == "on":
-        if thread:
-            thread.auto_accept = True
-        else:
-            project.auto_accept = True
-        project_manager.save()
-        await message.answer("⚡ Auto-accept **ON**", parse_mode="Markdown")
-    elif mode == "off":
-        if thread:
-            thread.auto_accept = False
-        else:
-            project.auto_accept = False
-        project_manager.save()
-        await message.answer("Auto-accept **OFF**", parse_mode="Markdown")
+    # /auto_accept - toggle current context
+    if thread:
+        thread.auto_accept = not thread.auto_accept
+        status = "⚡ ON" if thread.auto_accept else "OFF"
+        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="Markdown")
     else:
-        await message.answer("Usage: `/auto_accept on|off`", parse_mode="Markdown")
+        project.auto_accept = not project.auto_accept
+        status = "⚡ ON" if project.auto_accept else "OFF"
+        await message.answer(f"Auto-accept: **{status}**", parse_mode="Markdown")
+    project_manager._save()
 ```
 
 **Step 2: Commit**
@@ -478,17 +477,18 @@ git commit -m "docs: mark auto-accept mode as done"
 **Checklist:**
 
 1. [ ] Start bot: `./restart.sh`
-2. [ ] `/auto_accept` — shows OFF status
-3. [ ] `/auto_accept on` — enables
+2. [ ] `/help` — shows all commands including auto-accept
+3. [ ] `/auto_accept` — toggles ON (first call)
 4. [ ] `/settings` — shows "Auto-accept: ⚡ ON"
 5. [ ] Trigger permission prompt (ask Claude to create a file)
 6. [ ] Verify: "🤖 Auto: ..." notification, no keyboard
 7. [ ] Verify: log shows "auto_accept <context> option=1"
-8. [ ] `/auto_accept off` — disables
+8. [ ] `/auto_accept` — toggles OFF (second call)
 9. [ ] Trigger another prompt
 10. [ ] Verify: keyboard shown (manual mode)
-11. [ ] Restart bot: `./restart.sh`
-12. [ ] `/settings` — setting persisted
+11. [ ] `/auto_accept reset all` — resets all to off
+12. [ ] Restart bot: `./restart.sh`
+13. [ ] `/settings` — setting persisted
 
 ---
 
