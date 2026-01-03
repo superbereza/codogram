@@ -1205,9 +1205,9 @@ async def _do_branch_create(message: Message, project: ProjectState, branch_name
         await message.answer("`[x]` Branch creation failed. Check the new topic for details.", parse_mode="Markdown")
 
 
-@router.message(Command("my_chat_id"))
-async def cmd_my_chat_id(message: Message):
-    """Show user's chat ID - available to everyone."""
+@router.message(Command("get_debug_ids"))
+async def cmd_get_debug_ids(message: Message):
+    """Show debug IDs - admin only (protected by middleware)."""
     thread_id = message.message_thread_id
     thread_info = f"\nThread ID: `{thread_id}`" if thread_id else "\nThread ID: None (General)"
     await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`{thread_info}", parse_mode="Markdown")
