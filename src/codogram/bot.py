@@ -36,20 +36,6 @@ _start_state: dict[int, dict] = {}
 
 router = Router()
 
-# Cache admin IDs
-_admin_ids: set[int] | None = None
-
-def get_admin_ids() -> set[int]:
-    """Get admin IDs (cached)."""
-    global _admin_ids
-    if _admin_ids is None:
-        _admin_ids = settings.get_admin_ids()
-    return _admin_ids
-
-def is_admin(user_id: int) -> bool:
-    """Check if user is admin."""
-    return user_id in get_admin_ids()
-
 async def require_forum_group(message: Message) -> bool:
     """Check if message is from a forum group. Returns False and sends error if not."""
     if message.chat.type == "private":
@@ -274,9 +260,6 @@ async def cmd_start(message: Message):
         /start              - auto-detect from chat or ask for project name
         /start <project>    - start with specific project
     """
-    if not is_admin(message.from_user.id):
-        return
-
     chat_id = message.chat.id
     thread_id = message.message_thread_id
     args = message.text.split()[1:]  # Skip /start
@@ -422,9 +405,6 @@ async def launch_claude_in_thread(
 @router.message(Command("thread_delete"))
 async def cmd_thread_delete(message: Message):
     """Close current thread and its Claude session."""
-    if not is_admin(message.from_user.id):
-        return
-
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
@@ -459,10 +439,6 @@ async def cmd_thread_delete(message: Message):
 @router.callback_query(F.data.startswith("thread_delete:"))
 async def on_thread_delete_callback(callback: CallbackQuery):
     """Handle thread close confirmation."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     data = callback.data.split(":")[1]
     if data == "cancel":
         await callback.message.edit_text("Cancelled")
@@ -512,9 +488,6 @@ async def on_thread_delete_callback(callback: CallbackQuery):
 @router.message(Command("thread_create"))
 async def cmd_thread_create(message: Message):
     """Create a new thread (topic) with its own Claude session."""
-    if not is_admin(message.from_user.id):
-        return
-
     if not await require_forum_group(message):
         return
 
@@ -590,10 +563,6 @@ async def cmd_thread_create(message: Message):
 @router.callback_query(F.data == "start:create_dir")
 async def on_start_create_dir(callback: CallbackQuery):
     """Handle create directory button."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
@@ -625,10 +594,6 @@ async def on_start_create_dir(callback: CallbackQuery):
 @router.callback_query(F.data == "start:custom_path")
 async def on_start_custom_path(callback: CallbackQuery):
     """Handle custom path button."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
@@ -643,10 +608,6 @@ async def on_start_custom_path(callback: CallbackQuery):
 @router.callback_query(F.data == "start:git_init")
 async def on_start_git_init(callback: CallbackQuery):
     """Handle git init button."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
@@ -688,10 +649,6 @@ async def on_start_git_init(callback: CallbackQuery):
 @router.callback_query(F.data == "start:git_gh")
 async def on_start_git_gh(callback: CallbackQuery):
     """Handle git + gh button."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
@@ -709,10 +666,6 @@ async def on_start_git_gh(callback: CallbackQuery):
 @router.callback_query(F.data.in_({"start:gh_private", "start:gh_public"}))
 async def on_start_gh_visibility(callback: CallbackQuery):
     """Handle GitHub visibility choice."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
@@ -757,10 +710,6 @@ async def on_start_gh_visibility(callback: CallbackQuery):
 @router.callback_query(F.data == "start:git_clone")
 async def on_start_git_clone(callback: CallbackQuery):
     """Handle git clone button."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
@@ -780,10 +729,6 @@ async def on_start_git_clone(callback: CallbackQuery):
 @router.callback_query(F.data == "start:no_git")
 async def on_start_no_git(callback: CallbackQuery):
     """Handle no git button."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
@@ -821,9 +766,6 @@ async def on_start_no_git(callback: CallbackQuery):
 @router.message(Command("branch_create"))
 async def cmd_branch_create(message: Message):
     """Create a new worktree branch with isolated Claude session."""
-    if not is_admin(message.from_user.id):
-        return
-
     if not await require_forum_group(message):
         return
 
@@ -890,10 +832,6 @@ async def cmd_branch_create(message: Message):
 @router.callback_query(F.data.startswith("bc_base:"))
 async def cb_branch_create_base(callback: CallbackQuery):
     """Handle base branch selection for branch_create."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     _, branch_name, base_branch = callback.data.split(":")
     project = project_manager.get_by_chat(callback.message.chat.id)
     if not project:
@@ -927,10 +865,6 @@ async def cb_branch_create_base(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("bc_create:"))
 async def cb_branch_create_do(callback: CallbackQuery):
     """Create branch from last commit."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     _, branch_name, base_branch = callback.data.split(":")
     project = project_manager.get_by_chat(callback.message.chat.id)
     if not project:
@@ -945,10 +879,6 @@ async def cb_branch_create_do(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("bc_commit:"))
 async def cb_branch_create_commit(callback: CallbackQuery):
     """Send commit request to Claude."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     _, branch_name = callback.data.split(":")
     project = project_manager.get_by_chat(callback.message.chat.id)
     if not project:
@@ -983,10 +913,6 @@ async def cb_cancel(callback: CallbackQuery):
 @router.callback_query(F.data == "thread_create_confirm")
 async def cb_thread_create_confirm(callback: CallbackQuery):
     """Handle thread_create confirmation (create in main anyway)."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
 
@@ -1023,10 +949,6 @@ async def cb_thread_create_confirm(callback: CallbackQuery):
 @router.callback_query(F.data == "branch_create_redirect")
 async def cb_branch_create_redirect(callback: CallbackQuery):
     """Handle redirect to /branch_create."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     _start_state.pop(chat_id, None)
 
@@ -1040,9 +962,6 @@ async def cb_branch_create_redirect(callback: CallbackQuery):
 @router.message(Command("branch_finish"))
 async def cmd_branch_finish(message: Message):
     """Finish branch: merge and cleanup worktree."""
-    if not is_admin(message.from_user.id):
-        return
-
     if not await require_forum_group(message):
         return
 
@@ -1085,10 +1004,6 @@ async def cmd_branch_finish(message: Message):
 @router.callback_query(F.data.startswith("bf_merge:"))
 async def cb_branch_finish_merge_confirm(callback: CallbackQuery):
     """Show merge confirmation."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     parts = callback.data.split(":")
     thread_id = int(parts[1])
     target_branch = parts[2]
@@ -1131,10 +1046,6 @@ async def cb_branch_finish_merge_confirm(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("bf_do_merge:"))
 async def cb_branch_finish_do_merge(callback: CallbackQuery):
     """Execute merge and cleanup."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     parts = callback.data.split(":")
     thread_id = int(parts[1])
     target_branch = parts[2]
@@ -1179,10 +1090,6 @@ async def cb_branch_finish_do_merge(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("bf_delete:"))
 async def cb_branch_finish_delete_confirm(callback: CallbackQuery):
     """Show delete confirmation."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     parts = callback.data.split(":")
     thread_id = int(parts[1])
 
@@ -1218,10 +1125,6 @@ async def cb_branch_finish_delete_confirm(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("bf_do_delete:"))
 async def cb_branch_finish_do_delete(callback: CallbackQuery):
     """Execute delete without merge."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     parts = callback.data.split(":")
     thread_id = int(parts[1])
 
@@ -1311,9 +1214,6 @@ async def cmd_my_chat_id(message: Message):
 
 @router.message(Command("esc"))
 async def cmd_esc(message: Message):
-    if not is_admin(message.from_user.id):
-        return
-
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
@@ -1360,9 +1260,6 @@ async def _send_session_command(message: Message, command: str, status_text: str
 
     Returns True if command was sent successfully, False otherwise.
     """
-    if not is_admin(message.from_user.id):
-        return False
-
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
         await message.answer("Project not registered. Use /start")
@@ -1412,9 +1309,6 @@ async def cmd_clear(message: Message):
 
 @router.message(Command("restart"))
 async def cmd_restart(message: Message):
-    if not is_admin(message.from_user.id):
-        return
-
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
@@ -1463,10 +1357,6 @@ async def cmd_restart(message: Message):
 
 @router.callback_query(F.data == "restart:confirm")
 async def on_restart_confirm(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
 
@@ -1554,10 +1444,6 @@ async def on_restart_cancel(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("perm:"))
 async def on_permission_callback(callback: CallbackQuery):
     """Handle permission button press."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     # Parse callback data: perm:{action}:{tmux_session}
     parts = callback.data.split(":", 2)
     if len(parts) < 3:
@@ -1612,10 +1498,6 @@ async def on_permission_callback(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("select_tmux:"))
 async def on_tmux_selected(callback: CallbackQuery):
     """Handle tmux selection callback."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     # Parse callback data safely
     try:
         parts = callback.data.split(":", 2)
@@ -1650,10 +1532,6 @@ async def on_tmux_selected(callback: CallbackQuery):
 @router.callback_query(F.data == "start:launch_claude")
 async def on_start_launch_claude(callback: CallbackQuery):
     """Handle launch Claude button."""
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Not authorized")
-        return
-
     chat_id = callback.message.chat.id
     state = _start_state.get(chat_id)
     if not state:
@@ -1708,10 +1586,6 @@ async def on_message(message: Message):
     text_preview = message.text[:100] if message.text else '<no text>'
     thread_id = message.message_thread_id
     logger.info(f"Incoming message from user={message.from_user.id} chat={message.chat.id} thread={thread_id}: {text_preview}")
-
-    if not is_admin(message.from_user.id):
-        logger.debug(f"Ignored: not admin (user={message.from_user.id})")
-        return
 
     if not message.text:
         return
