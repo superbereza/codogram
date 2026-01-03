@@ -591,12 +591,16 @@ async def cmd_thread_create(message: Message):
             "name": name,
         }
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Create new git worktree", callback_data="branch_create_redirect")],
             [InlineKeyboardButton(text="Create in main anyway", callback_data="thread_create_confirm")],
-            [InlineKeyboardButton(text="/branch_create", callback_data="branch_create_redirect")],
             [InlineKeyboardButton(text="[x] Cancel", callback_data="cancel")]
         ])
         await message.answer(
-            "`[!]` Topic without isolation exists. Use /branch_create for isolated work.",
+            "You already have a topic working in the main directory.\n\n"
+            "Creating another one means both Claude sessions will edit the same files, "
+            "which may cause conflicts.\n\n"
+            "*Recommendation:* use git worktree — each topic gets "
+            "an isolated copy of the repository.",
             reply_markup=keyboard,
             parse_mode="Markdown"
         )
@@ -1313,36 +1317,23 @@ async def _do_branch_cleanup(message: Message, project: ProjectState, thread: Th
 
 
 async def _do_branch_create(message: Message, project: ProjectState, branch_name: str, base_branch: str):
-    """Actually create the worktree and launch Claude."""
-    from .worktree import create_worktree
+    """Create topic + worktree + launch Claude using unified service."""
     from .services.launch import create_thread_with_session
 
-    main_repo = Path(project.cwd)
-    worktree_path = main_repo.parent / f"{main_repo.name}-{branch_name}"
-
-    # Create worktree
-    result = create_worktree(main_repo, worktree_path, branch_name, base_branch)
-    if not result.success:
-        await message.answer(f"`[x]` {result.error}", parse_mode="Markdown")
-        return
-
-    # Create thread with session
+    # Unified flow: topic created first, then worktree, then Claude
+    # All status messages go to the new topic
     thread = await create_thread_with_session(
         bot=message.bot,
         chat_id=message.chat.id,
         project=project,
         name=branch_name,
-        worktree_path=str(worktree_path),
+        create_worktree=True,
         base_branch=base_branch,
     )
 
-    if thread:
-        await message.answer(
-            f"`[v]` Branch {branch_name} created\n\n"
-            f"Worktree: `{worktree_path}`\n"
-            f"Attach: `tmux attach -t claude-{project.project_name}-{branch_name}`",
-            parse_mode="Markdown"
-        )
+    if not thread:
+        # Error already reported in the topic by the service
+        await message.answer("`[x]` Branch creation failed. Check the new topic for details.", parse_mode="Markdown")
 
 
 @router.message(Command("my_chat_id"))
