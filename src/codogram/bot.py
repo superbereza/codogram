@@ -564,7 +564,8 @@ async def cmd_thread_create(message: Message):
         return
 
     # Create ThreadInfo
-    thread = ThreadInfo(thread_id=topic.message_thread_id, name=name)
+    topic_display_name = name.capitalize()  # Same as passed to create_forum_topic
+    thread = ThreadInfo(thread_id=topic.message_thread_id, name=name, topic_name=topic_display_name)
     project.threads[topic.message_thread_id] = thread
 
     # Launch Claude
@@ -811,7 +812,9 @@ async def on_start_no_git(callback: CallbackQuery):
 @router.message(Command("my_chat_id"))
 async def cmd_my_chat_id(message: Message):
     """Show user's chat ID - available to everyone."""
-    await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`", parse_mode="Markdown")
+    thread_id = message.message_thread_id
+    thread_info = f"\nThread ID: `{thread_id}`" if thread_id else "\nThread ID: None (General)"
+    await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`{thread_info}", parse_mode="Markdown")
 
 @router.message(Command("esc"))
 async def cmd_esc(message: Message):
