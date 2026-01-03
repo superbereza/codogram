@@ -1369,6 +1369,38 @@ async def cmd_esc(message: Message):
     tmux.send_key("Escape")
 
 
+@router.message(Command("help"))
+async def cmd_help(message: Message):
+    """Show available commands."""
+    if not is_admin(message.from_user.id):
+        return
+
+    text = """**Commands**
+
+`/start` — Start Claude / show status
+`/new` — Start new Claude session
+`/restart` — Kill and restart Claude tmux
+
+**Threads**
+`/thread_create [name]` — Create new Claude thread
+`/thread_delete` — Delete thread (in topic)
+
+**Git worktrees**
+`/branch_create [name]` — Create worktree + thread
+`/branch_finish` — Merge and cleanup
+
+**Settings**
+`/settings` — Show current settings
+`/auto_accept` — Toggle auto-accept
+`/auto_accept reset all` — Reset all to off
+
+**Other**
+`/esc` — Send Escape to Claude
+`/my_chat_id` — Show your user ID"""
+
+    await message.answer(text, parse_mode="Markdown")
+
+
 @router.message(Command("settings"))
 async def cmd_settings(message: Message):
     """Show current settings."""
@@ -1405,7 +1437,7 @@ async def cmd_settings(message: Message):
 
 @router.message(Command("auto_accept"))
 async def cmd_auto_accept(message: Message):
-    """Toggle auto-accept: /auto_accept on|off"""
+    """Toggle auto-accept or reset all."""
     if not is_admin(message.from_user.id):
         return
 
@@ -1423,30 +1455,26 @@ async def cmd_auto_accept(message: Message):
 
     args = (message.text or "").split()[1:]
 
-    if not args:
-        enabled = thread.auto_accept if thread else project.auto_accept
-        target = f"thread `{thread.name}`" if thread else f"project `{project.project_name}`"
-        status = "ON" if enabled else "OFF"
-        await message.answer(f"Auto-accept for {target}: **{status}**", parse_mode="Markdown")
+    # /auto_accept reset all - reset all to off
+    if len(args) >= 2 and args[0].lower() == "reset" and args[1].lower() == "all":
+        project.auto_accept = False
+        if project.threads:
+            for t in project.threads.values():
+                t.auto_accept = False
+        project_manager._save()
+        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="Markdown")
         return
 
-    mode = args[0].lower()
-    if mode == "on":
-        if thread:
-            thread.auto_accept = True
-        else:
-            project.auto_accept = True
-        project_manager._save()
-        await message.answer("⚡ Auto-accept **ON**", parse_mode="Markdown")
-    elif mode == "off":
-        if thread:
-            thread.auto_accept = False
-        else:
-            project.auto_accept = False
-        project_manager._save()
-        await message.answer("Auto-accept **OFF**", parse_mode="Markdown")
+    # /auto_accept - toggle current context
+    if thread:
+        thread.auto_accept = not thread.auto_accept
+        status = "⚡ ON" if thread.auto_accept else "OFF"
+        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="Markdown")
     else:
-        await message.answer("Usage: `/auto_accept on|off`", parse_mode="Markdown")
+        project.auto_accept = not project.auto_accept
+        status = "⚡ ON" if project.auto_accept else "OFF"
+        await message.answer(f"Auto-accept: **{status}**", parse_mode="Markdown")
+    project_manager._save()
 
 
 @router.message(Command("resume"))

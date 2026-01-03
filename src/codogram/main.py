@@ -42,7 +42,8 @@ async def main():
         BotCommand(command="branch_finish", description="Merge branch and cleanup worktree"),
         BotCommand(command="restart", description="Kill and restart Claude tmux"),
         BotCommand(command="settings", description="Show current settings"),
-        BotCommand(command="auto_accept", description="Toggle auto-accept mode"),
+        BotCommand(command="auto_accept", description="Toggle auto-accept (or reset all)"),
+        BotCommand(command="help", description="Show available commands"),
         BotCommand(command="my_chat_id", description="Show your user ID"),
         BotCommand(command="esc", description="Send Escape to Claude"),
         # /resume intentionally not in menu - just responds "not supported" if someone tries it
