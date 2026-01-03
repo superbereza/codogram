@@ -9,7 +9,6 @@ from typing import AsyncIterator, TYPE_CHECKING
 if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 from aiogram import Bot
-from .chunker import chunk_message
 from .logging_config import logger
 
 class ContentType(Enum):
@@ -177,65 +176,6 @@ async def watch_jsonl(path: Path, poll_interval: float = 0.5) -> AsyncIterator[P
         yield entry
 
 
-async def send_entry_to_telegram(
-    bot: Bot,
-    chat_id: int,
-    entry: ParsedEntry,
-    message_thread_id: int | None = None,
-):
-    """Send parsed entry to Telegram chat."""
-    try:
-        if entry.content_type == ContentType.TEXT:
-            for chunk in chunk_message(entry.text):
-                try:
-                    await bot.send_message(
-                        chat_id,
-                        f"● {chunk}",
-                        parse_mode="Markdown",
-                        message_thread_id=message_thread_id,
-                    )
-                except Exception:
-                    await bot.send_message(
-                        chat_id,
-                        f"● {chunk}",
-                        message_thread_id=message_thread_id,
-                    )
-
-        elif entry.content_type == ContentType.TOOL_USE:
-            logger.debug(f"send_entry: TOOL_USE {entry.tool_name}")
-            text = format_tool_use(entry.tool_name, entry.tool_input)
-            try:
-                await bot.send_message(
-                    chat_id,
-                    text,
-                    parse_mode="Markdown",
-                    message_thread_id=message_thread_id,
-                )
-                logger.debug(f"send_entry: sent {entry.tool_name}")
-            except Exception as e:
-                logger.warning(f"send_entry: error sending {entry.tool_name}: {e}")
-                await bot.send_message(
-                    chat_id,
-                    f"● {entry.tool_name}",
-                    message_thread_id=message_thread_id,
-                )
-
-    except Exception as e:
-        logger.warning(f"send_entry_to_telegram error: {e}")
-        if entry.content_type == ContentType.TEXT:
-            await bot.send_message(
-                chat_id,
-                f"● {entry.text[:4000]}",
-                message_thread_id=message_thread_id,
-            )
-        elif entry.content_type == ContentType.TOOL_USE:
-            await bot.send_message(
-                chat_id,
-                f"● {entry.tool_name}",
-                message_thread_id=message_thread_id,
-            )
-
-
 async def create_watcher_task(
     bot: Bot,
     project,
@@ -299,8 +239,7 @@ def _entry_to_messages(entry: ParsedEntry) -> list[dict]:
     messages = []
 
     if entry.content_type == ContentType.TEXT:
-        for chunk in chunk_message(entry.text):
-            messages.append({"text": f"● {chunk}", "parse_mode": "Markdown"})
+        messages.append({"text": f"● {entry.text}", "parse_mode": "Markdown"})
 
     elif entry.content_type == ContentType.TOOL_USE:
         text = format_tool_use(entry.tool_name, entry.tool_input)

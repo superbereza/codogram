@@ -53,13 +53,13 @@ async def try_auto_accept(
     if selected is None:
         return False
 
-    body_preview = (body[:80] + "...") if body else "[no details]"
+    body_text = body if body else "[no details]"
     logger.info(f"auto_accept {context_name} option={selected}")
 
     batch = OutgoingBatch(
         chat_id=chat_id,
         thread_id=thread_id,
-        messages=[{"text": f"🤖 Auto: {body_preview}"}],
+        messages=[{"text": f"🤖 Auto: {body_text}"}],
     )
     await telegram_queue.enqueue_nowait(batch)
 

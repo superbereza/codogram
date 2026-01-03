@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 from .telegram_queue import OutgoingBatch, KeyboardBatch
 from .screen import parse_screen, PermissionPrompt, is_claude_ready
 from .keyboards import permission_keyboard
-from .chunker import chunk_message
 from .state import permission_messages
 from .session_manager import ProjectState, ThreadInfo
 from .tmux import TmuxSession
@@ -164,8 +163,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                         body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            for chunk in chunk_message(body_text):
-                                body_messages.append({"text": chunk, "parse_mode": "Markdown"})
+                            body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
@@ -238,8 +236,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                     body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        for chunk in chunk_message(body_text):
-                            body_messages.append({"text": chunk, "parse_mode": "Markdown"})
+                        body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                     options_text = "\n".join(parsed.options)
                     body_messages.append({"text": options_text})
@@ -354,8 +351,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                         body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            for chunk in chunk_message(body_text):
-                                body_messages.append({"text": chunk, "parse_mode": "Markdown"})
+                            body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
@@ -428,8 +424,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                     body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        for chunk in chunk_message(body_text):
-                            body_messages.append({"text": chunk, "parse_mode": "Markdown"})
+                        body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                     options_text = "\n".join(parsed.options)
                     body_messages.append({"text": options_text})
