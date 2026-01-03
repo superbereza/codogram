@@ -44,7 +44,8 @@ async def create_thread_with_session(
     thread_id = topic.message_thread_id
 
     # Create ThreadInfo with worktree fields
-    thread = ThreadInfo(thread_id=thread_id, name=name)
+    topic_display_name = name.capitalize()  # Same as passed to create_forum_topic
+    thread = ThreadInfo(thread_id=thread_id, name=name, topic_name=topic_display_name)
     thread.worktree_path = worktree_path
     thread.base_branch = base_branch
     project.threads[thread_id] = thread

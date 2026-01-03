@@ -84,6 +84,7 @@ class ThreadInfo:
     """State for a single thread (topic) within a project."""
     thread_id: int | None  # None = General topic
     name: str              # mystic, arcane, user-provided, or "main"
+    topic_name: str | None = None  # Telegram topic name for debugging
 
     # Runtime state (from history.jsonl):
     session_id: str | None = None
@@ -170,11 +171,15 @@ class ProjectManager:
 
                 # Load explicit threads first
                 threads_data = data.get("threads", {})
+                logger.debug(f"_load_projects: {project_name} has {len(threads_data)} threads")
                 for tid_str, thread_data in threads_data.items():
                     tid = None if tid_str == "null" else int(tid_str)
+                    thread_name = thread_data.get("name", "main")
+                    logger.debug(f"_load_projects: loading thread tid={tid} name={thread_name}")
                     project.threads[tid] = ThreadInfo(
                         thread_id=tid,
-                        name=thread_data.get("name", "main"),
+                        name=thread_name,
+                        topic_name=thread_data.get("topic_name"),
                         session_id=thread_data.get("session_id"),
                         jsonl_path=thread_data.get("jsonl_path"),
                         awaiting_new_session=thread_data.get("awaiting_new_session", False),
@@ -215,6 +220,7 @@ class ProjectManager:
                 for tid, t in p.threads.items():
                     thread_data = {
                         "name": t.name,
+                        "topic_name": t.topic_name,
                         "session_id": t.session_id,
                         "jsonl_path": t.jsonl_path,
                         "awaiting_new_session": t.awaiting_new_session,
@@ -312,6 +318,10 @@ class ProjectManager:
     async def restore_projects(self, bot, start_poller, start_watcher, telegram_queue) -> None:
         """Restore sessions from history.jsonl after bot restart."""
         from .history_watcher import watch_thread_jsonl
+
+        # DEBUG: Log what we have at restore time
+        for pname, p in self.projects.items():
+            logger.info(f"restore_debug: project={pname} threads={len(p.threads)} names={[t.name for t in p.threads.values()]}")
 
         for project in list(self.projects.values()):
             if not project.chat_id or not project.cwd:
