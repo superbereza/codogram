@@ -81,7 +81,7 @@
 ### Interactive setup script
 - `./setup.sh` — интерактивная установка зависимостей
 - Определение ОС (Linux/macOS)
-- Интерактивный селектор с ↑/↓ + Space + Enter
+- Интерактивный селектор (числа для toggle, работает в Docker)
 - Проверка и установка: python3, brew (macOS), tmux, git, gh, claude
 - Создание venv, pip install
 - Настройка .env (токен бота, admin ID)
