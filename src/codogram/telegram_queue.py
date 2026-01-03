@@ -9,6 +9,7 @@ from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup
 
 from .logging_config import logger
+from .chunker import chunk_message
 
 
 @dataclass
@@ -166,10 +167,22 @@ class TelegramQueue:
             )
             return []
 
+        # Expand messages with chunking
+        expanded_messages = []
+        for msg in batch.messages:
+            text = msg.get("text", "")
+            if len(text) > 4000:
+                chunks = chunk_message(text)
+                logger.debug(f"Chunking message: {len(text)} chars -> {len(chunks)} chunks")
+                for chunk in chunks:
+                    expanded_messages.append({**msg, "text": chunk})
+            else:
+                expanded_messages.append(msg)
+
         sent_ids: list[int] = []
 
         try:
-            for msg in batch.messages:
+            for msg in expanded_messages:
                 result = await self.bot.send_message(
                     chat_id=batch.chat_id,
                     message_thread_id=batch.thread_id,

@@ -65,9 +65,9 @@ When loading old configs without `auto_accept` field:
 auto_accept = data.get("auto_accept", False)
 ```
 
-## Detection Logic
+## Core Logic
 
-### Option Selection
+### select_option()
 
 Select **single-action** option, skip session-wide:
 
@@ -108,69 +108,104 @@ def select_option(options: list[str]) -> str | None:
 | `["1. Allow for session", "2. No"]` | `None` | Session-wide skipped |
 | `["1. src/main.py", "2. Cancel"]` | `None` | Choice question |
 
+### try_auto_accept()
+
+Unified function for both pollers — **no code duplication**:
+
+```python
+# src/codogram/auto_accept.py
+from typing import TYPE_CHECKING
+
+from .telegram_queue import OutgoingBatch
+from .tmux import TmuxSession
+from .logging_config import logger
+
+if TYPE_CHECKING:
+    from .telegram_queue import TelegramQueue
+
+async def try_auto_accept(
+    options: list[str],
+    body: str | None,
+    tmux: TmuxSession,
+    telegram_queue: "TelegramQueue",
+    chat_id: int,
+    thread_id: int | None,
+    context_name: str,
+) -> bool:
+    """Try to auto-accept a permission prompt.
+
+    Returns True if auto-accepted, False if manual mode needed.
+
+    Args:
+        options: List of permission options from screen
+        body: Permission prompt body text
+        tmux: TmuxSession for sending keys
+        telegram_queue: Queue for sending notifications
+        chat_id: Telegram chat ID
+        thread_id: Telegram thread ID (None for simple mode)
+        context_name: For logging (project name or thread name)
+    """
+    selected = select_option(options)
+    if selected is None:
+        return False
+
+    body_preview = (body[:80] + "...") if body else "[no details]"
+    logger.info(f"auto_accept {context_name} option={selected}")
+
+    batch = OutgoingBatch(
+        chat_id=chat_id,
+        thread_id=thread_id,
+        messages=[{"text": f"🤖 Auto: {body_preview}"}],
+    )
+    await telegram_queue.enqueue_nowait(batch)
+
+    tmux.send_key(selected)
+    return True
+```
+
+**Benefits:**
+- Single source of truth (DRY)
+- Easy to test with mocked tmux/queue
+- Minimal changes needed when refactoring pollers
+- Handles empty body gracefully (`"[no details]"`)
+
 ## Permission Poller Integration
 
-### For `permission_poller_for_project()` (~line 148)
+### For `permission_poller_for_project()`
 
 ```python
-if elapsed >= DEBOUNCE_TIME:
-    # Check auto-accept (project-level for simple mode)
-    if project.auto_accept:
-        selected = select_option(parsed.options)
+from .auto_accept import try_auto_accept
 
-        if selected is not None:
-            body_preview = (parsed.body[:80] + "...") if parsed.body else ""
+# Inside DEBOUNCING state, after elapsed >= DEBOUNCE_TIME:
+if project.auto_accept:
+    if await try_auto_accept(
+        parsed.options, parsed.body, tmux,
+        telegram_queue, chat_id, None, project.project_name
+    ):
+        state = PollerState.IDLE
+        last_options = None
+        continue
 
-            logger.info(f"auto_accept project={project.project_name} option={selected}")
-
-            batch = OutgoingBatch(
-                chat_id=chat_id,
-                thread_id=None,  # simple mode
-                messages=[{"text": f"🤖 Auto: {body_preview}"}],
-            )
-            await telegram_queue.enqueue_nowait(batch)
-
-            tmux.send_key(selected)
-            state = PollerState.IDLE
-            last_options = None
-            continue
-
-    # MANUAL PATH (existing code)...
+# MANUAL PATH (existing code)...
 ```
 
-### For `permission_poller_for_thread()` (~line 328)
+### For `permission_poller_for_thread()`
 
 ```python
-if elapsed >= DEBOUNCE_TIME:
-    # Check auto-accept (thread-level for forum mode)
-    if thread.auto_accept:
-        selected = select_option(parsed.options)
+# Inside DEBOUNCING state, after elapsed >= DEBOUNCE_TIME:
+if thread.auto_accept:
+    if await try_auto_accept(
+        parsed.options, parsed.body, tmux,
+        telegram_queue, chat_id, thread_id, thread.name
+    ):
+        state = PollerState.IDLE
+        last_options = None
+        continue
 
-        if selected is not None:
-            body_preview = (parsed.body[:80] + "...") if parsed.body else ""
-
-            logger.info(f"auto_accept thread={thread.name} option={selected}")
-
-            batch = OutgoingBatch(
-                chat_id=chat_id,
-                thread_id=thread_id,  # forum topic
-                messages=[{"text": f"🤖 Auto: {body_preview}"}],
-            )
-            await telegram_queue.enqueue_nowait(batch)
-
-            tmux.send_key(selected)
-            state = PollerState.IDLE
-            last_options = None
-            continue
-
-    # MANUAL PATH (existing code)...
+# MANUAL PATH (existing code)...
 ```
 
-### Import
-
-```python
-from .auto_accept import select_option
-```
+**Result:** 5 lines per poller instead of 25 lines.
 
 ## User Commands
 
@@ -178,54 +213,55 @@ from .auto_accept import select_option
 
 Toggle auto-accept in current context:
 
+- `/auto_accept` — toggle on/off for current context (thread or project)
+- `/auto_accept reset all` — reset project and all threads to off
+
 ```python
 @router.message(Command("auto_accept"))
 async def cmd_auto_accept(message: Message):
-    """Toggle auto-accept: /auto_accept on|off"""
+    """Toggle auto-accept or reset all."""
     if not is_admin(message.from_user.id):
         return
 
     chat_id = message.chat.id
-    thread_id = message.message_thread_id  # None if not in topic
+    thread_id = message.message_thread_id
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
         await message.answer("No project. Use /start first.")
         return
 
-    # Determine target: thread or project
     thread = None
     if thread_id and project.threads:
-        thread = project.threads.get(str(thread_id))
+        thread = project.threads.get(thread_id)
 
     args = (message.text or "").split()[1:]
 
-    if not args:
-        # Show status
-        enabled = thread.auto_accept if thread else project.auto_accept
-        target = f"thread `{thread.name}`" if thread else f"project `{project.project_name}`"
-        status = "ON ⚡" if enabled else "OFF"
-        await message.answer(f"Auto-accept for {target}: **{status}**", parse_mode="Markdown")
+    # /auto_accept reset all - reset all to off
+    if len(args) >= 2 and args[0].lower() == "reset" and args[1].lower() == "all":
+        project.auto_accept = False
+        if project.threads:
+            for t in project.threads.values():
+                t.auto_accept = False
+        project_manager._save()
+        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="Markdown")
         return
 
-    mode = args[0].lower()
-    if mode == "on":
-        if thread:
-            thread.auto_accept = True
-        else:
-            project.auto_accept = True
-        project_manager.save()
-        await message.answer("⚡ Auto-accept **ON**", parse_mode="Markdown")
-    elif mode == "off":
-        if thread:
-            thread.auto_accept = False
-        else:
-            project.auto_accept = False
-        project_manager.save()
-        await message.answer("Auto-accept **OFF**", parse_mode="Markdown")
+    # /auto_accept - toggle current context
+    if thread:
+        thread.auto_accept = not thread.auto_accept
+        status = "⚡ ON" if thread.auto_accept else "OFF"
+        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="Markdown")
     else:
-        await message.answer("Usage: `/auto_accept on|off`", parse_mode="Markdown")
+        project.auto_accept = not project.auto_accept
+        status = "⚡ ON" if project.auto_accept else "OFF"
+        await message.answer(f"Auto-accept: **{status}**", parse_mode="Markdown")
+    project_manager._save()
 ```
+
+### /help
+
+Show available commands (includes auto-accept section).
 
 ### /settings
 
@@ -279,7 +315,7 @@ commands = [
 
 ## Testing
 
-### Unit Tests
+### Unit Tests for select_option()
 
 ```python
 # tests/test_auto_accept.py
@@ -306,16 +342,102 @@ def test_select_option_empty():
     assert select_option([]) is None
 ```
 
+### Integration Tests for try_auto_accept()
+
+```python
+# tests/test_auto_accept.py
+
+import pytest
+from unittest.mock import AsyncMock, MagicMock
+from codogram.auto_accept import try_auto_accept
+
+@pytest.mark.asyncio
+async def test_try_auto_accept_success():
+    """Auto-accept returns True and sends notification."""
+    tmux = MagicMock()
+    queue = AsyncMock()
+
+    result = await try_auto_accept(
+        options=["1. Yes", "2. No"],
+        body="Run command: git status",
+        tmux=tmux,
+        telegram_queue=queue,
+        chat_id=123,
+        thread_id=None,
+        context_name="test-project",
+    )
+
+    assert result is True
+    tmux.send_key.assert_called_once_with("1")
+    queue.enqueue_nowait.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_try_auto_accept_no_safe_option():
+    """Returns False when no safe option available."""
+    tmux = MagicMock()
+    queue = AsyncMock()
+
+    result = await try_auto_accept(
+        options=["1. Allow for session", "2. No"],
+        body="Some prompt",
+        tmux=tmux,
+        telegram_queue=queue,
+        chat_id=123,
+        thread_id=None,
+        context_name="test-project",
+    )
+
+    assert result is False
+    tmux.send_key.assert_not_called()
+    queue.enqueue_nowait.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_try_auto_accept_empty_body():
+    """Handles empty body gracefully."""
+    tmux = MagicMock()
+    queue = AsyncMock()
+
+    result = await try_auto_accept(
+        options=["1. Yes"],
+        body=None,
+        tmux=tmux,
+        telegram_queue=queue,
+        chat_id=123,
+        thread_id=456,
+        context_name="test-thread",
+    )
+
+    assert result is True
+    # Check notification contains "[no details]"
+    call_args = queue.enqueue_nowait.call_args[0][0]
+    assert "[no details]" in call_args.messages[0]["text"]
+```
+
 ### Manual Testing Checklist
 
-- [ ] `/auto_accept` — shows status
-- [ ] `/auto_accept on` — enables
-- [ ] `/auto_accept off` — disables
+- [ ] `/auto_accept` — toggles on (first call)
+- [ ] `/auto_accept` — toggles off (second call)
+- [ ] `/auto_accept reset all` — resets project and all threads to off
 - [ ] `/settings` — shows auto-accept status
+- [ ] `/help` — shows all commands including auto-accept
 - [ ] Prompt with "Yes" — auto-accepted, notification in chat
 - [ ] Prompt with "Allow for session" — NOT auto-accepted, keyboard shown
 - [ ] Choice question — keyboard (manual)
 - [ ] Bot restart — setting persisted
+
+## Refactoring Compatibility
+
+This design is compatible with planned refactoring (see `docs/designs/2025-12-27-bot-refactoring/`):
+
+| Component | Current Location | Future Location | Migration Effort |
+|-----------|-----------------|-----------------|------------------|
+| `select_option()` | `auto_accept.py` | `domain/auto_accept.py` | Move file |
+| `try_auto_accept()` | `auto_accept.py` | `services/auto_accept.py` | Move file |
+| `/auto_accept` cmd | `bot.py` | `handlers/settings.py` | Move function |
+| `/settings` cmd | `bot.py` | `handlers/settings.py` | Move function |
+| Data model | `session_manager.py` | `domain/models.py` | Already compatible |
+
+**Key benefit:** `try_auto_accept()` encapsulates all integration logic. When pollers are unified in Phase 11, only the call site changes — the function stays the same.
 
 ## Implementation Checklist
 
@@ -333,16 +455,15 @@ def test_select_option_empty():
 
 ### Tasks
 
-- [ ] Create `auto_accept.py` with `select_option()`
+- [ ] Create `auto_accept.py` with `select_option()` and `try_auto_accept()`
 - [ ] Add `auto_accept: bool = False` to `ThreadInfo`
 - [ ] Add `auto_accept: bool = False` to `ProjectState`
 - [ ] Update load/save for backwards compat
-- [ ] Integrate into `permission_poller_for_project()`
-- [ ] Integrate into `permission_poller_for_thread()`
+- [ ] Integrate into both pollers (5 lines each)
 - [ ] Add `/auto_accept` command
 - [ ] Add `/settings` command
 - [ ] Add commands to bot menu
-- [ ] Write unit tests
+- [ ] Write unit and integration tests
 - [ ] Manual testing
 - [ ] Update ROADMAP (Backlog -> Done)
 

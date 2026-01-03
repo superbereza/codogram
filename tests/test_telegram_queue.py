@@ -186,3 +186,70 @@ async def test_lock_prevents_duplicate_workers(queue, mock_bot):
     # Should only have 1 worker for chat_id=1
     assert len(queue._workers) == 1
     await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_long_message_chunked(queue, mock_bot):
+    """Messages over 4000 chars are automatically chunked."""
+    sent_texts = []
+    async def capture_send(**kw):
+        sent_texts.append(kw.get("text", ""))
+        return Mock(message_id=len(sent_texts))
+    mock_bot.send_message = AsyncMock(side_effect=capture_send)
+
+    # Create message over 4000 chars
+    long_text = "A" * 5000
+    batch = OutgoingBatch(1, None, [{"text": long_text, "parse_mode": "Markdown"}])
+    msg_ids = await queue.enqueue(batch)
+
+    # Should have sent 2 messages (chunked)
+    assert len(sent_texts) == 2
+    assert len(msg_ids) == 2
+    # Each chunk should be under 4000 chars
+    for text in sent_texts:
+        assert len(text) <= 4000
+    # Combined content should match original (minus chunk prefixes)
+    combined = "".join(t.split("\n", 1)[1] if t.startswith("[") else t for t in sent_texts)
+    assert "A" * 100 in combined  # Spot check content preserved
+
+    await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_short_message_not_chunked(queue, mock_bot):
+    """Messages under 4000 chars pass through unchanged."""
+    sent_texts = []
+    async def capture_send(**kw):
+        sent_texts.append(kw.get("text", ""))
+        return Mock(message_id=len(sent_texts))
+    mock_bot.send_message = AsyncMock(side_effect=capture_send)
+
+    short_text = "Hello world"
+    batch = OutgoingBatch(1, None, [{"text": short_text}])
+    await queue.enqueue(batch)
+
+    assert len(sent_texts) == 1
+    assert sent_texts[0] == short_text  # Unchanged
+
+    await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_chunking_preserves_parse_mode(queue, mock_bot):
+    """Chunked messages preserve parse_mode."""
+    sent_kwargs = []
+    async def capture_send(**kw):
+        sent_kwargs.append(kw)
+        return Mock(message_id=len(sent_kwargs))
+    mock_bot.send_message = AsyncMock(side_effect=capture_send)
+
+    long_text = "B" * 5000
+    batch = OutgoingBatch(1, None, [{"text": long_text, "parse_mode": "Markdown"}])
+    await queue.enqueue(batch)
+
+    # All chunks should have parse_mode
+    assert len(sent_kwargs) == 2
+    for kw in sent_kwargs:
+        assert kw.get("parse_mode") == "Markdown"
+
+    await queue.shutdown()

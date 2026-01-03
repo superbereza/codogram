@@ -52,6 +52,9 @@ async def main():
         BotCommand(command="branch_create", description="Create isolated git worktree + thread"),
         BotCommand(command="branch_finish", description="Merge branch and cleanup worktree"),
         BotCommand(command="restart", description="Kill and restart Claude tmux"),
+        BotCommand(command="settings", description="Show current settings"),
+        BotCommand(command="auto_accept", description="Toggle auto-accept (or reset all)"),
+        BotCommand(command="help", description="Show available commands"),
         BotCommand(command="get_debug_ids", description="Show debug IDs (admin only)"),
         BotCommand(command="esc", description="Send Escape to Claude"),
         # /resume intentionally not in menu - just responds "not supported" if someone tries it

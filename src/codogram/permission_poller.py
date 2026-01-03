@@ -11,11 +11,11 @@ if TYPE_CHECKING:
 from .telegram_queue import OutgoingBatch, KeyboardBatch
 from .screen import parse_screen, PermissionPrompt, is_claude_ready
 from .keyboards import permission_keyboard
-from .chunker import chunk_message
 from .state import permission_messages
 from .session_manager import ProjectState, ThreadInfo
 from .tmux import TmuxSession
 from .logging_config import logger
+from .auto_accept import try_auto_accept
 
 
 class PollerState(Enum):
@@ -146,6 +146,16 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
             else:
                 elapsed = asyncio.get_event_loop().time() - debounce_start
                 if elapsed >= DEBOUNCE_TIME:
+                    # Check auto-accept (project-level for simple mode)
+                    if project.auto_accept:
+                        if await try_auto_accept(
+                            parsed.options, parsed.body, tmux,
+                            telegram_queue, chat_id, None, project.project_name
+                        ):
+                            state = PollerState.IDLE
+                            last_options = None
+                            continue
+
                     logger.debug(f"Poller DEBOUNCING→SHOWING: sending to Telegram")
                     logger.debug(f"Poller: body preview: {parsed.body[:200]}...")
                     try:
@@ -153,8 +163,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                         body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            for chunk in chunk_message(body_text):
-                                body_messages.append({"text": chunk, "parse_mode": "Markdown"})
+                            body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
@@ -227,8 +236,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                     body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        for chunk in chunk_message(body_text):
-                            body_messages.append({"text": chunk, "parse_mode": "Markdown"})
+                        body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                     options_text = "\n".join(parsed.options)
                     body_messages.append({"text": options_text})
@@ -327,14 +335,23 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
             else:
                 elapsed = asyncio.get_event_loop().time() - debounce_start
                 if elapsed >= DEBOUNCE_TIME:
+                    # Check auto-accept (thread-level for forum mode)
+                    if thread.auto_accept:
+                        if await try_auto_accept(
+                            parsed.options, parsed.body, tmux,
+                            telegram_queue, chat_id, thread_id, thread.name
+                        ):
+                            state = PollerState.IDLE
+                            last_options = None
+                            continue
+
                     logger.debug(f"Thread poller {thread.name} DEBOUNCING→SHOWING")
                     try:
                         # Build batch of body messages
                         body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            for chunk in chunk_message(body_text):
-                                body_messages.append({"text": chunk, "parse_mode": "Markdown"})
+                            body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
@@ -407,8 +424,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                     body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        for chunk in chunk_message(body_text):
-                            body_messages.append({"text": chunk, "parse_mode": "Markdown"})
+                        body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                     options_text = "\n".join(parsed.options)
                     body_messages.append({"text": options_text})
