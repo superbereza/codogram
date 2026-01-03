@@ -1369,6 +1369,52 @@ async def cmd_esc(message: Message):
     tmux.send_key("Escape")
 
 
+@router.message(Command("auto_accept"))
+async def cmd_auto_accept(message: Message):
+    """Toggle auto-accept: /auto_accept on|off"""
+    if not is_admin(message.from_user.id):
+        return
+
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await message.answer("No project. Use /start first.")
+        return
+
+    thread = None
+    if thread_id and project.threads:
+        thread = project.threads.get(thread_id)
+
+    args = (message.text or "").split()[1:]
+
+    if not args:
+        enabled = thread.auto_accept if thread else project.auto_accept
+        target = f"thread `{thread.name}`" if thread else f"project `{project.project_name}`"
+        status = "ON" if enabled else "OFF"
+        await message.answer(f"Auto-accept for {target}: **{status}**", parse_mode="Markdown")
+        return
+
+    mode = args[0].lower()
+    if mode == "on":
+        if thread:
+            thread.auto_accept = True
+        else:
+            project.auto_accept = True
+        project_manager._save()
+        await message.answer("⚡ Auto-accept **ON**", parse_mode="Markdown")
+    elif mode == "off":
+        if thread:
+            thread.auto_accept = False
+        else:
+            project.auto_accept = False
+        project_manager._save()
+        await message.answer("Auto-accept **OFF**", parse_mode="Markdown")
+    else:
+        await message.answer("Usage: `/auto_accept on|off`", parse_mode="Markdown")
+
+
 @router.message(Command("resume"))
 async def cmd_resume(message: Message):
     """Handle /resume command - not supported in multi-session mode."""
