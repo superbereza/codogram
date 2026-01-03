@@ -12,6 +12,7 @@ from aiogram import Bot, Dispatcher
 
 from .config import settings
 from .bot import router
+from .middleware.admin import AdminMiddleware
 from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 from .logging_config import setup_logging, logger
@@ -29,6 +30,11 @@ async def main():
     global telegram_queue
     telegram_queue = TelegramQueue(bot)
     dp = Dispatcher()
+
+    # Global admin check - protects ALL routers
+    dp.message.middleware(AdminMiddleware())
+    dp.callback_query.middleware(AdminMiddleware())
+
     dp.include_router(router)
 
     from aiogram.types import BotCommand
