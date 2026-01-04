@@ -1,10 +1,13 @@
 """Admin middleware - global protection for all handlers."""
-from typing import Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, User
+from aiogram.types import Message, TelegramObject, User
 
 from ..config import settings
+
+if TYPE_CHECKING:
+    from ..telegram_queue import TelegramQueue
 
 # Cache admin IDs
 _admin_ids: set[int] | None = None
@@ -48,20 +51,24 @@ class AdminMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         # Non-admin: show helpful message with their ID
-        await self._reject_non_admin(event, user.id)
+        await self._reject_non_admin(event, user.id, data)
         return None
 
-    async def _reject_non_admin(self, event: TelegramObject, user_id: int):
+    async def _reject_non_admin(
+        self, event: TelegramObject, user_id: int, data: dict[str, Any]
+    ):
         """Send rejection message with user's ID."""
-        if hasattr(event, 'reply'):
-            # Message - markdown with status indicator
-            await event.reply(
-                f"`\\[x\\]` Not admin\\. Your ID: `{user_id}`\n"
-                f"Add to ADMIN\\_IDS in \\.env",
-                parse_mode="MarkdownV2"
+        if isinstance(event, Message):
+            # Message - use telegram_queue for rate limiting
+            telegram_queue: "TelegramQueue" = data["telegram_queue"]
+            await telegram_queue.reply(
+                event,
+                f"`[x]` Not admin. Your ID: `{user_id}`\n"
+                f"Add to ADMIN_IDS in .env",
             )
         elif hasattr(event, 'answer'):
             # CallbackQuery - popup (no markdown, shorter)
+            # Note: callback.answer() is not message sending, keep as-is
             await event.answer(
                 f"[x] Not admin. Your ID: {user_id}",
                 show_alert=True

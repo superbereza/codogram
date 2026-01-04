@@ -44,20 +44,27 @@ class TestAdminMiddleware:
     @pytest.mark.asyncio
     async def test_non_admin_message_blocked_with_id(self):
         """Non-admin Message users are blocked and receive their ID."""
+        from aiogram.types import Message
+
         middleware = AdminMiddleware()
         handler = AsyncMock()
-        event = Mock()
-        event.reply = AsyncMock()
-        data = {"event_from_user": Mock(id=999)}
+        # Create proper Message mock
+        event = Mock(spec=Message)
+        telegram_queue = AsyncMock()
+        telegram_queue.reply = AsyncMock()
+        data = {
+            "event_from_user": Mock(id=999),
+            "telegram_queue": telegram_queue,
+        }
 
         with patch("codogram.middleware.admin.get_admin_ids", return_value={123}):
             result = await middleware(handler, event, data)
 
         handler.assert_not_called()
         assert result is None
-        event.reply.assert_called_once()
-        # Check message follows tone-of-voice: [x] prefix + ID (escaped for MarkdownV2)
-        call_args = event.reply.call_args[0][0]
+        telegram_queue.reply.assert_called_once()
+        # Check message follows tone-of-voice: [x] prefix + ID
+        call_args = telegram_queue.reply.call_args[0][1]  # Second positional arg is text
         assert "Not admin" in call_args
         assert "999" in call_args
 
