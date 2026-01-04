@@ -62,6 +62,11 @@
 - enqueue_nowait() for fire-and-forget
 - Retry without parse_mode on Markdown errors
 
+### Markdown underscore escaping
+- Telegram interprets `_text_` as italic, breaking snake_case
+- Escape `_` → `\_` outside code blocks before sending
+- Regex-based, applied centrally in telegram_queue.py
+
 ### Security improvements
 - shell=False in all subprocess calls (prevents shell injection)
 - Project name validation (alphanumeric, dash, underscore only)
@@ -116,7 +121,23 @@ Centralized message chunking in TelegramQueue:
 - Removed duplicate code from watcher.py and permission_poller.py
 - See [docs/designs/done/2026-01-03-queue-level-chunking.md](designs/done/2026-01-03-queue-level-chunking.md)
 
+### Telegramify-markdown integration
+Full GFM → MarkdownV2 conversion using telegramify-markdown library:
+- Claude generates GFM Markdown (headers, **bold**, lists)
+- telegramify-markdown converts to Telegram MarkdownV2
+- Centralized conversion in telegram_queue.py
+- Fallback to plain text on parse errors
+- See [docs/designs/done/2025-01-04-telegramify-markdown-integration.md](designs/done/2025-01-04-telegramify-markdown-integration.md)
+
 ## Backlog
+
+### Menu redesign
+Reorganize bot commands for better usability:
+- Group commands by purpose (everyday, create, complete, settings)
+- Short aliases: `/thread`, `/branch`, `/finish`
+- Unified `/finish` for both worktree and regular topics
+- Archive topics instead of delete (close + icon)
+- See [docs/designs/2025-01-03-menu-redesign.md](designs/2025-01-03-menu-redesign.md)
 
 ### Bot refactoring
 Bot architecture refactoring — layered structure:
@@ -192,12 +213,6 @@ Command to toggle approval mode:
 - Reports mode change: "Allow once → Allow for session"
 - Parses current selection from tmux capture-pane
 
-### Markdown rendering fix
-Figure out why Markdown doesn't render in Telegram:
-- Sometimes messages come as plain text instead of formatted
-- Check character escaping
-- Possibly parse_mode issue
-
 ### Reply support
 When replying to message, send context to tmux:
 - Quote piece of message being replied to
@@ -267,11 +282,6 @@ Summarize long threads (questionable):
 Replace large dot `•` with dot in code block:
 - `•` renders poorly in some clients
 - Replace with `` `•` `` or another symbol
-
-### Markdown to Telegram converter
-Library for converting regular MD to TG-compatible:
-- Tables, headers don't render in Telegram
-- Look for existing solutions (telegramify-markdown, etc.)
 
 ## PoC / Research
 

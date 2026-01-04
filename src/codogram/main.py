@@ -41,8 +41,8 @@ async def main():
     from aiogram.types import BotCommand
     await bot.set_my_commands([
         BotCommand(command="start", description="Start Claude / show status"),
-        BotCommand(command="new", description="Start new Claude session (/clear)"),
-        # /clear intentionally not in menu - same as /new
+        BotCommand(command="clear", description="Clear context, start fresh"),
+        # /new intentionally not in menu - same as /clear
         BotCommand(command="thread_create", description="Create new Claude thread"),
         BotCommand(command="thread_delete", description="Delete Claude thread (in topic)"),
         BotCommand(command="branch_create", description="Create isolated git worktree + thread"),

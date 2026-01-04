@@ -12,10 +12,10 @@ _flow_state: dict[int, dict] = {}
 async def require_forum_group(message: Message) -> bool:
     """Check if message is from a forum group. Returns False and sends error if not."""
     if message.chat.type == "private":
-        await message.answer("`[!]` This command requires a group with topics.", parse_mode="Markdown")
+        await message.answer("`[!]` This command requires a group with topics.", parse_mode="MarkdownV2")
         return False
     if not message.chat.is_forum:
-        await message.answer("`[!]` Topics required. Enable in group settings -> Topics", parse_mode="Markdown")
+        await message.answer("`[!]` Topics required. Enable in group settings -> Topics", parse_mode="MarkdownV2")
         return False
     return True
 

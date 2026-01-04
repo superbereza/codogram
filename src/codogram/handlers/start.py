@@ -41,7 +41,7 @@ async def _handle_result(
             await message.answer(
                 f"Директория `{result.path}` не найдена.\n\nЧто делать?",
                 reply_markup=dir_not_found_keyboard(),
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
 
         case FlowAction.ASK_GIT_CHOICE:
@@ -59,14 +59,14 @@ async def _handle_result(
             await message.answer(
                 f"Запустить Claude в `{result.path}`?",
                 reply_markup=launch_confirm_keyboard(),
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
 
         case FlowAction.SHOW_STATUS:
             await state.clear()
             await message.answer(
                 f"Claude running: `{result.project}` in `{result.tmux_session}`",
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
 
         case FlowAction.CONNECT:
@@ -98,7 +98,7 @@ async def _handle_result(
             await state.clear()
             await message.answer(
                 f"Thread `{result.thread_name}` running in `{result.tmux_session}`",
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
 
         case FlowAction.THREAD_LAUNCH:
@@ -109,7 +109,7 @@ async def _handle_result(
             await state.clear()
             await message.answer(
                 f"Thread upgraded to `{result.thread_name}`",
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
             await _launch_claude_in_thread(message, result)
 
@@ -117,7 +117,7 @@ async def _handle_result(
             await state.clear()
             await message.answer(
                 f"Topic registered as `{result.thread_name}`",
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
             await _launch_claude_in_thread(message, result)
 
@@ -148,7 +148,7 @@ async def _handle_callback_result(
             await state.clear()
             await callback.message.edit_text(
                 f"Connected to `{result.tmux_session}`",
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
             await _connect_to_session_from_callback(callback, result)
 
@@ -257,7 +257,7 @@ async def _connect_to_session(message: Message, result: FlowResult):
         project_manager._save()
         await message.answer(
             f"Connected to `{result.tmux_session}`",
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
         )
 
 
@@ -494,7 +494,7 @@ async def cmd_restart(message: Message, state: FSMContext):
         await message.answer(
             f"Restart session `{result.tmux_session}`?",
             reply_markup=restart_confirm_keyboard(),
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
         )
     else:
         await _handle_result(message, state, result)

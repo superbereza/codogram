@@ -94,12 +94,12 @@ async def cmd_resume(message: Message):
         await message.answer(
             "`[!]` /resume not supported in multi-session mode.\n"
             "Use /thread_create for a new thread.",
-            parse_mode="Markdown"
+            parse_mode="MarkdownV2"
         )
     else:
         # In private/general - just inform
         await message.answer(
             "`[!]` /resume not supported.\n"
             "Use /start to connect to existing session.",
-            parse_mode="Markdown"
+            parse_mode="MarkdownV2"
         )

@@ -4,6 +4,7 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
 
+import telegramify_markdown
 from aiogram import Bot
 from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup
@@ -183,6 +184,17 @@ class TelegramQueue:
 
         try:
             for msg in expanded_messages:
+                # Convert GFM to MarkdownV2 using telegramify-markdown
+                if msg.get("parse_mode") == "MarkdownV2":
+                    try:
+                        msg["text"] = telegramify_markdown.markdownify(
+                            msg.get("text", ""),
+                            max_line_length=None,
+                            normalize_whitespace=False
+                        )
+                    except Exception as e:
+                        logger.warning(f"markdownify failed: {e}")
+
                 result = await self.bot.send_message(
                     chat_id=batch.chat_id,
                     message_thread_id=batch.thread_id,

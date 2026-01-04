@@ -33,12 +33,12 @@ async def cmd_branch_create(message: Message):
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await message.answer("`[!]` Project not registered. Use /start first.", parse_mode="Markdown")
+        await message.answer("`[!]` Project not registered. Use /start first.", parse_mode="MarkdownV2")
         return
 
     # Check git repo
     if not is_git_repo(Path(project.cwd)):
-        await message.answer("`[x]` Git repository required for /branch_create", parse_mode="Markdown")
+        await message.answer("`[x]` Git repository required for /branch_create", parse_mode="MarkdownV2")
         return
 
     # Parse name argument
@@ -56,7 +56,7 @@ async def cmd_branch_create(message: Message):
     # Check length
     max_len = max_branch_name_length(project.project_name)
     if len(branch_name) > max_len:
-        await message.answer(f"`[x]` Name too long (max {max_len} chars for this project)", parse_mode="Markdown")
+        await message.answer(f"`[x]` Name too long (max {max_len} chars for this project)", parse_mode="MarkdownV2")
         return
 
     # Get default branch
@@ -81,7 +81,7 @@ async def cmd_branch_create(message: Message):
             [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await message.answer("`[!]` Uncommitted changes detected", reply_markup=keyboard, parse_mode="Markdown")
+        await message.answer("`[!]` Uncommitted changes detected", reply_markup=keyboard, parse_mode="MarkdownV2")
         return
 
     # No uncommitted changes - create directly
@@ -112,7 +112,7 @@ async def on_branch_base_selected(callback: CallbackQuery):
             [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await callback.message.edit_text(f"`[!]` Uncommitted changes in {base_branch}", reply_markup=keyboard, parse_mode="Markdown")
+        await callback.message.edit_text(f"`[!]` Uncommitted changes in {base_branch}", reply_markup=keyboard, parse_mode="MarkdownV2")
         return
 
     await callback.message.delete()
@@ -154,7 +154,7 @@ async def on_branch_commit_request(callback: CallbackQuery):
     await callback.message.edit_text(
         "`[~]` Sent: \"Commit current changes in logical chunks with descriptive messages.\"\n\n"
         f"Run `/branch_create {branch_name}` again after commit.",
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
@@ -167,7 +167,7 @@ async def on_branch_redirect(callback: CallbackQuery):
 
     await callback.message.edit_text(
         "Use `/branch_create` or `/branch_create <name>` to create isolated worktree branch.",
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
@@ -184,19 +184,19 @@ async def cmd_branch_finish(message: Message):
     project = project_manager.get_by_chat(message.chat.id)
 
     if not project:
-        await message.answer("`[!]` Project not registered.", parse_mode="Markdown")
+        await message.answer("`[!]` Project not registered.", parse_mode="MarkdownV2")
         return
 
     thread = project.get_thread(thread_id)
     if not thread or not thread.worktree_path:
-        await message.answer("`[!]` /branch_finish only works in worktree topics. Use /thread_delete for this topic.", parse_mode="Markdown")
+        await message.answer("`[!]` /branch_finish only works in worktree topics. Use /thread_delete for this topic.", parse_mode="MarkdownV2")
         return
 
     # Check uncommitted changes
     worktree_path = Path(thread.worktree_path)
 
     if worktree_path.exists() and has_uncommitted_changes(worktree_path):
-        await message.answer("`[!]` Uncommitted changes. Commit or stash first.", parse_mode="Markdown")
+        await message.answer("`[!]` Uncommitted changes. Commit or stash first.", parse_mode="MarkdownV2")
         return
 
     # Build keyboard
@@ -212,7 +212,7 @@ async def cmd_branch_finish(message: Message):
     buttons.append([InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")])
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.answer(f"Finish `{thread.name}` branch:", reply_markup=keyboard, parse_mode="Markdown")
+    await message.answer(f"Finish `{thread.name}` branch:", reply_markup=keyboard, parse_mode="MarkdownV2")
 
 
 @router.callback_query(F.data.startswith("bf_merge:"))
@@ -234,7 +234,7 @@ async def on_branch_merge_selected(callback: CallbackQuery):
 
     # Check target has no uncommitted changes
     if has_uncommitted_changes(Path(project.cwd)):
-        await callback.message.edit_text("`[!]` Uncommitted changes in target directory. Commit or stash first.", parse_mode="Markdown")
+        await callback.message.edit_text("`[!]` Uncommitted changes in target directory. Commit or stash first.", parse_mode="MarkdownV2")
         await callback.answer()
         return
 
@@ -251,7 +251,7 @@ async def on_branch_merge_selected(callback: CallbackQuery):
         "- Archive topic\n\n"
         "Continue?",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
@@ -273,7 +273,7 @@ async def on_branch_do_merge(callback: CallbackQuery):
         await callback.answer("Thread not found")
         return
 
-    await callback.message.edit_text(f"`[~]` Merging {thread.name} -> {target_branch}...", parse_mode="Markdown")
+    await callback.message.edit_text(f"`[~]` Merging {thread.name} -> {target_branch}...", parse_mode="MarkdownV2")
     await callback.answer()
 
     main_repo = Path(project.cwd)
@@ -283,9 +283,9 @@ async def on_branch_do_merge(callback: CallbackQuery):
     result = merge_branch(main_repo, branch_name, target_branch)
     if not result.success:
         if "conflicts" in result.error.lower():
-            await callback.message.edit_text("`[!]` Merge conflicts. Resolve and run /branch_finish again.", parse_mode="Markdown")
+            await callback.message.edit_text("`[!]` Merge conflicts. Resolve and run /branch_finish again.", parse_mode="MarkdownV2")
         else:
-            await callback.message.edit_text(f"`[x]` Merge failed: {result.error}", parse_mode="Markdown")
+            await callback.message.edit_text(f"`[x]` Merge failed: {result.error}", parse_mode="MarkdownV2")
         return
 
     # Push (optional, don't fail on error)
@@ -295,7 +295,7 @@ async def on_branch_do_merge(callback: CallbackQuery):
     # Cleanup
     await do_branch_cleanup(callback.bot, callback.message.chat.id, project, thread, force=False)
 
-    await callback.message.edit_text(f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}", parse_mode="Markdown")
+    await callback.message.edit_text(f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}", parse_mode="MarkdownV2")
 
 
 @router.callback_query(F.data.startswith("bf_delete:"))
@@ -328,7 +328,7 @@ async def on_branch_delete_selected(callback: CallbackQuery):
         "- Archive topic\n\n"
         "WARNING: Changes will be LOST!",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
@@ -349,10 +349,10 @@ async def on_branch_do_delete(callback: CallbackQuery):
         await callback.answer("Thread not found")
         return
 
-    await callback.message.edit_text(f"`[~]` Deleting {thread.name}...", parse_mode="Markdown")
+    await callback.message.edit_text(f"`[~]` Deleting {thread.name}...", parse_mode="MarkdownV2")
     await callback.answer()
 
     # Cleanup with force=True to delete branch
     await do_branch_cleanup(callback.bot, callback.message.chat.id, project, thread, force=True)
 
-    await callback.message.edit_text(f"`[v]` Branch {thread.name} deleted", parse_mode="Markdown")
+    await callback.message.edit_text(f"`[v]` Branch {thread.name} deleted", parse_mode="MarkdownV2")

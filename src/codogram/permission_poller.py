@@ -113,7 +113,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                 batch = OutgoingBatch(
                     chat_id=chat_id,
                     thread_id=None,
-                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "Markdown"}],
+                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
@@ -163,7 +163,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                         body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            body_messages.append({"text": body_text, "parse_mode": "Markdown"})
+                            body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
@@ -236,7 +236,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                     body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        body_messages.append({"text": body_text, "parse_mode": "Markdown"})
+                        body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                     options_text = "\n".join(parsed.options)
                     body_messages.append({"text": options_text})
@@ -309,7 +309,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                 batch = OutgoingBatch(
                     chat_id=chat_id,
                     thread_id=thread_id,
-                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "Markdown"}],
+                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
@@ -351,7 +351,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                         body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            body_messages.append({"text": body_text, "parse_mode": "Markdown"})
+                            body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
@@ -424,7 +424,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                     body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        body_messages.append({"text": body_text, "parse_mode": "Markdown"})
+                        body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                     options_text = "\n".join(parsed.options)
                     body_messages.append({"text": options_text})

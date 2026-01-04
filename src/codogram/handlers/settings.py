@@ -16,7 +16,7 @@ async def cmd_get_debug_ids(message: Message):
     await message.answer(
         f"Your user ID: `{message.from_user.id}`\n"
         f"This chat ID: `{message.chat.id}`{thread_info}",
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
 
 
@@ -46,7 +46,7 @@ async def cmd_help(message: Message):
 `/esc` — Send Escape to Claude
 `/get_debug_ids` — Show debug IDs"""
 
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="MarkdownV2")
 
 
 @router.message(Command("settings"))
@@ -77,7 +77,7 @@ async def cmd_settings(message: Message):
             f"Auto-accept: {auto_status}"
         )
 
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="MarkdownV2")
 
 
 @router.message(Command("auto_accept"))
@@ -104,16 +104,16 @@ async def cmd_auto_accept(message: Message):
             for t in project.threads.values():
                 t.auto_accept = False
         project_manager._save()
-        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="Markdown")
+        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="MarkdownV2")
         return
 
     # /auto_accept - toggle current context
     if thread:
         thread.auto_accept = not thread.auto_accept
         status = "⚡ ON" if thread.auto_accept else "OFF"
-        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="Markdown")
+        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="MarkdownV2")
     else:
         project.auto_accept = not project.auto_accept
         status = "⚡ ON" if project.auto_accept else "OFF"
-        await message.answer(f"Auto-accept: **{status}**", parse_mode="Markdown")
+        await message.answer(f"Auto-accept: **{status}**", parse_mode="MarkdownV2")
     project_manager._save()
