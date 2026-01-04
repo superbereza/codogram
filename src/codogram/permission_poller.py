@@ -67,6 +67,33 @@ def _detect_crash(screen: str) -> str | None:
     return None
 
 
+def _detect_exit(screen: str) -> bool:
+    """Detect if Claude exited normally (not crash).
+
+    Returns True if:
+    1. Claude UI NOT visible
+    2. Shell prompt visible (at end of screen)
+    3. NO crash signatures
+    """
+    if is_claude_ready(screen):
+        return False
+
+    lines = screen.split("\n")
+    last_lines = "\n".join(lines[-5:])  # Check last 5 lines for shell
+
+    # Must have shell prompt
+    has_shell = any(p in last_lines for p in SHELL_PROMPTS)
+    if not has_shell:
+        return False
+
+    # Must NOT have crash signatures
+    for sig in CRASH_SIGNATURES:
+        if sig in last_lines:
+            return False
+
+    return True
+
+
 async def create_poller_task(bot: Bot, project: ProjectState, telegram_queue: "TelegramQueue") -> asyncio.Task:
     """Create permission poller task for project."""
     return asyncio.create_task(permission_poller_for_project(bot, project, telegram_queue))
@@ -95,6 +122,26 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
     DEBOUNCE_TIME = 0.5
     POLL_INTERVAL = 0.5
 
+    # Check if Claude already exited before poller started (e.g. after bot restart)
+    try:
+        initial_screen = tmux.capture_pane()
+        if _detect_exit(initial_screen):
+            logger.info(f"Permission poller: Claude already exited (detected on startup)")
+            try:
+                batch = OutgoingBatch(
+                    chat_id=chat_id,
+                    thread_id=None,
+                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "MarkdownV2"}],
+                )
+                await telegram_queue.enqueue_nowait(batch)
+            except Exception:
+                pass
+            return  # Don't start polling
+    except Exception:
+        pass  # tmux might not exist yet
+
+    claude_was_active = False  # Track if Claude was ever active (avoid false exit on startup)
+
     while True:
         await asyncio.sleep(POLL_INTERVAL)
 
@@ -105,6 +152,10 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
             logger.warning(f"Permission poller: capture error: {e}")
             continue
 
+        # Track if Claude was ever active
+        if is_claude_ready(screen):
+            claude_was_active = True
+
         # Crash detection
         crash_reason = _detect_crash(screen)
         if crash_reason:
@@ -114,6 +165,20 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                     chat_id=chat_id,
                     thread_id=None,
                     messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
+                )
+                await telegram_queue.enqueue_nowait(batch)
+            except Exception:
+                pass
+            return  # Exit poller
+
+        # Exit detection (only if Claude was active before)
+        if claude_was_active and _detect_exit(screen):
+            logger.info(f"Permission poller: Claude exited normally")
+            try:
+                batch = OutgoingBatch(
+                    chat_id=chat_id,
+                    thread_id=None,
+                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "MarkdownV2"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
@@ -291,6 +356,26 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
     DEBOUNCE_TIME = 0.5
     POLL_INTERVAL = 0.5
 
+    # Check if Claude already exited before poller started (e.g. after bot restart)
+    try:
+        initial_screen = tmux.capture_pane()
+        if _detect_exit(initial_screen):
+            logger.info(f"Thread poller {thread.name}: Claude already exited (detected on startup)")
+            try:
+                batch = OutgoingBatch(
+                    chat_id=chat_id,
+                    thread_id=thread_id,
+                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "MarkdownV2"}],
+                )
+                await telegram_queue.enqueue_nowait(batch)
+            except Exception:
+                pass
+            return  # Don't start polling
+    except Exception:
+        pass  # tmux might not exist yet
+
+    claude_was_active = False  # Track if Claude was ever active
+
     while True:
         await asyncio.sleep(POLL_INTERVAL)
 
@@ -301,6 +386,10 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
             logger.warning(f"Thread poller {thread.name}: capture error: {e}")
             continue
 
+        # Track if Claude was ever active
+        if is_claude_ready(screen):
+            claude_was_active = True
+
         # Crash detection
         crash_reason = _detect_crash(screen)
         if crash_reason:
@@ -310,6 +399,20 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                     chat_id=chat_id,
                     thread_id=thread_id,
                     messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
+                )
+                await telegram_queue.enqueue_nowait(batch)
+            except Exception:
+                pass
+            return  # Exit poller
+
+        # Exit detection (only if Claude was active before)
+        if claude_was_active and _detect_exit(screen):
+            logger.info(f"Thread poller {thread.name}: Claude exited normally")
+            try:
+                batch = OutgoingBatch(
+                    chat_id=chat_id,
+                    thread_id=thread_id,
+                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "MarkdownV2"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
