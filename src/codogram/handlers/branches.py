@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 
 from ..session_manager import project_manager
-from ..bot import require_forum_group, _start_state, _do_branch_create
+from ..bot import require_forum_group, _start_state, _do_branch_create, _do_branch_cleanup
 from ..magic_names import get_random_magic_name
 from ..git_utils import (
     is_git_repo,
@@ -14,8 +14,10 @@ from ..git_utils import (
     max_branch_name_length,
     has_uncommitted_changes,
     get_default_branch,
+    branch_exists,
 )
 from ..tmux import TmuxSession
+from ..worktree import merge_branch, push_branch
 
 router = Router(name="branches")
 
@@ -167,3 +169,189 @@ async def on_branch_redirect(callback: CallbackQuery):
         parse_mode="Markdown"
     )
     await callback.answer()
+
+
+# ===== /branch_finish =====
+
+@router.message(Command("branch_finish"))
+async def cmd_branch_finish(message: Message):
+    """Finish branch: merge and cleanup worktree."""
+    if not await require_forum_group(message):
+        return
+
+    thread_id = message.message_thread_id
+    project = project_manager.get_by_chat(message.chat.id)
+
+    if not project:
+        await message.answer("`[!]` Project not registered.", parse_mode="Markdown")
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread or not thread.worktree_path:
+        await message.answer("`[!]` /branch_finish only works in worktree topics. Use /thread_delete for this topic.", parse_mode="Markdown")
+        return
+
+    # Check uncommitted changes
+    worktree_path = Path(thread.worktree_path)
+
+    if worktree_path.exists() and has_uncommitted_changes(worktree_path):
+        await message.answer("`[!]` Uncommitted changes. Commit or stash first.", parse_mode="Markdown")
+        return
+
+    # Build keyboard
+    default_branch = get_default_branch(Path(project.cwd))
+    buttons = [[InlineKeyboardButton(text=f"Merge -> {default_branch}", callback_data=f"bf_merge:{thread_id}:{default_branch}")]]
+
+    # Add base_branch option if it exists and is different
+    if thread.base_branch and thread.base_branch != default_branch:
+        if branch_exists(Path(project.cwd), thread.base_branch):
+            buttons.append([InlineKeyboardButton(text=f"Merge -> {thread.base_branch}", callback_data=f"bf_merge:{thread_id}:{thread.base_branch}")])
+
+    buttons.append([InlineKeyboardButton(text="[!!] Delete without merge", callback_data=f"bf_delete:{thread_id}")])
+    buttons.append([InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await message.answer(f"Finish `{thread.name}` branch:", reply_markup=keyboard, parse_mode="Markdown")
+
+
+@router.callback_query(F.data.startswith("bf_merge:"))
+async def on_branch_merge_selected(callback: CallbackQuery):
+    """Show merge confirmation."""
+    parts = callback.data.split(":")
+    thread_id = int(parts[1])
+    target_branch = parts[2]
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await callback.answer("Thread not found")
+        return
+
+    # Check target has no uncommitted changes
+    if has_uncommitted_changes(Path(project.cwd)):
+        await callback.message.edit_text("`[!]` Uncommitted changes in target directory. Commit or stash first.", parse_mode="Markdown")
+        await callback.answer()
+        return
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Yes, finish", callback_data=f"bf_do_merge:{thread_id}:{target_branch}")],
+        [InlineKeyboardButton(text="[x] Cancel", callback_data="cancel")]
+    ])
+
+    await callback.message.edit_text(
+        f"Merge `{thread.name}` -> `{target_branch}` will:\n"
+        "- Merge branch and push\n"
+        "- Close tmux session\n"
+        f"- Delete {thread.worktree_path}\n"
+        "- Archive topic\n\n"
+        "Continue?",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("bf_do_merge:"))
+async def on_branch_do_merge(callback: CallbackQuery):
+    """Execute merge and cleanup."""
+    parts = callback.data.split(":")
+    thread_id = int(parts[1])
+    target_branch = parts[2]
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await callback.answer("Thread not found")
+        return
+
+    await callback.message.edit_text(f"`[~]` Merging {thread.name} -> {target_branch}...", parse_mode="Markdown")
+    await callback.answer()
+
+    main_repo = Path(project.cwd)
+    branch_name = thread.name
+
+    # Merge
+    result = merge_branch(main_repo, branch_name, target_branch)
+    if not result.success:
+        if "conflicts" in result.error.lower():
+            await callback.message.edit_text("`[!]` Merge conflicts. Resolve and run /branch_finish again.", parse_mode="Markdown")
+        else:
+            await callback.message.edit_text(f"`[x]` Merge failed: {result.error}", parse_mode="Markdown")
+        return
+
+    # Push (optional, don't fail on error)
+    push_result = push_branch(main_repo, target_branch)
+    push_warning = "" if push_result.success else "\n`[!]` Push failed. Run `git push` manually."
+
+    # Cleanup
+    await _do_branch_cleanup(callback.message, project, thread, force=False)
+
+    await callback.message.edit_text(f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}", parse_mode="Markdown")
+
+
+@router.callback_query(F.data.startswith("bf_delete:"))
+async def on_branch_delete_selected(callback: CallbackQuery):
+    """Show delete confirmation."""
+    parts = callback.data.split(":")
+    thread_id = int(parts[1])
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await callback.answer("Thread not found")
+        return
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Yes, delete", callback_data=f"bf_do_delete:{thread_id}")],
+        [InlineKeyboardButton(text="[x] Cancel", callback_data="cancel")]
+    ])
+
+    await callback.message.edit_text(
+        f"`[!!]` Delete `{thread.name}` WITHOUT merging?\n\n"
+        "This will:\n"
+        "- Close tmux session\n"
+        f"- Delete {thread.worktree_path}\n"
+        "- Delete local branch\n"
+        "- Archive topic\n\n"
+        "WARNING: Changes will be LOST!",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("bf_do_delete:"))
+async def on_branch_do_delete(callback: CallbackQuery):
+    """Execute delete without merge."""
+    parts = callback.data.split(":")
+    thread_id = int(parts[1])
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await callback.answer("Thread not found")
+        return
+
+    await callback.message.edit_text(f"`[~]` Deleting {thread.name}...", parse_mode="Markdown")
+    await callback.answer()
+
+    # Cleanup with force=True to delete branch
+    await _do_branch_cleanup(callback.message, project, thread, force=True)
+
+    await callback.message.edit_text(f"`[v]` Branch {thread.name} deleted", parse_mode="Markdown")
