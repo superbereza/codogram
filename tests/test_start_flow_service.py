@@ -556,3 +556,55 @@ class TestHandleStartWithThreadId:
 
         assert result.action == FlowAction.ASK_PROJECT_NAME
         assert result.thread_id == 456
+
+
+class TestHandleTopicExistingThread:
+    """Tests for topic start with existing thread."""
+
+    def test_thread_exists_tmux_running(self):
+        """Thread exists, tmux running -> THREAD_SHOW_STATUS."""
+        mock_pm = Mock()
+        thread = Mock()
+        thread.thread_id = 456
+        thread.name = "mystic"
+        thread.get_tmux_session.return_value = "claude-test-mystic"
+        project = Mock(
+            project_name="test",
+            cwd="/tmp/test",
+            threads={456: thread},
+        )
+        mock_pm.get_by_chat.return_value = project
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.TmuxSession") as mock_tmux:
+            mock_tmux.return_value.exists.return_value = True
+            result = service.handle_start(chat_id=123, args=[], thread_id=456)
+
+        assert result.action == FlowAction.THREAD_SHOW_STATUS
+        assert result.thread_id == 456
+        assert result.tmux_session == "claude-test-mystic"
+
+    def test_thread_exists_no_tmux(self):
+        """Thread exists, no tmux -> THREAD_LAUNCH."""
+        mock_pm = Mock()
+        thread = Mock()
+        thread.thread_id = 456
+        thread.name = "mystic"
+        thread.get_tmux_session.return_value = "claude-test-mystic"
+        project = Mock(
+            project_name="test",
+            cwd="/tmp/test",
+            threads={456: thread},
+        )
+        mock_pm.get_by_chat.return_value = project
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.TmuxSession") as mock_tmux:
+            mock_tmux.return_value.exists.return_value = False
+            result = service.handle_start(chat_id=123, args=[], thread_id=456)
+
+        assert result.action == FlowAction.THREAD_LAUNCH
+        assert result.thread_id == 456
+        assert result.thread_name == "mystic"

@@ -10,7 +10,7 @@ from ..domain.validators import (
     MAX_PROJECT_NAME_LENGTH,
 )
 from ..project_launcher import resolve_project_path, is_tmux_session_exists, git_init, git_init_with_github, git_clone
-from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention
+from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention, TmuxSession
 
 if TYPE_CHECKING:
     from ..session_manager import ProjectManager
@@ -127,8 +127,40 @@ class StartFlowService:
                 thread_id=thread_id,
             )
 
-        # TODO: More cases in next tasks
+        # Case 2: Thread exists
+        thread = project.threads.get(thread_id)
+        if thread:
+            if thread.name == "pending":
+                # TODO: Task 5
+                pass
+            else:
+                return self._check_thread_tmux(project, thread)
+
+        # TODO: Case 3 in Task 6
         return FlowResult(action=FlowAction.ERROR, error="Not implemented")
+
+    def _check_thread_tmux(self, project, thread) -> FlowResult:
+        """Check tmux for thread and return appropriate action."""
+        tmux_name = thread.get_tmux_session(project.project_name)
+        tmux = TmuxSession(tmux_name, project.cwd)
+
+        if tmux.exists():
+            return FlowResult(
+                action=FlowAction.THREAD_SHOW_STATUS,
+                project=project.project_name,
+                path=project.cwd,
+                tmux_session=tmux_name,
+                thread_id=thread.thread_id,
+                thread_name=thread.name,
+            )
+        else:
+            return FlowResult(
+                action=FlowAction.THREAD_LAUNCH,
+                project=project.project_name,
+                path=project.cwd,
+                thread_id=thread.thread_id,
+                thread_name=thread.name,
+            )
 
     def _validate_and_start(self, chat_id: int, project_name: str) -> FlowResult:
         """Validate project name and start flow."""
