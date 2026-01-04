@@ -33,6 +33,7 @@ class EditBatch:
     message_id: int
     text: str
     parse_mode: str | None = None
+    reply_markup: InlineKeyboardMarkup | None = None
 
 
 @dataclass
@@ -260,12 +261,25 @@ class TelegramQueue:
             )
             return
 
+        # Apply telegramify for MarkdownV2
+        text = batch.text
+        if batch.parse_mode == "MarkdownV2":
+            try:
+                text = telegramify_markdown.markdownify(
+                    text,
+                    max_line_length=None,
+                    normalize_whitespace=False
+                )
+            except Exception as e:
+                logger.warning(f"markdownify failed on edit: {e}")
+
         try:
             await self.bot.edit_message_text(
                 chat_id=batch.chat_id,
                 message_id=batch.message_id,
-                text=batch.text,
+                text=text,
                 parse_mode=batch.parse_mode,
+                reply_markup=batch.reply_markup,
             )
         except TelegramRetryAfter as e:
             logger.warning(
