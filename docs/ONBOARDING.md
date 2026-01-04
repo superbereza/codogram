@@ -48,7 +48,9 @@ codogram/
 │   ├── history_watcher.py    # Monitor history.jsonl for session changes
 │   ├── permission_poller.py  # Poll tmux for permission prompts
 │   ├── watcher.py            # Monitor session jsonl for tool calls
-│   ├── bot.py                # Telegram command handlers
+│   ├── handlers/             # Telegram command handlers (8 modules)
+│   ├── services/             # Business logic (launch, branch, message_router)
+│   ├── middleware/           # Admin check middleware
 │   ├── tmux.py               # Tmux session interaction
 │   └── screen.py             # Parse tmux screen content
 └── restart.sh                # Restart bot script

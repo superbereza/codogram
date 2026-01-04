@@ -152,11 +152,11 @@
 
 ### Migrate strings to strings.py
 Перенести все захардкоженные строки в `src/codogram/strings.py`:
-- bot.py — основной объём (~50 строк)
+- handlers/ — ответы команд (~50 строк)
 - launch_animation.py — статусы запуска
 - history_watcher.py — уведомления
-- keyboards.py — кнопки
-- start_flow.py — кнопки wizard'а
+- keyboards/ — кнопки
+- services/start_flow.py — кнопки wizard'а
 - См. `docs/specs/tone-of-voice.md` для гайдлайнов
 
 ### Voice → Whisper

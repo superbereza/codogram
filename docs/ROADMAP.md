@@ -152,11 +152,11 @@ Bot architecture refactoring — layered structure:
 
 ### Migrate strings to strings.py
 Move all hardcoded strings to `src/codogram/strings.py`:
-- bot.py — main volume (~50 strings)
+- handlers/ — command responses (~50 strings)
 - launch_animation.py — startup statuses
 - history_watcher.py — notifications
-- keyboards.py — buttons
-- start_flow.py — wizard buttons
+- keyboards/ — buttons
+- services/start_flow.py — wizard buttons
 - See `docs/specs/tone-of-voice.md` for guidelines
 
 ### Voice → Whisper
