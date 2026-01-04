@@ -239,10 +239,10 @@ def _entry_to_messages(entry: ParsedEntry) -> list[dict]:
     messages = []
 
     if entry.content_type == ContentType.TEXT:
-        messages.append({"text": f"● {entry.text}", "parse_mode": "MarkdownV2"})
+        messages.append({"text": f"● {entry.text}", "parse_mode": "Markdown"})
 
     elif entry.content_type == ContentType.TOOL_USE:
         text = format_tool_use(entry.tool_name, entry.tool_input)
-        messages.append({"text": text, "parse_mode": "MarkdownV2"})
+        messages.append({"text": text, "parse_mode": "Markdown"})
 
     return messages

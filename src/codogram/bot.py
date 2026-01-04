@@ -7,7 +7,7 @@ import time
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
-from aiogram.exceptions import TelegramRetryAfter
+from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 
 from .config import settings
 from .session_manager import project_manager, ProjectState, ThreadInfo
@@ -35,6 +35,18 @@ _start_state: dict[int, dict] = {}
 
 router = Router()
 
+
+@router.error()
+async def error_handler(event, exception):
+    """Global error handler - catch TelegramBadRequest and log."""
+    if isinstance(exception, TelegramBadRequest):
+        if "parse entities" in str(exception).lower():
+            logger.warning(f"MarkdownV2 parse error (swallowed): {exception}")
+            return True  # Mark as handled, don't propagate
+    # Re-raise other errors
+    return False
+
+
 # Cache admin IDs
 _admin_ids: set[int] | None = None
 
@@ -60,10 +72,10 @@ def is_valid_project_name(name: str) -> bool:
 async def require_forum_group(message: Message) -> bool:
     """Check if message is from a forum group. Returns False and sends error if not."""
     if message.chat.type == "private":
-        await message.answer("`[!]` This command requires a group with topics.", parse_mode="MarkdownV2")
+        await message.answer("`[!]` This command requires a group with topics.", parse_mode="Markdown")
         return False
     if not message.chat.is_forum:
-        await message.answer("`[!]` Topics required. Enable in group settings -> Topics", parse_mode="MarkdownV2")
+        await message.answer("`[!]` Topics required. Enable in group settings -> Topics", parse_mode="Markdown")
         return False
     return True
 
@@ -74,8 +86,9 @@ async def send_with_retry(
     parse_mode: str = "Markdown",
     retries: int = 3,
     message_thread_id: int | None = None,
+    reply_markup: InlineKeyboardMarkup | None = None,
 ) -> bool:
-    """Send message with retry on rate limit."""
+    """Send message with retry on rate limit and fallback on parse errors."""
     for attempt in range(retries):
         try:
             if message_thread_id is not None:
@@ -84,15 +97,69 @@ async def send_with_retry(
                     text,
                     parse_mode=parse_mode,
                     message_thread_id=message_thread_id,
+                    reply_markup=reply_markup,
                 )
             else:
-                await message.answer(text, parse_mode=parse_mode)
+                await message.answer(text, parse_mode=parse_mode, reply_markup=reply_markup)
             return True
         except TelegramRetryAfter as e:
             logger.warning(f"Rate limited, retrying in {e.retry_after}s (attempt {attempt + 1}/{retries})")
             await asyncio.sleep(e.retry_after + 1)
+        except TelegramBadRequest as e:
+            if "parse entities" in str(e).lower() and parse_mode:
+                logger.warning(f"Parse error with {parse_mode}, retrying without parse_mode")
+                parse_mode = None  # Retry without parse_mode
+            else:
+                logger.error(f"TelegramBadRequest: {e}")
+                return False
     logger.error("Failed to send message after retries")
     return False
+
+
+async def safe_edit(
+    message: Message,
+    text: str,
+    parse_mode: str = "Markdown",
+    reply_markup: InlineKeyboardMarkup | None = None,
+) -> bool:
+    """Edit message with fallback on parse errors."""
+    try:
+        await message.edit_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
+        return True
+    except TelegramBadRequest as e:
+        if "parse entities" in str(e).lower() and parse_mode:
+            logger.warning(f"Parse error with {parse_mode}, retrying without parse_mode")
+            try:
+                await message.edit_text(text, reply_markup=reply_markup)
+                return True
+            except Exception as e2:
+                logger.error(f"Edit failed even without parse_mode: {e2}")
+                return False
+        logger.error(f"TelegramBadRequest on edit: {e}")
+        return False
+
+
+async def safe_answer(
+    message: Message,
+    text: str,
+    parse_mode: str = "Markdown",
+    reply_markup: InlineKeyboardMarkup | None = None,
+) -> bool:
+    """Send message with fallback on parse errors."""
+    try:
+        await message.answer(text, parse_mode=parse_mode, reply_markup=reply_markup)
+        return True
+    except TelegramBadRequest as e:
+        if "parse entities" in str(e).lower() and parse_mode:
+            logger.warning(f"Parse error with {parse_mode}, retrying without parse_mode")
+            try:
+                await message.answer(text, reply_markup=reply_markup)
+                return True
+            except Exception as e2:
+                logger.error(f"Answer failed even without parse_mode: {e2}")
+                return False
+        logger.error(f"TelegramBadRequest on answer: {e}")
+        return False
 
 
 def get_session_for_chat(chat_id: int) -> TmuxSession | None:
@@ -167,7 +234,7 @@ async def show_status(message: Message, project: ProjectState):
         f"Attach: `tmux attach -t {project.tmux_session}`",
     ])
 
-    await message.answer("\n".join(status_lines), parse_mode="MarkdownV2")
+    await message.answer("\n".join(status_lines), parse_mode="Markdown")
 
 def _make_task_starters(bot):
     """Create task starter functions with bot and queue bound.
@@ -212,10 +279,11 @@ async def _start_project_flow(message: Message, project: ProjectState):
             "project": project.project_name,
             "path": path,
         }
-        await message.answer(
+        await send_with_retry(
+            message,
             f"Directory `{path}` not found.\n\nWhat to do?",
+            parse_mode="Markdown",
             reply_markup=dir_not_found_keyboard(),
-            parse_mode="MarkdownV2",
         )
 
     project_manager._save()
@@ -231,7 +299,7 @@ async def _start_thread_flow(message: Message, project: ProjectState, thread: Th
         await message.answer(
             f"Claude active in `{tmux_name}`\n\n"
             f"Attach: `tmux attach -t {tmux_name}`",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
         )
     else:
         # No tmux - launch Claude for this thread
@@ -270,7 +338,7 @@ async def _connect_or_launch(message: Message, project: ProjectState):
                         InlineKeyboardButton(text="No", callback_data="start:cancel"),
                     ]
                 ]),
-                parse_mode="MarkdownV2",
+                parse_mode="Markdown",
             )
             return
     elif len(tmux_list) == 1:
@@ -358,14 +426,14 @@ async def cmd_start(message: Message):
         if not is_valid_project_name(project_name):
             await message.answer(
                 "Project name can only contain letters, digits, `-` and `_`.",
-                parse_mode="MarkdownV2",
+                parse_mode="Markdown",
             )
             return
         if len(project_name) > 35:
             await message.answer(
                 "`[!]` Project name too long (max 35 chars). "
                 "Rename group or use /register_dir with shorter name.",
-                parse_mode="MarkdownV2",
+                parse_mode="Markdown",
             )
             return
         project = project_manager.get_or_create(project_name)
@@ -402,7 +470,7 @@ async def cmd_start(message: Message):
                 await message.answer(
                     "`[!]` Project name too long (max 35 chars). "
                     "Rename group or use /register_dir with shorter name.",
-                    parse_mode="MarkdownV2",
+                    parse_mode="Markdown",
                 )
                 return
             project = project_manager.get_or_create(sanitized)
@@ -414,7 +482,7 @@ async def cmd_start(message: Message):
     _start_state[chat_id] = {"state": "awaiting_project_name"}
     await message.answer(
         "Send project name (e.g. `my-project`):",
-        parse_mode="MarkdownV2",
+        parse_mode="Markdown",
     )
 
 
@@ -602,7 +670,7 @@ async def cmd_thread_create(message: Message):
             "*Recommendation:* use git worktree — each topic gets "
             "an isolated copy of the repository.",
             reply_markup=keyboard,
-            parse_mode="MarkdownV2"
+            parse_mode="Markdown"
         )
         return
 
@@ -643,16 +711,18 @@ async def on_start_create_dir(callback: CallbackQuery):
 
     # Ask about git
     state["state"] = "awaiting_git_choice"
-    await callback.message.edit_text(
+    text = (
         f"Directory `{state['path']}` created.\n\n"
-        f"**Setup git?**\n\n"
-        f"• `git init` — local repository\n"
-        f"• `git init + gh repo create` — create on GitHub\n"
-        f"• `git clone` — clone existing\n"
-        f"• No git — empty folder",
-        reply_markup=git_setup_keyboard(),
-        parse_mode="MarkdownV2",
+        f"Setup git?\n\n"
+        f"• git init — local repository\n"
+        f"• git init + gh repo create — create on GitHub\n"
+        f"• git clone — clone existing\n"
+        f"• No git — empty folder"
     )
+    try:
+        await callback.message.edit_text(text, reply_markup=git_setup_keyboard(), parse_mode="Markdown")
+    except TelegramBadRequest:
+        await callback.message.edit_text(text, reply_markup=git_setup_keyboard())
     await callback.answer()
 
 
@@ -806,7 +876,7 @@ async def on_start_git_clone(callback: CallbackQuery):
         "Send repository URL:\n"
         "• SSH: `git@github.com:user/repo.git`\n"
         "• HTTPS: `https://github.com/user/repo.git`",
-        parse_mode="MarkdownV2",
+        parse_mode="Markdown",
     )
     await callback.answer()
 
@@ -863,13 +933,13 @@ async def cmd_branch_create(message: Message):
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await message.answer("`[!]` Project not registered. Use /start first.", parse_mode="MarkdownV2")
+        await message.answer("`[!]` Project not registered. Use /start first.", parse_mode="Markdown")
         return
 
     # Check git repo
     from .git_utils import is_git_repo
     if not is_git_repo(Path(project.cwd)):
-        await message.answer("`[x]` Git repository required for /branch_create", parse_mode="MarkdownV2")
+        await message.answer("`[x]` Git repository required for /branch_create", parse_mode="Markdown")
         return
 
     # Parse name argument
@@ -889,7 +959,7 @@ async def cmd_branch_create(message: Message):
     # Check length
     max_len = max_branch_name_length(project.project_name)
     if len(branch_name) > max_len:
-        await message.answer(f"`[x]` Name too long (max {max_len} chars for this project)", parse_mode="MarkdownV2")
+        await message.answer(f"`[x]` Name too long (max {max_len} chars for this project)", parse_mode="Markdown")
         return
 
     # Get default branch
@@ -914,7 +984,7 @@ async def cmd_branch_create(message: Message):
             [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await message.answer("`[!]` Uncommitted changes detected", reply_markup=keyboard, parse_mode="MarkdownV2")
+        await message.answer("`[!]` Uncommitted changes detected", reply_markup=keyboard, parse_mode="Markdown")
         return
 
     # No uncommitted changes - create directly
@@ -950,7 +1020,7 @@ async def cb_branch_create_base(callback: CallbackQuery):
             [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await callback.message.edit_text(f"`[!]` Uncommitted changes in {base_branch}", reply_markup=keyboard, parse_mode="MarkdownV2")
+        await callback.message.edit_text(f"`[!]` Uncommitted changes in {base_branch}", reply_markup=keyboard, parse_mode="Markdown")
         return
 
     await callback.message.delete()
@@ -1000,7 +1070,7 @@ async def cb_branch_create_commit(callback: CallbackQuery):
     await callback.message.edit_text(
         "`[~]` Sent: \"Commit current changes in logical chunks with descriptive messages.\"\n\n"
         f"Run `/branch_create {branch_name}` again after commit.",
-        parse_mode="MarkdownV2"
+        parse_mode="Markdown"
     )
     await callback.answer()
 
@@ -1066,7 +1136,7 @@ async def cb_branch_create_redirect(callback: CallbackQuery):
 
     await callback.message.edit_text(
         "Use `/branch_create` or `/branch_create <name>` to create isolated worktree branch.",
-        parse_mode="MarkdownV2"
+        parse_mode="Markdown"
     )
     await callback.answer()
 
@@ -1084,12 +1154,12 @@ async def cmd_branch_finish(message: Message):
     project = project_manager.get_by_chat(message.chat.id)
 
     if not project:
-        await message.answer("`[!]` Project not registered.", parse_mode="MarkdownV2")
+        await message.answer("`[!]` Project not registered.", parse_mode="Markdown")
         return
 
     thread = project.get_thread(thread_id)
     if not thread or not thread.worktree_path:
-        await message.answer("`[!]` /branch_finish only works in worktree topics. Use /thread_close for this topic.", parse_mode="MarkdownV2")
+        await message.answer("`[!]` /branch_finish only works in worktree topics. Use /thread_close for this topic.", parse_mode="Markdown")
         return
 
     # Check uncommitted changes
@@ -1097,7 +1167,7 @@ async def cmd_branch_finish(message: Message):
     worktree_path = Path(thread.worktree_path)
 
     if worktree_path.exists() and has_uncommitted_changes(worktree_path):
-        await message.answer("`[!]` Uncommitted changes. Commit or stash first.", parse_mode="MarkdownV2")
+        await message.answer("`[!]` Uncommitted changes. Commit or stash first.", parse_mode="Markdown")
         return
 
     # Build keyboard
@@ -1113,7 +1183,7 @@ async def cmd_branch_finish(message: Message):
     buttons.append([InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")])
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.answer(f"Finish `{thread.name}` branch:", reply_markup=keyboard, parse_mode="MarkdownV2")
+    await message.answer(f"Finish `{thread.name}` branch:", reply_markup=keyboard, parse_mode="Markdown")
 
 
 @router.callback_query(F.data.startswith("bf_merge:"))
@@ -1140,7 +1210,7 @@ async def cb_branch_finish_merge_confirm(callback: CallbackQuery):
     # Check target has no uncommitted changes
     from .git_utils import has_uncommitted_changes
     if has_uncommitted_changes(Path(project.cwd)):
-        await callback.message.edit_text("`[!]` Uncommitted changes in target directory. Commit or stash first.", parse_mode="MarkdownV2")
+        await callback.message.edit_text("`[!]` Uncommitted changes in target directory. Commit or stash first.", parse_mode="Markdown")
         await callback.answer()
         return
 
@@ -1157,7 +1227,7 @@ async def cb_branch_finish_merge_confirm(callback: CallbackQuery):
         "- Archive topic\n\n"
         "Continue?",
         reply_markup=keyboard,
-        parse_mode="MarkdownV2"
+        parse_mode="Markdown"
     )
     await callback.answer()
 
@@ -1183,7 +1253,7 @@ async def cb_branch_finish_do_merge(callback: CallbackQuery):
         await callback.answer("Thread not found")
         return
 
-    await callback.message.edit_text(f"`[~]` Merging {thread.name} -> {target_branch}...", parse_mode="MarkdownV2")
+    await callback.message.edit_text(f"`[~]` Merging {thread.name} -> {target_branch}...", parse_mode="Markdown")
     await callback.answer()
 
     from .worktree import merge_branch, push_branch
@@ -1195,9 +1265,9 @@ async def cb_branch_finish_do_merge(callback: CallbackQuery):
     result = merge_branch(main_repo, branch_name, target_branch)
     if not result.success:
         if "conflicts" in result.error.lower():
-            await callback.message.edit_text("`[!]` Merge conflicts. Resolve and run /branch_finish again.", parse_mode="MarkdownV2")
+            await callback.message.edit_text("`[!]` Merge conflicts. Resolve and run /branch_finish again.", parse_mode="Markdown")
         else:
-            await callback.message.edit_text(f"`[x]` Merge failed: {result.error}", parse_mode="MarkdownV2")
+            await callback.message.edit_text(f"`[x]` Merge failed: {result.error}", parse_mode="Markdown")
         return
 
     # Push (optional, don't fail on error)
@@ -1207,7 +1277,7 @@ async def cb_branch_finish_do_merge(callback: CallbackQuery):
     # Cleanup
     await _do_branch_cleanup(callback.message, project, thread, force=False)
 
-    await callback.message.edit_text(f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}", parse_mode="MarkdownV2")
+    await callback.message.edit_text(f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}", parse_mode="Markdown")
 
 
 @router.callback_query(F.data.startswith("bf_delete:"))
@@ -1244,7 +1314,7 @@ async def cb_branch_finish_delete_confirm(callback: CallbackQuery):
         "- Archive topic\n\n"
         "All uncommitted work will be LOST.",
         reply_markup=keyboard,
-        parse_mode="MarkdownV2"
+        parse_mode="Markdown"
     )
     await callback.answer()
 
@@ -1269,12 +1339,12 @@ async def cb_branch_finish_do_delete(callback: CallbackQuery):
         await callback.answer("Thread not found")
         return
 
-    await callback.message.edit_text(f"`[~]` Deleting {thread.name}...", parse_mode="MarkdownV2")
+    await callback.message.edit_text(f"`[~]` Deleting {thread.name}...", parse_mode="Markdown")
     await callback.answer()
 
     await _do_branch_cleanup(callback.message, project, thread, force=True)
 
-    await callback.message.edit_text(f"`[v]` Branch {thread.name} deleted", parse_mode="MarkdownV2")
+    await callback.message.edit_text(f"`[v]` Branch {thread.name} deleted", parse_mode="Markdown")
 
 
 async def _do_branch_cleanup(message: Message, project: ProjectState, thread: ThreadInfo, force: bool):
@@ -1333,7 +1403,7 @@ async def _do_branch_create(message: Message, project: ProjectState, branch_name
 
     if not thread:
         # Error already reported in the topic by the service
-        await message.answer("`[x]` Branch creation failed. Check the new topic for details.", parse_mode="MarkdownV2")
+        await message.answer("`[x]` Branch creation failed. Check the new topic for details.", parse_mode="Markdown")
 
 
 @router.message(Command("my_chat_id"))
@@ -1341,7 +1411,7 @@ async def cmd_my_chat_id(message: Message):
     """Show user's chat ID - available to everyone."""
     thread_id = message.message_thread_id
     thread_info = f"\nThread ID: `{thread_id}`" if thread_id else "\nThread ID: None (General)"
-    await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`{thread_info}", parse_mode="MarkdownV2")
+    await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`{thread_info}", parse_mode="Markdown")
 
 @router.message(Command("esc"))
 async def cmd_esc(message: Message):
@@ -1398,7 +1468,7 @@ async def cmd_help(message: Message):
 `/esc` — Send Escape to Claude
 `/my_chat_id` — Show your user ID"""
 
-    await message.answer(text, parse_mode="MarkdownV2")
+    await message.answer(text, parse_mode="Markdown")
 
 
 @router.message(Command("settings"))
@@ -1432,7 +1502,7 @@ async def cmd_settings(message: Message):
             f"Auto-accept: {auto_status}"
         )
 
-    await message.answer(text, parse_mode="MarkdownV2")
+    await message.answer(text, parse_mode="Markdown")
 
 
 @router.message(Command("auto_accept"))
@@ -1462,18 +1532,18 @@ async def cmd_auto_accept(message: Message):
             for t in project.threads.values():
                 t.auto_accept = False
         project_manager._save()
-        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="MarkdownV2")
+        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="Markdown")
         return
 
     # /auto_accept - toggle current context
     if thread:
         thread.auto_accept = not thread.auto_accept
         status = "⚡ ON" if thread.auto_accept else "OFF"
-        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="MarkdownV2")
+        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="Markdown")
     else:
         project.auto_accept = not project.auto_accept
         status = "⚡ ON" if project.auto_accept else "OFF"
-        await message.answer(f"Auto-accept: **{status}**", parse_mode="MarkdownV2")
+        await message.answer(f"Auto-accept: **{status}**", parse_mode="Markdown")
     project_manager._save()
 
 
@@ -1486,14 +1556,14 @@ async def cmd_resume(message: Message):
         await message.answer(
             "`[!]` /resume not supported in multi-session mode.\n"
             "Use /thread_create for a new thread.",
-            parse_mode="MarkdownV2"
+            parse_mode="Markdown"
         )
     else:
         # In private/general - just inform
         await message.answer(
             "`[!]` /resume not supported.\n"
             "Use /start to connect to existing session.",
-            parse_mode="MarkdownV2"
+            parse_mode="Markdown"
         )
 
 
@@ -1599,7 +1669,7 @@ async def cmd_restart(message: Message):
     await message.answer(
         f"Restart session `{tmux_name}`?",
         reply_markup=restart_confirm_keyboard(),
-        parse_mode="MarkdownV2",
+        parse_mode="Markdown",
     )
 
 
@@ -1772,7 +1842,7 @@ async def on_tmux_selected(callback: CallbackQuery):
     project = project_manager.get_or_create(project_name)
     project.tmux_session = tmux_session
 
-    await callback.message.edit_text(f"Connected to tmux: `{tmux_session}`", parse_mode="MarkdownV2")
+    await callback.message.edit_text(f"Connected to tmux: `{tmux_session}`", parse_mode="Markdown")
     await callback.answer()
 
     # Refresh session and start tasks
@@ -1873,14 +1943,14 @@ async def on_message(message: Message):
             if not project_name or not is_valid_project_name(project_name):
                 await message.answer(
                     "Project name can only contain letters, digits, `-` and `_`.",
-                    parse_mode="MarkdownV2",
+                    parse_mode="Markdown",
                 )
                 return
             if len(project_name) > 35:
                 await message.answer(
                     "`[!]` Project name too long (max 35 chars). "
                     "Rename group or use /register_dir with shorter name.",
-                    parse_mode="MarkdownV2",
+                    parse_mode="Markdown",
                 )
                 return
 
@@ -1895,7 +1965,7 @@ async def on_message(message: Message):
             # User sent custom path
             path = message.text.strip()
             if not Path(path).expanduser().is_dir():
-                await message.answer(f"Directory `{path}` does not exist.", parse_mode="MarkdownV2")
+                await message.answer(f"Directory `{path}` does not exist.", parse_mode="Markdown")
                 return
 
             # Get or create project and save path
@@ -1929,7 +1999,8 @@ async def on_message(message: Message):
             url = message.text.strip()
             await message.answer("Cloning repository...")
 
-            result = git_clone(state["path"], url)
+            # Run in thread to avoid blocking event loop
+            result = await asyncio.to_thread(git_clone, state["path"], url)
             if not result.success:
                 await message.answer(f"Clone error: {result.error}")
                 return

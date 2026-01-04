@@ -67,26 +67,56 @@ def _detect_crash(screen: str) -> str | None:
     return None
 
 
+def _is_shell_line(line: str) -> bool:
+    """Check if line is a shell prompt, not Claude UI."""
+    stripped = line.lstrip()
+
+    # ➜ is definitely shell (oh-my-zsh)
+    if "➜" in stripped:
+        return True
+
+    # $ at start (but not $(...) command substitution)
+    if stripped.startswith("$ ") and not stripped.startswith("$ ("):
+        return True
+
+    # # at start with short line (root prompt)
+    if stripped.startswith("# ") and len(stripped) < 80:
+        return True
+
+    # ❯ is tricky - could be shell OR Claude selector
+    # Claude selector: "❯ 1. Yes" - has digit after
+    # Shell: "❯ " alone or "❯ command"
+    if stripped.startswith("❯ "):
+        rest = stripped[2:].strip()
+        # If starts with digit, it's Claude selector
+        if rest and rest[0].isdigit():
+            return False
+        return True
+
+    return False
+
+
 def _detect_exit(screen: str) -> bool:
     """Detect if Claude exited normally (not crash).
 
     Returns True if:
-    1. Claude UI NOT visible
-    2. Shell prompt visible (at end of screen)
+    1. Claude UI NOT visible (is_claude_ready = False)
+    2. Shell prompt at start of line in last 5 lines
     3. NO crash signatures
     """
     if is_claude_ready(screen):
         return False
 
     lines = screen.split("\n")
-    last_lines = "\n".join(lines[-5:])  # Check last 5 lines for shell
+    last_5 = lines[-5:] if len(lines) >= 5 else lines
 
-    # Must have shell prompt
-    has_shell = any(p in last_lines for p in SHELL_PROMPTS)
+    # Must have shell prompt at line start
+    has_shell = any(_is_shell_line(line) for line in last_5)
     if not has_shell:
         return False
 
     # Must NOT have crash signatures
+    last_lines = "\n".join(last_5)
     for sig in CRASH_SIGNATURES:
         if sig in last_lines:
             return False
@@ -121,25 +151,6 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
 
     DEBOUNCE_TIME = 0.5
     POLL_INTERVAL = 0.5
-
-    # Check if Claude already exited before poller started (e.g. after bot restart)
-    try:
-        initial_screen = tmux.capture_pane()
-        if _detect_exit(initial_screen):
-            logger.info(f"Permission poller: Claude already exited (detected on startup)")
-            try:
-                batch = OutgoingBatch(
-                    chat_id=chat_id,
-                    thread_id=None,
-                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "MarkdownV2"}],
-                )
-                await telegram_queue.enqueue_nowait(batch)
-            except Exception:
-                pass
-            return  # Don't start polling
-    except Exception:
-        pass  # tmux might not exist yet
-
     claude_was_active = False  # Track if Claude was ever active (avoid false exit on startup)
 
     while True:
@@ -164,7 +175,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                 batch = OutgoingBatch(
                     chat_id=chat_id,
                     thread_id=None,
-                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
+                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "Markdown"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
@@ -178,7 +189,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                 batch = OutgoingBatch(
                     chat_id=chat_id,
                     thread_id=None,
-                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "MarkdownV2"}],
+                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "Markdown"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
@@ -228,7 +239,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                         body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
+                            body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
@@ -301,7 +312,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                     body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
+                        body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                     options_text = "\n".join(parsed.options)
                     body_messages.append({"text": options_text})
@@ -355,25 +366,6 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
 
     DEBOUNCE_TIME = 0.5
     POLL_INTERVAL = 0.5
-
-    # Check if Claude already exited before poller started (e.g. after bot restart)
-    try:
-        initial_screen = tmux.capture_pane()
-        if _detect_exit(initial_screen):
-            logger.info(f"Thread poller {thread.name}: Claude already exited (detected on startup)")
-            try:
-                batch = OutgoingBatch(
-                    chat_id=chat_id,
-                    thread_id=thread_id,
-                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "MarkdownV2"}],
-                )
-                await telegram_queue.enqueue_nowait(batch)
-            except Exception:
-                pass
-            return  # Don't start polling
-    except Exception:
-        pass  # tmux might not exist yet
-
     claude_was_active = False  # Track if Claude was ever active
 
     while True:
@@ -398,7 +390,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                 batch = OutgoingBatch(
                     chat_id=chat_id,
                     thread_id=thread_id,
-                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
+                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "Markdown"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
@@ -412,7 +404,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                 batch = OutgoingBatch(
                     chat_id=chat_id,
                     thread_id=thread_id,
-                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "MarkdownV2"}],
+                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "Markdown"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
@@ -454,7 +446,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                         body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
+                            body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
@@ -527,7 +519,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                     body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
+                        body_messages.append({"text": body_text, "parse_mode": "Markdown"})
 
                     options_text = "\n".join(parsed.options)
                     body_messages.append({"text": options_text})
