@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 
 from ..session_manager import project_manager
-from ..bot import require_forum_group, _start_state
+from .common import require_forum_group, _flow_state
 from ..magic_names import get_random_magic_name
 from ..services.launch import create_thread_with_session
 
@@ -127,7 +127,7 @@ async def cmd_thread_create(message: Message):
 
     if non_worktree_threads:
         # Store pending thread name for confirmation
-        _start_state[chat_id] = {
+        _flow_state[chat_id] = {
             "state": "thread_create_pending",
             "name": name,
         }
@@ -159,14 +159,14 @@ async def cmd_thread_create(message: Message):
 async def on_thread_create_confirm(callback: CallbackQuery):
     """Handle thread_create confirmation (create in main anyway)."""
     chat_id = callback.message.chat.id
-    state = _start_state.get(chat_id)
+    state = _flow_state.get(chat_id)
 
     if not state or state.get("state") != "thread_create_pending":
         await callback.answer("Session expired")
         return
 
     name = state.get("name")
-    _start_state.pop(chat_id, None)
+    _flow_state.pop(chat_id, None)
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
