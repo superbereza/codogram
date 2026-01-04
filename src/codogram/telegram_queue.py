@@ -13,6 +13,11 @@ from .logging_config import logger
 from .chunker import chunk_message
 
 
+class TelegramQueueTimeout(Exception):
+    """Raised when queue operation times out."""
+    pass
+
+
 @dataclass
 class OutgoingBatch:
     """Batch of messages to send atomically."""
