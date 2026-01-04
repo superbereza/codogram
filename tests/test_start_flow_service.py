@@ -531,3 +531,28 @@ class TestFlowResultThreadFields:
         result = FlowResult(action=FlowAction.LAUNCH)
         assert result.thread_id is None
         assert result.thread_name is None
+
+
+class TestHandleStartWithThreadId:
+    """Tests for handle_start with thread_id parameter."""
+
+    def test_thread_id_none_uses_existing_flow(self):
+        """thread_id=None should use existing non-topic flow."""
+        mock_pm = Mock()
+        mock_pm.get_by_chat.return_value = None
+
+        service = StartFlowService(mock_pm, Mock())
+        result = service.handle_start(chat_id=123, args=[], thread_id=None)
+
+        assert result.action == FlowAction.ASK_PROJECT_NAME
+
+    def test_thread_id_provided_no_project(self):
+        """thread_id provided but no project -> ASK_PROJECT_NAME."""
+        mock_pm = Mock()
+        mock_pm.get_by_chat.return_value = None
+
+        service = StartFlowService(mock_pm, Mock())
+        result = service.handle_start(chat_id=123, args=[], thread_id=456)
+
+        assert result.action == FlowAction.ASK_PROJECT_NAME
+        assert result.thread_id == 456

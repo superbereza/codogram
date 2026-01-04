@@ -72,17 +72,23 @@ class StartFlowService:
         chat_id: int,
         args: list[str],
         chat_title: str | None = None,
+        thread_id: int | None = None,
     ) -> FlowResult:
-        """Entry point for /start command (non-topic mode).
+        """Entry point for /start command.
 
         Args:
             chat_id: Telegram chat ID
             args: Command arguments (e.g., ["project-name"])
             chat_title: Chat title for auto-naming
+            thread_id: Topic thread ID (None for main chat)
 
         Returns:
             FlowResult with next action to take
         """
+        # Topic mode
+        if thread_id is not None:
+            return self._handle_topic_start(chat_id, thread_id, args)
+
         # Case 1: project name provided in args
         if args:
             project_name = args[0]
@@ -108,6 +114,21 @@ class StartFlowService:
 
         # Case 4: ask for project name
         return FlowResult(action=FlowAction.ASK_PROJECT_NAME)
+
+    def _handle_topic_start(
+        self, chat_id: int, thread_id: int, args: list[str]
+    ) -> FlowResult:
+        """Handle /start in a topic."""
+        # Case 1: No project for this chat
+        project = self.pm.get_by_chat(chat_id)
+        if not project:
+            return FlowResult(
+                action=FlowAction.ASK_PROJECT_NAME,
+                thread_id=thread_id,
+            )
+
+        # TODO: More cases in next tasks
+        return FlowResult(action=FlowAction.ERROR, error="Not implemented")
 
     def _validate_and_start(self, chat_id: int, project_name: str) -> FlowResult:
         """Validate project name and start flow."""
