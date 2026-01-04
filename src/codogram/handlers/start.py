@@ -267,3 +267,23 @@ async def _connect_to_session_from_callback(callback: CallbackQuery, result: Flo
     if project:
         project.tmux_session = result.tmux_session
         project_manager._save()
+
+
+# ===== Commands =====
+
+@router.message(Command("start"))
+async def cmd_start(message: Message, state: FSMContext):
+    """Handle /start command."""
+    start_flow = StartFlowService(project_manager, None)
+
+    args = message.text.split()[1:] if message.text else []
+    thread_id = message.message_thread_id
+
+    result = start_flow.handle_start(
+        chat_id=message.chat.id,
+        args=args,
+        chat_title=message.chat.title,
+        thread_id=thread_id,
+    )
+
+    await _handle_result(message, state, result)
