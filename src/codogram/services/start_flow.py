@@ -9,6 +9,7 @@ from ..domain.validators import (
     sanitize_project_name,
     MAX_PROJECT_NAME_LENGTH,
 )
+from ..magic_names import get_random_magic_name
 from ..project_launcher import resolve_project_path, is_tmux_session_exists, git_init, git_init_with_github, git_clone
 from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention, TmuxSession
 
@@ -131,8 +132,7 @@ class StartFlowService:
         thread = project.threads.get(thread_id)
         if thread:
             if thread.name == "pending":
-                # TODO: Task 5
-                pass
+                return self._upgrade_pending_thread(project, thread)
             else:
                 return self._check_thread_tmux(project, thread)
 
@@ -161,6 +161,27 @@ class StartFlowService:
                 thread_id=thread.thread_id,
                 thread_name=thread.name,
             )
+
+    def _upgrade_pending_thread(self, project, thread) -> FlowResult:
+        """Upgrade a pending thread with a magic name."""
+        # Get existing names to exclude
+        existing_names = {
+            t.name for t in project.threads.values()
+            if t.name and t.name != "pending"
+        }
+
+        # Generate unique name
+        new_name = get_random_magic_name(existing_names)
+        thread.name = new_name
+        self.pm._save()
+
+        return FlowResult(
+            action=FlowAction.UPGRADE_PENDING_THREAD,
+            project=project.project_name,
+            path=project.cwd,
+            thread_id=thread.thread_id,
+            thread_name=new_name,
+        )
 
     def _validate_and_start(self, chat_id: int, project_name: str) -> FlowResult:
         """Validate project name and start flow."""

@@ -608,3 +608,60 @@ class TestHandleTopicExistingThread:
         assert result.action == FlowAction.THREAD_LAUNCH
         assert result.thread_id == 456
         assert result.thread_name == "mystic"
+
+
+class TestHandlePendingThread:
+    """Tests for upgrading pending threads."""
+
+    def test_pending_thread_gets_upgraded(self):
+        """Pending thread -> UPGRADE_PENDING_THREAD with generated name."""
+        mock_pm = Mock()
+        pending_thread = Mock()
+        pending_thread.thread_id = 456
+        pending_thread.name = "pending"
+        project = Mock(
+            project_name="test",
+            cwd="/tmp/test",
+            threads={456: pending_thread},
+        )
+        mock_pm.get_by_chat.return_value = project
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.get_random_magic_name") as mock_name:
+            mock_name.return_value = "ethereal"
+            result = service.handle_start(chat_id=123, args=[], thread_id=456)
+
+        assert result.action == FlowAction.UPGRADE_PENDING_THREAD
+        assert result.thread_id == 456
+        assert result.thread_name == "ethereal"
+        assert pending_thread.name == "ethereal"
+        mock_pm._save.assert_called_once()
+
+    def test_pending_thread_excludes_existing_names(self):
+        """Magic name excludes names already in use."""
+        mock_pm = Mock()
+        pending_thread = Mock()
+        pending_thread.thread_id = 456
+        pending_thread.name = "pending"
+        existing_thread = Mock()
+        existing_thread.thread_id = 789
+        existing_thread.name = "mystic"
+        project = Mock(
+            project_name="test",
+            cwd="/tmp/test",
+            threads={456: pending_thread, 789: existing_thread},
+        )
+        mock_pm.get_by_chat.return_value = project
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.get_random_magic_name") as mock_name:
+            mock_name.return_value = "arcane"
+            result = service.handle_start(chat_id=123, args=[], thread_id=456)
+
+        # Verify excluded names were passed
+        mock_name.assert_called_once()
+        excluded = mock_name.call_args[0][0]
+        assert "mystic" in excluded
+        assert "pending" not in excluded  # pending is special, not excluded
