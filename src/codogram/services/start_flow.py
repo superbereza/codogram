@@ -45,6 +45,11 @@ class FlowAction(Enum):
     UPGRADE_PENDING_THREAD = "upgrade_pending_thread"
     REGISTER_UNKNOWN_TOPIC = "register_unknown_topic"
 
+    # Restart flow
+    ASK_RESTART_CONFIRM = "ask_restart_confirm"
+    RESTART_DONE = "restart_done"
+    CANCELLED = "cancelled"
+
 
 @dataclass
 class FlowResult:

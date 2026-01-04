@@ -693,3 +693,19 @@ class TestHandleUnknownTopic:
         assert 999 in project.threads
         assert project.threads[999].name == "cosmic"
         mock_pm._save.assert_called_once()
+
+
+class TestRestartFlowActions:
+    """Tests for restart-related FlowActions."""
+
+    def test_has_ask_restart_confirm(self):
+        """FlowAction.ASK_RESTART_CONFIRM exists."""
+        assert hasattr(FlowAction, "ASK_RESTART_CONFIRM")
+
+    def test_has_restart_done(self):
+        """FlowAction.RESTART_DONE exists."""
+        assert hasattr(FlowAction, "RESTART_DONE")
+
+    def test_has_cancelled(self):
+        """FlowAction.CANCELLED exists."""
+        assert hasattr(FlowAction, "CANCELLED")
