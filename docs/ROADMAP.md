@@ -131,6 +131,14 @@ Full GFM → MarkdownV2 conversion using telegramify-markdown library:
 
 ## Backlog
 
+### Menu redesign
+Reorganize bot commands for better usability:
+- Group commands by purpose (everyday, create, complete, settings)
+- Short aliases: `/thread`, `/branch`, `/finish`
+- Unified `/finish` for both worktree and regular topics
+- Archive topics instead of delete (close + icon)
+- See [docs/designs/2025-01-03-menu-redesign.md](designs/2025-01-03-menu-redesign.md)
+
 ### Bot refactoring
 Bot architecture refactoring — layered structure:
 - handlers → services → domain → adapters
