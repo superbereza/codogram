@@ -190,3 +190,7 @@ class StartFlowService:
         if not project.watcher_task or project.watcher_task.done():
             return False
         return True
+
+    def handle_project_name(self, chat_id: int, name: str) -> FlowResult:
+        """Handle user input for project name (FSM state handler)."""
+        return self._validate_and_start(chat_id, name.strip())

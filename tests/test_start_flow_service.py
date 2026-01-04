@@ -250,3 +250,42 @@ class TestShowStatus:
         assert result.action == FlowAction.SHOW_STATUS
         assert result.project == "running"
         assert result.tmux_session == "claude-running"
+
+
+class TestHandleProjectName:
+    """Tests for handle_project_name (FSM state handler)."""
+
+    def test_valid_name_starts_flow(self):
+        mock_pm = Mock()
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch(
+            "codogram.services.start_flow.resolve_project_path"
+        ) as mock_resolve:
+            mock_resolve.return_value = Mock(path="/tmp/test", exists=False)
+            result = service.handle_project_name(chat_id=123, name="my-project")
+
+        assert result.action == FlowAction.ASK_DIR_CHOICE
+        assert result.project == "my-project"
+
+    def test_invalid_name_returns_error(self):
+        service = StartFlowService(Mock(), Mock())
+        result = service.handle_project_name(chat_id=123, name="invalid name")
+
+        assert result.action == FlowAction.ERROR
+
+    def test_strips_whitespace(self):
+        mock_pm = Mock()
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch(
+            "codogram.services.start_flow.resolve_project_path"
+        ) as mock_resolve:
+            mock_resolve.return_value = Mock(path="/tmp/test", exists=False)
+            result = service.handle_project_name(chat_id=123, name="  my-project  ")
+
+        assert result.project == "my-project"
