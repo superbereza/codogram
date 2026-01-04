@@ -39,7 +39,8 @@ agent-tools/codogram/
 │   ├── history_reader.py     # Parse ~/.claude/history.jsonl
 │   ├── permission_poller.py  # Poll tmux for permission prompts
 │   ├── watcher.py            # Monitor jsonl for tool calls
-│   ├── bot.py                # Telegram command handlers
+│   ├── handlers/             # Telegram command handlers (8 modules)
+│   ├── services/             # Business logic (launch, branch, message_router)
 │   ├── tmux.py               # Tmux session interaction
 │   └── screen.py             # Parse tmux screen content
 └── restart.sh                # Restart bot script
