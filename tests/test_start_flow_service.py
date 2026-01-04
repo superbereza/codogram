@@ -355,3 +355,62 @@ class TestHandleCustomPath:
         )
 
         assert result.action == FlowAction.LAUNCH
+
+
+class TestGitMethods:
+    """Tests for git-related methods."""
+
+    def test_handle_git_init_launches(self):
+        mock_pm = Mock()
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.git_init") as mock_git:
+            mock_git.return_value = Mock(success=True)
+            result = service.handle_git_init(
+                chat_id=123, project="test", path="/tmp/test"
+            )
+
+        assert result.action == FlowAction.LAUNCH
+        mock_git.assert_called_once_with("/tmp/test")
+
+    def test_handle_no_git_launches(self):
+        mock_pm = Mock()
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        service = StartFlowService(mock_pm, Mock())
+        result = service.handle_no_git(
+            chat_id=123, project="test", path="/tmp/test"
+        )
+
+        assert result.action == FlowAction.LAUNCH
+        assert result.project == "test"
+
+    def test_handle_gh_create_private(self):
+        mock_pm = Mock()
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.git_init_with_github") as mock_gh:
+            mock_gh.return_value = Mock(success=True)
+            result = service.handle_gh_create(
+                chat_id=123, project="test", path="/tmp/test", private=True
+            )
+
+        assert result.action == FlowAction.LAUNCH
+        mock_gh.assert_called_once_with("/tmp/test", private=True)
+
+    def test_handle_gh_create_error(self):
+        mock_pm = Mock()
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.git_init_with_github") as mock_gh:
+            mock_gh.return_value = Mock(success=False, error="gh auth required")
+            result = service.handle_gh_create(
+                chat_id=123, project="test", path="/tmp/test", private=False
+            )
+
+        assert result.action == FlowAction.ERROR
+        assert "gh auth" in result.error.lower() or "failed" in result.error.lower()

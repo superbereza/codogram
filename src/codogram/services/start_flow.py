@@ -9,7 +9,7 @@ from ..domain.validators import (
     sanitize_project_name,
     MAX_PROJECT_NAME_LENGTH,
 )
-from ..project_launcher import resolve_project_path, is_tmux_session_exists
+from ..project_launcher import resolve_project_path, is_tmux_session_exists, git_init, git_init_with_github
 from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention
 
 if TYPE_CHECKING:
@@ -226,4 +226,61 @@ class StartFlowService:
             action=FlowAction.LAUNCH,
             project=project,
             path=str(expanded),
+        )
+
+    def handle_git_init(self, chat_id: int, project: str, path: str) -> FlowResult:
+        """Handle 'git init' button."""
+        result = git_init(path)
+
+        if not result.success:
+            return FlowResult(
+                action=FlowAction.ERROR,
+                error=f"git init failed: {result.error}",
+            )
+
+        proj = self.pm.get_or_create(project)
+        proj.chat_id = chat_id
+        proj.cwd = path
+        self.pm._save()
+
+        return FlowResult(
+            action=FlowAction.LAUNCH,
+            project=project,
+            path=path,
+        )
+
+    def handle_no_git(self, chat_id: int, project: str, path: str) -> FlowResult:
+        """Handle 'No git' button."""
+        proj = self.pm.get_or_create(project)
+        proj.chat_id = chat_id
+        proj.cwd = path
+        self.pm._save()
+
+        return FlowResult(
+            action=FlowAction.LAUNCH,
+            project=project,
+            path=path,
+        )
+
+    def handle_gh_create(
+        self, chat_id: int, project: str, path: str, private: bool
+    ) -> FlowResult:
+        """Handle GitHub repo creation."""
+        result = git_init_with_github(path, private=private)
+
+        if not result.success:
+            return FlowResult(
+                action=FlowAction.ERROR,
+                error=f"GitHub creation failed: {result.error}",
+            )
+
+        proj = self.pm.get_or_create(project)
+        proj.chat_id = chat_id
+        proj.cwd = path
+        self.pm._save()
+
+        return FlowResult(
+            action=FlowAction.LAUNCH,
+            project=project,
+            path=path,
         )
