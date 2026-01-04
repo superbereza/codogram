@@ -514,3 +514,20 @@ class TestThreadFlowActions:
 
     def test_has_register_unknown_topic(self):
         assert FlowAction.REGISTER_UNKNOWN_TOPIC.value == "register_unknown_topic"
+
+
+class TestFlowResultThreadFields:
+    """Tests for thread fields in FlowResult."""
+
+    def test_has_thread_id_field(self):
+        result = FlowResult(action=FlowAction.THREAD_LAUNCH, thread_id=123)
+        assert result.thread_id == 123
+
+    def test_has_thread_name_field(self):
+        result = FlowResult(action=FlowAction.THREAD_LAUNCH, thread_name="mystic")
+        assert result.thread_name == "mystic"
+
+    def test_thread_fields_default_none(self):
+        result = FlowResult(action=FlowAction.LAUNCH)
+        assert result.thread_id is None
+        assert result.thread_name is None

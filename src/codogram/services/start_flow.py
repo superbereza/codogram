@@ -55,6 +55,9 @@ class FlowResult:
     tmux_list: list[str] | None = None
     message: str | None = None
     error: str | None = None
+    # Thread-specific
+    thread_id: int | None = None
+    thread_name: str | None = None
 
 
 class StartFlowService:
