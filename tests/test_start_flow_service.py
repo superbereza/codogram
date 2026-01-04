@@ -289,3 +289,69 @@ class TestHandleProjectName:
             result = service.handle_project_name(chat_id=123, name="  my-project  ")
 
         assert result.project == "my-project"
+
+
+class TestHandleCreateDir:
+    """Tests for handle_create_dir (Create directory button)."""
+
+    def test_creates_dir_and_asks_git(self, tmp_path):
+        service = StartFlowService(Mock(), Mock())
+        new_dir = tmp_path / "new_project"
+
+        result = service.handle_create_dir(project="test", path=str(new_dir))
+
+        assert result.action == FlowAction.ASK_GIT_CHOICE
+        assert result.project == "test"
+        assert new_dir.exists()
+
+    def test_works_with_existing_dir(self, tmp_path):
+        service = StartFlowService(Mock(), Mock())
+        existing = tmp_path / "existing"
+        existing.mkdir()
+
+        result = service.handle_create_dir(project="test", path=str(existing))
+
+        assert result.action == FlowAction.ASK_GIT_CHOICE
+
+
+class TestHandleCustomPath:
+    """Tests for handle_custom_path (Custom path input)."""
+
+    def test_valid_path_launches(self, tmp_path):
+        mock_pm = Mock()
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        service = StartFlowService(mock_pm, Mock())
+        result = service.handle_custom_path(
+            chat_id=123, project="test", path=str(tmp_path)
+        )
+
+        assert result.action == FlowAction.LAUNCH
+        assert result.project == "test"
+        assert result.path == str(tmp_path)
+
+    def test_nonexistent_path_returns_error(self):
+        service = StartFlowService(Mock(), Mock())
+        result = service.handle_custom_path(
+            chat_id=123, project="test", path="/nonexistent/path"
+        )
+
+        assert result.action == FlowAction.ERROR
+        assert "not exist" in result.error.lower() or "does not exist" in result.error.lower()
+
+    def test_expands_tilde(self, tmp_path, monkeypatch):
+        mock_pm = Mock()
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        # Mock os.path.expanduser to expand ~ to tmp_path
+        monkeypatch.setenv("HOME", str(tmp_path))
+
+        service = StartFlowService(mock_pm, Mock())
+        test_dir = tmp_path / "test"
+        test_dir.mkdir()
+
+        result = service.handle_custom_path(
+            chat_id=123, project="test", path="~/test"
+        )
+
+        assert result.action == FlowAction.LAUNCH

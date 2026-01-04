@@ -1,6 +1,7 @@
 """StartFlowService - business logic for /start flow."""
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..domain.validators import (
@@ -194,3 +195,35 @@ class StartFlowService:
     def handle_project_name(self, chat_id: int, name: str) -> FlowResult:
         """Handle user input for project name (FSM state handler)."""
         return self._validate_and_start(chat_id, name.strip())
+
+    def handle_create_dir(self, project: str, path: str) -> FlowResult:
+        """Handle 'Create directory' button."""
+        expanded = Path(path).expanduser()
+        expanded.mkdir(parents=True, exist_ok=True)
+
+        return FlowResult(
+            action=FlowAction.ASK_GIT_CHOICE,
+            project=project,
+            path=str(expanded),
+        )
+
+    def handle_custom_path(self, chat_id: int, project: str, path: str) -> FlowResult:
+        """Handle user input for custom path."""
+        expanded = Path(path).expanduser().resolve()
+
+        if not expanded.is_dir():
+            return FlowResult(
+                action=FlowAction.ERROR,
+                error=f"Directory {path} does not exist",
+            )
+
+        proj = self.pm.get_or_create(project)
+        proj.chat_id = chat_id
+        proj.cwd = str(expanded)
+        self.pm._save()
+
+        return FlowResult(
+            action=FlowAction.LAUNCH,
+            project=project,
+            path=str(expanded),
+        )
