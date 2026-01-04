@@ -67,63 +67,6 @@ def _detect_crash(screen: str) -> str | None:
     return None
 
 
-def _is_shell_line(line: str) -> bool:
-    """Check if line is a shell prompt, not Claude UI."""
-    stripped = line.lstrip()
-
-    # ➜ is definitely shell (oh-my-zsh)
-    if "➜" in stripped:
-        return True
-
-    # $ at start (but not $(...) command substitution)
-    if stripped.startswith("$ ") and not stripped.startswith("$ ("):
-        return True
-
-    # # at start with short line (root prompt)
-    if stripped.startswith("# ") and len(stripped) < 80:
-        return True
-
-    # ❯ is tricky - could be shell OR Claude selector
-    # Claude selector: "❯ 1. Yes" - has digit after
-    # Shell: "❯ " alone or "❯ command"
-    if stripped.startswith("❯ "):
-        rest = stripped[2:].strip()
-        # If starts with digit, it's Claude selector
-        if rest and rest[0].isdigit():
-            return False
-        return True
-
-    return False
-
-
-def _detect_exit(screen: str) -> bool:
-    """Detect if Claude exited normally (not crash).
-
-    Returns True if:
-    1. Claude UI NOT visible (is_claude_ready = False)
-    2. Shell prompt at start of line in last 5 lines
-    3. NO crash signatures
-    """
-    if is_claude_ready(screen):
-        return False
-
-    lines = screen.split("\n")
-    last_5 = lines[-5:] if len(lines) >= 5 else lines
-
-    # Must have shell prompt at line start
-    has_shell = any(_is_shell_line(line) for line in last_5)
-    if not has_shell:
-        return False
-
-    # Must NOT have crash signatures
-    last_lines = "\n".join(last_5)
-    for sig in CRASH_SIGNATURES:
-        if sig in last_lines:
-            return False
-
-    return True
-
-
 async def create_poller_task(bot: Bot, project: ProjectState, telegram_queue: "TelegramQueue") -> asyncio.Task:
     """Create permission poller task for project."""
     return asyncio.create_task(permission_poller_for_project(bot, project, telegram_queue))
@@ -151,7 +94,6 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
 
     DEBOUNCE_TIME = 0.5
     POLL_INTERVAL = 0.5
-    claude_was_active = False  # Track if Claude was ever active (avoid false exit on startup)
 
     while True:
         await asyncio.sleep(POLL_INTERVAL)
@@ -163,10 +105,6 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
             logger.warning(f"Permission poller: capture error: {e}")
             continue
 
-        # Track if Claude was ever active
-        if is_claude_ready(screen):
-            claude_was_active = True
-
         # Crash detection
         crash_reason = _detect_crash(screen)
         if crash_reason:
@@ -175,21 +113,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                 batch = OutgoingBatch(
                     chat_id=chat_id,
                     thread_id=None,
-                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "Markdown"}],
-                )
-                await telegram_queue.enqueue_nowait(batch)
-            except Exception:
-                pass
-            return  # Exit poller
-
-        # Exit detection (only if Claude was active before)
-        if claude_was_active and _detect_exit(screen):
-            logger.info(f"Permission poller: Claude exited normally")
-            try:
-                batch = OutgoingBatch(
-                    chat_id=chat_id,
-                    thread_id=None,
-                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "Markdown"}],
+                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
@@ -239,7 +163,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                         body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            body_messages.append({"text": body_text, "parse_mode": "Markdown"})
+                            body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
@@ -312,7 +236,7 @@ async def permission_poller_for_project(bot: Bot, project: ProjectState, telegra
                     body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        body_messages.append({"text": body_text, "parse_mode": "Markdown"})
+                        body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                     options_text = "\n".join(parsed.options)
                     body_messages.append({"text": options_text})
@@ -366,7 +290,6 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
 
     DEBOUNCE_TIME = 0.5
     POLL_INTERVAL = 0.5
-    claude_was_active = False  # Track if Claude was ever active
 
     while True:
         await asyncio.sleep(POLL_INTERVAL)
@@ -378,10 +301,6 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
             logger.warning(f"Thread poller {thread.name}: capture error: {e}")
             continue
 
-        # Track if Claude was ever active
-        if is_claude_ready(screen):
-            claude_was_active = True
-
         # Crash detection
         crash_reason = _detect_crash(screen)
         if crash_reason:
@@ -390,21 +309,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                 batch = OutgoingBatch(
                     chat_id=chat_id,
                     thread_id=thread_id,
-                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "Markdown"}],
-                )
-                await telegram_queue.enqueue_nowait(batch)
-            except Exception:
-                pass
-            return  # Exit poller
-
-        # Exit detection (only if Claude was active before)
-        if claude_was_active and _detect_exit(screen):
-            logger.info(f"Thread poller {thread.name}: Claude exited normally")
-            try:
-                batch = OutgoingBatch(
-                    chat_id=chat_id,
-                    thread_id=thread_id,
-                    messages=[{"text": "`[~]` Claude exited\\. Use /start to restart\\.", "parse_mode": "Markdown"}],
+                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
@@ -446,7 +351,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                         body_messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            body_messages.append({"text": body_text, "parse_mode": "Markdown"})
+                            body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
@@ -519,7 +424,7 @@ async def permission_poller_for_thread(bot: Bot, project: ProjectState, thread: 
                     body_messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        body_messages.append({"text": body_text, "parse_mode": "Markdown"})
+                        body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                     options_text = "\n".join(parsed.options)
                     body_messages.append({"text": options_text})

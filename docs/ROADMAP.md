@@ -131,6 +131,22 @@ Full GFM → MarkdownV2 conversion using telegramify-markdown library:
 
 ## Backlog
 
+### MCP trust prompt support
+Detect MCP server trust prompts (box-style UI):
+- Different from standard prompts: `❯` on separate line, options around it
+- Box characters `│` and `╰────╯` border
+- "Enter to confirm · Esc to reject" footer
+- Need careful parsing to avoid false positives on numbered lists
+- See failed attempt: 2026-01-04 (broke permission detection everywhere)
+
+### Claude exit detection
+Detect when Claude exits normally (not crash):
+- Show `[~] Claude exited. Use /start to restart.` notification
+- Detect shell prompt after Claude UI disappears
+- Must track `claude_was_active` to avoid false positives on startup
+- Must distinguish shell prompt `❯` from Claude selector `❯ 1. Yes`
+- See reverted attempt: 8b6baf8 (had issues with false positives)
+
 ### Menu redesign
 Reorganize bot commands for better usability:
 - Group commands by purpose (everyday, create, complete, settings)

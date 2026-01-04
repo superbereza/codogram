@@ -5,7 +5,7 @@ import re
 import time
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ErrorEvent
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 
@@ -37,11 +37,12 @@ router = Router()
 
 
 @router.error()
-async def error_handler(event, exception):
+async def error_handler(error: ErrorEvent):
     """Global error handler - catch TelegramBadRequest and log."""
+    exception = error.exception
     if isinstance(exception, TelegramBadRequest):
         if "parse entities" in str(exception).lower():
-            logger.warning(f"MarkdownV2 parse error (swallowed): {exception}")
+            logger.warning(f"Markdown parse error (swallowed): {exception}")
             return True  # Mark as handled, don't propagate
     # Re-raise other errors
     return False
