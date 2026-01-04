@@ -474,3 +474,54 @@ async def on_tmux_selected(callback: CallbackQuery, state: FSMContext):
     )
 
     await _handle_callback_result(callback, state, result)
+
+
+# ===== Restart Flow =====
+
+@router.message(Command("restart"))
+async def cmd_restart(message: Message, state: FSMContext):
+    """Handle /restart command."""
+    start_flow = StartFlowService(project_manager, None)
+
+    result = start_flow.handle_restart(
+        chat_id=message.chat.id,
+        thread_id=message.message_thread_id,
+    )
+
+    if result.action == FlowAction.ASK_RESTART_CONFIRM:
+        await state.set_state(RestartFlow.awaiting_confirm)
+        await state.update_data(tmux_session=result.tmux_session)
+        await message.answer(
+            f"Restart session `{result.tmux_session}`?",
+            reply_markup=restart_confirm_keyboard(),
+            parse_mode="Markdown",
+        )
+    else:
+        await _handle_result(message, state, result)
+
+
+@router.callback_query(F.data == "restart:confirm")
+async def on_restart_confirm(callback: CallbackQuery, state: FSMContext):
+    """Handle restart confirmation."""
+    start_flow = StartFlowService(project_manager, None)
+
+    data = await state.get_data()
+    tmux_session = data.get("tmux_session")
+
+    if not tmux_session:
+        await callback.answer("Session expired")
+        return
+
+    result = start_flow.handle_restart_confirm(tmux_session)
+
+    await _handle_callback_result(callback, state, result)
+
+
+@router.callback_query(F.data == "restart:cancel")
+async def on_restart_cancel(callback: CallbackQuery, state: FSMContext):
+    """Handle restart cancel."""
+    start_flow = StartFlowService(project_manager, None)
+
+    result = start_flow.handle_cancel()
+
+    await _handle_callback_result(callback, state, result)
