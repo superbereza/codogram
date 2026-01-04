@@ -132,9 +132,8 @@ class ProjectState:
 
     # DEPRECATED: Legacy fields kept for backward compatibility with old configs.
     # All new code should use threads[None] for main thread.
-    # These fields are used by: bot.py (is_claude_running, show_status,
-    # cmd_restart, on_tmux_selected), permission_poller.py (permission_poller_for_project),
-    # history_watcher.py (HistoryWatcher._check_for_changes), and session_manager.py itself.
+    # These fields are used by: handlers/, permission_poller.py (permission_poller),
+    # history_watcher.py, and session_manager.py itself.
     session_id: str | None = None  # DEPRECATED: use threads[None].session_id
     jsonl_path: str | None = None  # DEPRECATED: use threads[None].jsonl_path
     watcher_task: asyncio.Task | None = field(default=None, repr=False)  # DEPRECATED: use threads[None].watcher_task
