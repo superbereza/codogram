@@ -76,20 +76,20 @@ async def launch_with_animation(
         thread.start_requested_at = time.time()
 
         # 1. Create tmux
-        await bot.send_message(chat_id, "`[~]` Creating tmux session...", message_thread_id=thread_id, parse_mode="Markdown")
+        await bot.send_message(chat_id, "`[~]` Creating tmux session...", message_thread_id=thread_id, parse_mode="MarkdownV2")
 
         if not tmux.exists():
             tmux.create()
 
         # 2. Launch Claude
-        await bot.send_message(chat_id, "`[~]` Starting Claude...", message_thread_id=thread_id, parse_mode="Markdown")
+        await bot.send_message(chat_id, "`[~]` Starting Claude...", message_thread_id=thread_id, parse_mode="MarkdownV2")
         tmux.send("claude")
 
         # 2.5. Start poller early to catch trust prompts during startup
         await _start_monitoring(bot, project, thread, queue)
 
         # 3. Wait for ready with animation
-        await bot.send_message(chat_id, "`[~]` Waiting for Claude...", message_thread_id=thread_id, parse_mode="Markdown")
+        await bot.send_message(chat_id, "`[~]` Waiting for Claude...", message_thread_id=thread_id, parse_mode="MarkdownV2")
 
         start_time = time.time()
         face_msg = None
@@ -113,7 +113,7 @@ async def launch_with_animation(
                 await bot.send_message(
                     chat_id, "`[x]` Timeout: Claude didn't start in 2 minutes",
                     message_thread_id=thread_id,
-                    parse_mode="Markdown"
+                    parse_mode="MarkdownV2"
                 )
                 return False
 
@@ -121,7 +121,7 @@ async def launch_with_animation(
             if elapsed > 3 and face_msg is None:
                 face_msg = await bot.send_message(
                     chat_id, f"`{FACES[0]}`",
-                    parse_mode="Markdown",
+                    parse_mode="MarkdownV2",
                     message_thread_id=thread_id
                 )
                 face_idx = 1
@@ -130,7 +130,7 @@ async def launch_with_animation(
                     chat_id=chat_id,
                     message_id=face_msg.message_id,
                     text=f"`{FACES[face_idx % len(FACES)]}`",
-                    parse_mode="Markdown",
+                    parse_mode="MarkdownV2",
                 ))
                 face_idx += 1
 
@@ -142,7 +142,7 @@ async def launch_with_animation(
                 chat_id=chat_id,
                 message_id=face_msg.message_id,
                 text=f"`{FACE_READY}`",
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             ))
             await asyncio.sleep(1.5)
             try:
@@ -153,7 +153,7 @@ async def launch_with_animation(
         await bot.send_message(
             chat_id,
             f"`[v]` Claude ready\n\nAttach: `tmux attach -t {tmux_name}`",
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
             message_thread_id=thread_id
         )
 
@@ -168,7 +168,7 @@ async def launch_with_animation(
     except Exception as e:
         logger.error(f"launch_error: {e}")
         try:
-            await bot.send_message(chat_id, f"`[x]` Launch error: {e}", message_thread_id=thread_id, parse_mode="Markdown")
+            await bot.send_message(chat_id, f"`[x]` Launch error: {e}", message_thread_id=thread_id, parse_mode="MarkdownV2")
         except Exception:
             pass
         return False
