@@ -1,7 +1,54 @@
 # tests/test_telegram_queue.py
 import pytest
-from codogram.telegram_queue import OutgoingBatch
+from codogram.telegram_queue import OutgoingBatch, escape_markdown_underscores
 
+
+# --- escape_markdown_underscores tests ---
+
+def test_escape_simple_underscore():
+    assert escape_markdown_underscores("var_name") == "var\\_name"
+
+
+def test_escape_multiple_underscores():
+    assert escape_markdown_underscores("my_var_name") == "my\\_var\\_name"
+
+
+def test_preserve_code_block():
+    assert escape_markdown_underscores("`code_block`") == "`code_block`"
+
+
+def test_escape_outside_code_block():
+    assert escape_markdown_underscores("x `code` var_name") == "x `code` var\\_name"
+
+
+def test_preserve_already_escaped():
+    assert escape_markdown_underscores("already\\_escaped") == "already\\_escaped"
+
+
+def test_double_underscore():
+    assert escape_markdown_underscores("__init__") == "\\_\\_init\\_\\_"
+
+
+def test_no_underscores():
+    assert escape_markdown_underscores("hello world") == "hello world"
+
+
+def test_underscore_in_path():
+    assert escape_markdown_underscores("/path/to/file_name.py") == "/path/to/file\\_name.py"
+
+
+def test_our_format_preserved():
+    # Our messages like `[v]` should work
+    assert escape_markdown_underscores("`[v]` Claude ready") == "`[v]` Claude ready"
+
+
+def test_mixed_code_and_text():
+    input_text = "`code_here` then var_name `more_code`"
+    expected = "`code_here` then var\\_name `more_code`"
+    assert escape_markdown_underscores(input_text) == expected
+
+
+# --- OutgoingBatch tests ---
 
 def test_outgoing_batch_creation():
     batch = OutgoingBatch(

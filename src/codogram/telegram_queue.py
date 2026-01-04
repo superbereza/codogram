@@ -1,6 +1,7 @@
 # src/codogram/telegram_queue.py
 """Rate-limited Telegram message queue with FIFO ordering per chat_id."""
 import asyncio
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -10,6 +11,33 @@ from aiogram.types import InlineKeyboardMarkup
 
 from .logging_config import logger
 from .chunker import chunk_message
+
+
+# Pre-compiled regexes for markdown escaping
+_CODE_BLOCK_RE = re.compile(r'`[^`]*`|[^`]+')
+_UNDERSCORE_RE = re.compile(r'(?<!\\)_')
+
+
+def escape_markdown_underscores(text: str) -> str:
+    """Escape underscores outside code blocks for Telegram Markdown.
+
+    Telegram interprets _text_ as italic. Claude Code uses snake_case
+    heavily, causing broken formatting.
+
+    Rules:
+    - _ → \\_ (escape)
+    - Inside `code` → leave as is
+    - Already escaped \\_ → leave as is
+
+    TODO(refactor): Move to adapters/telegram.py
+    """
+    def process_part(match: re.Match) -> str:
+        part = match.group(0)
+        if part.startswith('`'):
+            return part  # code block - keep as is
+        return _UNDERSCORE_RE.sub(r'\\_', part)
+
+    return _CODE_BLOCK_RE.sub(process_part, text)
 
 
 @dataclass
@@ -183,6 +211,10 @@ class TelegramQueue:
 
         try:
             for msg in expanded_messages:
+                # Escape underscores in Markdown messages
+                if msg.get("parse_mode") == "Markdown":
+                    msg["text"] = escape_markdown_underscores(msg.get("text", ""))
+
                 result = await self.bot.send_message(
                     chat_id=batch.chat_id,
                     message_thread_id=batch.thread_id,
