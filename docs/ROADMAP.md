@@ -139,6 +139,12 @@ Reorganize bot commands for better usability:
 - Archive topics instead of delete (close + icon)
 - See [docs/designs/2025-01-03-menu-redesign.md](designs/2025-01-03-menu-redesign.md)
 
+### Session resume by session_id
+Resume Claude session after crash or archived topic restore:
+- Store session_id in ThreadInfo
+- On /start in archived topic or after crash: `claude --resume <session_id>`
+- Preserves conversation context instead of starting fresh
+
 ### Bot refactoring
 Bot architecture refactoring — layered structure:
 - handlers → services → domain → adapters

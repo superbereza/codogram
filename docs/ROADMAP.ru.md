@@ -139,6 +139,12 @@
 - Архивация топиков вместо удаления (закрытие + иконка)
 - См. [docs/designs/2025-01-03-menu-redesign.md](designs/2025-01-03-menu-redesign.md)
 
+### Resume сессии по session_id
+Восстановление сессии Claude после краша или разархивации топика:
+- Хранить session_id в ThreadInfo
+- При /start в архивированном топике или после краша: `claude --resume <session_id>`
+- Сохраняет контекст диалога вместо старта с нуля
+
 ### Bot refactoring
 Рефакторинг архитектуры бота — слоёная структура:
 - handlers → services → domain → adapters
