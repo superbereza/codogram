@@ -6,7 +6,8 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 
 from ..session_manager import project_manager
-from ..bot import require_forum_group, _start_state, _do_branch_create, _do_branch_cleanup
+from .common import require_forum_group, _flow_state
+from ..services.branch import do_branch_create, do_branch_cleanup
 from ..magic_names import get_random_magic_name
 from ..git_utils import (
     is_git_repo,
@@ -84,7 +85,7 @@ async def cmd_branch_create(message: Message):
         return
 
     # No uncommitted changes - create directly
-    await _do_branch_create(message, project, branch_name, default_branch)
+    await do_branch_create(message.bot, message.chat.id, project, branch_name, default_branch)
 
 
 @router.callback_query(F.data.startswith("bc_base:"))
@@ -115,7 +116,7 @@ async def on_branch_base_selected(callback: CallbackQuery):
         return
 
     await callback.message.delete()
-    await _do_branch_create(callback.message, project, branch_name, base_branch)
+    await do_branch_create(callback.bot, callback.message.chat.id, project, branch_name, base_branch)
     await callback.answer()
 
 
@@ -129,7 +130,7 @@ async def on_branch_create_confirm(callback: CallbackQuery):
         return
 
     await callback.message.delete()
-    await _do_branch_create(callback.message, project, branch_name, base_branch)
+    await do_branch_create(callback.bot, callback.message.chat.id, project, branch_name, base_branch)
     await callback.answer()
 
 
@@ -162,7 +163,7 @@ async def on_branch_commit_request(callback: CallbackQuery):
 async def on_branch_redirect(callback: CallbackQuery):
     """Handle redirect to /branch_create."""
     chat_id = callback.message.chat.id
-    _start_state.pop(chat_id, None)
+    _flow_state.pop(chat_id, None)
 
     await callback.message.edit_text(
         "Use `/branch_create` or `/branch_create <name>` to create isolated worktree branch.",
@@ -292,7 +293,7 @@ async def on_branch_do_merge(callback: CallbackQuery):
     push_warning = "" if push_result.success else "\n`[!]` Push failed. Run `git push` manually."
 
     # Cleanup
-    await _do_branch_cleanup(callback.message, project, thread, force=False)
+    await do_branch_cleanup(callback.bot, callback.message.chat.id, project, thread, force=False)
 
     await callback.message.edit_text(f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}", parse_mode="Markdown")
 
@@ -352,6 +353,6 @@ async def on_branch_do_delete(callback: CallbackQuery):
     await callback.answer()
 
     # Cleanup with force=True to delete branch
-    await _do_branch_cleanup(callback.message, project, thread, force=True)
+    await do_branch_cleanup(callback.bot, callback.message.chat.id, project, thread, force=True)
 
     await callback.message.edit_text(f"`[v]` Branch {thread.name} deleted", parse_mode="Markdown")
