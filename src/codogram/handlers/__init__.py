@@ -1,7 +1,7 @@
 """Handlers layer - thin routers delegating to services."""
 from aiogram import Dispatcher
 
-from . import permissions, start
+from . import permissions, start, threads
 
 
 def register_handlers(dp: Dispatcher):
@@ -12,3 +12,4 @@ def register_handlers(dp: Dispatcher):
     """
     dp.include_router(permissions.router)
     dp.include_router(start.router)
+    dp.include_router(threads.router)
