@@ -103,11 +103,14 @@ git commit -m "feat(config): add timing constants to Settings"
 
 **Files:**
 - Modify: `src/codogram/watcher.py:28-50`
+- Modify: `tests/test_watcher.py:57-114` (delete tests)
 
-**Step 1: Verify function is not used**
+**Step 1: Verify function is not called in production code**
 
-Run: `grep -r "find_missed_entries" src/codogram/ --include="*.py" | grep -v "^src/codogram/watcher.py:.*def find_missed_entries"`
-Expected: No output (function not called anywhere)
+Run: `grep -r "find_missed_entries" src/codogram/ --include="*.py" | grep -v "def find_missed_entries"`
+Expected: No output (function not called in production code)
+
+Note: Tests exist but they test dead code — delete them too.
 
 **Step 2: Delete the function**
 
@@ -136,16 +139,22 @@ def find_missed_entries(path: Path) -> list[ParsedEntry]:
         return []
 ```
 
-**Step 3: Run tests**
+**Step 3: Delete tests for find_missed_entries**
+
+Remove from `tests/test_watcher.py`:
+- Lines 57-114: Comment block, import, and 4 test functions
+- Update import on line 59: remove `find_missed_entries, ParsedEntry` from import
+
+**Step 4: Run tests**
 
 Run: `PYTHONPATH=src pytest tests/ -q --tb=short`
-Expected: All tests pass (function was never used)
+Expected: All tests pass (4 fewer tests than before)
 
-**Step 4: Commit**
+**Step 5: Commit**
 
 ```bash
-git add src/codogram/watcher.py
-git commit -m "refactor(watcher): remove unused find_missed_entries"
+git add src/codogram/watcher.py tests/test_watcher.py
+git commit -m "refactor(watcher): remove unused find_missed_entries and its tests"
 ```
 
 ---
