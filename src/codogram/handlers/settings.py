@@ -4,24 +4,25 @@ from aiogram.types import Message
 from aiogram.filters import Command
 
 from ..session_manager import project_manager
+from ..telegram_queue import TelegramQueue
 
 router = Router(name="settings")
 
 
 @router.message(Command("get_debug_ids"))
-async def cmd_get_debug_ids(message: Message):
+async def cmd_get_debug_ids(message: Message, telegram_queue: TelegramQueue):
     """Show debug IDs - admin only (protected by middleware)."""
     thread_id = message.message_thread_id
     thread_info = f"\nThread ID: `{thread_id}`" if thread_id else "\nThread ID: None (General)"
-    await message.answer(
+    await telegram_queue.reply(
+        message,
         f"Your user ID: `{message.from_user.id}`\n"
-        f"This chat ID: `{message.chat.id}`{thread_info}",
-        parse_mode="MarkdownV2"
+        f"This chat ID: `{message.chat.id}`{thread_info}"
     )
 
 
 @router.message(Command("help"))
-async def cmd_help(message: Message):
+async def cmd_help(message: Message, telegram_queue: TelegramQueue):
     """Show available commands."""
     text = """**Commands**
 
@@ -46,18 +47,18 @@ async def cmd_help(message: Message):
 `/esc` — Send Escape to Claude
 `/get_debug_ids` — Show debug IDs"""
 
-    await message.answer(text, parse_mode="MarkdownV2")
+    await telegram_queue.reply(message, text)
 
 
 @router.message(Command("settings"))
-async def cmd_settings(message: Message):
+async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     """Show current settings."""
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await message.answer("No project. Use /start first.")
+        await telegram_queue.reply(message, "No project. Use /start first.")
         return
 
     thread = None
@@ -77,18 +78,18 @@ async def cmd_settings(message: Message):
             f"Auto-accept: {auto_status}"
         )
 
-    await message.answer(text, parse_mode="MarkdownV2")
+    await telegram_queue.reply(message, text)
 
 
 @router.message(Command("auto_accept"))
-async def cmd_auto_accept(message: Message):
+async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
     """Toggle auto-accept or reset all."""
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await message.answer("No project. Use /start first.")
+        await telegram_queue.reply(message, "No project. Use /start first.")
         return
 
     thread = None
@@ -104,16 +105,16 @@ async def cmd_auto_accept(message: Message):
             for t in project.threads.values():
                 t.auto_accept = False
         project_manager._save()
-        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="MarkdownV2")
+        await telegram_queue.reply(message, "Auto-accept reset to **OFF** for project and all threads.")
         return
 
     # /auto_accept - toggle current context
     if thread:
         thread.auto_accept = not thread.auto_accept
         status = "⚡ ON" if thread.auto_accept else "OFF"
-        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="MarkdownV2")
+        await telegram_queue.reply(message, f"Auto-accept for `{thread.name}`: **{status}**")
     else:
         project.auto_accept = not project.auto_accept
         status = "⚡ ON" if project.auto_accept else "OFF"
-        await message.answer(f"Auto-accept: **{status}**", parse_mode="MarkdownV2")
+        await telegram_queue.reply(message, f"Auto-accept: **{status}**")
     project_manager._save()
