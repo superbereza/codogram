@@ -110,7 +110,7 @@ async def _create_worktree_with_status(
         chat_id,
         f"`[~]` Creating branch `{branch_name}` from `{base_branch}`...",
         message_thread_id=thread_id,
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
 
     # Create worktree (includes branch creation)
@@ -121,7 +121,7 @@ async def _create_worktree_with_status(
             chat_id,
             f"`[x]` {result.error}",
             message_thread_id=thread_id,
-            parse_mode="Markdown"
+            parse_mode="MarkdownV2"
         )
         return None
 
@@ -130,7 +130,7 @@ async def _create_worktree_with_status(
         chat_id,
         f"`[v]` Worktree: `{worktree_path}`",
         message_thread_id=thread_id,
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
 
     return str(worktree_path)
