@@ -276,3 +276,24 @@ async def test_markdownv2_messages_are_converted(queue, mock_bot):
     assert "##" not in sent_texts[0]  # Header syntax removed
 
     await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_enqueue_timeout():
+    """Test that enqueue raises timeout after specified duration."""
+    from unittest.mock import MagicMock
+    from codogram.telegram_queue import TelegramQueueTimeout
+
+    bot = MagicMock()
+    # Make send_message hang forever
+    async def hang_forever(**kw):
+        await asyncio.sleep(100)
+    bot.send_message = hang_forever
+
+    queue = TelegramQueue(bot)
+    batch = OutgoingBatch(chat_id=123, thread_id=None, messages=[{"text": "test"}])
+
+    with pytest.raises(TelegramQueueTimeout):
+        await queue.enqueue(batch, timeout=0.1)
+
+    await queue.shutdown()

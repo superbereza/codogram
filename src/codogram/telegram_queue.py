@@ -77,12 +77,19 @@ class TelegramQueue:
         self._workers: dict[int, asyncio.Task] = {}
         self._locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
-    async def enqueue(self, batch: OutgoingBatch | EditBatch | KeyboardBatch) -> list[int] | None:
+    async def enqueue(self, batch: OutgoingBatch | EditBatch | KeyboardBatch, timeout: float = 30.0) -> list[int] | None:
         """Add batch to queue, wait for send.
 
         For OutgoingBatch: returns list of sent message IDs.
         For EditBatch: returns None (edit doesn't create new messages).
         For KeyboardBatch: returns list with single message ID.
+
+        Args:
+            batch: The batch to send.
+            timeout: Maximum seconds to wait for send to complete. Defaults to 30.0.
+
+        Raises:
+            TelegramQueueTimeout: If the operation times out.
         """
         chat_id = batch.chat_id
 
@@ -102,13 +109,16 @@ class TelegramQueue:
 
         await self._queues[chat_id].put(item)
 
-        if isinstance(batch, EditBatch):
-            await result_future
-            return None
-        elif isinstance(batch, KeyboardBatch):
-            return await result_future_kb
-        else:
-            return await result_future_send
+        try:
+            if isinstance(batch, EditBatch):
+                await asyncio.wait_for(result_future, timeout=timeout)
+                return None
+            elif isinstance(batch, KeyboardBatch):
+                return await asyncio.wait_for(result_future_kb, timeout=timeout)
+            else:
+                return await asyncio.wait_for(result_future_send, timeout=timeout)
+        except asyncio.TimeoutError as e:
+            raise TelegramQueueTimeout(f"Enqueue operation timed out after {timeout}s") from e
 
     async def enqueue_nowait(self, batch: OutgoingBatch | EditBatch | KeyboardBatch) -> None:
         """Add batch to queue without waiting. Fire-and-forget.
