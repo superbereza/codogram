@@ -14,6 +14,7 @@ from aiogram.fsm.context import FSMContext
 
 from codogram.handlers.start import cmd_start
 from codogram.services.start_flow import FlowAction
+from codogram.telegram_queue import TelegramQueue
 
 
 @pytest.fixture
@@ -40,21 +41,31 @@ def mock_state():
     return state
 
 
+@pytest.fixture
+def mock_telegram_queue():
+    """Create mock TelegramQueue."""
+    queue = Mock(spec=TelegramQueue)
+    queue.reply = AsyncMock(return_value=[1])
+    queue.edit = AsyncMock()
+    queue.send = AsyncMock(return_value=[1])
+    return queue
+
+
 class TestCmdStart:
     """Tests for /start command."""
 
     @pytest.mark.asyncio
-    async def test_start_no_project_no_title_asks_name(self, mock_message, mock_state):
+    async def test_start_no_project_no_title_asks_name(self, mock_message, mock_state, mock_telegram_queue):
         """No project and no chat title -> asks for project name."""
         mock_message.chat.title = None  # No chat title
 
         with patch("codogram.handlers.start.project_manager") as mock_pm:
             mock_pm.get_by_chat.return_value = None
 
-            await cmd_start(mock_message, mock_state)
+            await cmd_start(mock_message, mock_state, mock_telegram_queue)
 
         mock_state.set_state.assert_called_once()
-        mock_message.answer.assert_called_once()
+        mock_telegram_queue.reply.assert_called_once()
         # Should ask for project name
-        call_args = mock_message.answer.call_args[0][0].lower()
+        call_args = mock_telegram_queue.reply.call_args[0][1].lower()
         assert "проект" in call_args or "имя" in call_args

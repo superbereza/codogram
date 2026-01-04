@@ -15,6 +15,7 @@ from ..start_flow import (
     git_visibility_keyboard,
     restart_confirm_keyboard,
 )
+from ..telegram_queue import TelegramQueue
 from ..tmux_selector import create_tmux_selection_keyboard
 
 router = Router(name="start")
@@ -26,6 +27,7 @@ async def _handle_result(
     message: Message,
     state: FSMContext,
     result: FlowResult,
+    telegram_queue: TelegramQueue,
 ):
     """Map FlowResult to Telegram response for messages."""
     match result.action:
@@ -33,99 +35,104 @@ async def _handle_result(
             await state.set_state(StartFlow.awaiting_project_name)
             if result.thread_id:
                 await state.update_data(thread_id=result.thread_id)
-            await message.answer("Отправь имя проекта:")
+            await telegram_queue.reply(message, "Отправь имя проекта:", parse_mode=None)
 
         case FlowAction.ASK_DIR_CHOICE:
             await state.set_state(StartFlow.awaiting_dir_choice)
             await state.update_data(project=result.project, path=result.path)
-            await message.answer(
+            await telegram_queue.reply(
+                message,
                 f"Директория `{result.path}` не найдена.\n\nЧто делать?",
                 reply_markup=dir_not_found_keyboard(),
-                parse_mode="MarkdownV2",
             )
 
         case FlowAction.ASK_GIT_CHOICE:
             await state.set_state(StartFlow.awaiting_git_choice)
             await state.update_data(project=result.project, path=result.path)
-            await message.answer(
+            await telegram_queue.reply(
+                message,
                 "Git setup?",
                 reply_markup=git_setup_keyboard(),
+                parse_mode=None,
             )
 
         case FlowAction.ASK_LAUNCH_CONFIRM:
             await state.set_state(StartFlow.awaiting_launch_confirm)
             await state.update_data(project=result.project, path=result.path)
             from ..start_flow import launch_confirm_keyboard
-            await message.answer(
+            await telegram_queue.reply(
+                message,
                 f"Запустить Claude в `{result.path}`?",
                 reply_markup=launch_confirm_keyboard(),
-                parse_mode="MarkdownV2",
             )
 
         case FlowAction.SHOW_STATUS:
             await state.clear()
-            await message.answer(
+            await telegram_queue.reply(
+                message,
                 f"Claude running: `{result.project}` in `{result.tmux_session}`",
-                parse_mode="MarkdownV2",
             )
 
         case FlowAction.CONNECT:
             await state.clear()
-            await _connect_to_session(message, result)
+            await _connect_to_session(message, result, telegram_queue)
 
         case FlowAction.LAUNCH:
             await state.clear()
-            await _launch_claude(message, result)
+            await _launch_claude(message, result, telegram_queue)
 
         case FlowAction.SELECT_TMUX:
-            await message.answer(
+            await telegram_queue.reply(
+                message,
                 "Multiple tmux sessions found. Select one:",
                 reply_markup=create_tmux_selection_keyboard(
                     result.tmux_list, result.project
                 ),
+                parse_mode=None,
             )
 
         case FlowAction.ERROR:
             await state.clear()
-            await message.answer(f"Error: {result.error}")
+            await telegram_queue.reply(message, f"Error: {result.error}", parse_mode=None)
 
         case FlowAction.CANCELLED:
             await state.clear()
-            await message.answer("Cancelled.")
+            await telegram_queue.reply(message, "Cancelled.", parse_mode=None)
 
         # Thread-specific actions
         case FlowAction.THREAD_SHOW_STATUS:
             await state.clear()
-            await message.answer(
+            await telegram_queue.reply(
+                message,
                 f"Thread `{result.thread_name}` running in `{result.tmux_session}`",
-                parse_mode="MarkdownV2",
             )
 
         case FlowAction.THREAD_LAUNCH:
             await state.clear()
-            await _launch_claude_in_thread(message, result)
+            await _launch_claude_in_thread(message, result, telegram_queue)
 
         case FlowAction.UPGRADE_PENDING_THREAD:
             await state.clear()
-            await message.answer(
+            await telegram_queue.reply(
+                message,
                 f"Thread upgraded to `{result.thread_name}`",
-                parse_mode="MarkdownV2",
             )
-            await _launch_claude_in_thread(message, result)
+            await _launch_claude_in_thread(message, result, telegram_queue)
 
         case FlowAction.REGISTER_UNKNOWN_TOPIC:
             await state.clear()
-            await message.answer(
+            await telegram_queue.reply(
+                message,
                 f"Topic registered as `{result.thread_name}`",
-                parse_mode="MarkdownV2",
             )
-            await _launch_claude_in_thread(message, result)
+            await _launch_claude_in_thread(message, result, telegram_queue)
 
 
 async def _handle_callback_result(
     callback: CallbackQuery,
     state: FSMContext,
     result: FlowResult,
+    telegram_queue: TelegramQueue,
 ):
     """Map FlowResult to Telegram response for callbacks."""
     await callback.answer()
@@ -134,53 +141,54 @@ async def _handle_callback_result(
         case FlowAction.ASK_GIT_CHOICE:
             await state.set_state(StartFlow.awaiting_git_choice)
             await state.update_data(project=result.project, path=result.path)
-            await callback.message.edit_text(
+            await telegram_queue.edit(
+                callback.message,
                 "Git setup?",
                 reply_markup=git_setup_keyboard(),
+                parse_mode=None,
             )
 
         case FlowAction.LAUNCH:
             await state.clear()
-            await callback.message.edit_text("Launching Claude...")
-            await _launch_claude_from_callback(callback, result)
+            await telegram_queue.edit(callback.message, "Launching Claude...", parse_mode=None)
+            await _launch_claude_from_callback(callback, result, telegram_queue)
 
         case FlowAction.CONNECT:
             await state.clear()
-            await callback.message.edit_text(
+            await telegram_queue.edit(
+                callback.message,
                 f"Connected to `{result.tmux_session}`",
-                parse_mode="MarkdownV2",
             )
             await _connect_to_session_from_callback(callback, result)
 
         case FlowAction.ERROR:
             await state.clear()
-            await callback.message.edit_text(f"Error: {result.error}")
+            await telegram_queue.edit(callback.message, f"Error: {result.error}", parse_mode=None)
 
         case FlowAction.RESTART_DONE:
             await state.clear()
-            await callback.message.edit_text("Session killed. Use /start to restart.")
+            await telegram_queue.edit(callback.message, "Session killed. Use /start to restart.", parse_mode=None)
 
         case FlowAction.CANCELLED:
             await state.clear()
-            await callback.message.edit_text("Cancelled.")
+            await telegram_queue.edit(callback.message, "Cancelled.", parse_mode=None)
 
 
 # ===== Launch Helpers =====
 
-async def _launch_claude(message: Message, result: FlowResult):
+async def _launch_claude(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
     """Launch Claude session from message context."""
     from ..launch_animation import launch_with_animation
-    from ..main import telegram_queue
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await message.answer("Project not found")
+        await telegram_queue.reply(message, "Project not found", parse_mode=None)
         return
 
     thread = project.get_or_create_thread(None, "main")
 
     if thread.launch_task and not thread.launch_task.done():
-        await message.answer("Launch already in progress")
+        await telegram_queue.reply(message, "Launch already in progress", parse_mode=None)
         return
 
     thread.launch_task = asyncio.create_task(
@@ -195,10 +203,9 @@ async def _launch_claude(message: Message, result: FlowResult):
     )
 
 
-async def _launch_claude_from_callback(callback: CallbackQuery, result: FlowResult):
+async def _launch_claude_from_callback(callback: CallbackQuery, result: FlowResult, telegram_queue: TelegramQueue):
     """Launch Claude session from callback context."""
     from ..launch_animation import launch_with_animation
-    from ..main import telegram_queue
 
     project = project_manager.get_by_chat(callback.message.chat.id)
     if not project:
@@ -221,10 +228,9 @@ async def _launch_claude_from_callback(callback: CallbackQuery, result: FlowResu
     )
 
 
-async def _launch_claude_in_thread(message: Message, result: FlowResult):
+async def _launch_claude_in_thread(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
     """Launch Claude in a specific thread."""
     from ..launch_animation import launch_with_animation
-    from ..main import telegram_queue
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
@@ -249,15 +255,15 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult):
     )
 
 
-async def _connect_to_session(message: Message, result: FlowResult):
+async def _connect_to_session(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
     """Connect to existing tmux session."""
     project = project_manager.get_by_chat(message.chat.id)
     if project:
         project.tmux_session = result.tmux_session
         project_manager._save()
-        await message.answer(
+        await telegram_queue.reply(
+            message,
             f"Connected to `{result.tmux_session}`",
-            parse_mode="MarkdownV2",
         )
 
 
@@ -272,7 +278,7 @@ async def _connect_to_session_from_callback(callback: CallbackQuery, result: Flo
 # ===== Commands =====
 
 @router.message(Command("start"))
-async def cmd_start(message: Message, state: FSMContext):
+async def cmd_start(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /start command."""
     start_flow = StartFlowService(project_manager, None)
 
@@ -286,13 +292,13 @@ async def cmd_start(message: Message, state: FSMContext):
         thread_id=thread_id,
     )
 
-    await _handle_result(message, state, result)
+    await _handle_result(message, state, result, telegram_queue)
 
 
 # ===== FSM State Handlers =====
 
 @router.message(StartFlow.awaiting_project_name)
-async def on_project_name(message: Message, state: FSMContext):
+async def on_project_name(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle project name input."""
     start_flow = StartFlowService(project_manager, None)
 
@@ -305,11 +311,11 @@ async def on_project_name(message: Message, state: FSMContext):
     if thread_id and result.thread_id is None:
         result.thread_id = thread_id
 
-    await _handle_result(message, state, result)
+    await _handle_result(message, state, result, telegram_queue)
 
 
 @router.message(StartFlow.awaiting_custom_path)
-async def on_custom_path(message: Message, state: FSMContext):
+async def on_custom_path(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle custom path input."""
     start_flow = StartFlowService(project_manager, None)
 
@@ -320,11 +326,11 @@ async def on_custom_path(message: Message, state: FSMContext):
         message.text.strip(),
     )
 
-    await _handle_result(message, state, result)
+    await _handle_result(message, state, result, telegram_queue)
 
 
 @router.message(StartFlow.awaiting_clone_url)
-async def on_clone_url(message: Message, state: FSMContext):
+async def on_clone_url(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle git clone URL input."""
     start_flow = StartFlowService(project_manager, None)
 
@@ -336,32 +342,32 @@ async def on_clone_url(message: Message, state: FSMContext):
         message.text.strip(),
     )
 
-    await _handle_result(message, state, result)
+    await _handle_result(message, state, result, telegram_queue)
 
 
 # ===== Callback Handlers =====
 
 @router.callback_query(F.data == "start:create_dir")
-async def on_create_dir(callback: CallbackQuery, state: FSMContext):
+async def on_create_dir(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle create directory button."""
     start_flow = StartFlowService(project_manager, None)
 
     data = await state.get_data()
     result = start_flow.handle_create_dir(data["project"], data["path"])
 
-    await _handle_callback_result(callback, state, result)
+    await _handle_callback_result(callback, state, result, telegram_queue)
 
 
 @router.callback_query(F.data == "start:custom_path")
-async def on_custom_path_btn(callback: CallbackQuery, state: FSMContext):
+async def on_custom_path_btn(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle custom path button."""
     await state.set_state(StartFlow.awaiting_custom_path)
-    await callback.message.edit_text("Отправь путь к директории:")
+    await telegram_queue.edit(callback.message, "Отправь путь к директории:", parse_mode=None)
     await callback.answer()
 
 
 @router.callback_query(F.data == "start:git_init")
-async def on_git_init(callback: CallbackQuery, state: FSMContext):
+async def on_git_init(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle git init button."""
     start_flow = StartFlowService(project_manager, None)
 
@@ -372,22 +378,24 @@ async def on_git_init(callback: CallbackQuery, state: FSMContext):
         data["path"],
     )
 
-    await _handle_callback_result(callback, state, result)
+    await _handle_callback_result(callback, state, result, telegram_queue)
 
 
 @router.callback_query(F.data == "start:git_gh")
-async def on_git_gh(callback: CallbackQuery, state: FSMContext):
+async def on_git_gh(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle git + gh button."""
     await state.set_state(StartFlow.awaiting_gh_visibility)
-    await callback.message.edit_text(
+    await telegram_queue.edit(
+        callback.message,
         "Видимость репозитория?",
         reply_markup=git_visibility_keyboard(),
+        parse_mode=None,
     )
     await callback.answer()
 
 
 @router.callback_query(F.data.in_({"start:gh_private", "start:gh_public"}))
-async def on_gh_visibility(callback: CallbackQuery, state: FSMContext):
+async def on_gh_visibility(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle GitHub visibility choice."""
     start_flow = StartFlowService(project_manager, None)
 
@@ -400,19 +408,19 @@ async def on_gh_visibility(callback: CallbackQuery, state: FSMContext):
         private,
     )
 
-    await _handle_callback_result(callback, state, result)
+    await _handle_callback_result(callback, state, result, telegram_queue)
 
 
 @router.callback_query(F.data == "start:git_clone")
-async def on_git_clone(callback: CallbackQuery, state: FSMContext):
+async def on_git_clone(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle git clone button."""
     await state.set_state(StartFlow.awaiting_clone_url)
-    await callback.message.edit_text("Отправь ссылку на репозиторий:")
+    await telegram_queue.edit(callback.message, "Отправь ссылку на репозиторий:", parse_mode=None)
     await callback.answer()
 
 
 @router.callback_query(F.data == "start:no_git")
-async def on_no_git(callback: CallbackQuery, state: FSMContext):
+async def on_no_git(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle no git button."""
     start_flow = StartFlowService(project_manager, None)
 
@@ -423,11 +431,11 @@ async def on_no_git(callback: CallbackQuery, state: FSMContext):
         data["path"],
     )
 
-    await _handle_callback_result(callback, state, result)
+    await _handle_callback_result(callback, state, result, telegram_queue)
 
 
 @router.callback_query(F.data == "start:launch_claude")
-async def on_launch_claude(callback: CallbackQuery, state: FSMContext):
+async def on_launch_claude(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle launch Claude button."""
     data = await state.get_data()
 
@@ -437,7 +445,7 @@ async def on_launch_claude(callback: CallbackQuery, state: FSMContext):
         return
 
     await state.clear()
-    await callback.message.edit_text("Launching Claude...")
+    await telegram_queue.edit(callback.message, "Launching Claude...", parse_mode=None)
     await callback.answer()
 
     result = FlowResult(
@@ -445,19 +453,19 @@ async def on_launch_claude(callback: CallbackQuery, state: FSMContext):
         project=data.get("project"),
         path=data.get("path"),
     )
-    await _launch_claude_from_callback(callback, result)
+    await _launch_claude_from_callback(callback, result, telegram_queue)
 
 
 @router.callback_query(F.data == "start:cancel")
-async def on_cancel(callback: CallbackQuery, state: FSMContext):
+async def on_cancel(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle cancel button."""
     await state.clear()
-    await callback.message.edit_text("Cancelled.")
+    await telegram_queue.edit(callback.message, "Cancelled.", parse_mode=None)
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("select_tmux:"))
-async def on_tmux_selected(callback: CallbackQuery, state: FSMContext):
+async def on_tmux_selected(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle tmux selection."""
     start_flow = StartFlowService(project_manager, None)
 
@@ -473,13 +481,13 @@ async def on_tmux_selected(callback: CallbackQuery, state: FSMContext):
         tmux_session,
     )
 
-    await _handle_callback_result(callback, state, result)
+    await _handle_callback_result(callback, state, result, telegram_queue)
 
 
 # ===== Restart Flow =====
 
 @router.message(Command("restart"))
-async def cmd_restart(message: Message, state: FSMContext):
+async def cmd_restart(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /restart command."""
     start_flow = StartFlowService(project_manager, None)
 
@@ -491,17 +499,17 @@ async def cmd_restart(message: Message, state: FSMContext):
     if result.action == FlowAction.ASK_RESTART_CONFIRM:
         await state.set_state(RestartFlow.awaiting_confirm)
         await state.update_data(tmux_session=result.tmux_session)
-        await message.answer(
+        await telegram_queue.reply(
+            message,
             f"Restart session `{result.tmux_session}`?",
             reply_markup=restart_confirm_keyboard(),
-            parse_mode="MarkdownV2",
         )
     else:
-        await _handle_result(message, state, result)
+        await _handle_result(message, state, result, telegram_queue)
 
 
 @router.callback_query(F.data == "restart:confirm")
-async def on_restart_confirm(callback: CallbackQuery, state: FSMContext):
+async def on_restart_confirm(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle restart confirmation."""
     start_flow = StartFlowService(project_manager, None)
 
@@ -514,14 +522,14 @@ async def on_restart_confirm(callback: CallbackQuery, state: FSMContext):
 
     result = start_flow.handle_restart_confirm(tmux_session)
 
-    await _handle_callback_result(callback, state, result)
+    await _handle_callback_result(callback, state, result, telegram_queue)
 
 
 @router.callback_query(F.data == "restart:cancel")
-async def on_restart_cancel(callback: CallbackQuery, state: FSMContext):
+async def on_restart_cancel(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle restart cancel."""
     start_flow = StartFlowService(project_manager, None)
 
     result = start_flow.handle_cancel()
 
-    await _handle_callback_result(callback, state, result)
+    await _handle_callback_result(callback, state, result, telegram_queue)
