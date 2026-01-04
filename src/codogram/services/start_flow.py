@@ -9,7 +9,7 @@ from ..domain.validators import (
     sanitize_project_name,
     MAX_PROJECT_NAME_LENGTH,
 )
-from ..project_launcher import resolve_project_path, is_tmux_session_exists, git_init, git_init_with_github
+from ..project_launcher import resolve_project_path, is_tmux_session_exists, git_init, git_init_with_github, git_clone
 from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention
 
 if TYPE_CHECKING:
@@ -283,4 +283,49 @@ class StartFlowService:
             action=FlowAction.LAUNCH,
             project=project,
             path=path,
+        )
+
+    def handle_clone_url(
+        self, chat_id: int, project: str, path: str, url: str
+    ) -> FlowResult:
+        """Handle user input for git clone URL."""
+        # Validate URL format
+        if not url.startswith(("https://", "git@", "ssh://")):
+            return FlowResult(
+                action=FlowAction.ERROR,
+                error="Invalid URL. Use https:// or git@ format",
+            )
+
+        result = git_clone(path, url)
+
+        if not result.success:
+            return FlowResult(
+                action=FlowAction.ERROR,
+                error=f"Clone failed: {result.error}",
+            )
+
+        proj = self.pm.get_or_create(project)
+        proj.chat_id = chat_id
+        proj.cwd = path
+        self.pm._save()
+
+        return FlowResult(
+            action=FlowAction.LAUNCH,
+            project=project,
+            path=path,
+        )
+
+    def handle_tmux_selected(
+        self, chat_id: int, project_name: str, tmux_session: str
+    ) -> FlowResult:
+        """Handle tmux session selection from list."""
+        proj = self.pm.get_or_create(project_name)
+        proj.chat_id = chat_id
+        proj.tmux_session = tmux_session
+        self.pm._save()
+
+        return FlowResult(
+            action=FlowAction.CONNECT,
+            project=project_name,
+            tmux_session=tmux_session,
         )

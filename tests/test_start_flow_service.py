@@ -414,3 +414,87 @@ class TestGitMethods:
 
         assert result.action == FlowAction.ERROR
         assert "gh auth" in result.error.lower() or "failed" in result.error.lower()
+
+
+class TestHandleCloneUrl:
+    """Tests for handle_clone_url."""
+
+    def test_valid_https_url(self):
+        mock_pm = Mock()
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.git_clone") as mock_clone:
+            mock_clone.return_value = Mock(success=True)
+            result = service.handle_clone_url(
+                chat_id=123,
+                project="test",
+                path="/tmp/test",
+                url="https://github.com/user/repo.git",
+            )
+
+        assert result.action == FlowAction.LAUNCH
+        mock_clone.assert_called_once()
+
+    def test_valid_ssh_url(self):
+        mock_pm = Mock()
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.git_clone") as mock_clone:
+            mock_clone.return_value = Mock(success=True)
+            result = service.handle_clone_url(
+                chat_id=123,
+                project="test",
+                path="/tmp/test",
+                url="git@github.com:user/repo.git",
+            )
+
+        assert result.action == FlowAction.LAUNCH
+
+    def test_invalid_url_format(self):
+        service = StartFlowService(Mock(), Mock())
+        result = service.handle_clone_url(
+            chat_id=123,
+            project="test",
+            path="/tmp/test",
+            url="not-a-valid-url",
+        )
+
+        assert result.action == FlowAction.ERROR
+        assert "invalid" in result.error.lower() or "url" in result.error.lower()
+
+    def test_clone_failure(self):
+        service = StartFlowService(Mock(), Mock())
+
+        with patch("codogram.services.start_flow.git_clone") as mock_clone:
+            mock_clone.return_value = Mock(success=False, error="repo not found")
+            result = service.handle_clone_url(
+                chat_id=123,
+                project="test",
+                path="/tmp/test",
+                url="https://github.com/user/repo.git",
+            )
+
+        assert result.action == FlowAction.ERROR
+
+
+class TestHandleTmuxSelected:
+    """Tests for handle_tmux_selected."""
+
+    def test_selects_tmux_and_connects(self):
+        mock_pm = Mock()
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        service = StartFlowService(mock_pm, Mock())
+        result = service.handle_tmux_selected(
+            chat_id=123,
+            project_name="test",
+            tmux_session="session-1",
+        )
+
+        assert result.action == FlowAction.CONNECT
+        assert result.tmux_session == "session-1"
+        mock_pm._save.assert_called_once()
