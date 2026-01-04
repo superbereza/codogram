@@ -11,6 +11,7 @@ from ..domain.validators import (
 )
 from ..magic_names import get_random_magic_name
 from ..project_launcher import resolve_project_path, is_tmux_session_exists, git_init, git_init_with_github, git_clone
+from ..session_manager import ThreadInfo
 from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention, TmuxSession
 
 if TYPE_CHECKING:
@@ -136,8 +137,8 @@ class StartFlowService:
             else:
                 return self._check_thread_tmux(project, thread)
 
-        # TODO: Case 3 in Task 6
-        return FlowResult(action=FlowAction.ERROR, error="Not implemented")
+        # Case 3: Unknown topic - register it
+        return self._register_unknown_topic(project, thread_id)
 
     def _check_thread_tmux(self, project, thread) -> FlowResult:
         """Check tmux for thread and return appropriate action."""
@@ -180,6 +181,30 @@ class StartFlowService:
             project=project.project_name,
             path=project.cwd,
             thread_id=thread.thread_id,
+            thread_name=new_name,
+        )
+
+    def _register_unknown_topic(self, project, thread_id: int) -> FlowResult:
+        """Register an unknown topic with a new ThreadInfo."""
+        # Get existing names to exclude
+        existing_names = {
+            t.name for t in project.threads.values()
+            if t.name and t.name != "pending"
+        }
+
+        # Generate unique name
+        new_name = get_random_magic_name(existing_names)
+
+        # Create and register thread
+        thread = ThreadInfo(thread_id=thread_id, name=new_name)
+        project.threads[thread_id] = thread
+        self.pm._save()
+
+        return FlowResult(
+            action=FlowAction.REGISTER_UNKNOWN_TOPIC,
+            project=project.project_name,
+            path=project.cwd,
+            thread_id=thread_id,
             thread_name=new_name,
         )
 

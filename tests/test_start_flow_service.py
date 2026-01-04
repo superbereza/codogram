@@ -665,3 +665,31 @@ class TestHandlePendingThread:
         excluded = mock_name.call_args[0][0]
         assert "mystic" in excluded
         assert "pending" not in excluded  # pending is special, not excluded
+
+
+class TestHandleUnknownTopic:
+    """Tests for registering unknown topics."""
+
+    def test_unknown_topic_gets_registered(self):
+        """Unknown thread_id -> REGISTER_UNKNOWN_TOPIC."""
+        mock_pm = Mock()
+        project = Mock(
+            project_name="test",
+            cwd="/tmp/test",
+            threads={},  # No threads
+        )
+        mock_pm.get_by_chat.return_value = project
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.get_random_magic_name") as mock_name:
+            mock_name.return_value = "cosmic"
+            result = service.handle_start(chat_id=123, args=[], thread_id=999)
+
+        assert result.action == FlowAction.REGISTER_UNKNOWN_TOPIC
+        assert result.thread_id == 999
+        assert result.thread_name == "cosmic"
+        # Thread should be created
+        assert 999 in project.threads
+        assert project.threads[999].name == "cosmic"
+        mock_pm._save.assert_called_once()
