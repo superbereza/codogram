@@ -1,6 +1,6 @@
 # Bot.py Refactoring Design
 
-> **Статус:** Актуализировано 2025-01-03. Фазы 1-6 завершены.
+> **Статус:** Актуализировано 2025-01-04. Фазы 1-10 завершены, bot.py удалён.
 
 ## Проблема
 
@@ -20,7 +20,9 @@
 |------|--------|----------|
 | 1-3 | ✅ Done | Структура папок, domain/, adapters/ |
 | 4-6 | ✅ Done | middleware/admin.py, handlers/permissions.py, keyboards/ |
-| 7-11 | ⏳ TODO | FSM, handlers, финализация |
+| 7-9 | ✅ Done | FSM в handlers/start.py, все handlers извлечены |
+| 10 | ✅ Done | bot.py удалён (522 → 0 строк) |
+| 11 | 📋 Planned | Cleanup техдолга (см. 05-phase-11-cleanup.md) |
 
 ## Решение
 
