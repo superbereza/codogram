@@ -62,6 +62,11 @@
 - enqueue_nowait() для fire-and-forget
 - Retry без parse_mode при Markdown ошибках
 
+### Markdown underscore escaping
+- Telegram интерпретирует `_text_` как курсив, ломая snake_case
+- Экранирование `_` → `\_` вне code blocks перед отправкой
+- На regex, централизованно в telegram_queue.py
+
 ### Security improvements
 - shell=False во всех subprocess calls (предотвращает shell injection)
 - Валидация project name (только alphanumeric, dash, underscore)
@@ -191,12 +196,6 @@
 - Отправляет Shift+Tab в tmux
 - Репортит изменение режима: "Allow once → Allow for session"
 - Парсит текущий выбор из tmux capture-pane
-
-### Markdown rendering fix
-Разобраться почему Markdown не рендерится в Telegram:
-- Иногда сообщения приходят plain text вместо formatted
-- Проверить escape символов
-- Возможно проблема с parse_mode
 
 ### Reply support
 При реплае на сообщение отправлять контекст в tmux:

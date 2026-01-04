@@ -62,6 +62,11 @@
 - enqueue_nowait() for fire-and-forget
 - Retry without parse_mode on Markdown errors
 
+### Markdown underscore escaping
+- Telegram interprets `_text_` as italic, breaking snake_case
+- Escape `_` → `\_` outside code blocks before sending
+- Regex-based, applied centrally in telegram_queue.py
+
 ### Security improvements
 - shell=False in all subprocess calls (prevents shell injection)
 - Project name validation (alphanumeric, dash, underscore only)
@@ -191,12 +196,6 @@ Command to toggle approval mode:
 - Sends Shift+Tab to tmux
 - Reports mode change: "Allow once → Allow for session"
 - Parses current selection from tmux capture-pane
-
-### Markdown rendering fix
-Figure out why Markdown doesn't render in Telegram:
-- Sometimes messages come as plain text instead of formatted
-- Check character escaping
-- Possibly parse_mode issue
 
 ### Reply support
 When replying to message, send context to tmux:
