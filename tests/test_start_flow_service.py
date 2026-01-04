@@ -147,3 +147,106 @@ class TestHandleStartNoArgs:
 
         assert result.action == FlowAction.ASK_DIR_CHOICE
         assert result.project == "existing-project"
+
+
+class TestConnectOrLaunch:
+    """Tests for _connect_or_launch method."""
+
+    def test_no_tmux_found_asks_launch(self):
+        """No tmux sessions in cwd -> ASK_LAUNCH_CONFIRM."""
+        mock_pm = Mock()
+        project = Mock(project_name="test", cwd="/tmp/test", tmux_session=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch(
+            "codogram.services.start_flow.find_all_tmux_by_cwd", return_value=[]
+        ):
+            with patch(
+                "codogram.services.start_flow.find_tmux_by_convention",
+                return_value=None,
+            ):
+                result = service._connect_or_launch(project)
+
+        assert result.action == FlowAction.ASK_LAUNCH_CONFIRM
+        assert result.project == "test"
+        assert result.path == "/tmp/test"
+
+    def test_one_tmux_found_connects(self):
+        """One tmux session in cwd -> CONNECT."""
+        mock_pm = Mock()
+        project = Mock(project_name="test", cwd="/tmp/test", tmux_session=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch(
+            "codogram.services.start_flow.find_all_tmux_by_cwd",
+            return_value=["claude-test"],
+        ):
+            result = service._connect_or_launch(project)
+
+        assert result.action == FlowAction.CONNECT
+        assert result.tmux_session == "claude-test"
+        assert project.tmux_session == "claude-test"
+
+    def test_multiple_tmux_found_selects(self):
+        """Multiple tmux sessions -> SELECT_TMUX."""
+        mock_pm = Mock()
+        project = Mock(project_name="test", cwd="/tmp/test", tmux_session=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch(
+            "codogram.services.start_flow.find_all_tmux_by_cwd",
+            return_value=["session1", "session2"],
+        ):
+            result = service._connect_or_launch(project)
+
+        assert result.action == FlowAction.SELECT_TMUX
+        assert result.tmux_list == ["session1", "session2"]
+
+    def test_finds_by_convention(self):
+        """No tmux in cwd, but found by convention -> CONNECT."""
+        mock_pm = Mock()
+        project = Mock(project_name="myproj", cwd="/tmp/myproj", tmux_session=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch(
+            "codogram.services.start_flow.find_all_tmux_by_cwd", return_value=[]
+        ):
+            with patch(
+                "codogram.services.start_flow.find_tmux_by_convention",
+                return_value="claude-myproj",
+            ):
+                result = service._connect_or_launch(project)
+
+        assert result.action == FlowAction.CONNECT
+        assert result.tmux_session == "claude-myproj"
+
+
+class TestShowStatus:
+    """Tests for showing status of running project."""
+
+    def test_running_project_shows_status(self):
+        """Running project -> SHOW_STATUS."""
+        mock_pm = Mock()
+        running = Mock(
+            project_name="running",
+            cwd="/tmp/running",
+            tmux_session="claude-running",
+            poller_task=Mock(done=Mock(return_value=False)),
+            watcher_task=Mock(done=Mock(return_value=False)),
+        )
+        mock_pm.get_by_chat.return_value = running
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch(
+            "codogram.services.start_flow.is_tmux_session_exists", return_value=True
+        ):
+            result = service.handle_start(chat_id=123, args=[])
+
+        assert result.action == FlowAction.SHOW_STATUS
+        assert result.project == "running"
+        assert result.tmux_session == "claude-running"

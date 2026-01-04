@@ -8,7 +8,8 @@ from ..domain.validators import (
     sanitize_project_name,
     MAX_PROJECT_NAME_LENGTH,
 )
-from ..project_launcher import resolve_project_path
+from ..project_launcher import resolve_project_path, is_tmux_session_exists
+from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention
 
 if TYPE_CHECKING:
     from ..session_manager import ProjectManager
@@ -80,6 +81,13 @@ class StartFlowService:
         # Case 2: existing project for this chat
         project = self.pm.get_by_chat(chat_id)
         if project:
+            if self._is_claude_running(project):
+                return FlowResult(
+                    action=FlowAction.SHOW_STATUS,
+                    project=project.project_name,
+                    path=project.cwd,
+                    tmux_session=project.tmux_session,
+                )
             return self._start_project_flow(chat_id, project.project_name)
 
         # Case 3: use chat title if valid
@@ -125,15 +133,60 @@ class StartFlowService:
 
         if exists:
             project.cwd = path
-            # TODO: _connect_or_launch in next task
-            return FlowResult(
-                action=FlowAction.ASK_LAUNCH_CONFIRM,
-                project=project_name,
-                path=path,
-            )
+            self.pm._save()
+            return self._connect_or_launch(project)
         else:
             return FlowResult(
                 action=FlowAction.ASK_DIR_CHOICE,
                 project=project_name,
                 path=path,
             )
+
+    def _connect_or_launch(self, project) -> FlowResult:
+        """Find tmux or offer to create."""
+        tmux_list = find_all_tmux_by_cwd(project.cwd)
+
+        if len(tmux_list) == 0:
+            # Try convention naming
+            tmux = find_tmux_by_convention(project.project_name)
+            if tmux:
+                project.tmux_session = tmux
+                self.pm._save()
+                return FlowResult(
+                    action=FlowAction.CONNECT,
+                    project=project.project_name,
+                    tmux_session=tmux,
+                )
+            else:
+                return FlowResult(
+                    action=FlowAction.ASK_LAUNCH_CONFIRM,
+                    project=project.project_name,
+                    path=project.cwd,
+                )
+        elif len(tmux_list) == 1:
+            project.tmux_session = tmux_list[0]
+            self.pm._save()
+            return FlowResult(
+                action=FlowAction.CONNECT,
+                project=project.project_name,
+                tmux_session=tmux_list[0],
+            )
+        else:
+            return FlowResult(
+                action=FlowAction.SELECT_TMUX,
+                project=project.project_name,
+                path=project.cwd,
+                tmux_list=tmux_list,
+            )
+
+    def _is_claude_running(self, project) -> bool:
+        """Check if Claude is running for project."""
+        if not project.tmux_session:
+            return False
+        if not is_tmux_session_exists(project.tmux_session):
+            return False
+        if not project.poller_task or project.poller_task.done():
+            return False
+        if not project.watcher_task or project.watcher_task.done():
+            return False
+        return True
