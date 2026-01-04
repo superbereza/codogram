@@ -1,18 +1,26 @@
 # Bot.py Refactoring Design
 
-> **Статус:** План актуализирован 2025-01-03
+> **Статус:** Актуализировано 2025-01-03. Фазы 1-6 завершены.
 
 ## Проблема
 
-`bot.py` — **1361 строка** (было 1273), God Object:
-- 10 команд: `/start`, `/thread_create`, `/thread_delete`, `/get_debug_ids`, `/esc`, `/resume`, `/new`, `/clear`, `/restart`
-- ~15 callback-хендлеров
+`bot.py` — **1802 строки** (вырос из-за auto-accept), God Object:
+- 15 команд: `/start`, `/thread_create`, `/thread_delete`, `/branch_create`, `/branch_finish`, `/get_debug_ids`, `/esc`, `/resume`, `/new`, `/clear`, `/restart`, `/settings`, `/auto_accept`, `/help`
+- 38 router decorators, 47 async functions
 - FSM-состояние через `_start_state` dict
-- Хелперы (admin check, validation, retry, task starters)
+- Хелперы (validation, retry, task starters)
 
 **Боли:**
 - Сложно добавлять новые команды — непонятно куда класть
 - Повторяющийся код запуска анимации в callback'ах (~6 мест)
+
+## Прогресс
+
+| Фаза | Статус | Описание |
+|------|--------|----------|
+| 1-3 | ✅ Done | Структура папок, domain/, adapters/ |
+| 4-6 | ✅ Done | middleware/admin.py, handlers/permissions.py, keyboards/ |
+| 7-11 | ⏳ TODO | FSM, handlers, финализация |
 
 ## Решение
 
@@ -30,10 +38,12 @@ handlers/ → services/ → domain/
 src/codogram/
 ├── handlers/
 │   ├── __init__.py           # register_handlers()
-│   ├── start.py              # /start + callbacks
+│   ├── start.py              # /start + git callbacks
 │   ├── threads.py            # /thread_create, /thread_delete
-│   ├── sessions.py           # /new, /clear, /restart, /esc, /resume, /get_debug_ids
-│   ├── permissions.py        # permission Yes/No/Esc
+│   ├── branches.py           # /branch_create, /branch_finish (NEW)
+│   ├── sessions.py           # /new, /clear, /restart, /esc, /resume
+│   ├── settings.py           # /settings, /auto_accept, /help, /get_debug_ids (NEW)
+│   ├── permissions.py        # permission Yes/No/Esc ✅ DONE
 │   └── messages.py           # on_message routing
 │
 ├── services/
@@ -58,13 +68,13 @@ src/codogram/
 │   └── history.py            # HistoryAdapter (wrap existing)
 │
 ├── middleware/
-│   ├── __init__.py
-│   ├── admin.py              # AdminMiddleware
+│   ├── __init__.py           # ✅ DONE
+│   ├── admin.py              # AdminMiddleware ✅ DONE
 │   └── dependencies.py       # DI middleware
 │
 ├── keyboards/
-│   ├── __init__.py
-│   ├── permissions.py
+│   ├── __init__.py           # ✅ DONE
+│   ├── permissions.py        # ✅ DONE (migrated from keyboards.py)
 │   ├── start_flow.py
 │   └── common.py
 │
@@ -91,49 +101,56 @@ src/codogram/
 - Domain ни о чём не знает (чистые dataclasses)
 - Adapters — обёртки над внешними системами
 
-## Маппинг bot.py → новые файлы (актуализирован 2025-12-30)
+## Маппинг bot.py → новые файлы (актуализирован 2025-01-03)
 
-| Строки | Функция | Куда |
-|--------|---------|------|
-| 41-50 | `get_admin_ids()`, `is_admin()` | middleware/admin.py |
-| 52-57 | `is_valid_project_name()` | domain/validators.py |
-| 60-84 | `send_with_retry()` | adapters/telegram.py (или telegram_queue.py) |
-| 87-139 | `get_*_for_chat()`, `is_claude_running()` | services/project.py |
-| 141-159 | `show_status()` | services/start_flow.py |
-| 161-177 | `_make_task_starters()` | services/launch.py |
-| 179-289 | `_start_project_flow()`, `_start_thread_flow()`, `_connect_or_launch()` | services/start_flow.py |
-| 292-393 | `cmd_start()` | handlers/start.py |
-| 396-428 | `launch_claude_in_thread()` | services/launch.py (использует launch_animation.py) |
-| 431-577 | `/thread_delete`, `/thread_create` + callbacks | handlers/threads.py |
-| 580-808 | start flow callbacks (git, clone, etc.) | handlers/start.py |
-| 811-814 | `/get_debug_ids` (бывший /my_chat_id) | handlers/sessions.py |
-| 816-823 | `/esc` | handlers/sessions.py |
-| 826-843 | `/resume` | handlers/sessions.py |
-| 846-898 | `_send_session_command()`, `/new`, `/clear` | handlers/sessions.py |
-| 901-1039 | `/restart` + callbacks | handlers/sessions.py |
-| 1042-1093 | permission callback | handlers/permissions.py |
-| 1096-1130 | tmux select callback | handlers/start.py |
-| 1133-1184 | launch_claude, cancel callbacks | handlers/start.py |
-| 1187-1361 | `on_message()` | handlers/messages.py |
+> **Note:** Номера строк изменились после merge с main (auto-accept).
+> Текущий bot.py: **1802 строки**, 38 decorators, 47 async functions.
+
+| Область | Функции | Куда | Статус |
+|---------|---------|------|--------|
+| Admin check | `is_admin()`, `get_admin_ids()` | middleware/admin.py | ✅ DONE |
+| Validation | `is_valid_project_name()` | domain/validators.py | ✅ DONE |
+| Rate limit | `send_with_retry()` | telegram_queue.py | ✅ DONE |
+| Helpers | `get_*_for_chat()`, `is_claude_running()` | services/project.py | ⏳ |
+| Status | `show_status()` | services/start_flow.py | ⏳ |
+| Task starters | `_make_task_starters()` | services/launch.py | ⏳ |
+| Start flow | `_start_project_flow()`, `_connect_or_launch()` | services/start_flow.py | ⏳ |
+| `/start` | cmd_start + git callbacks (~500 LOC) | handlers/start.py | ⏳ |
+| Launch | `launch_claude_in_thread()` | services/launch.py | ⏳ |
+| Threads | `/thread_create`, `/thread_delete` + callbacks | handlers/threads.py | ⏳ |
+| Branches | `/branch_create`, `/branch_finish` + callbacks (~400 LOC) | handlers/branches.py | ⏳ |
+| Settings | `/settings`, `/auto_accept`, `/help`, `/get_debug_ids` | handlers/settings.py | ⏳ |
+| Sessions | `/new`, `/clear`, `/restart`, `/esc`, `/resume` | handlers/sessions.py | ⏳ |
+| Permissions | perm: callback | handlers/permissions.py | ✅ DONE |
+| Tmux select | select_tmux: callback | handlers/start.py | ⏳ |
+| Message routing | `on_message()` (~175 LOC) | handlers/messages.py | ⏳ |
 
 ## Экономия
 
-**Было:** 1 файл × 1361 строка
-**Стало:** 14+ файлов × 50-180 строк каждый
+**Было:** 1 файл × 1802 строки (после merge auto-accept)
+**Станет:** 15+ файлов × 50-180 строк каждый
 
-**Ожидаемая экономия ~350 строк:**
+**Уже достигнуто (Фазы 1-6):**
+- ✅ Удалены 30 `if not is_admin()` checks (~90 строк)
+- ✅ Permission callback вынесен (handlers/permissions.py)
+- ✅ keyboards.py → keyboards/ directory
+
+**Ожидаемая экономия (Фазы 7-11):**
 - Удаление дублей launch_with_animation вызовов (~60 строк, 6 мест)
-- Удаление повторных `if not is_admin()` (~45 строк, ~15 мест)
 - Тонкие handlers вместо логики в них (~200 строк)
 - DRY в FSM через aiogram StatesGroup (~50 строк)
 
-## Уже вынесено (частично готово)
+## Уже вынесено
 
 | Модуль | Что делает | Статус |
 |--------|------------|--------|
-| `telegram_queue.py` | Rate limiting, batching, retry | ✅ Готово |
+| `telegram_queue.py` | Rate limiting, batching, retry, chunking | ✅ Готово |
 | `launch_animation.py` | FACES, анимация, создание tmux | ✅ Готово |
-| `keyboards.py` | Клавиатуры (частично) | ⚠️ Частично |
+| `middleware/admin.py` | AdminMiddleware на Dispatcher | ✅ Готово |
+| `handlers/permissions.py` | Yes/No/Esc buttons | ✅ Готово |
+| `keyboards/` | Migrated from keyboards.py | ✅ Готово |
+| `domain/` | validators, models, states, errors | ✅ Готово |
+| `adapters/telegram.py` | send_with_retry | ✅ Готово |
 | `start_flow.py` | Keyboard builders для start flow | ⚠️ Только keyboards |
 
 ## Дополнительный техдолг (выявлен 2025-12-30)
