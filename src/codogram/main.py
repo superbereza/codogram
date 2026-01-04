@@ -30,6 +30,7 @@ async def main():
     global telegram_queue
     telegram_queue = TelegramQueue(bot)
     dp = Dispatcher()
+    dp["telegram_queue"] = telegram_queue  # Register for aiogram DI
 
     # Global admin check - protects ALL routers
     dp.message.middleware(AdminMiddleware())

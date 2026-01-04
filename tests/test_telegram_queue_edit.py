@@ -58,6 +58,7 @@ async def test_edit_batch_calls_edit_message_text(queue, mock_bot):
         message_id=456,
         text="edited text",
         parse_mode="Markdown",
+        reply_markup=None,
     )
     await queue.shutdown()
 
