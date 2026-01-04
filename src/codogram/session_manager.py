@@ -76,7 +76,7 @@ def should_cleanup_project(project: 'ProjectState') -> bool:
         return True  # No jsonl anywhere = cleanup
 
     age_days = (time.time() - newest_mtime) / 86400
-    return age_days > 30
+    return age_days > settings.project_cleanup_days
 
 
 @dataclass

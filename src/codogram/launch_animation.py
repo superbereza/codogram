@@ -6,6 +6,7 @@ import time
 
 from aiogram import Bot
 
+from .config import settings
 from .logging_config import logger
 from .session_manager import ProjectState, ThreadInfo, project_manager
 from .telegram_queue import TelegramQueue, EditBatch
@@ -104,7 +105,7 @@ async def launch_with_animation(
                 logger.debug(f"launch_wait: elapsed={elapsed:.0f}s, pane_preview={pane_content[-200:] if pane_content else 'empty'}")
 
             # Timeout check FIRST
-            if elapsed > 120:
+            if elapsed > settings.claude_launch_timeout:
                 if face_msg:
                     try:
                         await bot.delete_message(chat_id, face_msg.message_id)

@@ -9,11 +9,10 @@ from .session_manager import project_manager, ProjectState, ThreadInfo
 
 if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
+from .config import settings
 from .history_reader import find_session_for_project
 from .logging_config import logger
 from .tmux import TmuxSession
-
-REFRESH_INTERVAL = 15  # seconds
 
 
 class HistoryWatcher:
@@ -50,7 +49,7 @@ class HistoryWatcher:
             except Exception as e:
                 logger.error("watch_loop_error", extra={"error": str(e)})
 
-            await asyncio.sleep(REFRESH_INTERVAL)
+            await asyncio.sleep(settings.history_watcher_interval)
 
     async def _check_for_changes(self):
         """Check tmux health and session changes for all projects."""
@@ -235,10 +234,6 @@ class HistoryWatcher:
         self.project_manager._save()
 
 
-BINDING_TIMEOUT = 300  # 5 minutes
-BINDING_INTERVAL = 0.5  # seconds
-
-
 async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo, telegram_queue: "TelegramQueue"):
     """Watch jsonl for a specific thread and send messages through queue."""
     from .watcher import JsonlWatcher, _entry_to_messages
@@ -310,7 +305,7 @@ async def poll_for_session_thread(
         logger.error(f"poll_for_session_thread: logging error: {e}")
 
     logger.debug("poll_for_session_thread: entering while loop")
-    while time.time() - start_time < BINDING_TIMEOUT:
+    while time.time() - start_time < settings.session_binding_timeout:
         try:
             # Scan ALL sessions for this cwd to find one with matching user message
             # Uses mtime filter to support both new and resumed sessions
@@ -348,7 +343,7 @@ async def poll_for_session_thread(
         except Exception as e:
             logger.warning(f"poll_for_session_thread_error: {e}")
 
-        await asyncio.sleep(BINDING_INTERVAL)
+        await asyncio.sleep(settings.session_binding_interval)
 
     # Timeout
     logger.warning(f"poll_for_session_thread_timeout: project={project.project_name}, thread={thread.name}")
