@@ -287,3 +287,53 @@ async def cmd_start(message: Message, state: FSMContext):
     )
 
     await _handle_result(message, state, result)
+
+
+# ===== FSM State Handlers =====
+
+@router.message(StartFlow.awaiting_project_name)
+async def on_project_name(message: Message, state: FSMContext):
+    """Handle project name input."""
+    start_flow = StartFlowService(project_manager, None)
+
+    data = await state.get_data()
+    thread_id = data.get("thread_id")
+
+    result = start_flow.handle_project_name(message.chat.id, message.text.strip())
+
+    # If thread flow, preserve thread_id in result
+    if thread_id and result.thread_id is None:
+        result.thread_id = thread_id
+
+    await _handle_result(message, state, result)
+
+
+@router.message(StartFlow.awaiting_custom_path)
+async def on_custom_path(message: Message, state: FSMContext):
+    """Handle custom path input."""
+    start_flow = StartFlowService(project_manager, None)
+
+    data = await state.get_data()
+    result = start_flow.handle_custom_path(
+        message.chat.id,
+        data["project"],
+        message.text.strip(),
+    )
+
+    await _handle_result(message, state, result)
+
+
+@router.message(StartFlow.awaiting_clone_url)
+async def on_clone_url(message: Message, state: FSMContext):
+    """Handle git clone URL input."""
+    start_flow = StartFlowService(project_manager, None)
+
+    data = await state.get_data()
+    result = start_flow.handle_clone_url(
+        message.chat.id,
+        data["project"],
+        data["path"],
+        message.text.strip(),
+    )
+
+    await _handle_result(message, state, result)
