@@ -60,10 +60,10 @@ def is_valid_project_name(name: str) -> bool:
 async def require_forum_group(message: Message) -> bool:
     """Check if message is from a forum group. Returns False and sends error if not."""
     if message.chat.type == "private":
-        await message.answer("`[!]` This command requires a group with topics.", parse_mode="Markdown")
+        await message.answer("`[!]` This command requires a group with topics.", parse_mode="MarkdownV2")
         return False
     if not message.chat.is_forum:
-        await message.answer("`[!]` Topics required. Enable in group settings -> Topics", parse_mode="Markdown")
+        await message.answer("`[!]` Topics required. Enable in group settings -> Topics", parse_mode="MarkdownV2")
         return False
     return True
 
@@ -167,7 +167,7 @@ async def show_status(message: Message, project: ProjectState):
         f"Attach: `tmux attach -t {project.tmux_session}`",
     ])
 
-    await message.answer("\n".join(status_lines), parse_mode="Markdown")
+    await message.answer("\n".join(status_lines), parse_mode="MarkdownV2")
 
 def _make_task_starters(bot):
     """Create task starter functions with bot and queue bound.
@@ -215,7 +215,7 @@ async def _start_project_flow(message: Message, project: ProjectState):
         await message.answer(
             f"Directory `{path}` not found.\n\nWhat to do?",
             reply_markup=dir_not_found_keyboard(),
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
         )
 
     project_manager._save()
@@ -231,7 +231,7 @@ async def _start_thread_flow(message: Message, project: ProjectState, thread: Th
         await message.answer(
             f"Claude active in `{tmux_name}`\n\n"
             f"Attach: `tmux attach -t {tmux_name}`",
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
         )
     else:
         # No tmux - launch Claude for this thread
@@ -270,7 +270,7 @@ async def _connect_or_launch(message: Message, project: ProjectState):
                         InlineKeyboardButton(text="No", callback_data="start:cancel"),
                     ]
                 ]),
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
             return
     elif len(tmux_list) == 1:
@@ -358,14 +358,14 @@ async def cmd_start(message: Message):
         if not is_valid_project_name(project_name):
             await message.answer(
                 "Project name can only contain letters, digits, `-` and `_`.",
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
             return
         if len(project_name) > 35:
             await message.answer(
                 "`[!]` Project name too long (max 35 chars). "
                 "Rename group or use /register_dir with shorter name.",
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
             return
         project = project_manager.get_or_create(project_name)
@@ -402,7 +402,7 @@ async def cmd_start(message: Message):
                 await message.answer(
                     "`[!]` Project name too long (max 35 chars). "
                     "Rename group or use /register_dir with shorter name.",
-                    parse_mode="Markdown",
+                    parse_mode="MarkdownV2",
                 )
                 return
             project = project_manager.get_or_create(sanitized)
@@ -414,7 +414,7 @@ async def cmd_start(message: Message):
     _start_state[chat_id] = {"state": "awaiting_project_name"}
     await message.answer(
         "Send project name (e.g. `my-project`):",
-        parse_mode="Markdown",
+        parse_mode="MarkdownV2",
     )
 
 
@@ -602,7 +602,7 @@ async def cmd_thread_create(message: Message):
             "*Recommendation:* use git worktree — each topic gets "
             "an isolated copy of the repository.",
             reply_markup=keyboard,
-            parse_mode="Markdown"
+            parse_mode="MarkdownV2"
         )
         return
 
@@ -651,7 +651,7 @@ async def on_start_create_dir(callback: CallbackQuery):
         f"• `git clone` — clone existing\n"
         f"• No git — empty folder",
         reply_markup=git_setup_keyboard(),
-        parse_mode="Markdown",
+        parse_mode="MarkdownV2",
     )
     await callback.answer()
 
@@ -806,7 +806,7 @@ async def on_start_git_clone(callback: CallbackQuery):
         "Send repository URL:\n"
         "• SSH: `git@github.com:user/repo.git`\n"
         "• HTTPS: `https://github.com/user/repo.git`",
-        parse_mode="Markdown",
+        parse_mode="MarkdownV2",
     )
     await callback.answer()
 
@@ -863,13 +863,13 @@ async def cmd_branch_create(message: Message):
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await message.answer("`[!]` Project not registered. Use /start first.", parse_mode="Markdown")
+        await message.answer("`[!]` Project not registered. Use /start first.", parse_mode="MarkdownV2")
         return
 
     # Check git repo
     from .git_utils import is_git_repo
     if not is_git_repo(Path(project.cwd)):
-        await message.answer("`[x]` Git repository required for /branch_create", parse_mode="Markdown")
+        await message.answer("`[x]` Git repository required for /branch_create", parse_mode="MarkdownV2")
         return
 
     # Parse name argument
@@ -889,7 +889,7 @@ async def cmd_branch_create(message: Message):
     # Check length
     max_len = max_branch_name_length(project.project_name)
     if len(branch_name) > max_len:
-        await message.answer(f"`[x]` Name too long (max {max_len} chars for this project)", parse_mode="Markdown")
+        await message.answer(f"`[x]` Name too long (max {max_len} chars for this project)", parse_mode="MarkdownV2")
         return
 
     # Get default branch
@@ -914,7 +914,7 @@ async def cmd_branch_create(message: Message):
             [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await message.answer("`[!]` Uncommitted changes detected", reply_markup=keyboard, parse_mode="Markdown")
+        await message.answer("`[!]` Uncommitted changes detected", reply_markup=keyboard, parse_mode="MarkdownV2")
         return
 
     # No uncommitted changes - create directly
@@ -950,7 +950,7 @@ async def cb_branch_create_base(callback: CallbackQuery):
             [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await callback.message.edit_text(f"`[!]` Uncommitted changes in {base_branch}", reply_markup=keyboard, parse_mode="Markdown")
+        await callback.message.edit_text(f"`[!]` Uncommitted changes in {base_branch}", reply_markup=keyboard, parse_mode="MarkdownV2")
         return
 
     await callback.message.delete()
@@ -1000,7 +1000,7 @@ async def cb_branch_create_commit(callback: CallbackQuery):
     await callback.message.edit_text(
         "`[~]` Sent: \"Commit current changes in logical chunks with descriptive messages.\"\n\n"
         f"Run `/branch_create {branch_name}` again after commit.",
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
@@ -1066,7 +1066,7 @@ async def cb_branch_create_redirect(callback: CallbackQuery):
 
     await callback.message.edit_text(
         "Use `/branch_create` or `/branch_create <name>` to create isolated worktree branch.",
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
@@ -1084,12 +1084,12 @@ async def cmd_branch_finish(message: Message):
     project = project_manager.get_by_chat(message.chat.id)
 
     if not project:
-        await message.answer("`[!]` Project not registered.", parse_mode="Markdown")
+        await message.answer("`[!]` Project not registered.", parse_mode="MarkdownV2")
         return
 
     thread = project.get_thread(thread_id)
     if not thread or not thread.worktree_path:
-        await message.answer("`[!]` /branch_finish only works in worktree topics. Use /thread_close for this topic.", parse_mode="Markdown")
+        await message.answer("`[!]` /branch_finish only works in worktree topics. Use /thread_close for this topic.", parse_mode="MarkdownV2")
         return
 
     # Check uncommitted changes
@@ -1097,7 +1097,7 @@ async def cmd_branch_finish(message: Message):
     worktree_path = Path(thread.worktree_path)
 
     if worktree_path.exists() and has_uncommitted_changes(worktree_path):
-        await message.answer("`[!]` Uncommitted changes. Commit or stash first.", parse_mode="Markdown")
+        await message.answer("`[!]` Uncommitted changes. Commit or stash first.", parse_mode="MarkdownV2")
         return
 
     # Build keyboard
@@ -1113,7 +1113,7 @@ async def cmd_branch_finish(message: Message):
     buttons.append([InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")])
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.answer(f"Finish `{thread.name}` branch:", reply_markup=keyboard, parse_mode="Markdown")
+    await message.answer(f"Finish `{thread.name}` branch:", reply_markup=keyboard, parse_mode="MarkdownV2")
 
 
 @router.callback_query(F.data.startswith("bf_merge:"))
@@ -1140,7 +1140,7 @@ async def cb_branch_finish_merge_confirm(callback: CallbackQuery):
     # Check target has no uncommitted changes
     from .git_utils import has_uncommitted_changes
     if has_uncommitted_changes(Path(project.cwd)):
-        await callback.message.edit_text("`[!]` Uncommitted changes in target directory. Commit or stash first.", parse_mode="Markdown")
+        await callback.message.edit_text("`[!]` Uncommitted changes in target directory. Commit or stash first.", parse_mode="MarkdownV2")
         await callback.answer()
         return
 
@@ -1157,7 +1157,7 @@ async def cb_branch_finish_merge_confirm(callback: CallbackQuery):
         "- Archive topic\n\n"
         "Continue?",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
@@ -1183,7 +1183,7 @@ async def cb_branch_finish_do_merge(callback: CallbackQuery):
         await callback.answer("Thread not found")
         return
 
-    await callback.message.edit_text(f"`[~]` Merging {thread.name} -> {target_branch}...", parse_mode="Markdown")
+    await callback.message.edit_text(f"`[~]` Merging {thread.name} -> {target_branch}...", parse_mode="MarkdownV2")
     await callback.answer()
 
     from .worktree import merge_branch, push_branch
@@ -1195,9 +1195,9 @@ async def cb_branch_finish_do_merge(callback: CallbackQuery):
     result = merge_branch(main_repo, branch_name, target_branch)
     if not result.success:
         if "conflicts" in result.error.lower():
-            await callback.message.edit_text("`[!]` Merge conflicts. Resolve and run /branch_finish again.", parse_mode="Markdown")
+            await callback.message.edit_text("`[!]` Merge conflicts. Resolve and run /branch_finish again.", parse_mode="MarkdownV2")
         else:
-            await callback.message.edit_text(f"`[x]` Merge failed: {result.error}", parse_mode="Markdown")
+            await callback.message.edit_text(f"`[x]` Merge failed: {result.error}", parse_mode="MarkdownV2")
         return
 
     # Push (optional, don't fail on error)
@@ -1207,7 +1207,7 @@ async def cb_branch_finish_do_merge(callback: CallbackQuery):
     # Cleanup
     await _do_branch_cleanup(callback.message, project, thread, force=False)
 
-    await callback.message.edit_text(f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}", parse_mode="Markdown")
+    await callback.message.edit_text(f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}", parse_mode="MarkdownV2")
 
 
 @router.callback_query(F.data.startswith("bf_delete:"))
@@ -1244,7 +1244,7 @@ async def cb_branch_finish_delete_confirm(callback: CallbackQuery):
         "- Archive topic\n\n"
         "All uncommitted work will be LOST.",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
@@ -1269,12 +1269,12 @@ async def cb_branch_finish_do_delete(callback: CallbackQuery):
         await callback.answer("Thread not found")
         return
 
-    await callback.message.edit_text(f"`[~]` Deleting {thread.name}...", parse_mode="Markdown")
+    await callback.message.edit_text(f"`[~]` Deleting {thread.name}...", parse_mode="MarkdownV2")
     await callback.answer()
 
     await _do_branch_cleanup(callback.message, project, thread, force=True)
 
-    await callback.message.edit_text(f"`[v]` Branch {thread.name} deleted", parse_mode="Markdown")
+    await callback.message.edit_text(f"`[v]` Branch {thread.name} deleted", parse_mode="MarkdownV2")
 
 
 async def _do_branch_cleanup(message: Message, project: ProjectState, thread: ThreadInfo, force: bool):
@@ -1333,7 +1333,7 @@ async def _do_branch_create(message: Message, project: ProjectState, branch_name
 
     if not thread:
         # Error already reported in the topic by the service
-        await message.answer("`[x]` Branch creation failed. Check the new topic for details.", parse_mode="Markdown")
+        await message.answer("`[x]` Branch creation failed. Check the new topic for details.", parse_mode="MarkdownV2")
 
 
 @router.message(Command("my_chat_id"))
@@ -1341,7 +1341,7 @@ async def cmd_my_chat_id(message: Message):
     """Show user's chat ID - available to everyone."""
     thread_id = message.message_thread_id
     thread_info = f"\nThread ID: `{thread_id}`" if thread_id else "\nThread ID: None (General)"
-    await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`{thread_info}", parse_mode="Markdown")
+    await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`{thread_info}", parse_mode="MarkdownV2")
 
 @router.message(Command("esc"))
 async def cmd_esc(message: Message):
@@ -1398,7 +1398,7 @@ async def cmd_help(message: Message):
 `/esc` — Send Escape to Claude
 `/my_chat_id` — Show your user ID"""
 
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="MarkdownV2")
 
 
 @router.message(Command("settings"))
@@ -1432,7 +1432,7 @@ async def cmd_settings(message: Message):
             f"Auto-accept: {auto_status}"
         )
 
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="MarkdownV2")
 
 
 @router.message(Command("auto_accept"))
@@ -1462,18 +1462,18 @@ async def cmd_auto_accept(message: Message):
             for t in project.threads.values():
                 t.auto_accept = False
         project_manager._save()
-        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="Markdown")
+        await message.answer("Auto-accept reset to **OFF** for project and all threads.", parse_mode="MarkdownV2")
         return
 
     # /auto_accept - toggle current context
     if thread:
         thread.auto_accept = not thread.auto_accept
         status = "⚡ ON" if thread.auto_accept else "OFF"
-        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="Markdown")
+        await message.answer(f"Auto-accept for `{thread.name}`: **{status}**", parse_mode="MarkdownV2")
     else:
         project.auto_accept = not project.auto_accept
         status = "⚡ ON" if project.auto_accept else "OFF"
-        await message.answer(f"Auto-accept: **{status}**", parse_mode="Markdown")
+        await message.answer(f"Auto-accept: **{status}**", parse_mode="MarkdownV2")
     project_manager._save()
 
 
@@ -1486,14 +1486,14 @@ async def cmd_resume(message: Message):
         await message.answer(
             "`[!]` /resume not supported in multi-session mode.\n"
             "Use /thread_create for a new thread.",
-            parse_mode="Markdown"
+            parse_mode="MarkdownV2"
         )
     else:
         # In private/general - just inform
         await message.answer(
             "`[!]` /resume not supported.\n"
             "Use /start to connect to existing session.",
-            parse_mode="Markdown"
+            parse_mode="MarkdownV2"
         )
 
 
@@ -1599,7 +1599,7 @@ async def cmd_restart(message: Message):
     await message.answer(
         f"Restart session `{tmux_name}`?",
         reply_markup=restart_confirm_keyboard(),
-        parse_mode="Markdown",
+        parse_mode="MarkdownV2",
     )
 
 
@@ -1772,7 +1772,7 @@ async def on_tmux_selected(callback: CallbackQuery):
     project = project_manager.get_or_create(project_name)
     project.tmux_session = tmux_session
 
-    await callback.message.edit_text(f"Connected to tmux: `{tmux_session}`", parse_mode="Markdown")
+    await callback.message.edit_text(f"Connected to tmux: `{tmux_session}`", parse_mode="MarkdownV2")
     await callback.answer()
 
     # Refresh session and start tasks
@@ -1873,14 +1873,14 @@ async def on_message(message: Message):
             if not project_name or not is_valid_project_name(project_name):
                 await message.answer(
                     "Project name can only contain letters, digits, `-` and `_`.",
-                    parse_mode="Markdown",
+                    parse_mode="MarkdownV2",
                 )
                 return
             if len(project_name) > 35:
                 await message.answer(
                     "`[!]` Project name too long (max 35 chars). "
                     "Rename group or use /register_dir with shorter name.",
-                    parse_mode="Markdown",
+                    parse_mode="MarkdownV2",
                 )
                 return
 
@@ -1895,7 +1895,7 @@ async def on_message(message: Message):
             # User sent custom path
             path = message.text.strip()
             if not Path(path).expanduser().is_dir():
-                await message.answer(f"Directory `{path}` does not exist.", parse_mode="Markdown")
+                await message.answer(f"Directory `{path}` does not exist.", parse_mode="MarkdownV2")
                 return
 
             # Get or create project and save path
