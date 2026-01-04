@@ -101,37 +101,37 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
 def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
     """Format tool use for Telegram display."""
     if not tool_input:
-        return f"● *{tool_name}*"
+        return f"● **{tool_name}**"
 
     if tool_name == "Bash":
         cmd = tool_input.get("command", "")[:500]
         desc = tool_input.get("description", "")
         if desc:
-            return f"● *Bash*: {desc}\n`{cmd}`"
-        return f"● *Bash*\n`{cmd}`"
+            return f"● **Bash**: {desc}\n`{cmd}`"
+        return f"● **Bash**\n`{cmd}`"
     elif tool_name == "Read":
         path = tool_input.get("file_path", "")
-        return f"● *Read* `{path}`"
+        return f"● **Read** `{path}`"
     elif tool_name == "Write":
         path = tool_input.get("file_path", "")
-        return f"● *Write* `{path}`"
+        return f"● **Write** `{path}`"
     elif tool_name == "Edit":
         path = tool_input.get("file_path", "")
-        return f"● *Edit* `{path}`"
+        return f"● **Edit** `{path}`"
     elif tool_name == "Glob":
         pattern = tool_input.get("pattern", "")
-        return f"● *Glob* `{pattern}`"
+        return f"● **Glob** `{pattern}`"
     elif tool_name == "Grep":
         pattern = tool_input.get("pattern", "")
-        return f"● *Grep* `{pattern}`"
+        return f"● **Grep** `{pattern}`"
     elif tool_name == "Task":
         desc = tool_input.get("description", "")
-        return f"● *Task*: {desc}"
+        return f"● **Task**: {desc}"
     elif tool_name == "TodoWrite":
-        return f"● *TodoWrite*"
+        return f"● **TodoWrite**"
     else:
         preview = str(tool_input)[:200]
-        return f"● *{tool_name}*\n`{preview}`"
+        return f"● **{tool_name}**\n`{preview}`"
 
 class JsonlWatcher:
     """Watches a jsonl file and yields new entries."""
@@ -239,10 +239,10 @@ def _entry_to_messages(entry: ParsedEntry) -> list[dict]:
     messages = []
 
     if entry.content_type == ContentType.TEXT:
-        messages.append({"text": f"● {entry.text}", "parse_mode": "Markdown"})
+        messages.append({"text": f"● {entry.text}", "parse_mode": "MarkdownV2"})
 
     elif entry.content_type == ContentType.TOOL_USE:
         text = format_tool_use(entry.tool_name, entry.tool_input)
-        messages.append({"text": text, "parse_mode": "Markdown"})
+        messages.append({"text": text, "parse_mode": "MarkdownV2"})
 
     return messages
