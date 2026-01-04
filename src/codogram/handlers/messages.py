@@ -6,6 +6,7 @@ from aiogram.types import Message
 
 from ..services.message_router import MessageRouterService, RouteAction
 from ..session_manager import project_manager, ThreadInfo
+from ..telegram_queue import TelegramQueue
 from ..logging_config import logger
 
 router = Router(name="messages")
@@ -15,7 +16,7 @@ _message_router = MessageRouterService()
 
 
 @router.message()
-async def on_message(message: Message):
+async def on_message(message: Message, telegram_queue: TelegramQueue):
     """Route regular messages to tmux sessions.
 
     This is the catch-all handler - registered last so commands
@@ -52,7 +53,7 @@ async def on_message(message: Message):
             thread = ThreadInfo(thread_id=thread_id, name="pending")
             result.project.threads[thread_id] = thread
             project_manager._save()
-            await message.answer("Use /start or /thread_create to connect Claude to this topic")
+            await telegram_queue.reply(message, "Use /start or /thread_create to connect Claude to this topic")
             return
 
         case RouteAction.SKIP_PENDING:
@@ -69,11 +70,11 @@ async def on_message(message: Message):
         case RouteAction.SEND_TO_TMUX:
             success = _message_router.send_to_tmux(result, text)
             if not success and message.chat.id < 0:
-                await message.answer("No active Claude session. Use /start to launch.")
+                await telegram_queue.reply(message, "No active Claude session. Use /start to launch.")
 
         case RouteAction.NO_TMUX:
             if message.chat.id < 0:
-                await message.answer("No active Claude session. Use /start to launch.")
+                await telegram_queue.reply(message, "No active Claude session. Use /start to launch.")
 
 
 def _try_send_to_tmux(result, text: str) -> bool:
