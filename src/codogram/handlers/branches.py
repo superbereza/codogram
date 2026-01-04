@@ -6,6 +6,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 
 from ..session_manager import project_manager
+from ..telegram_queue import TelegramQueue
 from .common import require_forum_group, _flow_state
 from ..services.branch import do_branch_create, do_branch_cleanup
 from ..magic_names import get_random_magic_name
@@ -26,19 +27,19 @@ router = Router(name="branches")
 # ===== /branch_create =====
 
 @router.message(Command("branch_create"))
-async def cmd_branch_create(message: Message):
+async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
     """Create a new worktree branch with isolated Claude session."""
-    if not await require_forum_group(message):
+    if not await require_forum_group(message, telegram_queue):
         return
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await message.answer("`[!]` Project not registered. Use /start first.", parse_mode="MarkdownV2")
+        await telegram_queue.reply(message, "`[!]` Project not registered. Use /start first.")
         return
 
     # Check git repo
     if not is_git_repo(Path(project.cwd)):
-        await message.answer("`[x]` Git repository required for /branch_create", parse_mode="MarkdownV2")
+        await telegram_queue.reply(message, "`[x]` Git repository required for /branch_create")
         return
 
     # Parse name argument
@@ -56,7 +57,7 @@ async def cmd_branch_create(message: Message):
     # Check length
     max_len = max_branch_name_length(project.project_name)
     if len(branch_name) > max_len:
-        await message.answer(f"`[x]` Name too long (max {max_len} chars for this project)", parse_mode="MarkdownV2")
+        await telegram_queue.reply(message, f"`[x]` Name too long (max {max_len} chars for this project)")
         return
 
     # Get default branch
@@ -71,7 +72,7 @@ async def cmd_branch_create(message: Message):
             [InlineKeyboardButton(text=f"From {current_thread.name}", callback_data=f"bc_base:{branch_name}:{current_thread.name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await message.answer("Create branch from:", reply_markup=keyboard)
+        await telegram_queue.reply(message, "Create branch from:", reply_markup=keyboard)
         return
 
     # From main - check uncommitted changes
@@ -81,7 +82,7 @@ async def cmd_branch_create(message: Message):
             [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await message.answer("`[!]` Uncommitted changes detected", reply_markup=keyboard, parse_mode="MarkdownV2")
+        await telegram_queue.reply(message, "`[!]` Uncommitted changes detected", reply_markup=keyboard)
         return
 
     # No uncommitted changes - create directly
@@ -89,7 +90,7 @@ async def cmd_branch_create(message: Message):
 
 
 @router.callback_query(F.data.startswith("bc_base:"))
-async def on_branch_base_selected(callback: CallbackQuery):
+async def on_branch_base_selected(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle base branch selection for branch_create."""
     _, branch_name, base_branch = callback.data.split(":")
     project = project_manager.get_by_chat(callback.message.chat.id)
@@ -112,7 +113,7 @@ async def on_branch_base_selected(callback: CallbackQuery):
             [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await callback.message.edit_text(f"`[!]` Uncommitted changes in {base_branch}", reply_markup=keyboard, parse_mode="MarkdownV2")
+        await telegram_queue.edit(callback.message, f"`[!]` Uncommitted changes in {base_branch}", reply_markup=keyboard)
         return
 
     await callback.message.delete()
@@ -121,7 +122,7 @@ async def on_branch_base_selected(callback: CallbackQuery):
 
 
 @router.callback_query(F.data.startswith("bc_create:"))
-async def on_branch_create_confirm(callback: CallbackQuery):
+async def on_branch_create_confirm(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Create branch from last commit."""
     _, branch_name, base_branch = callback.data.split(":")
     project = project_manager.get_by_chat(callback.message.chat.id)
@@ -135,7 +136,7 @@ async def on_branch_create_confirm(callback: CallbackQuery):
 
 
 @router.callback_query(F.data.startswith("bc_commit:"))
-async def on_branch_commit_request(callback: CallbackQuery):
+async def on_branch_commit_request(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Send commit request to Claude."""
     _, branch_name = callback.data.split(":")
     project = project_manager.get_by_chat(callback.message.chat.id)
@@ -151,23 +152,23 @@ async def on_branch_commit_request(callback: CallbackQuery):
         if tmux.exists():
             tmux.send("Commit current changes in logical chunks with descriptive messages.")
 
-    await callback.message.edit_text(
+    await telegram_queue.edit(
+        callback.message,
         "`[~]` Sent: \"Commit current changes in logical chunks with descriptive messages.\"\n\n"
         f"Run `/branch_create {branch_name}` again after commit.",
-        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
 
 @router.callback_query(F.data == "branch_create_redirect")
-async def on_branch_redirect(callback: CallbackQuery):
+async def on_branch_redirect(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle redirect to /branch_create."""
     chat_id = callback.message.chat.id
     _flow_state.pop(chat_id, None)
 
-    await callback.message.edit_text(
+    await telegram_queue.edit(
+        callback.message,
         "Use `/branch_create` or `/branch_create <name>` to create isolated worktree branch.",
-        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
@@ -175,28 +176,28 @@ async def on_branch_redirect(callback: CallbackQuery):
 # ===== /branch_finish =====
 
 @router.message(Command("branch_finish"))
-async def cmd_branch_finish(message: Message):
+async def cmd_branch_finish(message: Message, telegram_queue: TelegramQueue):
     """Finish branch: merge and cleanup worktree."""
-    if not await require_forum_group(message):
+    if not await require_forum_group(message, telegram_queue):
         return
 
     thread_id = message.message_thread_id
     project = project_manager.get_by_chat(message.chat.id)
 
     if not project:
-        await message.answer("`[!]` Project not registered.", parse_mode="MarkdownV2")
+        await telegram_queue.reply(message, "`[!]` Project not registered.")
         return
 
     thread = project.get_thread(thread_id)
     if not thread or not thread.worktree_path:
-        await message.answer("`[!]` /branch_finish only works in worktree topics. Use /thread_delete for this topic.", parse_mode="MarkdownV2")
+        await telegram_queue.reply(message, "`[!]` /branch_finish only works in worktree topics. Use /thread_delete for this topic.")
         return
 
     # Check uncommitted changes
     worktree_path = Path(thread.worktree_path)
 
     if worktree_path.exists() and has_uncommitted_changes(worktree_path):
-        await message.answer("`[!]` Uncommitted changes. Commit or stash first.", parse_mode="MarkdownV2")
+        await telegram_queue.reply(message, "`[!]` Uncommitted changes. Commit or stash first.")
         return
 
     # Build keyboard
@@ -212,11 +213,11 @@ async def cmd_branch_finish(message: Message):
     buttons.append([InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")])
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.answer(f"Finish `{thread.name}` branch:", reply_markup=keyboard, parse_mode="MarkdownV2")
+    await telegram_queue.reply(message, f"Finish `{thread.name}` branch:", reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("bf_merge:"))
-async def on_branch_merge_selected(callback: CallbackQuery):
+async def on_branch_merge_selected(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Show merge confirmation."""
     parts = callback.data.split(":")
     thread_id = int(parts[1])
@@ -234,7 +235,7 @@ async def on_branch_merge_selected(callback: CallbackQuery):
 
     # Check target has no uncommitted changes
     if has_uncommitted_changes(Path(project.cwd)):
-        await callback.message.edit_text("`[!]` Uncommitted changes in target directory. Commit or stash first.", parse_mode="MarkdownV2")
+        await telegram_queue.edit(callback.message, "`[!]` Uncommitted changes in target directory. Commit or stash first.")
         await callback.answer()
         return
 
@@ -243,7 +244,8 @@ async def on_branch_merge_selected(callback: CallbackQuery):
         [InlineKeyboardButton(text="[x] Cancel", callback_data="cancel")]
     ])
 
-    await callback.message.edit_text(
+    await telegram_queue.edit(
+        callback.message,
         f"Merge `{thread.name}` -> `{target_branch}` will:\n"
         "- Merge branch and push\n"
         "- Close tmux session\n"
@@ -251,13 +253,12 @@ async def on_branch_merge_selected(callback: CallbackQuery):
         "- Archive topic\n\n"
         "Continue?",
         reply_markup=keyboard,
-        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("bf_do_merge:"))
-async def on_branch_do_merge(callback: CallbackQuery):
+async def on_branch_do_merge(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Execute merge and cleanup."""
     parts = callback.data.split(":")
     thread_id = int(parts[1])
@@ -273,7 +274,7 @@ async def on_branch_do_merge(callback: CallbackQuery):
         await callback.answer("Thread not found")
         return
 
-    await callback.message.edit_text(f"`[~]` Merging {thread.name} -> {target_branch}...", parse_mode="MarkdownV2")
+    await telegram_queue.edit(callback.message, f"`[~]` Merging {thread.name} -> {target_branch}...")
     await callback.answer()
 
     main_repo = Path(project.cwd)
@@ -283,9 +284,9 @@ async def on_branch_do_merge(callback: CallbackQuery):
     result = merge_branch(main_repo, branch_name, target_branch)
     if not result.success:
         if "conflicts" in result.error.lower():
-            await callback.message.edit_text("`[!]` Merge conflicts. Resolve and run /branch_finish again.", parse_mode="MarkdownV2")
+            await telegram_queue.edit(callback.message, "`[!]` Merge conflicts. Resolve and run /branch_finish again.")
         else:
-            await callback.message.edit_text(f"`[x]` Merge failed: {result.error}", parse_mode="MarkdownV2")
+            await telegram_queue.edit(callback.message, f"`[x]` Merge failed: {result.error}")
         return
 
     # Push (optional, don't fail on error)
@@ -295,11 +296,11 @@ async def on_branch_do_merge(callback: CallbackQuery):
     # Cleanup
     await do_branch_cleanup(callback.bot, callback.message.chat.id, project, thread, force=False)
 
-    await callback.message.edit_text(f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}", parse_mode="MarkdownV2")
+    await telegram_queue.edit(callback.message, f"`[v]` Branch {branch_name} merged and cleaned up{push_warning}")
 
 
 @router.callback_query(F.data.startswith("bf_delete:"))
-async def on_branch_delete_selected(callback: CallbackQuery):
+async def on_branch_delete_selected(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Show delete confirmation."""
     parts = callback.data.split(":")
     thread_id = int(parts[1])
@@ -319,7 +320,8 @@ async def on_branch_delete_selected(callback: CallbackQuery):
         [InlineKeyboardButton(text="[x] Cancel", callback_data="cancel")]
     ])
 
-    await callback.message.edit_text(
+    await telegram_queue.edit(
+        callback.message,
         f"`[!!]` Delete `{thread.name}` WITHOUT merging?\n\n"
         "This will:\n"
         "- Close tmux session\n"
@@ -328,13 +330,12 @@ async def on_branch_delete_selected(callback: CallbackQuery):
         "- Archive topic\n\n"
         "WARNING: Changes will be LOST!",
         reply_markup=keyboard,
-        parse_mode="MarkdownV2"
     )
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("bf_do_delete:"))
-async def on_branch_do_delete(callback: CallbackQuery):
+async def on_branch_do_delete(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Execute delete without merge."""
     parts = callback.data.split(":")
     thread_id = int(parts[1])
@@ -349,10 +350,10 @@ async def on_branch_do_delete(callback: CallbackQuery):
         await callback.answer("Thread not found")
         return
 
-    await callback.message.edit_text(f"`[~]` Deleting {thread.name}...", parse_mode="MarkdownV2")
+    await telegram_queue.edit(callback.message, f"`[~]` Deleting {thread.name}...")
     await callback.answer()
 
     # Cleanup with force=True to delete branch
     await do_branch_cleanup(callback.bot, callback.message.chat.id, project, thread, force=True)
 
-    await callback.message.edit_text(f"`[v]` Branch {thread.name} deleted", parse_mode="MarkdownV2")
+    await telegram_queue.edit(callback.message, f"`[v]` Branch {thread.name} deleted")

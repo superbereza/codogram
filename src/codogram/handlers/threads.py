@@ -6,6 +6,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 
 from ..session_manager import project_manager
+from ..telegram_queue import TelegramQueue
 from .common import require_forum_group, _flow_state
 from ..magic_names import get_random_magic_name
 from ..services.launch import create_thread_with_session
@@ -16,23 +17,23 @@ router = Router(name="threads")
 # ===== /thread_delete =====
 
 @router.message(Command("thread_delete"))
-async def cmd_thread_delete(message: Message):
+async def cmd_thread_delete(message: Message, telegram_queue: TelegramQueue):
     """Close current thread and its Claude session."""
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
     if thread_id is None:
-        await message.answer("This command can only be used in a topic")
+        await telegram_queue.reply(message, "This command can only be used in a topic")
         return
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await message.answer("Project not found")
+        await telegram_queue.reply(message, "Project not found")
         return
 
     thread = project.threads.get(thread_id)
     if not thread:
-        await message.answer("This topic is not linked to a Claude session")
+        await telegram_queue.reply(message, "This topic is not linked to a Claude session")
         return
 
     # Confirmation
@@ -42,7 +43,8 @@ async def cmd_thread_delete(message: Message):
             InlineKeyboardButton(text="Cancel", callback_data="thread_delete:cancel"),
         ]
     ])
-    await message.answer(
+    await telegram_queue.reply(
+        message,
         f"Delete thread '{thread.name}'?\n"
         "Topic and tmux session will be deleted.",
         reply_markup=keyboard
@@ -50,11 +52,11 @@ async def cmd_thread_delete(message: Message):
 
 
 @router.callback_query(F.data.startswith("thread_delete:"))
-async def on_thread_delete_callback(callback: CallbackQuery):
+async def on_thread_delete_callback(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle thread close confirmation."""
     data = callback.data.split(":")[1]
     if data == "cancel":
-        await callback.message.edit_text("Cancelled")
+        await telegram_queue.edit(callback.message, "Cancelled")
         await callback.answer()
         return
 
@@ -86,7 +88,7 @@ async def on_thread_delete_callback(callback: CallbackQuery):
     try:
         await callback.bot.delete_forum_topic(chat_id, thread_id)
     except Exception as e:
-        await callback.message.edit_text(f"Error deleting topic: {e}")
+        await telegram_queue.edit(callback.message, f"Error deleting topic: {e}")
         await callback.answer()
         return
 
@@ -100,15 +102,15 @@ async def on_thread_delete_callback(callback: CallbackQuery):
 # ===== /thread_create =====
 
 @router.message(Command("thread_create"))
-async def cmd_thread_create(message: Message):
+async def cmd_thread_create(message: Message, telegram_queue: TelegramQueue):
     """Create a new thread (topic) with its own Claude session."""
-    if not await require_forum_group(message):
+    if not await require_forum_group(message, telegram_queue):
         return
 
     chat_id = message.chat.id
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await message.answer("Project not found. Use /start first")
+        await telegram_queue.reply(message, "Project not found. Use /start first")
         return
 
     # Parse optional name from command
@@ -136,7 +138,8 @@ async def cmd_thread_create(message: Message):
             [InlineKeyboardButton(text="Use /branch_create instead", callback_data="branch_create_redirect")],
             [InlineKeyboardButton(text="Cancel", callback_data="cancel")]
         ])
-        await message.answer(
+        await telegram_queue.reply(
+            message,
             "Non-worktree threads exist. For isolated work, consider /branch_create.\n"
             "Create thread in main repo anyway?",
             reply_markup=keyboard
@@ -152,11 +155,11 @@ async def cmd_thread_create(message: Message):
     )
 
     if not thread:
-        await message.answer("Error creating topic")
+        await telegram_queue.reply(message, "Error creating topic")
 
 
 @router.callback_query(F.data == "thread_create_confirm")
-async def on_thread_create_confirm(callback: CallbackQuery):
+async def on_thread_create_confirm(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle thread_create confirmation (create in main anyway)."""
     chat_id = callback.message.chat.id
     state = _flow_state.get(chat_id)
@@ -183,6 +186,6 @@ async def on_thread_create_confirm(callback: CallbackQuery):
     )
 
     if not thread:
-        await callback.bot.send_message(chat_id, "Error creating topic")
+        await telegram_queue.send(chat_id, "Error creating topic")
 
     await callback.answer()
