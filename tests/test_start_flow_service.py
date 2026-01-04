@@ -79,3 +79,71 @@ class TestHandleStartWithProjectName:
 
         assert result.action == FlowAction.ERROR
         assert "too long" in result.error.lower()
+
+
+class TestHandleStartNoArgs:
+    """Tests for handle_start when no args provided."""
+
+    def test_no_project_no_title_asks_name(self):
+        """No project, no chat title -> ASK_PROJECT_NAME."""
+        mock_pm = Mock()
+        mock_pm.get_by_chat.return_value = None
+
+        service = StartFlowService(mock_pm, Mock())
+        result = service.handle_start(chat_id=123, args=[], chat_title=None)
+
+        assert result.action == FlowAction.ASK_PROJECT_NAME
+
+    def test_uses_chat_title_if_valid(self):
+        """No project, valid chat title -> start flow with sanitized title."""
+        mock_pm = Mock()
+        mock_pm.get_by_chat.return_value = None
+        mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch(
+            "codogram.services.start_flow.resolve_project_path"
+        ) as mock_resolve:
+            mock_resolve.return_value = Mock(path="/tmp/My-Project", exists=False)
+            result = service.handle_start(
+                chat_id=123, args=[], chat_title="My Project!"
+            )
+
+        assert result.action == FlowAction.ASK_DIR_CHOICE
+        assert result.project == "My-Project"
+
+    def test_ignores_invalid_chat_title(self):
+        """Chat title that sanitizes to empty -> ASK_PROJECT_NAME."""
+        mock_pm = Mock()
+        mock_pm.get_by_chat.return_value = None
+
+        service = StartFlowService(mock_pm, Mock())
+        result = service.handle_start(chat_id=123, args=[], chat_title="!!!")
+
+        assert result.action == FlowAction.ASK_PROJECT_NAME
+
+    def test_existing_project_not_running(self):
+        """Existing project for chat, not running -> start flow."""
+        mock_pm = Mock()
+        existing = Mock(
+            project_name="existing-project",
+            cwd=None,
+            chat_id=123,
+            tmux_session=None,
+        )
+        mock_pm.get_by_chat.return_value = existing
+        mock_pm.get_or_create.return_value = existing
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch(
+            "codogram.services.start_flow.resolve_project_path"
+        ) as mock_resolve:
+            mock_resolve.return_value = Mock(
+                path="/tmp/existing-project", exists=False
+            )
+            result = service.handle_start(chat_id=123, args=[])
+
+        assert result.action == FlowAction.ASK_DIR_CHOICE
+        assert result.project == "existing-project"

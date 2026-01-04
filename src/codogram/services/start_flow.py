@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from ..domain.validators import (
     is_valid_project_name,
+    sanitize_project_name,
     MAX_PROJECT_NAME_LENGTH,
 )
 from ..project_launcher import resolve_project_path
@@ -76,7 +77,18 @@ class StartFlowService:
             project_name = args[0]
             return self._validate_and_start(chat_id, project_name)
 
-        # TODO: Other cases in next tasks
+        # Case 2: existing project for this chat
+        project = self.pm.get_by_chat(chat_id)
+        if project:
+            return self._start_project_flow(chat_id, project.project_name)
+
+        # Case 3: use chat title if valid
+        if chat_title:
+            sanitized = sanitize_project_name(chat_title)
+            if sanitized:
+                return self._start_project_flow(chat_id, sanitized)
+
+        # Case 4: ask for project name
         return FlowResult(action=FlowAction.ASK_PROJECT_NAME)
 
     def _validate_and_start(self, chat_id: int, project_name: str) -> FlowResult:
