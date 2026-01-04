@@ -121,6 +121,14 @@
 - Убрано дублирование кода из watcher.py и permission_poller.py
 - См. [docs/designs/done/2026-01-03-queue-level-chunking.md](designs/done/2026-01-03-queue-level-chunking.md)
 
+### Telegramify-markdown интеграция
+Полная конвертация GFM → MarkdownV2 через библиотеку telegramify-markdown:
+- Claude генерирует GFM Markdown (заголовки, **bold**, списки)
+- telegramify-markdown конвертирует в Telegram MarkdownV2
+- Централизованная конвертация в telegram_queue.py
+- Fallback на plain text при ошибках парсинга
+- См. [docs/designs/done/2025-01-04-telegramify-markdown-integration.md](designs/done/2025-01-04-telegramify-markdown-integration.md)
+
 ## Backlog
 
 ### Bot refactoring
@@ -266,11 +274,6 @@
 Заменить большую точку `•` на точку в code block:
 - `•` плохо рендерится в некоторых клиентах
 - Заменить на `\`•\`` или другой символ
-
-### Markdown to Telegram converter
-Библиотека для конвертации обычного MD в TG-совместимый:
-- Таблицы, headers не рендерятся в Telegram
-- Поискать готовые решения (telegramify-markdown, etc.)
 
 ## PoC / Research
 

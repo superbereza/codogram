@@ -121,6 +121,14 @@ Centralized message chunking in TelegramQueue:
 - Removed duplicate code from watcher.py and permission_poller.py
 - See [docs/designs/done/2026-01-03-queue-level-chunking.md](designs/done/2026-01-03-queue-level-chunking.md)
 
+### Telegramify-markdown integration
+Full GFM → MarkdownV2 conversion using telegramify-markdown library:
+- Claude generates GFM Markdown (headers, **bold**, lists)
+- telegramify-markdown converts to Telegram MarkdownV2
+- Centralized conversion in telegram_queue.py
+- Fallback to plain text on parse errors
+- See [docs/designs/done/2025-01-04-telegramify-markdown-integration.md](designs/done/2025-01-04-telegramify-markdown-integration.md)
+
 ## Backlog
 
 ### Bot refactoring
@@ -266,11 +274,6 @@ Summarize long threads (questionable):
 Replace large dot `•` with dot in code block:
 - `•` renders poorly in some clients
 - Replace with `` `•` `` or another symbol
-
-### Markdown to Telegram converter
-Library for converting regular MD to TG-compatible:
-- Tables, headers don't render in Telegram
-- Look for existing solutions (telegramify-markdown, etc.)
 
 ## PoC / Research
 
