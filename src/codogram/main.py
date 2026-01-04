@@ -11,7 +11,6 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher
 
 from .config import settings
-from .bot import router
 from .middleware.admin import AdminMiddleware
 from .handlers import register_handlers
 from .session_manager import project_manager, ProjectState
@@ -38,9 +37,6 @@ async def main():
 
     # Register handler routers (all protected by AdminMiddleware)
     register_handlers(dp)
-
-    # Main router
-    dp.include_router(router)
 
     from aiogram.types import BotCommand
     await bot.set_my_commands([
