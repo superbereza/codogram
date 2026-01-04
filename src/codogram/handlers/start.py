@@ -337,3 +337,140 @@ async def on_clone_url(message: Message, state: FSMContext):
     )
 
     await _handle_result(message, state, result)
+
+
+# ===== Callback Handlers =====
+
+@router.callback_query(F.data == "start:create_dir")
+async def on_create_dir(callback: CallbackQuery, state: FSMContext):
+    """Handle create directory button."""
+    start_flow = StartFlowService(project_manager, None)
+
+    data = await state.get_data()
+    result = start_flow.handle_create_dir(data["project"], data["path"])
+
+    await _handle_callback_result(callback, state, result)
+
+
+@router.callback_query(F.data == "start:custom_path")
+async def on_custom_path_btn(callback: CallbackQuery, state: FSMContext):
+    """Handle custom path button."""
+    await state.set_state(StartFlow.awaiting_custom_path)
+    await callback.message.edit_text("Отправь путь к директории:")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "start:git_init")
+async def on_git_init(callback: CallbackQuery, state: FSMContext):
+    """Handle git init button."""
+    start_flow = StartFlowService(project_manager, None)
+
+    data = await state.get_data()
+    result = start_flow.handle_git_init(
+        callback.message.chat.id,
+        data["project"],
+        data["path"],
+    )
+
+    await _handle_callback_result(callback, state, result)
+
+
+@router.callback_query(F.data == "start:git_gh")
+async def on_git_gh(callback: CallbackQuery, state: FSMContext):
+    """Handle git + gh button."""
+    await state.set_state(StartFlow.awaiting_gh_visibility)
+    await callback.message.edit_text(
+        "Видимость репозитория?",
+        reply_markup=git_visibility_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.in_({"start:gh_private", "start:gh_public"}))
+async def on_gh_visibility(callback: CallbackQuery, state: FSMContext):
+    """Handle GitHub visibility choice."""
+    start_flow = StartFlowService(project_manager, None)
+
+    data = await state.get_data()
+    private = callback.data == "start:gh_private"
+    result = start_flow.handle_gh_create(
+        callback.message.chat.id,
+        data["project"],
+        data["path"],
+        private,
+    )
+
+    await _handle_callback_result(callback, state, result)
+
+
+@router.callback_query(F.data == "start:git_clone")
+async def on_git_clone(callback: CallbackQuery, state: FSMContext):
+    """Handle git clone button."""
+    await state.set_state(StartFlow.awaiting_clone_url)
+    await callback.message.edit_text("Отправь ссылку на репозиторий:")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "start:no_git")
+async def on_no_git(callback: CallbackQuery, state: FSMContext):
+    """Handle no git button."""
+    start_flow = StartFlowService(project_manager, None)
+
+    data = await state.get_data()
+    result = start_flow.handle_no_git(
+        callback.message.chat.id,
+        data["project"],
+        data["path"],
+    )
+
+    await _handle_callback_result(callback, state, result)
+
+
+@router.callback_query(F.data == "start:launch_claude")
+async def on_launch_claude(callback: CallbackQuery, state: FSMContext):
+    """Handle launch Claude button."""
+    data = await state.get_data()
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    await state.clear()
+    await callback.message.edit_text("Launching Claude...")
+    await callback.answer()
+
+    result = FlowResult(
+        action=FlowAction.LAUNCH,
+        project=data.get("project"),
+        path=data.get("path"),
+    )
+    await _launch_claude_from_callback(callback, result)
+
+
+@router.callback_query(F.data == "start:cancel")
+async def on_cancel(callback: CallbackQuery, state: FSMContext):
+    """Handle cancel button."""
+    await state.clear()
+    await callback.message.edit_text("Cancelled.")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("select_tmux:"))
+async def on_tmux_selected(callback: CallbackQuery, state: FSMContext):
+    """Handle tmux selection."""
+    start_flow = StartFlowService(project_manager, None)
+
+    parts = callback.data.split(":", 2)
+    if len(parts) < 3:
+        await callback.answer("Invalid callback")
+        return
+
+    project_name, tmux_session = parts[1], parts[2]
+    result = start_flow.handle_tmux_selected(
+        callback.message.chat.id,
+        project_name,
+        tmux_session,
+    )
+
+    await _handle_callback_result(callback, state, result)
