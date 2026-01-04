@@ -77,23 +77,23 @@ async def launch_with_animation(
         thread.start_requested_at = time.time()
 
         # 1. Create tmux
-        await bot.send_message(chat_id, "`[~]` Creating tmux session...", message_thread_id=thread_id, parse_mode="MarkdownV2")
+        await queue.send(chat_id, "`[~]` Creating tmux session...", thread_id=thread_id, parse_mode="MarkdownV2")
 
         if not tmux.exists():
             tmux.create()
 
         # 2. Launch Claude
-        await bot.send_message(chat_id, "`[~]` Starting Claude...", message_thread_id=thread_id, parse_mode="MarkdownV2")
+        await queue.send(chat_id, "`[~]` Starting Claude...", thread_id=thread_id, parse_mode="MarkdownV2")
         tmux.send("claude")
 
         # 2.5. Start poller early to catch trust prompts during startup
         await _start_monitoring(bot, project, thread, queue)
 
         # 3. Wait for ready with animation
-        await bot.send_message(chat_id, "`[~]` Waiting for Claude...", message_thread_id=thread_id, parse_mode="MarkdownV2")
+        await queue.send(chat_id, "`[~]` Waiting for Claude...", thread_id=thread_id, parse_mode="MarkdownV2")
 
         start_time = time.time()
-        face_msg = None
+        face_msg_id: int | None = None
         face_idx = 0
 
         while not tmux.is_claude_ready():
@@ -106,30 +106,31 @@ async def launch_with_animation(
 
             # Timeout check FIRST
             if elapsed > settings.claude_launch_timeout:
-                if face_msg:
+                if face_msg_id:
                     try:
-                        await bot.delete_message(chat_id, face_msg.message_id)
+                        await bot.delete_message(chat_id, face_msg_id)
                     except Exception:
                         pass
-                await bot.send_message(
+                await queue.send(
                     chat_id, "`[x]` Timeout: Claude didn't start in 2 minutes",
-                    message_thread_id=thread_id,
+                    thread_id=thread_id,
                     parse_mode="MarkdownV2"
                 )
                 return False
 
             # Face animation
-            if elapsed > 3 and face_msg is None:
-                face_msg = await bot.send_message(
+            if elapsed > 3 and face_msg_id is None:
+                sent_ids = await queue.send(
                     chat_id, f"`{FACES[0]}`",
+                    thread_id=thread_id,
                     parse_mode="MarkdownV2",
-                    message_thread_id=thread_id
                 )
+                face_msg_id = sent_ids[0] if sent_ids else None
                 face_idx = 1
-            elif face_msg:
+            elif face_msg_id:
                 await queue.enqueue(EditBatch(
                     chat_id=chat_id,
-                    message_id=face_msg.message_id,
+                    message_id=face_msg_id,
                     text=f"`{FACES[face_idx % len(FACES)]}`",
                     parse_mode="MarkdownV2",
                 ))
@@ -138,24 +139,24 @@ async def launch_with_animation(
             await asyncio.sleep(3)
 
         # 4. Success - cleanup face
-        if face_msg:
+        if face_msg_id:
             await queue.enqueue(EditBatch(
                 chat_id=chat_id,
-                message_id=face_msg.message_id,
+                message_id=face_msg_id,
                 text=f"`{FACE_READY}`",
                 parse_mode="MarkdownV2",
             ))
             await asyncio.sleep(1.5)
             try:
-                await bot.delete_message(chat_id, face_msg.message_id)
+                await bot.delete_message(chat_id, face_msg_id)
             except Exception:
                 pass
 
-        await bot.send_message(
+        await queue.send(
             chat_id,
             f"`[v]` Claude ready\n\nAttach: `tmux attach -t {tmux_name}`",
+            thread_id=thread_id,
             parse_mode="MarkdownV2",
-            message_thread_id=thread_id
         )
 
         # 5. Start monitoring
@@ -169,7 +170,7 @@ async def launch_with_animation(
     except Exception as e:
         logger.error(f"launch_error: {e}")
         try:
-            await bot.send_message(chat_id, f"`[x]` Launch error: {e}", message_thread_id=thread_id, parse_mode="MarkdownV2")
+            await queue.send(chat_id, f"`[x]` Launch error: {e}", thread_id=thread_id, parse_mode="MarkdownV2")
         except Exception:
             pass
         return False

@@ -18,6 +18,7 @@ def mock_bot():
 def mock_queue():
     queue = MagicMock()
     queue.enqueue = AsyncMock(return_value=[123])
+    queue.send = AsyncMock(return_value=[123])
     return queue
 
 
@@ -95,8 +96,8 @@ async def test_launch_timeout_shows_error(mock_bot, mock_queue, mock_project, mo
         )
 
         assert result is False
-        # Check error message was sent
-        calls = mock_bot.send_message.call_args_list
+        # Check error message was sent via queue.send
+        calls = mock_queue.send.call_args_list
         error_call = [c for c in calls if "Timeout" in str(c)]
         assert len(error_call) > 0
 
