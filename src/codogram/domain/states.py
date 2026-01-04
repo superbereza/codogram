@@ -15,3 +15,9 @@ class StartFlow(StatesGroup):
     awaiting_clone_url = State()
     awaiting_custom_path = State()
     awaiting_launch_confirm = State()
+
+
+class RestartFlow(StatesGroup):
+    """States for /restart confirmation flow."""
+
+    awaiting_confirm = State()
