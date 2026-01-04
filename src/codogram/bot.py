@@ -2,7 +2,6 @@
 from pathlib import Path
 import asyncio
 import re
-import time
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -679,29 +678,6 @@ async def cmd_get_debug_ids(message: Message):
     thread_info = f"\nThread ID: `{thread_id}`" if thread_id else "\nThread ID: None (General)"
     await message.answer(f"Your user ID: `{message.from_user.id}`\nThis chat ID: `{message.chat.id}`{thread_info}", parse_mode="Markdown")
 
-@router.message(Command("esc"))
-async def cmd_esc(message: Message):
-    chat_id = message.chat.id
-    thread_id = message.message_thread_id
-
-    project = project_manager.get_by_chat(chat_id)
-    if not project:
-        return
-
-    # Get correct thread (topic or main)
-    thread = project.threads.get(thread_id)
-    if not thread:
-        return
-
-    if not project.cwd:
-        logger.error(f"esc: project {project.project_name} has no cwd")
-        return
-
-    tmux_name = thread.get_tmux_session(project.project_name)
-    tmux = TmuxSession(tmux_name, project.cwd)
-    tmux.send_key("Escape")
-
-
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     """Show available commands."""
@@ -799,78 +775,6 @@ async def cmd_auto_accept(message: Message):
         status = "⚡ ON" if project.auto_accept else "OFF"
         await message.answer(f"Auto-accept: **{status}**", parse_mode="Markdown")
     project_manager._save()
-
-
-@router.message(Command("resume"))
-async def cmd_resume(message: Message):
-    """Handle /resume command - not supported in multi-session mode."""
-    thread_id = message.message_thread_id
-    if thread_id is not None:
-        # In a topic - resume not supported
-        await message.answer(
-            "`[!]` /resume not supported in multi-session mode.\n"
-            "Use /thread_create for a new thread.",
-            parse_mode="Markdown"
-        )
-    else:
-        # In private/general - just inform
-        await message.answer(
-            "`[!]` /resume not supported.\n"
-            "Use /start to connect to existing session.",
-            parse_mode="Markdown"
-        )
-
-
-async def _send_session_command(message: Message, command: str, status_text: str) -> bool:
-    """Common logic for /new and /clear commands.
-
-    Returns True if command was sent successfully, False otherwise.
-    """
-    project = project_manager.get_by_chat(message.chat.id)
-    if not project:
-        await message.answer("Project not registered. Use /start")
-        return False
-
-    thread_id = message.message_thread_id
-    thread = project.threads.get(thread_id)
-    if not thread:
-        await message.answer("Thread not found. Use /start")
-        return False
-
-    tmux_name = thread.get_tmux_session(project.project_name)
-
-    if not is_tmux_session_exists(tmux_name):
-        await message.answer("tmux session not found. Start Claude in terminal.")
-        return False
-
-    # NOTE: Do NOT cancel watcher here - let it continue watching old session.
-    # _bind_thread_to_session will cancel it when new session is found.
-    # This prevents thread becoming "dead" if user cancels the command in Claude.
-
-    # Mark thread as awaiting new session
-    thread.awaiting_new_session = True
-    thread.start_requested_at = time.time()
-    thread.last_sent_message = None
-    project_manager._save()
-
-    # Send command to tmux
-    tmux = TmuxSession(tmux_name, project.cwd)
-    tmux.send_keys(command)
-
-    await message.answer(status_text)
-    return True
-
-
-@router.message(Command("new"))
-async def cmd_new(message: Message):
-    """Start new Claude session in current thread."""
-    await _send_session_command(message, "/new", "`[~]` Creating new session...")
-
-
-@router.message(Command("clear"))
-async def cmd_clear(message: Message):
-    """Clear Claude session and start fresh."""
-    await _send_session_command(message, "/clear", "`[~]` Clearing session...")
 
 
 @router.message(Command("restart"))
