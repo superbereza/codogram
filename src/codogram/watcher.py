@@ -25,31 +25,6 @@ class ParsedEntry:
     tool_name: str = ""
     tool_input: dict | None = None
 
-def find_missed_entries(path: Path) -> list[ParsedEntry]:
-    """Find all assistant entries after last user message."""
-    if not path.exists():
-        return []
-
-    try:
-        entries = []
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                entry = json.loads(line)
-                if entry.get("type") == "user":
-                    entries = []  # reset after each user message
-                else:
-                    parsed = parse_jsonl_entry(entry)
-                    if parsed:
-                        entries.append(parsed)
-        return entries
-    except (json.JSONDecodeError, IOError) as e:
-        logger.warning(f"find_missed_entries error: {e}")
-        return []
-
-
 def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
     entry_type = entry.get("type")
 
