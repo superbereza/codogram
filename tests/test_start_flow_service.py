@@ -777,3 +777,28 @@ class TestHandleRestart:
         assert result.action == FlowAction.ASK_RESTART_CONFIRM
         assert result.tmux_session == "test-mystic"
         assert result.thread_id == 456
+
+
+class TestHandleRestartConfirm:
+    """Tests for restart confirmation."""
+
+    def test_handle_restart_confirm(self):
+        """Confirm -> RESTART_DONE."""
+        mock_pm = Mock()
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.kill_tmux_session") as mock_kill:
+            mock_kill.return_value = True
+            result = service.handle_restart_confirm(tmux_session="test-main")
+
+        assert result.action == FlowAction.RESTART_DONE
+        mock_kill.assert_called_once_with("test-main")
+
+    def test_handle_cancel(self):
+        """Cancel -> CANCELLED."""
+        mock_pm = Mock()
+        service = StartFlowService(mock_pm, Mock())
+
+        result = service.handle_cancel()
+
+        assert result.action == FlowAction.CANCELLED

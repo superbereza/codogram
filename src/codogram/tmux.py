@@ -163,3 +163,23 @@ def find_tmux_by_convention(project_name: str) -> str | None:
         if t.exists():
             return pattern
     return None
+
+
+def kill_tmux_session(session_name: str) -> bool:
+    """Kill a tmux session by name.
+
+    Args:
+        session_name: Name of the tmux session to kill
+
+    Returns:
+        True if session was killed, False otherwise
+    """
+    try:
+        subprocess.run(
+            ["tmux", "kill-session", "-t", session_name],
+            check=True,
+            capture_output=True,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False

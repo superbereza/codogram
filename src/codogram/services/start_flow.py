@@ -12,7 +12,7 @@ from ..domain.validators import (
 from ..magic_names import get_random_magic_name
 from ..project_launcher import resolve_project_path, is_tmux_session_exists, git_init, git_init_with_github, git_clone
 from ..session_manager import ThreadInfo
-from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention, TmuxSession
+from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention, TmuxSession, kill_tmux_session
 
 if TYPE_CHECKING:
     from ..session_manager import ProjectManager
@@ -497,3 +497,23 @@ class StartFlowService:
             tmux_session=tmux_name,
             thread_id=thread_id,
         )
+
+    def handle_restart_confirm(self, tmux_session: str) -> FlowResult:
+        """Handle restart confirmation - kill tmux session.
+
+        Args:
+            tmux_session: Name of the tmux session to kill
+
+        Returns:
+            FlowResult with RESTART_DONE action
+        """
+        kill_tmux_session(tmux_session)
+        return FlowResult(action=FlowAction.RESTART_DONE)
+
+    def handle_cancel(self) -> FlowResult:
+        """Handle cancel button.
+
+        Returns:
+            FlowResult with CANCELLED action
+        """
+        return FlowResult(action=FlowAction.CANCELLED)
