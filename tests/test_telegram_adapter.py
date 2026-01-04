@@ -2,8 +2,6 @@
 import pytest
 from unittest.mock import AsyncMock
 
-from aiogram.exceptions import TelegramRetryAfter
-
 from codogram.adapters.telegram import send_with_retry
 
 
@@ -13,64 +11,53 @@ class TestSendWithRetry:
     @pytest.mark.asyncio
     async def test_success_first_try(self):
         """Message sent successfully on first attempt."""
-        mock_bot = AsyncMock()
+        mock_queue = AsyncMock()
+        mock_queue.send.return_value = [123]  # Message ID returned
 
-        result = await send_with_retry(mock_bot, 123, "test message")
+        result = await send_with_retry(mock_queue, 123, "test message")
 
         assert result is True
-        mock_bot.send_message.assert_called_once_with(
-            123,
-            "test message",
+        mock_queue.send.assert_called_once_with(
+            chat_id=123,
+            text="test message",
+            thread_id=None,
             parse_mode="Markdown",
-            message_thread_id=None,
         )
 
     @pytest.mark.asyncio
     async def test_success_with_thread_id(self):
         """Message sent to specific thread."""
-        mock_bot = AsyncMock()
+        mock_queue = AsyncMock()
+        mock_queue.send.return_value = [456]
 
         result = await send_with_retry(
-            mock_bot, 123, "test", message_thread_id=456
+            mock_queue, 123, "test", message_thread_id=456
         )
 
         assert result is True
-        mock_bot.send_message.assert_called_once_with(
-            123,
-            "test",
+        mock_queue.send.assert_called_once_with(
+            chat_id=123,
+            text="test",
+            thread_id=456,
             parse_mode="Markdown",
-            message_thread_id=456,
         )
 
     @pytest.mark.asyncio
-    async def test_retry_on_rate_limit(self):
-        """Retries on rate limit and succeeds."""
-        mock_bot = AsyncMock()
-        # TelegramRetryAfter requires: method, message, retry_after
-        error = TelegramRetryAfter(
-            method=None,
-            message="Rate limited",
-            retry_after=0,  # Don't actually wait in tests
-        )
-        mock_bot.send_message.side_effect = [error, None]
+    async def test_returns_true_when_message_sent(self):
+        """Returns True when telegram_queue.send returns message IDs."""
+        mock_queue = AsyncMock()
+        mock_queue.send.return_value = [789]
 
-        result = await send_with_retry(mock_bot, 123, "test", retries=2)
+        result = await send_with_retry(mock_queue, 123, "test")
 
         assert result is True
-        assert mock_bot.send_message.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_fail_after_max_retries(self):
-        """Returns False after exhausting retries."""
-        mock_bot = AsyncMock()
-        error = TelegramRetryAfter(
-            method=None,
-            message="Rate limited",
-            retry_after=0,
-        )
-        mock_bot.send_message.side_effect = error
+    async def test_returns_false_when_no_messages_sent(self):
+        """Returns False when telegram_queue.send returns empty list."""
+        mock_queue = AsyncMock()
+        mock_queue.send.return_value = []  # No messages sent (queue handles retries internally)
 
-        result = await send_with_retry(mock_bot, 123, "test", retries=2)
+        result = await send_with_retry(mock_queue, 123, "test")
 
         assert result is False
-        assert mock_bot.send_message.call_count == 2
