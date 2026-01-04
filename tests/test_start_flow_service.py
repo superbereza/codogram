@@ -498,3 +498,19 @@ class TestHandleTmuxSelected:
         assert result.action == FlowAction.CONNECT
         assert result.tmux_session == "session-1"
         mock_pm._save.assert_called_once()
+
+
+class TestThreadFlowActions:
+    """Tests for thread-specific FlowActions."""
+
+    def test_has_thread_show_status(self):
+        assert FlowAction.THREAD_SHOW_STATUS.value == "thread_show_status"
+
+    def test_has_thread_launch(self):
+        assert FlowAction.THREAD_LAUNCH.value == "thread_launch"
+
+    def test_has_upgrade_pending_thread(self):
+        assert FlowAction.UPGRADE_PENDING_THREAD.value == "upgrade_pending_thread"
+
+    def test_has_register_unknown_topic(self):
+        assert FlowAction.REGISTER_UNKNOWN_TOPIC.value == "register_unknown_topic"

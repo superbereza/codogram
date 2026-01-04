@@ -37,6 +37,12 @@ class FlowAction(Enum):
     # Errors
     ERROR = "error"
 
+    # Thread-specific
+    THREAD_SHOW_STATUS = "thread_show_status"
+    THREAD_LAUNCH = "thread_launch"
+    UPGRADE_PENDING_THREAD = "upgrade_pending_thread"
+    REGISTER_UNKNOWN_TOPIC = "register_unknown_topic"
+
 
 @dataclass
 class FlowResult:
