@@ -3,11 +3,15 @@
 import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import telegramify_markdown
 from aiogram import Bot
 from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup
+
+if TYPE_CHECKING:
+    from aiogram.types import Message
 
 from .logging_config import logger
 from .chunker import chunk_message
@@ -336,3 +340,63 @@ class TelegramQueue:
         if self._workers:
             await asyncio.gather(*self._workers.values(), return_exceptions=True)
         self._workers.clear()
+
+    async def reply(
+        self,
+        message: "Message",
+        text: str,
+        parse_mode: str | None = "MarkdownV2",
+        reply_markup: "InlineKeyboardMarkup | None" = None,
+    ) -> list[int]:
+        """Reply to a message through queue."""
+        msg_dict: dict = {"text": text}
+        if parse_mode:
+            msg_dict["parse_mode"] = parse_mode
+        if reply_markup:
+            msg_dict["reply_markup"] = reply_markup
+
+        batch = OutgoingBatch(
+            chat_id=message.chat.id,
+            thread_id=message.message_thread_id,
+            messages=[msg_dict],
+        )
+        return await self.enqueue(batch)
+
+    async def send(
+        self,
+        chat_id: int,
+        text: str,
+        thread_id: int | None = None,
+        parse_mode: str | None = "MarkdownV2",
+        reply_markup: "InlineKeyboardMarkup | None" = None,
+    ) -> list[int]:
+        """Send message to chat through queue."""
+        msg_dict: dict = {"text": text}
+        if parse_mode:
+            msg_dict["parse_mode"] = parse_mode
+        if reply_markup:
+            msg_dict["reply_markup"] = reply_markup
+
+        batch = OutgoingBatch(
+            chat_id=chat_id,
+            thread_id=thread_id,
+            messages=[msg_dict],
+        )
+        return await self.enqueue(batch)
+
+    async def edit(
+        self,
+        message: "Message",
+        text: str,
+        parse_mode: str | None = "MarkdownV2",
+        reply_markup: "InlineKeyboardMarkup | None" = None,
+    ) -> None:
+        """Edit a message through queue."""
+        batch = EditBatch(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            text=text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup,
+        )
+        await self.enqueue(batch)

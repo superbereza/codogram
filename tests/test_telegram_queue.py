@@ -297,3 +297,72 @@ async def test_enqueue_timeout():
         await queue.enqueue(batch, timeout=0.1)
 
     await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_reply_helper():
+    """Test reply() helper creates correct batch."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from aiogram.types import Message, Chat
+
+    bot = MagicMock()
+    queue = TelegramQueue(bot)
+
+    message = MagicMock(spec=Message)
+    message.chat = MagicMock(spec=Chat)
+    message.chat.id = 123
+    message.message_thread_id = 456
+
+    with patch.object(queue, 'enqueue', new_callable=AsyncMock) as mock_enqueue:
+        mock_enqueue.return_value = [789]
+        result = await queue.reply(message, "Hello")
+
+        assert result == [789]
+        mock_enqueue.assert_called_once()
+        batch = mock_enqueue.call_args[0][0]
+        assert batch.chat_id == 123
+        assert batch.thread_id == 456
+        assert batch.messages[0]["text"] == "Hello"
+        assert batch.messages[0]["parse_mode"] == "MarkdownV2"
+
+
+@pytest.mark.asyncio
+async def test_send_helper():
+    """Test send() helper creates correct batch."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    bot = MagicMock()
+    queue = TelegramQueue(bot)
+
+    with patch.object(queue, 'enqueue', new_callable=AsyncMock) as mock_enqueue:
+        mock_enqueue.return_value = [789]
+        result = await queue.send(123, "Hello", thread_id=456)
+
+        assert result == [789]
+        batch = mock_enqueue.call_args[0][0]
+        assert batch.chat_id == 123
+        assert batch.thread_id == 456
+
+
+@pytest.mark.asyncio
+async def test_edit_helper():
+    """Test edit() helper creates correct batch."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from aiogram.types import Message, Chat
+
+    bot = MagicMock()
+    queue = TelegramQueue(bot)
+
+    message = MagicMock(spec=Message)
+    message.chat = MagicMock(spec=Chat)
+    message.chat.id = 123
+    message.message_id = 456
+
+    with patch.object(queue, 'enqueue', new_callable=AsyncMock) as mock_enqueue:
+        mock_enqueue.return_value = None
+        await queue.edit(message, "Updated")
+
+        batch = mock_enqueue.call_args[0][0]
+        assert batch.chat_id == 123
+        assert batch.message_id == 456
+        assert batch.text == "Updated"
