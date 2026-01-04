@@ -56,9 +56,9 @@ class AdminMiddleware(BaseMiddleware):
         if hasattr(event, 'reply'):
             # Message - markdown with status indicator
             await event.reply(
-                f"`[x]` Not admin. Your ID: `{user_id}`\n"
-                f"Add to ADMIN\\_IDS in .env",
-                parse_mode="Markdown"
+                f"`\\[x\\]` Not admin\\. Your ID: `{user_id}`\n"
+                f"Add to ADMIN\\_IDS in \\.env",
+                parse_mode="MarkdownV2"
             )
         elif hasattr(event, 'answer'):
             # CallbackQuery - popup (no markdown, shorter)

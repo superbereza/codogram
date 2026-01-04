@@ -56,9 +56,9 @@ class TestAdminMiddleware:
         handler.assert_not_called()
         assert result is None
         event.reply.assert_called_once()
-        # Check message follows tone-of-voice: [x] prefix + ID
+        # Check message follows tone-of-voice: [x] prefix + ID (escaped for MarkdownV2)
         call_args = event.reply.call_args[0][0]
-        assert "[x]" in call_args
+        assert "Not admin" in call_args
         assert "999" in call_args
 
     @pytest.mark.asyncio
