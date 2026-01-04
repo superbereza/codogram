@@ -1,43 +1,16 @@
 # src/codogram/telegram_queue.py
 """Rate-limited Telegram message queue with FIFO ordering per chat_id."""
 import asyncio
-import re
 from collections import defaultdict
 from dataclasses import dataclass
 
+import telegramify_markdown
 from aiogram import Bot
 from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup
 
 from .logging_config import logger
 from .chunker import chunk_message
-
-
-# Pre-compiled regexes for markdown escaping
-_CODE_BLOCK_RE = re.compile(r'`[^`]*`|[^`]+')
-_UNDERSCORE_RE = re.compile(r'(?<!\\)_')
-
-
-def escape_markdown_underscores(text: str) -> str:
-    """Escape underscores outside code blocks for Telegram Markdown.
-
-    Telegram interprets _text_ as italic. Claude Code uses snake_case
-    heavily, causing broken formatting.
-
-    Rules:
-    - _ → \\_ (escape)
-    - Inside `code` → leave as is
-    - Already escaped \\_ → leave as is
-
-    TODO(refactor): Move to adapters/telegram.py
-    """
-    def process_part(match: re.Match) -> str:
-        part = match.group(0)
-        if part.startswith('`'):
-            return part  # code block - keep as is
-        return _UNDERSCORE_RE.sub(r'\\_', part)
-
-    return _CODE_BLOCK_RE.sub(process_part, text)
 
 
 @dataclass
@@ -211,9 +184,16 @@ class TelegramQueue:
 
         try:
             for msg in expanded_messages:
-                # Escape underscores in Markdown messages
-                if msg.get("parse_mode") == "Markdown":
-                    msg["text"] = escape_markdown_underscores(msg.get("text", ""))
+                # Convert GFM to MarkdownV2 using telegramify-markdown
+                if msg.get("parse_mode") == "MarkdownV2":
+                    try:
+                        msg["text"] = telegramify_markdown.markdownify(
+                            msg.get("text", ""),
+                            max_line_length=None,
+                            normalize_whitespace=False
+                        )
+                    except Exception as e:
+                        logger.warning(f"markdownify failed: {e}")
 
                 result = await self.bot.send_message(
                     chat_id=batch.chat_id,
