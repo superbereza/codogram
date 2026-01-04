@@ -1,51 +1,6 @@
 # tests/test_telegram_queue.py
 import pytest
-from codogram.telegram_queue import OutgoingBatch, escape_markdown_underscores
-
-
-# --- escape_markdown_underscores tests ---
-
-def test_escape_simple_underscore():
-    assert escape_markdown_underscores("var_name") == "var\\_name"
-
-
-def test_escape_multiple_underscores():
-    assert escape_markdown_underscores("my_var_name") == "my\\_var\\_name"
-
-
-def test_preserve_code_block():
-    assert escape_markdown_underscores("`code_block`") == "`code_block`"
-
-
-def test_escape_outside_code_block():
-    assert escape_markdown_underscores("x `code` var_name") == "x `code` var\\_name"
-
-
-def test_preserve_already_escaped():
-    assert escape_markdown_underscores("already\\_escaped") == "already\\_escaped"
-
-
-def test_double_underscore():
-    assert escape_markdown_underscores("__init__") == "\\_\\_init\\_\\_"
-
-
-def test_no_underscores():
-    assert escape_markdown_underscores("hello world") == "hello world"
-
-
-def test_underscore_in_path():
-    assert escape_markdown_underscores("/path/to/file_name.py") == "/path/to/file\\_name.py"
-
-
-def test_our_format_preserved():
-    # Our messages like `[v]` should work
-    assert escape_markdown_underscores("`[v]` Claude ready") == "`[v]` Claude ready"
-
-
-def test_mixed_code_and_text():
-    input_text = "`code_here` then var_name `more_code`"
-    expected = "`code_here` then var\\_name `more_code`"
-    assert escape_markdown_underscores(input_text) == expected
+from codogram.telegram_queue import OutgoingBatch
 
 
 # --- OutgoingBatch tests ---
@@ -54,7 +9,7 @@ def test_outgoing_batch_creation():
     batch = OutgoingBatch(
         chat_id=123,
         thread_id=456,
-        messages=[{"text": "hello", "parse_mode": "Markdown"}]
+        messages=[{"text": "hello", "parse_mode": "MarkdownV2"}]
     )
     assert batch.chat_id == 123
     assert batch.thread_id == 456
@@ -246,7 +201,7 @@ async def test_long_message_chunked(queue, mock_bot):
 
     # Create message over 4000 chars
     long_text = "A" * 5000
-    batch = OutgoingBatch(1, None, [{"text": long_text, "parse_mode": "Markdown"}])
+    batch = OutgoingBatch(1, None, [{"text": long_text, "parse_mode": "MarkdownV2"}])
     msg_ids = await queue.enqueue(batch)
 
     # Should have sent 2 messages (chunked)
@@ -291,12 +246,33 @@ async def test_chunking_preserves_parse_mode(queue, mock_bot):
     mock_bot.send_message = AsyncMock(side_effect=capture_send)
 
     long_text = "B" * 5000
-    batch = OutgoingBatch(1, None, [{"text": long_text, "parse_mode": "Markdown"}])
+    batch = OutgoingBatch(1, None, [{"text": long_text, "parse_mode": "MarkdownV2"}])
     await queue.enqueue(batch)
 
     # All chunks should have parse_mode
     assert len(sent_kwargs) == 2
     for kw in sent_kwargs:
-        assert kw.get("parse_mode") == "Markdown"
+        assert kw.get("parse_mode") == "MarkdownV2"
+
+    await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_markdownv2_messages_are_converted(queue, mock_bot):
+    """MarkdownV2 messages should be processed by markdownify."""
+    sent_texts = []
+    async def capture_send(**kw):
+        sent_texts.append(kw.get("text", ""))
+        return Mock(message_id=1)
+    mock_bot.send_message = AsyncMock(side_effect=capture_send)
+
+    # GFM markdown with header
+    batch = OutgoingBatch(1, None, [{"text": "## Header", "parse_mode": "MarkdownV2"}])
+    await queue.enqueue(batch)
+
+    # Should be converted (header becomes bold with emoji)
+    assert len(sent_texts) == 1
+    assert "Header" in sent_texts[0]
+    assert "##" not in sent_texts[0]  # Header syntax removed
 
     await queue.shutdown()
