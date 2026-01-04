@@ -316,14 +316,8 @@ class ProjectManager:
         if cwd:
             project.cwd = cwd
 
-        await self._maybe_start_tasks(project, start_poller, start_watcher)
         self._save()
         return project
-
-    async def _maybe_start_tasks(self, project: ProjectState, start_poller, start_watcher,
-                                 send_missed: bool = False) -> None:
-        """DEPRECATED: Tasks are now started per-thread in poll_for_session_thread."""
-        logger.warning("_maybe_start_tasks called but is deprecated - tasks now handled per-thread")
 
     async def restore_projects(self, bot, start_poller, start_watcher, telegram_queue) -> None:
         """Restore sessions from history.jsonl after bot restart."""
