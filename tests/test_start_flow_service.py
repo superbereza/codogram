@@ -709,3 +709,71 @@ class TestRestartFlowActions:
     def test_has_cancelled(self):
         """FlowAction.CANCELLED exists."""
         assert hasattr(FlowAction, "CANCELLED")
+
+
+class TestHandleRestart:
+    """Tests for restart flow."""
+
+    def test_handle_restart_no_project(self):
+        """No project -> ERROR."""
+        mock_pm = Mock()
+        mock_pm.get_by_chat.return_value = None
+
+        service = StartFlowService(mock_pm, Mock())
+        result = service.handle_restart(chat_id=123, thread_id=None)
+
+        assert result.action == FlowAction.ERROR
+        assert "No active session" in result.error
+
+    def test_handle_restart_no_tmux(self):
+        """Project exists but no tmux -> ERROR."""
+        mock_pm = Mock()
+        project = Mock(project_name="test", tmux_session=None, threads={})
+        mock_pm.get_by_chat.return_value = project
+
+        service = StartFlowService(mock_pm, Mock())
+        result = service.handle_restart(chat_id=123, thread_id=None)
+
+        assert result.action == FlowAction.ERROR
+
+    def test_handle_restart_tmux_exists(self):
+        """Project with tmux -> ASK_RESTART_CONFIRM."""
+        mock_pm = Mock()
+        project = Mock(
+            project_name="test",
+            tmux_session="test-main",
+            threads={},
+        )
+        mock_pm.get_by_chat.return_value = project
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.is_tmux_session_exists") as mock_exists:
+            mock_exists.return_value = True
+            result = service.handle_restart(chat_id=123, thread_id=None)
+
+        assert result.action == FlowAction.ASK_RESTART_CONFIRM
+        assert result.project == "test"
+        assert result.tmux_session == "test-main"
+
+    def test_handle_restart_thread_mode(self):
+        """Thread mode uses thread's tmux."""
+        mock_pm = Mock()
+        thread = Mock()
+        thread.thread_id = 456
+        thread.get_tmux_session.return_value = "test-mystic"
+        project = Mock(
+            project_name="test",
+            threads={456: thread},
+        )
+        mock_pm.get_by_chat.return_value = project
+
+        service = StartFlowService(mock_pm, Mock())
+
+        with patch("codogram.services.start_flow.is_tmux_session_exists") as mock_exists:
+            mock_exists.return_value = True
+            result = service.handle_restart(chat_id=123, thread_id=456)
+
+        assert result.action == FlowAction.ASK_RESTART_CONFIRM
+        assert result.tmux_session == "test-mystic"
+        assert result.thread_id == 456

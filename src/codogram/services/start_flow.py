@@ -442,3 +442,58 @@ class StartFlowService:
             project=project_name,
             tmux_session=tmux_session,
         )
+
+    def handle_restart(
+        self, chat_id: int, thread_id: int | None = None
+    ) -> FlowResult:
+        """Handle /restart command.
+
+        Args:
+            chat_id: Telegram chat ID
+            thread_id: Topic thread ID (None for main chat)
+
+        Returns:
+            FlowResult with ASK_RESTART_CONFIRM or ERROR
+        """
+        project = self.pm.get_by_chat(chat_id)
+        if not project:
+            return FlowResult(
+                action=FlowAction.ERROR,
+                error="No active session to restart.",
+            )
+
+        # Determine tmux session
+        if thread_id:
+            thread = project.threads.get(thread_id)
+            if not thread:
+                return FlowResult(
+                    action=FlowAction.ERROR,
+                    error="No active session to restart.",
+                )
+            tmux_name = thread.get_tmux_session(project.project_name)
+        else:
+            # Main thread or legacy
+            main_thread = project.threads.get(None)
+            if main_thread:
+                tmux_name = main_thread.get_tmux_session(project.project_name)
+            elif project.tmux_session:
+                tmux_name = project.tmux_session
+            else:
+                return FlowResult(
+                    action=FlowAction.ERROR,
+                    error="No active session to restart.",
+                )
+
+        # Check tmux exists
+        if not is_tmux_session_exists(tmux_name):
+            return FlowResult(
+                action=FlowAction.ERROR,
+                error="No active session to restart.",
+            )
+
+        return FlowResult(
+            action=FlowAction.ASK_RESTART_CONFIRM,
+            project=project.project_name,
+            tmux_session=tmux_name,
+            thread_id=thread_id,
+        )
