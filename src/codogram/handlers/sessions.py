@@ -46,7 +46,7 @@ async def _send_session_command(
 
     # Send command to tmux
     tmux = TmuxSession(tmux_name, project.cwd)
-    tmux.send_keys(command)
+    tmux.send(command)
 
     await telegram_queue.reply(message, status_text)
     return True
