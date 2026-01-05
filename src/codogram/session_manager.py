@@ -31,20 +31,20 @@ def should_cleanup_project(project: 'ProjectState') -> bool:
     if project.binding_task and not project.binding_task.done():
         return False
 
-    # Check tmux for all threads
+    # Check tmux for all threads (use '=' for exact match)
     for thread in project.threads.values():
         tmux_name = thread.get_tmux_session(project.project_name)
         result = subprocess.run(
-            ["tmux", "has-session", "-t", tmux_name],
+            ["tmux", "has-session", "-t", f"={tmux_name}"],
             capture_output=True
         )
         if result.returncode == 0:
             return False  # Tmux exists, don't cleanup
 
-    # Legacy tmux check
+    # Legacy tmux check (use '=' for exact match)
     if project.tmux_session:
         result = subprocess.run(
-            ["tmux", "has-session", "-t", project.tmux_session],
+            ["tmux", "has-session", "-t", f"={project.tmux_session}"],
             capture_output=True
         )
         if result.returncode == 0:
@@ -346,10 +346,10 @@ class ProjectManager:
             for thread in project.threads.values():
                 tmux_name = thread.get_tmux_session(project.project_name)
 
-                # Check if tmux exists
+                # Check if tmux exists (use '=' for exact match)
                 import subprocess
                 result = subprocess.run(
-                    ["tmux", "has-session", "-t", tmux_name],
+                    ["tmux", "has-session", "-t", f"={tmux_name}"],
                     capture_output=True
                 )
 

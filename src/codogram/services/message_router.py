@@ -69,10 +69,13 @@ class MessageRouterService:
 
         # Check if session needs binding
         if thread and thread.session_id is None:
+            tmux_name = thread.get_tmux_session(project.project_name)
             return RouteResult(
                 action=RouteAction.START_BINDING,
                 project=project,
                 thread=thread,
+                tmux_name=tmux_name,
+                cwd=project.cwd,
             )
 
         # Ready to send to tmux

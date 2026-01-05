@@ -87,9 +87,14 @@ class TmuxSession:
         )
 
     def exists(self) -> bool:
-        """Check if tmux session exists."""
+        """Check if tmux session exists.
+
+        Uses '=' prefix for exact session name matching.
+        Without '=', tmux does prefix matching which causes
+        'claude-codogram' to match 'claude-codogram-immortal'.
+        """
         result = subprocess.run(
-            ["tmux", "has-session", "-t", self.name],
+            ["tmux", "has-session", "-t", f"={self.name}"],
             capture_output=True
         )
         return result.returncode == 0

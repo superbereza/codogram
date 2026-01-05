@@ -104,6 +104,13 @@ class StartFlowService:
         # Case 2: existing project for this chat
         project = self.pm.get_by_chat(chat_id)
         if project:
+            # Check if there's a configured thread for this thread_id (including None)
+            # This ensures general topic uses naming convention, not CWD discovery
+            thread = project.threads.get(thread_id)
+            if thread and thread.name != "pending":
+                return self._check_thread_tmux(project, thread)
+
+            # Fallback to project-level flow (for backwards compat / new projects)
             if self._is_claude_running(project):
                 return FlowResult(
                     action=FlowAction.SHOW_STATUS,

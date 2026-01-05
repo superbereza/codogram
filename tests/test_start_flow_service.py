@@ -131,6 +131,7 @@ class TestHandleStartNoArgs:
             cwd=None,
             chat_id=123,
             tmux_session=None,
+            threads=Mock(get=Mock(return_value=None)),  # No configured thread
         )
         mock_pm.get_by_chat.return_value = existing
         mock_pm.get_or_create.return_value = existing
@@ -237,6 +238,7 @@ class TestShowStatus:
             tmux_session="claude-running",
             poller_task=Mock(done=Mock(return_value=False)),
             watcher_task=Mock(done=Mock(return_value=False)),
+            threads=Mock(get=Mock(return_value=None)),  # No configured thread
         )
         mock_pm.get_by_chat.return_value = running
 
