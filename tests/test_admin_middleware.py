@@ -33,7 +33,7 @@ class TestAdminMiddleware:
         middleware = AdminMiddleware()
         handler = AsyncMock(return_value="result")
         event = Mock()
-        data = {"event_from_user": Mock(id=123)}
+        data = {"event_from_user": Mock(id=123, is_bot=False)}
 
         with patch("codogram.middleware.admin.get_admin_ids", return_value={123}):
             result = await middleware(handler, event, data)
@@ -53,7 +53,7 @@ class TestAdminMiddleware:
         telegram_queue = AsyncMock()
         telegram_queue.reply = AsyncMock()
         data = {
-            "event_from_user": Mock(id=999),
+            "event_from_user": Mock(id=999, is_bot=False),
             "telegram_queue": telegram_queue,
         }
 
@@ -75,7 +75,7 @@ class TestAdminMiddleware:
         handler = AsyncMock()
         event = Mock(spec=['answer'])  # CallbackQuery-like
         event.answer = AsyncMock()
-        data = {"event_from_user": Mock(id=999)}
+        data = {"event_from_user": Mock(id=999, is_bot=False)}
 
         with patch("codogram.middleware.admin.get_admin_ids", return_value={123}):
             result = await middleware(handler, event, data)
@@ -106,3 +106,19 @@ class TestAdminMiddleware:
         with patch("codogram.middleware.admin.get_admin_ids", return_value=set()):
             assert is_admin(123) is False
             assert is_admin(0) is False
+
+    @pytest.mark.asyncio
+    async def test_bot_user_ignored_silently(self):
+        """Bot users (including service messages) are ignored silently."""
+        middleware = AdminMiddleware()
+        handler = AsyncMock()
+        event = Mock()
+        # Simulate a bot user (e.g., service message from topic creation)
+        bot_user = Mock(id=8261696530, is_bot=True)
+        data = {"event_from_user": bot_user}
+
+        with patch("codogram.middleware.admin.get_admin_ids", return_value={123}):
+            result = await middleware(handler, event, data)
+
+        handler.assert_not_called()
+        assert result is None

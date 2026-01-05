@@ -47,6 +47,10 @@ class AdminMiddleware(BaseMiddleware):
         if user is None:
             return None
 
+        # Ignore messages from bots (including service messages from self)
+        if user.is_bot:
+            return None
+
         if is_admin(user.id):
             return await handler(event, data)
 
