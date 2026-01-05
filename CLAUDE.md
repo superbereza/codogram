@@ -29,21 +29,27 @@ Telegram bot for managing Claude Code sessions through Telegram:
 ## Key files
 
 ```
-agent-tools/codogram/
-├── .env                      # TELEGRAM_TOKEN, ADMIN_IDS, BASE_DIR
-├── .config.json              # Projects + chat mapping (auto-created)
-├── src/codogram/
-│   ├── main.py               # Bot entry point
-│   ├── config.py             # Settings + config persistence
-│   ├── session_manager.py    # ProjectManager - project state
-│   ├── history_reader.py     # Parse ~/.claude/history.jsonl
-│   ├── permission_poller.py  # Poll tmux for permission prompts
-│   ├── watcher.py            # Monitor jsonl for tool calls
-│   ├── handlers/             # Telegram command handlers (8 modules)
-│   ├── services/             # Business logic (launch, branch, message_router)
-│   ├── tmux.py               # Tmux session interaction
-│   └── screen.py             # Parse tmux screen content
-└── restart.sh                # Restart bot script
+src/codogram/
+├── main.py                   # Bot entry point
+├── config.py                 # Settings + config persistence
+├── session_manager.py        # ProjectManager - project state
+├── telegram_queue.py         # Rate-limited message queue
+├── handlers/                 # Telegram command handlers
+│   ├── start.py              # /start flow
+│   ├── sessions.py           # /new, /clear, /resume
+│   ├── threads.py            # /thread_create, /thread_delete
+│   ├── branches.py           # /branch_create, /branch_finish
+│   └── settings.py           # /settings, /auto_accept, /help
+├── services/                 # Business logic
+│   ├── start_flow.py         # StartFlowService
+│   └── branch.py             # Branch operations
+├── middleware/               # Global middleware
+│   └── admin.py              # AdminMiddleware
+├── history_reader.py         # Parse ~/.claude/history.jsonl
+├── permission_poller.py      # Poll tmux for permission prompts
+├── watcher.py                # Monitor jsonl for tool calls
+├── tmux.py                   # Tmux session interaction
+└── screen.py                 # Parse tmux screen content
 ```
 
 ## Usage
@@ -74,6 +80,54 @@ tail -f logs/codogram.log
 # View config
 cat .config.json | jq
 ```
+
+## E2E Testing with Telegram MCP
+
+Claude can test the bot end-to-end using the Telegram MCP integration.
+
+### Setup
+
+1. MCP configured in `.mcp.json`:
+```json
+{
+  "mcpServers": {
+    "telegram": {
+      "type": "stdio",
+      "command": "/home/superbereza/dev/telegram-mcp/venv/bin/python",
+      "args": ["/home/superbereza/dev/telegram-mcp/main.py"]
+    }
+  }
+}
+```
+
+2. Create test chat with bot, note the chat ID
+
+3. Add MCP user ID to ADMIN_IDS in `.env`
+
+### Feedback loop
+
+```bash
+# 1. Make code changes
+
+# 2. Restart bot
+./restart.sh
+
+# 3. Send command via MCP
+mcp__telegram__send_message(chat_id=TEST_CHAT_ID, message="/help")
+
+# 4. Read response
+mcp__telegram__get_messages(chat_id=TEST_CHAT_ID, page_size=3)
+
+# 5. Check logs if needed
+tail -f logs/codogram.log
+```
+
+### Available MCP tools
+
+- `mcp__telegram__send_message` - send commands
+- `mcp__telegram__get_messages` - read bot responses
+- `mcp__telegram__list_inline_buttons` - see keyboard buttons
+- `mcp__telegram__press_inline_button` - click buttons
 
 ## Constraints
 
