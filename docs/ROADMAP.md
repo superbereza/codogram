@@ -173,6 +173,14 @@ Resume Claude session after crash or archived topic restore:
 - On /start in archived topic or after crash: `claude --resume <session_id>`
 - Preserves conversation context instead of starting fresh
 
+### Group → Supergroup migration
+Handle chat_id change when topics are enabled in existing group:
+- Telegram changes chat_id when converting group to supergroup (forum)
+- Current behavior: project becomes orphaned, need to /start again
+- Solution: listen for `message.migrate_to_chat_id` event
+- Auto-update chat_id in config when migration detected
+- Notify user about successful migration
+
 ### GitHub Actions CI
 - Workflow for running tests on PR
 - pytest + type checking
