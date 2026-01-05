@@ -129,6 +129,18 @@
 - Fallback на plain text при ошибках парсинга
 - См. [docs/designs/done/2025-01-04-telegramify-markdown-integration.md](designs/done/2025-01-04-telegramify-markdown-integration.md)
 
+### Рефакторинг архитектуры бота
+Слоистая архитектура вместо монолитного bot.py (1500+ строк → 0):
+- **handlers/** — Telegram хендлеры команд (start, sessions, threads, branches, settings, messages, permissions)
+- **services/** — Бизнес-логика (start_flow, branch, message_router, launch)
+- **middleware/** — AdminMiddleware для глобальной защиты админов
+- **domain/** — Модели, валидаторы, FSM состояния
+- **adapters/** — telegram.py (send_with_retry)
+- TelegramQueue инжектится через aiogram DI
+- StartFlowService с паттерном FlowAction/FlowResult
+- 236 тестов, E2E регрессионное тестирование через Telegram MCP
+- См. [docs/designs/done/2025-12-27-bot-refactoring/](designs/done/2025-12-27-bot-refactoring/)
+
 ## Backlog
 
 ### Поддержка MCP trust prompt
@@ -160,13 +172,6 @@
 - Хранить session_id в ThreadInfo
 - При /start в архивированном топике или после краша: `claude --resume <session_id>`
 - Сохраняет контекст диалога вместо старта с нуля
-
-### Bot refactoring
-Рефакторинг архитектуры бота — слоёная структура:
-- handlers → services → domain → adapters
-- Убрать дублирование кода
-- Очистить deprecated поля
-- См. [docs/designs/2025-12-27-bot-refactoring/](designs/2025-12-27-bot-refactoring/)
 
 ### GitHub Actions CI
 - Workflow для запуска тестов на PR
