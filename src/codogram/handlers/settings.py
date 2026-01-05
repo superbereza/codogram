@@ -62,7 +62,9 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
         return
 
     thread = None
-    if thread_id and project.threads:
+    if project.threads:
+        # thread_id is None for General, or int for topics
+        # In-memory key is None (not "null" string)
         thread = project.threads.get(thread_id)
 
     if thread:
@@ -93,7 +95,9 @@ async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
         return
 
     thread = None
-    if thread_id and project.threads:
+    if project.threads:
+        # thread_id is None for General, or int for topics
+        # In-memory key is None (not "null" string)
         thread = project.threads.get(thread_id)
 
     args = (message.text or "").split()[1:]
