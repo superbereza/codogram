@@ -21,7 +21,7 @@ class TestSendWithRetry:
             chat_id=123,
             text="test message",
             thread_id=None,
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
         )
 
     @pytest.mark.asyncio
@@ -39,7 +39,7 @@ class TestSendWithRetry:
             chat_id=123,
             text="test",
             thread_id=456,
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
         )
 
     @pytest.mark.asyncio

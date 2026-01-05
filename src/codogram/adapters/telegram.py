@@ -7,7 +7,7 @@ async def send_with_retry(
     telegram_queue: TelegramQueue,
     chat_id: int,
     text: str,
-    parse_mode: str = "Markdown",
+    parse_mode: str = "MarkdownV2",
     message_thread_id: int | None = None,
     retries: int = 3,  # noqa: ARG001 - kept for backwards compat
 ) -> bool:
