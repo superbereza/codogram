@@ -100,13 +100,11 @@ async def permission_poller(
     if thread:
         tmux_name = thread.get_tmux_session(project.project_name)
         thread_id = thread.thread_id
-        auto_accept_flag = thread.auto_accept
         log_prefix = f"Thread poller [{thread.name}]"
         context_name = thread.name
     else:
         tmux_name = project.tmux_session
         thread_id = None
-        auto_accept_flag = project.auto_accept
         log_prefix = "Poller"
         context_name = project.project_name
 
@@ -177,8 +175,9 @@ async def permission_poller(
             else:
                 elapsed = asyncio.get_event_loop().time() - debounce_start
                 if elapsed >= debounce_time:
-                    # Check auto-accept
-                    if auto_accept_flag:
+                    # Check auto-accept (read dynamically - may have changed since poller started)
+                    auto_accept_enabled = thread.auto_accept if thread else project.auto_accept
+                    if auto_accept_enabled:
                         if await try_auto_accept(
                             parsed.options, parsed.body, tmux,
                             telegram_queue, chat_id, thread_id, context_name
