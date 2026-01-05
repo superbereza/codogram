@@ -1,6 +1,6 @@
 # Итоговая сводка
 
-> **Статус:** Актуализировано 2025-12-30
+> **Статус:** Актуализировано 2025-01-03. Фазы 1-6 завершены.
 
 ## Результат рефакторинга
 
@@ -11,17 +11,39 @@ src/codogram/
 └── bot.py    # 1273 строки, God Object
 ```
 
-### Сейчас (2025-12-30)
+### Сейчас (2025-01-03)
 
 ```
 src/codogram/
-├── bot.py              # 1361 строка (+88), всё ещё God Object
-├── telegram_queue.py   # 11KB - rate limiting (NEW)
-├── launch_animation.py # 5.7KB - анимация запуска (NEW)
-├── keyboards.py        # 1.3KB - клавиатуры
-├── start_flow.py       # 1.7KB - keyboard builders
+├── bot.py                   # 1802 строки (вырос из-за auto-accept)
+├── telegram_queue.py        # rate limiting, batching, retry
+├── launch_animation.py      # анимация запуска, FACES
+├── keyboards/               # ✅ migrated from keyboards.py
+│   ├── __init__.py
+│   └── permissions.py
+├── middleware/              # ✅ Phase 4
+│   ├── __init__.py
+│   └── admin.py             # AdminMiddleware на dp
+├── handlers/                # ✅ Phase 6 started
+│   ├── __init__.py          # register_handlers()
+│   └── permissions.py       # Yes/No/Esc buttons
+├── domain/                  # ✅ Phase 2
+│   ├── __init__.py
+│   ├── validators.py
+│   ├── models.py
+│   ├── states.py
+│   └── errors.py
+├── adapters/                # ✅ Phase 3
+│   ├── __init__.py
+│   └── telegram.py          # send_with_retry
+├── start_flow.py            # keyboard builders
 └── ...
 ```
+
+**Прогресс:**
+- 159 тестов проходят
+- 30 `if not is_admin()` checks удалены из bot.py
+- AdminMiddleware защищает ВСЕ роутеры глобально
 
 ### Целевая структура
 
@@ -31,10 +53,11 @@ src/codogram/
 │   ├── __init__.py        # register_handlers()
 │   ├── start.py           # ~150 LOC - /start + git callbacks
 │   ├── threads.py         # ~100 LOC - /thread_create, /thread_delete
-│   ├── sessions.py        # ~120 LOC - /new, /clear, /restart, /esc
-│   ├── permissions.py     # ~50 LOC  - Yes/No/✕ buttons
-│   ├── messages.py        # ~80 LOC  - on_message routing
-│   └── public.py          # ~15 LOC  - /my_chat_id
+│   ├── branches.py        # ~400 LOC - /branch_create, /branch_finish
+│   ├── sessions.py        # ~150 LOC - /new, /clear, /restart, /esc, /resume
+│   ├── settings.py        # ~100 LOC - /settings, /auto_accept, /help, /get_debug_ids
+│   ├── permissions.py     # ~50 LOC  - Yes/No/✕ buttons ✅ DONE
+│   └── messages.py        # ~80 LOC  - on_message routing
 │
 ├── services/
 │   ├── __init__.py
@@ -45,44 +68,47 @@ src/codogram/
 │
 ├── domain/
 │   ├── __init__.py
-│   ├── models.py          # ~40 LOC
-│   ├── states.py          # ~20 LOC
-│   ├── validators.py      # ~15 LOC
-│   └── errors.py          # ~30 LOC
+│   ├── models.py          # ~40 LOC ✅ DONE
+│   ├── states.py          # ~20 LOC ✅ DONE
+│   ├── validators.py      # ~15 LOC ✅ DONE
+│   └── errors.py          # ~30 LOC ✅ DONE
 │
 ├── adapters/
-│   ├── __init__.py
-│   ├── telegram.py        # ~40 LOC
+│   ├── __init__.py        # ✅ DONE
+│   ├── telegram.py        # ~40 LOC ✅ DONE
 │   ├── tmux.py            # wrap existing
 │   └── history.py         # wrap existing
 │
 ├── middleware/
-│   ├── __init__.py
-│   ├── admin.py           # ~30 LOC
+│   ├── __init__.py        # ✅ DONE
+│   ├── admin.py           # ~30 LOC ✅ DONE
 │   └── dependencies.py    # ~25 LOC
 │
 ├── keyboards/
-│   └── ...                # существующие
+│   ├── __init__.py        # ✅ DONE
+│   └── permissions.py     # ✅ DONE
 │
 └── main.py                # ~60 LOC
 ```
 
-## Сводка фаз (актуализировано 2025-12-30)
+## Сводка фаз (актуализировано 2025-01-03)
 
 | Фаза | Что | Сложность | Строк | Статус |
 |------|-----|-----------|-------|--------|
-| 1 | Структура папок | Низкая | 0 | ⏳ Не начато |
-| 2 | domain/ | Низкая | ~20 | ⏳ Не начато |
-| 3 | adapters/telegram | Низкая | ~25 | ⚠️ telegram_queue.py готов |
-| 4 | middleware/admin | Низкая | ~50 | ⏳ Не начато |
-| 5 | services/launch | Средняя | ~35 | ⚠️ launch_animation.py готов |
-| 6 | handlers/permissions | Низкая | ~50 | ⏳ Не начато |
-| 7 | services/start_flow + FSM | Высокая | ~200 | ⏳ Не начато |
-| 8 | handlers/start | Средняя | ~400 | ⏳ Не начато |
-| 9a | handlers/threads | Средняя | ~100 | ⏳ Не начато (/thread_create, /thread_delete) |
-| 9b | handlers/sessions | Средняя | ~120 | ⏳ Не начато (/new, /clear, /restart, /esc) |
-| 10 | handlers/messages | Средняя | ~175 | ⏳ Не начато |
-| 11 | Финализация + техдолг | Средняя | — | ⏳ Не начато (см. 04-phase-10-11.md) |
+| 1 | Структура папок | Низкая | 0 | ✅ Done |
+| 2 | domain/ | Низкая | ~20 | ✅ Done |
+| 3 | adapters/telegram | Низкая | ~25 | ✅ Done |
+| 4 | middleware/admin | Низкая | ~50 | ✅ Done |
+| 5 | services/launch | Средняя | ~35 | ✅ Done (launch_animation.py) |
+| 6 | handlers/permissions | Низкая | ~50 | ✅ Done |
+| 7 | services/start_flow + FSM | Высокая | ~200 | ⏳ TODO |
+| 8 | handlers/start | Средняя | ~400 | ⏳ TODO |
+| 9a | handlers/threads | Средняя | ~100 | ⏳ TODO |
+| 9b | handlers/branches | Средняя | ~400 | ⏳ TODO (/branch_create, /branch_finish) |
+| 9c | handlers/sessions | Средняя | ~150 | ⏳ TODO (/new, /clear, /restart, /esc, /resume) |
+| 9d | handlers/settings | Средняя | ~100 | ⏳ TODO (/settings, /auto_accept, /help, /get_debug_ids) |
+| 10 | handlers/messages | Средняя | ~175 | ⏳ TODO |
+| 11 | Финализация + техдолг | Средняя | — | ⏳ TODO (см. 04-phase-10-11.md) |
 
 ## Ключевые победы
 
@@ -143,7 +169,7 @@ src/codogram/
 - `watcher.py`, `history_watcher.py` — отдельная задача
 - `screen.py` — только обернём в adapters
 
-## Техдолг (добавлено 2025-12-30)
+## Техдолг (актуализировано 2025-01-03)
 
 Полный список в `00-overview.md`, cleanup чеклист в `04-phase-10-11.md`.
 
@@ -165,8 +191,19 @@ src/codogram/
 
 ## Метрики успеха
 
-- [ ] Все unit тесты проходят
+- [x] Все unit тесты проходят (159 тестов)
 - [ ] E2E чеклист зелёный
 - [ ] Бот работает стабильно 1+ час
 - [ ] Новый handler добавляется за 5 минут
 - [ ] Код review проходит без вопросов "где это?"
+
+## Готово к Phase 7
+
+После merge с main (auto-accept feature, 14 commits):
+- AdminMiddleware на dp защищает все роутеры
+- handlers/permissions.py вынесен
+- keyboards/ directory создан
+- domain/, adapters/ созданы
+- 159 тестов проходят
+
+Следующий шаг: Phase 7 (FSM + StartFlowService)

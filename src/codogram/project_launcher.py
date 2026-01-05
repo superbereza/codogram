@@ -34,9 +34,12 @@ def resolve_project_path(project_name: str, custom_path: str | None) -> ProjectP
 
 
 def is_tmux_session_exists(session_name: str) -> bool:
-    """Check if tmux session exists."""
+    """Check if tmux session exists.
+
+    Uses '=' prefix for exact session name matching.
+    """
     result = subprocess.run(
-        ["tmux", "has-session", "-t", session_name],
+        ["tmux", "has-session", "-t", f"={session_name}"],
         capture_output=True,
     )
     return result.returncode == 0

@@ -129,6 +129,18 @@ Full GFM → MarkdownV2 conversion using telegramify-markdown library:
 - Fallback to plain text on parse errors
 - See [docs/designs/done/2025-01-04-telegramify-markdown-integration.md](designs/done/2025-01-04-telegramify-markdown-integration.md)
 
+### Bot architecture refactoring
+Layered architecture replacing monolithic bot.py (1500+ lines → 0):
+- **handlers/** — Telegram command handlers (start, sessions, threads, branches, settings, messages, permissions)
+- **services/** — Business logic (start_flow, branch, message_router, launch)
+- **middleware/** — AdminMiddleware for global admin protection
+- **domain/** — Models, validators, FSM states
+- **adapters/** — telegram.py (send_with_retry)
+- TelegramQueue injected via aiogram DI
+- StartFlowService with FlowAction/FlowResult pattern
+- 236 tests, E2E regression testing via Telegram MCP
+- See [docs/designs/done/2025-12-27-bot-refactoring/](designs/done/2025-12-27-bot-refactoring/)
+
 ## Backlog
 
 ### MCP trust prompt support
@@ -161,12 +173,13 @@ Resume Claude session after crash or archived topic restore:
 - On /start in archived topic or after crash: `claude --resume <session_id>`
 - Preserves conversation context instead of starting fresh
 
-### Bot refactoring
-Bot architecture refactoring — layered structure:
-- handlers → services → domain → adapters
-- Remove code duplication
-- Clean up deprecated fields
-- See [docs/designs/2025-12-27-bot-refactoring/](designs/2025-12-27-bot-refactoring/)
+### Group → Supergroup migration
+Handle chat_id change when topics are enabled in existing group:
+- Telegram changes chat_id when converting group to supergroup (forum)
+- Current behavior: project becomes orphaned, need to /start again
+- Solution: listen for `message.migrate_to_chat_id` event
+- Auto-update chat_id in config when migration detected
+- Notify user about successful migration
 
 ### GitHub Actions CI
 - Workflow for running tests on PR

@@ -31,20 +31,20 @@ def should_cleanup_project(project: 'ProjectState') -> bool:
     if project.binding_task and not project.binding_task.done():
         return False
 
-    # Check tmux for all threads
+    # Check tmux for all threads (use '=' for exact match)
     for thread in project.threads.values():
         tmux_name = thread.get_tmux_session(project.project_name)
         result = subprocess.run(
-            ["tmux", "has-session", "-t", tmux_name],
+            ["tmux", "has-session", "-t", f"={tmux_name}"],
             capture_output=True
         )
         if result.returncode == 0:
             return False  # Tmux exists, don't cleanup
 
-    # Legacy tmux check
+    # Legacy tmux check (use '=' for exact match)
     if project.tmux_session:
         result = subprocess.run(
-            ["tmux", "has-session", "-t", project.tmux_session],
+            ["tmux", "has-session", "-t", f"={project.tmux_session}"],
             capture_output=True
         )
         if result.returncode == 0:
@@ -76,7 +76,7 @@ def should_cleanup_project(project: 'ProjectState') -> bool:
         return True  # No jsonl anywhere = cleanup
 
     age_days = (time.time() - newest_mtime) / 86400
-    return age_days > 30
+    return age_days > settings.project_cleanup_days
 
 
 @dataclass
@@ -132,9 +132,8 @@ class ProjectState:
 
     # DEPRECATED: Legacy fields kept for backward compatibility with old configs.
     # All new code should use threads[None] for main thread.
-    # These fields are used by: bot.py (is_claude_running, show_status,
-    # cmd_restart, on_tmux_selected), permission_poller.py (permission_poller_for_project),
-    # history_watcher.py (HistoryWatcher._check_for_changes), and session_manager.py itself.
+    # These fields are used by: handlers/, permission_poller.py (permission_poller),
+    # history_watcher.py, and session_manager.py itself.
     session_id: str | None = None  # DEPRECATED: use threads[None].session_id
     jsonl_path: str | None = None  # DEPRECATED: use threads[None].jsonl_path
     watcher_task: asyncio.Task | None = field(default=None, repr=False)  # DEPRECATED: use threads[None].watcher_task
@@ -316,14 +315,8 @@ class ProjectManager:
         if cwd:
             project.cwd = cwd
 
-        await self._maybe_start_tasks(project, start_poller, start_watcher)
         self._save()
         return project
-
-    async def _maybe_start_tasks(self, project: ProjectState, start_poller, start_watcher,
-                                 send_missed: bool = False) -> None:
-        """DEPRECATED: Tasks are now started per-thread in poll_for_session_thread."""
-        logger.warning("_maybe_start_tasks called but is deprecated - tasks now handled per-thread")
 
     async def restore_projects(self, bot, start_poller, start_watcher, telegram_queue) -> None:
         """Restore sessions from history.jsonl after bot restart."""
@@ -353,10 +346,10 @@ class ProjectManager:
             for thread in project.threads.values():
                 tmux_name = thread.get_tmux_session(project.project_name)
 
-                # Check if tmux exists
+                # Check if tmux exists (use '=' for exact match)
                 import subprocess
                 result = subprocess.run(
-                    ["tmux", "has-session", "-t", tmux_name],
+                    ["tmux", "has-session", "-t", f"={tmux_name}"],
                     capture_output=True
                 )
 

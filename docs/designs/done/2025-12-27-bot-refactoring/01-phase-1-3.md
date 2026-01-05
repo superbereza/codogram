@@ -8,7 +8,7 @@
 
 ```bash
 # 1.1 Создать директории
-mkdir -p src/codogram/{handlers,services,domain,adapters,middleware,keyboards}
+mkdir -p src/codogram/{handlers,services,domain,adapters,middleware}
 
 # 1.2 Создать __init__.py в каждой
 touch src/codogram/handlers/__init__.py
@@ -16,7 +16,9 @@ touch src/codogram/services/__init__.py
 touch src/codogram/domain/__init__.py
 touch src/codogram/adapters/__init__.py
 touch src/codogram/middleware/__init__.py
-touch src/codogram/keyboards/__init__.py
+
+# NOTE: keyboards/ НЕ создаём здесь - конфликт с существующим keyboards.py
+# Миграция keyboards.py → keyboards/ делается в Phase 4 (Task 4.0)
 
 # 1.3 Проверить запуск
 python -m codogram.main

@@ -9,6 +9,7 @@ from typing import AsyncIterator, TYPE_CHECKING
 if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 from aiogram import Bot
+from .config import settings
 from .logging_config import logger
 
 class ContentType(Enum):
@@ -24,31 +25,6 @@ class ParsedEntry:
     text: str = ""
     tool_name: str = ""
     tool_input: dict | None = None
-
-def find_missed_entries(path: Path) -> list[ParsedEntry]:
-    """Find all assistant entries after last user message."""
-    if not path.exists():
-        return []
-
-    try:
-        entries = []
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                entry = json.loads(line)
-                if entry.get("type") == "user":
-                    entries = []  # reset after each user message
-                else:
-                    parsed = parse_jsonl_entry(entry)
-                    if parsed:
-                        entries.append(parsed)
-        return entries
-    except (json.JSONDecodeError, IOError) as e:
-        logger.warning(f"find_missed_entries error: {e}")
-        return []
-
 
 def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
     entry_type = entry.get("type")
@@ -136,9 +112,9 @@ def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
 class JsonlWatcher:
     """Watches a jsonl file and yields new entries."""
 
-    def __init__(self, path: Path, poll_interval: float = 0.5):
+    def __init__(self, path: Path, poll_interval: float | None = None):
         self.path = path
-        self.poll_interval = poll_interval
+        self.poll_interval = poll_interval if poll_interval is not None else settings.jsonl_watcher_interval
         self.last_position = path.stat().st_size if path.exists() else 0
 
     async def watch(self) -> AsyncIterator[ParsedEntry]:
@@ -169,7 +145,7 @@ class JsonlWatcher:
             await asyncio.sleep(self.poll_interval)
 
 
-async def watch_jsonl(path: Path, poll_interval: float = 0.5) -> AsyncIterator[ParsedEntry]:
+async def watch_jsonl(path: Path, poll_interval: float | None = None) -> AsyncIterator[ParsedEntry]:
     """Watch jsonl file and yield new parsed entries."""
     watcher = JsonlWatcher(path, poll_interval)
     async for entry in watcher.watch():

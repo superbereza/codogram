@@ -87,9 +87,14 @@ class TmuxSession:
         )
 
     def exists(self) -> bool:
-        """Check if tmux session exists."""
+        """Check if tmux session exists.
+
+        Uses '=' prefix for exact session name matching.
+        Without '=', tmux does prefix matching which causes
+        'claude-codogram' to match 'claude-codogram-immortal'.
+        """
         result = subprocess.run(
-            ["tmux", "has-session", "-t", self.name],
+            ["tmux", "has-session", "-t", f"={self.name}"],
             capture_output=True
         )
         return result.returncode == 0
@@ -163,3 +168,23 @@ def find_tmux_by_convention(project_name: str) -> str | None:
         if t.exists():
             return pattern
     return None
+
+
+def kill_tmux_session(session_name: str) -> bool:
+    """Kill a tmux session by name.
+
+    Args:
+        session_name: Name of the tmux session to kill
+
+    Returns:
+        True if session was killed, False otherwise
+    """
+    try:
+        subprocess.run(
+            ["tmux", "kill-session", "-t", session_name],
+            check=True,
+            capture_output=True,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False

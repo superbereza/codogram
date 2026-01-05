@@ -276,3 +276,93 @@ async def test_markdownv2_messages_are_converted(queue, mock_bot):
     assert "##" not in sent_texts[0]  # Header syntax removed
 
     await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_enqueue_timeout():
+    """Test that enqueue raises timeout after specified duration."""
+    from unittest.mock import MagicMock
+    from codogram.telegram_queue import TelegramQueueTimeout
+
+    bot = MagicMock()
+    # Make send_message hang forever
+    async def hang_forever(**kw):
+        await asyncio.sleep(100)
+    bot.send_message = hang_forever
+
+    queue = TelegramQueue(bot)
+    batch = OutgoingBatch(chat_id=123, thread_id=None, messages=[{"text": "test"}])
+
+    with pytest.raises(TelegramQueueTimeout):
+        await queue.enqueue(batch, timeout=0.1)
+
+    await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_reply_helper():
+    """Test reply() helper creates correct batch."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from aiogram.types import Message, Chat
+
+    bot = MagicMock()
+    queue = TelegramQueue(bot)
+
+    message = MagicMock(spec=Message)
+    message.chat = MagicMock(spec=Chat)
+    message.chat.id = 123
+    message.message_thread_id = 456
+
+    with patch.object(queue, 'enqueue', new_callable=AsyncMock) as mock_enqueue:
+        mock_enqueue.return_value = [789]
+        result = await queue.reply(message, "Hello")
+
+        assert result == [789]
+        mock_enqueue.assert_called_once()
+        batch = mock_enqueue.call_args[0][0]
+        assert batch.chat_id == 123
+        assert batch.thread_id == 456
+        assert batch.messages[0]["text"] == "Hello"
+        assert batch.messages[0]["parse_mode"] == "MarkdownV2"
+
+
+@pytest.mark.asyncio
+async def test_send_helper():
+    """Test send() helper creates correct batch."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    bot = MagicMock()
+    queue = TelegramQueue(bot)
+
+    with patch.object(queue, 'enqueue', new_callable=AsyncMock) as mock_enqueue:
+        mock_enqueue.return_value = [789]
+        result = await queue.send(123, "Hello", thread_id=456)
+
+        assert result == [789]
+        batch = mock_enqueue.call_args[0][0]
+        assert batch.chat_id == 123
+        assert batch.thread_id == 456
+
+
+@pytest.mark.asyncio
+async def test_edit_helper():
+    """Test edit() helper creates correct batch."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from aiogram.types import Message, Chat
+
+    bot = MagicMock()
+    queue = TelegramQueue(bot)
+
+    message = MagicMock(spec=Message)
+    message.chat = MagicMock(spec=Chat)
+    message.chat.id = 123
+    message.message_id = 456
+
+    with patch.object(queue, 'enqueue', new_callable=AsyncMock) as mock_enqueue:
+        mock_enqueue.return_value = None
+        await queue.edit(message, "Updated")
+
+        batch = mock_enqueue.call_args[0][0]
+        assert batch.chat_id == 123
+        assert batch.message_id == 456
+        assert batch.text == "Updated"

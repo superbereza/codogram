@@ -11,6 +11,16 @@ class Settings(BaseSettings):
     base_dir: str  # e.g. /home/user/dev
     log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR
 
+    # Timing constants (seconds)
+    permission_poller_debounce: float = 0.5
+    permission_poller_interval: float = 0.5
+    history_watcher_interval: int = 15
+    session_binding_timeout: int = 300
+    session_binding_interval: float = 0.5
+    jsonl_watcher_interval: float = 0.5
+    claude_launch_timeout: int = 120
+    project_cleanup_days: int = 30
+
     def get_admin_ids(self) -> set[int]:
         """Parse admin_ids string into set of ints."""
         return {int(x.strip()) for x in self.admin_ids.split(",") if x.strip()}

@@ -11,7 +11,8 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher
 
 from .config import settings
-from .bot import router
+from .middleware.admin import AdminMiddleware
+from .handlers import register_handlers
 from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 from .logging_config import setup_logging, logger
@@ -29,7 +30,14 @@ async def main():
     global telegram_queue
     telegram_queue = TelegramQueue(bot)
     dp = Dispatcher()
-    dp.include_router(router)
+    dp["telegram_queue"] = telegram_queue  # Register for aiogram DI
+
+    # Global admin check - protects ALL routers
+    dp.message.middleware(AdminMiddleware())
+    dp.callback_query.middleware(AdminMiddleware())
+
+    # Register handler routers (all protected by AdminMiddleware)
+    register_handlers(dp)
 
     from aiogram.types import BotCommand
     await bot.set_my_commands([
@@ -44,7 +52,7 @@ async def main():
         BotCommand(command="settings", description="Show current settings"),
         BotCommand(command="auto_accept", description="Toggle auto-accept (or reset all)"),
         BotCommand(command="help", description="Show available commands"),
-        BotCommand(command="my_chat_id", description="Show your user ID"),
+        BotCommand(command="get_debug_ids", description="Show debug IDs (admin only)"),
         BotCommand(command="esc", description="Send Escape to Claude"),
         # /resume intentionally not in menu - just responds "not supported" if someone tries it
     ])

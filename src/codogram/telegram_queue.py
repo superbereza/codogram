@@ -3,14 +3,23 @@
 import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import telegramify_markdown
 from aiogram import Bot
 from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup
 
+if TYPE_CHECKING:
+    from aiogram.types import Message
+
 from .logging_config import logger
 from .chunker import chunk_message
+
+
+class TelegramQueueTimeout(Exception):
+    """Raised when queue operation times out."""
+    pass
 
 
 @dataclass
@@ -28,6 +37,7 @@ class EditBatch:
     message_id: int
     text: str
     parse_mode: str | None = None
+    reply_markup: InlineKeyboardMarkup | None = None
 
 
 @dataclass
@@ -72,12 +82,19 @@ class TelegramQueue:
         self._workers: dict[int, asyncio.Task] = {}
         self._locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
-    async def enqueue(self, batch: OutgoingBatch | EditBatch | KeyboardBatch) -> list[int] | None:
+    async def enqueue(self, batch: OutgoingBatch | EditBatch | KeyboardBatch, timeout: float = 30.0) -> list[int] | None:
         """Add batch to queue, wait for send.
 
         For OutgoingBatch: returns list of sent message IDs.
         For EditBatch: returns None (edit doesn't create new messages).
         For KeyboardBatch: returns list with single message ID.
+
+        Args:
+            batch: The batch to send.
+            timeout: Maximum seconds to wait for send to complete. Defaults to 30.0.
+
+        Raises:
+            TelegramQueueTimeout: If the operation times out.
         """
         chat_id = batch.chat_id
 
@@ -97,13 +114,16 @@ class TelegramQueue:
 
         await self._queues[chat_id].put(item)
 
-        if isinstance(batch, EditBatch):
-            await result_future
-            return None
-        elif isinstance(batch, KeyboardBatch):
-            return await result_future_kb
-        else:
-            return await result_future_send
+        try:
+            if isinstance(batch, EditBatch):
+                await asyncio.wait_for(result_future, timeout=timeout)
+                return None
+            elif isinstance(batch, KeyboardBatch):
+                return await asyncio.wait_for(result_future_kb, timeout=timeout)
+            else:
+                return await asyncio.wait_for(result_future_send, timeout=timeout)
+        except asyncio.TimeoutError as e:
+            raise TelegramQueueTimeout(f"Enqueue operation timed out after {timeout}s") from e
 
     async def enqueue_nowait(self, batch: OutgoingBatch | EditBatch | KeyboardBatch) -> None:
         """Add batch to queue without waiting. Fire-and-forget.
@@ -245,12 +265,25 @@ class TelegramQueue:
             )
             return
 
+        # Apply telegramify for MarkdownV2
+        text = batch.text
+        if batch.parse_mode == "MarkdownV2":
+            try:
+                text = telegramify_markdown.markdownify(
+                    text,
+                    max_line_length=None,
+                    normalize_whitespace=False
+                )
+            except Exception as e:
+                logger.warning(f"markdownify failed on edit: {e}")
+
         try:
             await self.bot.edit_message_text(
                 chat_id=batch.chat_id,
                 message_id=batch.message_id,
-                text=batch.text,
+                text=text,
                 parse_mode=batch.parse_mode,
+                reply_markup=batch.reply_markup,
             )
         except TelegramRetryAfter as e:
             logger.warning(
@@ -307,3 +340,63 @@ class TelegramQueue:
         if self._workers:
             await asyncio.gather(*self._workers.values(), return_exceptions=True)
         self._workers.clear()
+
+    async def reply(
+        self,
+        message: "Message",
+        text: str,
+        parse_mode: str | None = "MarkdownV2",
+        reply_markup: "InlineKeyboardMarkup | None" = None,
+    ) -> list[int]:
+        """Reply to a message through queue."""
+        msg_dict: dict = {"text": text}
+        if parse_mode:
+            msg_dict["parse_mode"] = parse_mode
+        if reply_markup:
+            msg_dict["reply_markup"] = reply_markup
+
+        batch = OutgoingBatch(
+            chat_id=message.chat.id,
+            thread_id=message.message_thread_id,
+            messages=[msg_dict],
+        )
+        return await self.enqueue(batch)
+
+    async def send(
+        self,
+        chat_id: int,
+        text: str,
+        thread_id: int | None = None,
+        parse_mode: str | None = "MarkdownV2",
+        reply_markup: "InlineKeyboardMarkup | None" = None,
+    ) -> list[int]:
+        """Send message to chat through queue."""
+        msg_dict: dict = {"text": text}
+        if parse_mode:
+            msg_dict["parse_mode"] = parse_mode
+        if reply_markup:
+            msg_dict["reply_markup"] = reply_markup
+
+        batch = OutgoingBatch(
+            chat_id=chat_id,
+            thread_id=thread_id,
+            messages=[msg_dict],
+        )
+        return await self.enqueue(batch)
+
+    async def edit(
+        self,
+        message: "Message",
+        text: str,
+        parse_mode: str | None = "MarkdownV2",
+        reply_markup: "InlineKeyboardMarkup | None" = None,
+    ) -> None:
+        """Edit a message through queue."""
+        batch = EditBatch(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            text=text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup,
+        )
+        await self.enqueue(batch)
