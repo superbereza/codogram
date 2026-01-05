@@ -131,6 +131,22 @@
 
 ## Backlog
 
+### Поддержка MCP trust prompt
+Обнаружение промптов доверия MCP серверам (box-style UI):
+- Отличается от стандартных: `❯` на отдельной строке, опции вокруг
+- Box-символы `│` и `╰────╯` как рамка
+- Футер "Enter to confirm · Esc to reject"
+- Нужен аккуратный парсинг чтобы не ловить нумерованные списки
+- См. неудачную попытку: 2026-01-04 (сломало детекцию везде)
+
+### Детекция выхода Claude
+Обнаружение нормального выхода Claude (не краша):
+- Показывать `[~] Claude exited. Use /start to restart.`
+- Определять shell prompt после исчезновения Claude UI
+- Трекать `claude_was_active` чтобы избежать false positives на старте
+- Отличать shell prompt `❯` от Claude selector `❯ 1. Yes`
+- См. откаченную попытку: 8b6baf8 (были false positives)
+
 ### Редизайн меню
 Реорганизация команд бота для удобства:
 - Группировка по назначению (повседневные, создание, завершение, настройки)
@@ -138,6 +154,12 @@
 - Единый `/finish` для worktree и обычных топиков
 - Архивация топиков вместо удаления (закрытие + иконка)
 - См. [docs/designs/2025-01-03-menu-redesign.md](designs/2025-01-03-menu-redesign.md)
+
+### Resume сессии по session_id
+Восстановление сессии Claude после краша или разархивации топика:
+- Хранить session_id в ThreadInfo
+- При /start в архивированном топике или после краша: `claude --resume <session_id>`
+- Сохраняет контекст диалога вместо старта с нуля
 
 ### Bot refactoring
 Рефакторинг архитектуры бота — слоёная структура:
@@ -152,11 +174,11 @@
 
 ### Migrate strings to strings.py
 Перенести все захардкоженные строки в `src/codogram/strings.py`:
-- handlers/ — ответы команд (~50 строк)
+- bot.py — основной объём (~50 строк)
 - launch_animation.py — статусы запуска
 - history_watcher.py — уведомления
-- keyboards/ — кнопки
-- services/start_flow.py — кнопки wizard'а
+- keyboards.py — кнопки
+- start_flow.py — кнопки wizard'а
 - См. `docs/specs/tone-of-voice.md` для гайдлайнов
 
 ### Voice → Whisper

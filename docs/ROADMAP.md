@@ -131,6 +131,22 @@ Full GFM → MarkdownV2 conversion using telegramify-markdown library:
 
 ## Backlog
 
+### MCP trust prompt support
+Detect MCP server trust prompts (box-style UI):
+- Different from standard prompts: `❯` on separate line, options around it
+- Box characters `│` and `╰────╯` border
+- "Enter to confirm · Esc to reject" footer
+- Need careful parsing to avoid false positives on numbered lists
+- See failed attempt: 2026-01-04 (broke permission detection everywhere)
+
+### Claude exit detection
+Detect when Claude exits normally (not crash):
+- Show `[~] Claude exited. Use /start to restart.` notification
+- Detect shell prompt after Claude UI disappears
+- Must track `claude_was_active` to avoid false positives on startup
+- Must distinguish shell prompt `❯` from Claude selector `❯ 1. Yes`
+- See reverted attempt: 8b6baf8 (had issues with false positives)
+
 ### Menu redesign
 Reorganize bot commands for better usability:
 - Group commands by purpose (everyday, create, complete, settings)
@@ -138,6 +154,12 @@ Reorganize bot commands for better usability:
 - Unified `/finish` for both worktree and regular topics
 - Archive topics instead of delete (close + icon)
 - See [docs/designs/2025-01-03-menu-redesign.md](designs/2025-01-03-menu-redesign.md)
+
+### Session resume by session_id
+Resume Claude session after crash or archived topic restore:
+- Store session_id in ThreadInfo
+- On /start in archived topic or after crash: `claude --resume <session_id>`
+- Preserves conversation context instead of starting fresh
 
 ### Bot refactoring
 Bot architecture refactoring — layered structure:
@@ -152,11 +174,11 @@ Bot architecture refactoring — layered structure:
 
 ### Migrate strings to strings.py
 Move all hardcoded strings to `src/codogram/strings.py`:
-- handlers/ — command responses (~50 strings)
+- bot.py — main volume (~50 strings)
 - launch_animation.py — startup statuses
 - history_watcher.py — notifications
-- keyboards/ — buttons
-- services/start_flow.py — wizard buttons
+- keyboards.py — buttons
+- start_flow.py — wizard buttons
 - See `docs/specs/tone-of-voice.md` for guidelines
 
 ### Voice → Whisper
