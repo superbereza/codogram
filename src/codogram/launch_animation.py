@@ -69,6 +69,15 @@ async def launch_with_animation(
     queue: TelegramQueue,
 ) -> bool:
     """Launch Claude with animated status messages."""
+    if not project.cwd:
+        await queue.send(
+            chat_id,
+            "`[x]` Project cwd not set. Re-register with /start",
+            thread_id=thread_id,
+            parse_mode="MarkdownV2",
+        )
+        return False
+
     tmux_name = thread.get_tmux_session(project.project_name)
     tmux = TmuxSession(tmux_name, project.cwd)
 

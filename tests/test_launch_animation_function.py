@@ -226,3 +226,24 @@ async def test_start_monitoring_restarts_if_poller_done(mock_bot, mock_queue, mo
 
         mock_create_poller.assert_called_once()
         assert mock_thread.poller_task == new_task
+
+
+@pytest.mark.asyncio
+async def test_launch_fails_if_cwd_is_none(mock_bot, mock_queue, mock_project, mock_thread):
+    """Launch returns False and sends error if project.cwd is None."""
+    mock_project.cwd = None
+
+    result = await launch_with_animation(
+        bot=mock_bot,
+        chat_id=123,
+        thread_id=None,
+        project=mock_project,
+        thread=mock_thread,
+        queue=mock_queue,
+    )
+
+    assert result is False
+    # Check error message was sent
+    mock_queue.send.assert_called_once()
+    call_args = mock_queue.send.call_args
+    assert "cwd not set" in call_args[0][1]
