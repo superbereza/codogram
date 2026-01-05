@@ -60,6 +60,18 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
         await telegram_queue.reply(message, f"`[x]` Name too long (max {max_len} chars for this project)")
         return
 
+    # Check if branch already exists
+    if branch_exists(Path(project.cwd), branch_name):
+        await telegram_queue.reply(message, f"`[x]` Branch `{branch_name}` already exists")
+        return
+
+    # Check if worktree directory already exists
+    main_repo = Path(project.cwd)
+    worktree_dir = main_repo.parent / f"{main_repo.name}-{branch_name}"
+    if worktree_dir.exists():
+        await telegram_queue.reply(message, f"`[x]` Directory already exists: `{worktree_dir}`")
+        return
+
     # Get default branch
     default_branch = get_default_branch(Path(project.cwd))
 
