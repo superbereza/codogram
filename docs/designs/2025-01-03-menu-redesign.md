@@ -9,7 +9,6 @@ Reorganize bot menu for better usability, add short command aliases, and unify t
 ```
 Everyday:
 /esc         - Cancel current operation
-/clear       - Clear context, start fresh
 /auto_accept - Toggle auto-accept mode
 
 Create:
@@ -17,7 +16,8 @@ Create:
 /branch      - New isolated feature branch + topic
 
 Complete:
-/finish      - Merge branch, archive topic
+/clear       - Clear context, start fresh
+/finish      - Merge branch, archive topic (keeps worktree)
 
 Settings:
 /start       - Connect Claude or show status
@@ -39,34 +39,40 @@ Help:
 | `/thread_delete` | Responds "Use /finish" |
 | `/branch_finish` | Responds "Use /finish" |
 
-## New Fields in ThreadInfo
+## ThreadInfo Changes
 
 ```python
 @dataclass
 class ThreadInfo:
     # ... existing fields ...
-
-    archived: bool = False
-    branch_name: str | None = None  # Git branch name (None = regular topic)
+    archived: bool = False  # NEW: topic is closed via /finish
 ```
 
-- `branch_name` present → worktree topic
-- `branch_name` = None → regular topic
-- `archived` = True → topic is closed
+**Branch detection** (no new field needed):
+- `worktree_path != None` → worktree/branch topic
+- `worktree_path == None` → regular topic
+- `name` field already stores branch name for worktree topics
+
+**States:**
+- `archived = False` → active topic
+- `archived = True` → closed via /finish (can reopen with /start)
 
 ## /finish Logic
 
-### In worktree topic (branch_name exists):
+### In worktree topic (worktree_path != None):
 
 1. Existing merge confirmation flow
 2. Merge branch → target
-3. Delete worktree directory
-4. Delete git branch
-5. Kill tmux session
-6. Close Telegram topic + archive icon
-7. Set `archived = True`, keep `branch_name`
+3. Kill tmux session (frees RAM)
+4. Close Telegram topic + archive icon
+5. Set `archived = True`, keep `branch_name`
 
-### In regular topic (branch_name = None):
+**Note:** Worktree and git branch are NOT deleted. This allows:
+- Easy restart via `/start` in archived topic
+- Session resume with full context
+- Explicit cleanup via `/cleanup` when ready
+
+### In regular topic (worktree_path = None):
 
 1. Show confirmation: "Archive this topic?"
 2. Kill tmux session
@@ -81,50 +87,46 @@ class ThreadInfo:
 
 User reopens topic manually in Telegram UI before /start.
 
-### Regular topic (branch_name = None):
+### Regular topic (worktree_path = None):
 
 1. Set `archived = False`
 2. Remove archive icon
 3. Launch Claude in `project.cwd`
 
-### Worktree topic (branch_name exists):
+### Worktree topic (worktree_path != None):
 
-1. Show inline keyboard:
-   ```
-   "Continue in new branch or main directory?"
-   [New branch] [Main directory]
-   ```
+Since worktree is preserved after /finish, restart is simple:
 
-2. **[New branch]:**
-   - `git checkout main`
-   - `git branch {branch_name}`
-   - `git worktree add .worktrees/{name} {branch_name}`
-   - Set `archived = False`
-   - Remove archive icon
-   - Launch Claude in worktree
+1. Set `archived = False`
+2. Remove archive icon
+3. Create tmux session in worktree_path
+4. Resume Claude: `claude --resume {session_id}` (if exists)
+5. Or fresh start: `claude` (if no session)
 
-3. **[Main directory]:**
-   - Set `branch_name = None` (convert to regular topic)
-   - Set `archived = False`
-   - Remove archive icon
-   - Launch Claude in `project.cwd`
+## /cleanup Command
+
+See separate design: `2026-01-05-cleanup-command.md`
 
 ## Edge Cases
 
 | Situation | Solution |
 |-----------|----------|
 | Branch with same name exists | Error: "Branch exists. Delete it or use /branch for new name" |
-| Worktree directory remains | Delete and recreate |
-| Topic deleted in Telegram | Catch error, remove thread from config |
+| Worktree missing on /start | Recreate worktree from existing branch |
+| Topic deleted in Telegram | Catch error, set `deleted = True` in config |
 | Merge conflicts | Show error, ask to resolve manually |
 
 ## Implementation Changes
 
 | File | Changes |
 |------|---------|
-| `session_manager.py` | Add `archived`, `branch_name` to ThreadInfo + save/load |
+| `session_manager.py` | Add `archived` field to ThreadInfo |
 | `main.py` | New menu order and descriptions |
-| `bot.py` | Command aliases, /finish for regular topics, /start for archived |
+| `handlers/start.py` | Resume logic, tmux running check |
+| `handlers/finish.py` | Unified /finish (don't delete worktree) |
+| `launch_animation.py` | Add `session_id`, `cwd` params |
+
+Note: `deleted` field and `/cleanup` command in separate design.
 
 ## Archive Icon
 
