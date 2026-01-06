@@ -240,6 +240,18 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
     if not thread:
         return
 
+    # Handle archived topic - reopen it
+    if thread.archived:
+        thread.archived = False
+        project_manager._save()
+        # Remove archive icon
+        try:
+            await message.bot.edit_forum_topic(
+                message.chat.id, result.thread_id, icon_custom_emoji_id=""
+            )
+        except Exception:
+            pass  # May fail if no icon was set
+
     if thread.launch_task and not thread.launch_task.done():
         return
 
