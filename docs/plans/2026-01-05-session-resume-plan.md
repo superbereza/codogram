@@ -20,7 +20,7 @@
 
 **Step 1: Write the failing test**
 
-Create `tests/test_launch_animation.py`:
+Add to `tests/test_launch_animation.py`:
 
 ```python
 """Tests for launch_with_animation."""
@@ -215,6 +215,7 @@ def test_thread_has_valid_session():
     from codogram.session_manager import ThreadInfo
     from pathlib import Path
     import tempfile
+    import os
 
     # No session_id
     thread = ThreadInfo(name="test", thread_id=123)
@@ -230,8 +231,11 @@ def test_thread_has_valid_session():
 
     # session_id and jsonl_path and file exists
     with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as f:
-        thread.jsonl_path = f.name
-        assert thread.has_valid_session() is True
+        try:
+            thread.jsonl_path = f.name
+            assert thread.has_valid_session() is True
+        finally:
+            os.unlink(f.name)
 ```
 
 **Step 2: Run test to verify it fails**
@@ -369,10 +373,11 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
 
     # Check if tmux already running
     tmux_name = thread.get_tmux_session(project.project_name)
+    actual_cwd = thread.worktree_path or project.cwd
     if is_tmux_session_exists(tmux_name):
         # Check if Claude is ready in tmux
         from ..tmux import TmuxSession
-        tmux = TmuxSession(tmux_name, project.cwd)
+        tmux = TmuxSession(tmux_name, actual_cwd)
         if tmux.is_claude_ready():
             await telegram_queue.reply(
                 message,
@@ -504,6 +509,17 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
 
     if thread.launch_task and not thread.launch_task.done():
         return
+
+    # Handle archived topic - reopen it (already implemented in menu-redesign)
+    if thread.archived:
+        thread.archived = False
+        project_manager._save()
+        try:
+            await message.bot.edit_forum_topic(
+                message.chat.id, result.thread_id, icon_custom_emoji_id=""
+            )
+        except Exception:
+            pass  # May fail if no icon was set
 
     # Determine cwd (worktree or project)
     cwd = thread.worktree_path if thread.has_valid_worktree() else None
@@ -652,7 +668,9 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
             worktree_path.parent.mkdir(parents=True, exist_ok=True)
 
             # git worktree add <path> <existing-branch>
-            result = subprocess.run(
+            # Use asyncio.to_thread to avoid blocking event loop
+            result = await asyncio.to_thread(
+                subprocess.run,
                 ["git", "worktree", "add", str(worktree_path), branch_name],
                 cwd=str(main_repo),
                 capture_output=True,
@@ -692,6 +710,8 @@ git commit -m "feat(start): add resume error recovery callbacks"
 **Files:**
 - Modify: `src/codogram/services/launch.py`
 - Test: Check worktree creation path
+
+**Note:** Existing worktrees use the old path format (`{repo}-{branch}` next to repo). The resume logic (Task 5) uses `thread.worktree_path` from config, so existing worktrees will continue to work. Only NEW branches will use `.worktrees/` format.
 
 **Step 1: Find worktree path creation**
 
