@@ -336,3 +336,23 @@ def test_thread_has_valid_session():
             assert thread.has_valid_session() is True
         finally:
             os.unlink(f.name)
+
+
+def test_thread_has_valid_worktree():
+    """ThreadInfo.has_valid_worktree checks worktree exists."""
+    from codogram.session_manager import ThreadInfo
+    import tempfile
+    import os
+
+    # No worktree_path
+    thread = ThreadInfo(name="test", thread_id=123)
+    assert thread.has_valid_worktree() is False
+
+    # worktree_path but doesn't exist
+    thread.worktree_path = "/nonexistent/worktree"
+    assert thread.has_valid_worktree() is False
+
+    # worktree_path exists
+    with tempfile.TemporaryDirectory() as tmpdir:
+        thread.worktree_path = tmpdir
+        assert thread.has_valid_worktree() is True

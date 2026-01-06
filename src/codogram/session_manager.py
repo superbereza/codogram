@@ -128,6 +128,15 @@ class ThreadInfo:
             return False
         return Path(self.jsonl_path).exists()
 
+    def has_valid_worktree(self) -> bool:
+        """Check if thread has a valid worktree directory.
+
+        Returns True only if worktree_path is set and directory exists.
+        """
+        if not self.worktree_path:
+            return False
+        return Path(self.worktree_path).is_dir()
+
 
 @dataclass
 class ProjectState:
