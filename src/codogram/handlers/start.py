@@ -605,3 +605,91 @@ async def on_restart_cancel(callback: CallbackQuery, state: FSMContext, telegram
     result = start_flow.handle_cancel()
 
     await _handle_callback_result(callback, state, result, telegram_queue)
+
+
+# ===== Resume Error Recovery =====
+
+@router.callback_query(F.data.startswith("resume:"))
+async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
+    """Handle resume error recovery callbacks."""
+    parts = callback.data.split(":")
+    action = parts[1]
+    thread_id = int(parts[2]) if parts[2] != "None" else None
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    thread = project.threads.get(thread_id) if thread_id else None
+
+    if action == "start_new":
+        # Clear stale session and start fresh
+        if thread:
+            thread.session_id = None
+            thread.jsonl_path = None
+            project_manager._save()
+
+        await telegram_queue.edit(callback.message, "`[~]` Starting new session...")
+        await callback.answer()
+
+        # Trigger launch
+        from ..launch_animation import launch_with_animation
+        cwd = thread.worktree_path if thread and thread.has_valid_worktree() else None
+
+        if thread:
+            thread.launch_task = asyncio.create_task(
+                launch_with_animation(
+                    bot=callback.bot,
+                    chat_id=callback.message.chat.id,
+                    thread_id=thread_id,
+                    project=project,
+                    thread=thread,
+                    queue=telegram_queue,
+                    cwd=cwd,
+                )
+            )
+
+    elif action == "recreate":
+        # Recreate worktree from existing branch
+        if not thread:
+            await callback.answer("Thread not found")
+            return
+
+        await telegram_queue.edit(callback.message, "`[~]` Recreating worktree...")
+        await callback.answer()
+
+        # Attach worktree to existing branch
+        from pathlib import Path
+        import subprocess
+
+        main_repo = Path(project.cwd)
+        branch_name = thread.name
+        worktree_path = main_repo / ".worktrees" / branch_name
+
+        try:
+            # Ensure .worktrees/ directory exists
+            worktree_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # git worktree add <path> <existing-branch>
+            # Use asyncio.to_thread to avoid blocking event loop
+            result = await asyncio.to_thread(
+                subprocess.run,
+                ["git", "worktree", "add", str(worktree_path), branch_name],
+                cwd=str(main_repo),
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip())
+
+            thread.worktree_path = str(worktree_path)
+            project_manager._save()
+
+            await telegram_queue.edit(callback.message, "`[v]` Worktree recreated. Use /start to launch.")
+        except Exception as e:
+            await telegram_queue.edit(callback.message, f"`[x]` Failed to recreate: {e}")
+
+    elif action == "cancel":
+        await telegram_queue.edit(callback.message, "Cancelled.")
+        await callback.answer()
