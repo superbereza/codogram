@@ -266,7 +266,8 @@ def test_check_unmerged_commits_returns_list():
     mock_result.stdout = "abc1234 Add feature X\ndef5678 Fix bug Y"
     mock_result.returncode = 0
 
-    with patch("subprocess.run", return_value=mock_result):
+    # Mock at import location (codogram.utils.cleanup.subprocess)
+    with patch("codogram.utils.cleanup.subprocess.run", return_value=mock_result):
         commits = check_unmerged_commits("/project", "feature-x", "main")
 
         assert len(commits) == 2
@@ -283,7 +284,8 @@ def test_check_unmerged_commits_empty_when_merged():
     mock_result.stdout = ""
     mock_result.returncode = 0
 
-    with patch("subprocess.run", return_value=mock_result):
+    # Mock at import location
+    with patch("codogram.utils.cleanup.subprocess.run", return_value=mock_result):
         commits = check_unmerged_commits("/project", "feature-x", "main")
 
         assert commits == []
@@ -514,66 +516,71 @@ git commit -m "feat(services): add delete_thread_files to thread_lifecycle"
 - Modify: `src/codogram/session_manager.py`
 - Test: `tests/test_session_manager.py`
 
+**Note:** ThreadInfo serialization is done inline in ProjectManager._save() and _load_projects(), NOT via to_dict/from_dict methods.
+
 **Step 1: Write the failing test**
 
 Add to `tests/test_session_manager.py`:
 
 ```python
-def test_thread_deleted_field_serialization():
-    """deleted field should serialize/deserialize properly."""
+def test_thread_deleted_field_default():
+    """deleted field should default to False."""
     from codogram.session_manager import ThreadInfo
 
-    # Default value
     thread = ThreadInfo(name="test", thread_id=123)
     assert thread.deleted is False
 
-    # Serialize
-    data = thread.to_dict()
-    assert "deleted" in data
-    assert data["deleted"] is False
 
-    # Mark as deleted
+def test_thread_deleted_field_can_be_set():
+    """deleted field should be settable."""
+    from codogram.session_manager import ThreadInfo
+
+    thread = ThreadInfo(name="test", thread_id=123)
     thread.deleted = True
-    data = thread.to_dict()
-    assert data["deleted"] is True
-
-    # Deserialize
-    restored = ThreadInfo.from_dict(data)
-    assert restored.deleted is True
+    assert thread.deleted is True
 ```
 
 **Step 2: Run test to verify it fails**
 
-Run: `PYTHONPATH=src pytest tests/test_session_manager.py::test_thread_deleted_field_serialization -v`
+Run: `PYTHONPATH=src pytest tests/test_session_manager.py::test_thread_deleted_field_default -v`
 Expected: FAIL - deleted field not found
 
 **Step 3: Add deleted field to ThreadInfo**
 
-Add to ThreadInfo dataclass:
+Add to ThreadInfo dataclass (after `archived` field around line 108):
 
 ```python
-deleted: bool = False  # True after /cleanup
+deleted: bool = False              # True after /cleanup deletes worktree
 ```
 
-**Step 4: Update to_dict method**
+**Step 4: Update _save method to serialize deleted**
 
-Add to to_dict:
+In `ProjectManager._save()` (around line 241), add after the `archived` serialization:
 
 ```python
-"deleted": self.deleted,
+                    if t.archived:
+                        thread_data["archived"] = t.archived
+                    if t.deleted:
+                        thread_data["deleted"] = t.deleted
 ```
 
-**Step 5: Update from_dict method**
+**Step 5: Update _load_projects method to deserialize deleted**
 
-Add to from_dict:
+In `ProjectManager._load_projects()` (around line 185), add to the ThreadInfo constructor:
 
 ```python
-deleted=data.get("deleted", False),
+                    project.threads[tid] = ThreadInfo(
+                        thread_id=tid,
+                        name=thread_name,
+                        # ... existing fields ...
+                        archived=thread_data.get("archived", False),
+                        deleted=thread_data.get("deleted", False),  # NEW
+                    )
 ```
 
 **Step 6: Run test to verify it passes**
 
-Run: `PYTHONPATH=src pytest tests/test_session_manager.py::test_thread_deleted_field_serialization -v`
+Run: `PYTHONPATH=src pytest tests/test_session_manager.py -k deleted -v`
 Expected: PASS
 
 **Step 7: Commit**

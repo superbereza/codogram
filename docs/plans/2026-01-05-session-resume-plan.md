@@ -342,7 +342,15 @@ git commit -m "feat(session): add has_valid_worktree method to ThreadInfo"
 
 The key is to check if tmux is already running BEFORE any launch logic.
 
-**Step 2: Add tmux check at the beginning of thread flow**
+**Step 2: Add import for is_tmux_session_exists at top of start.py**
+
+Add near other imports at top of `src/codogram/handlers/start.py`:
+
+```python
+from ..project_launcher import is_tmux_session_exists
+```
+
+**Step 3: Add tmux check at the beginning of thread flow**
 
 In `_launch_claude_in_thread` (start.py:231), add check:
 
@@ -350,7 +358,6 @@ In `_launch_claude_in_thread` (start.py:231), add check:
 async def _launch_claude_in_thread(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
     """Launch Claude in a specific thread."""
     from ..launch_animation import launch_with_animation
-    from ..project_launcher import is_tmux_session_exists
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
@@ -380,12 +387,12 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
     # ... rest unchanged
 ```
 
-**Step 3: Verify changes**
+**Step 4: Verify changes**
 
 Run: `python -m py_compile src/codogram/handlers/start.py`
 Expected: No output (success)
 
-**Step 4: Commit**
+**Step 5: Commit**
 
 ```bash
 git add src/codogram/handlers/start.py

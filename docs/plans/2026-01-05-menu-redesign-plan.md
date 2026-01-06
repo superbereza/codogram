@@ -188,7 +188,6 @@ async def test_archive_thread_preserves_worktree(mock_project, mock_thread):
     bot = AsyncMock()
 
     with patch("codogram.services.branch.subprocess.run") as mock_run, \
-         patch("codogram.services.branch.remove_worktree") as mock_remove, \
          patch("codogram.services.branch.project_manager") as mock_pm:
 
         await archive_thread(
@@ -198,13 +197,10 @@ async def test_archive_thread_preserves_worktree(mock_project, mock_thread):
             thread=mock_thread,
         )
 
-        # Should NOT call remove_worktree
-        mock_remove.assert_not_called()
-
-        # Should still kill tmux
+        # Should kill tmux
         mock_run.assert_called_once()
 
-        # worktree_path and session_id should be preserved
+        # worktree_path should be preserved (not deleted)
         assert mock_thread.worktree_path == "/tmp/test-project/.worktrees/feature-x"
         assert mock_thread.archived is True
 ```
@@ -635,24 +631,26 @@ Expected: PASS
 Modify `src/codogram/handlers/__init__.py`:
 
 ```python
-# Add import at top:
+# Add import at top (with other imports):
 from . import finish
 
-# In register_handlers function, add BEFORE common.router:
-dp.include_router(finish.router)
+# In register_handlers function, add AFTER settings.router and BEFORE common.router:
+dp.include_router(settings.router)      # /settings, /auto_accept, /help
+dp.include_router(finish.router)        # /finish (NEW)
+dp.include_router(common.router)        # cb_cancel
 ```
 
 **Important:** Router must be added before `common.router` because common has catch-all handlers.
 
 **Step 6: Verify all compiles**
 
-Run: `python -m py_compile src/codogram/main.py src/codogram/handlers/finish.py`
+Run: `python -m py_compile src/codogram/handlers/finish.py src/codogram/handlers/__init__.py`
 Expected: No output (success)
 
 **Step 7: Commit**
 
 ```bash
-git add src/codogram/handlers/finish.py src/codogram/main.py tests/test_finish_handler.py
+git add src/codogram/handlers/finish.py src/codogram/handlers/__init__.py tests/test_finish_handler.py
 git commit -m "feat(finish): add unified /finish command"
 ```
 
@@ -667,21 +665,16 @@ git commit -m "feat(finish): add unified /finish command"
 
 **Step 1: Add archived handling in _launch_claude_in_thread**
 
-In `src/codogram/handlers/start.py`, find `_launch_claude_in_thread` function and add at the beginning:
+In `src/codogram/handlers/start.py`, find `_launch_claude_in_thread` function (around line 231).
+
+**ADD** this block AFTER the `thread = project.threads.get(...)` null check and BEFORE `if thread.launch_task`:
 
 ```python
-async def _launch_claude_in_thread(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
-    """Launch Claude in a specific thread."""
-    from ..launch_animation import launch_with_animation
-
-    project = project_manager.get_by_chat(message.chat.id)
-    if not project:
-        return
-
     thread = project.threads.get(result.thread_id)
     if not thread:
         return
 
+    # === ADD THIS BLOCK ===
     # Handle archived topic - reopen it
     if thread.archived:
         thread.archived = False
@@ -693,9 +686,13 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
             )
         except Exception:
             pass  # May fail if no icon was set
+    # === END OF ADDED BLOCK ===
 
-    # ... rest of function unchanged
+    if thread.launch_task and not thread.launch_task.done():
+        return
 ```
+
+**Note:** This is an INSERT, not a replacement. The rest of the function stays unchanged.
 
 **Step 2: Verify changes**
 
