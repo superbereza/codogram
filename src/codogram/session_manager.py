@@ -116,6 +116,18 @@ class ThreadInfo:
             return f"claude-{project_name}"
         return f"claude-{project_name}-{self.name}"
 
+    def has_valid_session(self) -> bool:
+        """Check if thread has a valid resumable session.
+
+        Returns True only if:
+        - session_id is set
+        - jsonl_path is set
+        - jsonl file exists on disk
+        """
+        if not self.session_id or not self.jsonl_path:
+            return False
+        return Path(self.jsonl_path).exists()
+
 
 @dataclass
 class ProjectState:

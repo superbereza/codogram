@@ -308,3 +308,31 @@ def test_worktree_fields_load_from_config(tmp_path, monkeypatch):
     assert thread.worktree_path == "/dev/test-project-auth"
     assert thread.base_branch == "main"
     assert thread.archived is True
+
+
+def test_thread_has_valid_session():
+    """ThreadInfo.has_valid_session checks jsonl exists."""
+    from codogram.session_manager import ThreadInfo
+    from pathlib import Path
+    import tempfile
+    import os
+
+    # No session_id
+    thread = ThreadInfo(name="test", thread_id=123)
+    assert thread.has_valid_session() is False
+
+    # session_id but no jsonl_path
+    thread.session_id = "abc-123"
+    assert thread.has_valid_session() is False
+
+    # session_id and jsonl_path but file doesn't exist
+    thread.jsonl_path = "/nonexistent/path.jsonl"
+    assert thread.has_valid_session() is False
+
+    # session_id and jsonl_path and file exists
+    with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as f:
+        try:
+            thread.jsonl_path = f.name
+            assert thread.has_valid_session() is True
+        finally:
+            os.unlink(f.name)
