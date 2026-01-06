@@ -111,9 +111,9 @@ class HistoryWatcher:
                     except Exception:
                         pass
 
-                    # Reset thread state
-                    thread.session_id = None
-                    thread.jsonl_path = None
+                    # NOTE: Do NOT reset session_id/jsonl_path here!
+                    # We keep them so /start can resume the session.
+                    # Only /new and /clear should reset session state.
 
             # After thread health checks, bind awaiting threads
             await self._bind_awaiting_threads(project)
