@@ -621,7 +621,7 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
         await callback.answer("Project not found")
         return
 
-    thread = project.threads.get(thread_id) if thread_id else None
+    thread = project.threads.get(thread_id)
 
     if action == "start_new":
         # Clear stale session and start fresh
