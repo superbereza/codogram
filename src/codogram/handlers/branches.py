@@ -24,6 +24,12 @@ from ..worktree import merge_branch, push_branch
 router = Router(name="branches")
 
 
+@router.message(Command("branch"))
+async def cmd_branch(message: Message, telegram_queue: TelegramQueue):
+    """Alias for /branch_create."""
+    await cmd_branch_create(message, telegram_queue)
+
+
 # ===== /branch_create =====
 
 @router.message(Command("branch_create"))

@@ -14,6 +14,12 @@ from ..services.launch import create_thread_with_session
 router = Router(name="threads")
 
 
+@router.message(Command("thread"))
+async def cmd_thread(message: Message, telegram_queue: TelegramQueue):
+    """Alias for /thread_create."""
+    await cmd_thread_create(message, telegram_queue)
+
+
 # ===== /thread_delete =====
 
 @router.message(Command("thread_delete"))
