@@ -33,8 +33,8 @@ from unittest.mock import MagicMock
 
 def test_get_days_inactive_no_jsonl_path():
     """Should return 0 if no jsonl_path."""
-    from src.codogram.utils.cleanup import get_days_inactive
-    from src.codogram.session_manager import ThreadInfo
+    from codogram.utils.cleanup import get_days_inactive
+    from codogram.session_manager import ThreadInfo
 
     thread = MagicMock(spec=ThreadInfo)
     thread.jsonl_path = None
@@ -44,8 +44,8 @@ def test_get_days_inactive_no_jsonl_path():
 
 def test_get_days_inactive_file_not_exists():
     """Should return 0 if jsonl file doesn't exist."""
-    from src.codogram.utils.cleanup import get_days_inactive
-    from src.codogram.session_manager import ThreadInfo
+    from codogram.utils.cleanup import get_days_inactive
+    from codogram.session_manager import ThreadInfo
 
     thread = MagicMock(spec=ThreadInfo)
     thread.jsonl_path = "/nonexistent/path.jsonl"
@@ -55,8 +55,8 @@ def test_get_days_inactive_file_not_exists():
 
 def test_get_days_inactive_calculates_from_mtime():
     """Should calculate days from file mtime."""
-    from src.codogram.utils.cleanup import get_days_inactive
-    from src.codogram.session_manager import ThreadInfo
+    from codogram.utils.cleanup import get_days_inactive
+    from codogram.session_manager import ThreadInfo
     import os
 
     with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as f:
@@ -144,7 +144,7 @@ Add to `tests/test_cleanup_utils.py`:
 ```python
 def test_validate_worktree_path_must_be_in_project():
     """Worktree path must be child of project directory."""
-    from src.codogram.utils.cleanup import validate_worktree_path
+    from codogram.utils.cleanup import validate_worktree_path
 
     # Path outside project - NOT valid
     assert validate_worktree_path("/tmp/worktree", "/home/user/project") is False
@@ -158,7 +158,7 @@ def test_validate_worktree_path_must_be_in_project():
 
 def test_validate_worktree_path_must_contain_worktrees():
     """Worktree path must contain .worktrees segment."""
-    from src.codogram.utils.cleanup import validate_worktree_path
+    from codogram.utils.cleanup import validate_worktree_path
 
     # Path without .worktrees - NOT valid (safety check)
     assert validate_worktree_path(
@@ -175,7 +175,7 @@ def test_validate_worktree_path_must_contain_worktrees():
 
 def test_validate_worktree_path_handles_symlinks():
     """Should resolve symlinks before validation."""
-    from src.codogram.utils.cleanup import validate_worktree_path
+    from codogram.utils.cleanup import validate_worktree_path
     import tempfile
     import os
 
@@ -224,8 +224,8 @@ def validate_worktree_path(worktree_path: str, project_cwd: str) -> bool:
     except ValueError:
         return False
 
-    # Must contain .worktrees segment (safety)
-    if ".worktrees" not in str(path):
+    # Must contain .worktrees segment (safety) - use path.parts for robustness
+    if ".worktrees" not in path.parts:
         return False
 
     return True
@@ -258,7 +258,7 @@ Add to `tests/test_cleanup_utils.py`:
 ```python
 def test_check_unmerged_commits_returns_list():
     """Should return list of unmerged commit summaries."""
-    from src.codogram.utils.cleanup import check_unmerged_commits
+    from codogram.utils.cleanup import check_unmerged_commits
     from unittest.mock import patch, MagicMock
 
     # Mock subprocess.run to return unmerged commits
@@ -276,7 +276,7 @@ def test_check_unmerged_commits_returns_list():
 
 def test_check_unmerged_commits_empty_when_merged():
     """Should return empty list when no unmerged commits."""
-    from src.codogram.utils.cleanup import check_unmerged_commits
+    from codogram.utils.cleanup import check_unmerged_commits
     from unittest.mock import patch, MagicMock
 
     mock_result = MagicMock()
@@ -339,37 +339,48 @@ git commit -m "feat(cleanup): add check_unmerged_commits helper"
 
 ---
 
-## Task 4: Create do_cleanup Function
+## Task 4: Create delete_thread_files Function in Services
 
 **Files:**
-- Modify: `src/codogram/utils/cleanup.py`
-- Test: `tests/test_cleanup_utils.py`
+- Create: `src/codogram/services/thread_lifecycle.py`
+- Test: `tests/test_thread_lifecycle.py`
+
+**Note:** Following project architecture, orchestration functions go in `services/`, pure functions stay in `utils/`. This is consistent with `archive_thread` in `services/branch.py`.
 
 **Step 1: Write the failing test**
 
+Create `tests/test_thread_lifecycle.py`:
+
 ```python
+"""Tests for thread lifecycle service."""
+import pytest
+from unittest.mock import patch, MagicMock
+
+
 @pytest.mark.asyncio
-async def test_do_cleanup_deletes_worktree_and_branch():
-    """do_cleanup should delete worktree dir and git branch."""
-    from src.codogram.utils.cleanup import do_cleanup
-    from unittest.mock import patch, MagicMock, AsyncMock
+async def test_delete_thread_files_deletes_worktree_and_branch():
+    """delete_thread_files should delete worktree dir and git branch."""
+    from codogram.services.thread_lifecycle import delete_thread_files
 
     mock_thread = MagicMock()
     mock_thread.name = "feature-x"
     mock_thread.worktree_path = "/project/.worktrees/feature-x"
+    mock_thread.watcher_task = None
+    mock_thread.poller_task = None
+    mock_thread.binding_task = None
     mock_thread.get_tmux_session = MagicMock(return_value="proj-feature-x")
 
     mock_project = MagicMock()
     mock_project.cwd = "/project"
     mock_project.project_name = "proj"
 
-    with patch("src.codogram.utils.cleanup.validate_worktree_path", return_value=True), \
-         patch("src.codogram.utils.cleanup.is_tmux_session_exists", return_value=False), \
-         patch("shutil.rmtree") as mock_rmtree, \
-         patch("subprocess.run") as mock_run, \
-         patch("src.codogram.utils.cleanup.project_manager") as mock_pm:
+    with patch("codogram.services.thread_lifecycle.validate_worktree_path", return_value=True), \
+         patch("codogram.services.thread_lifecycle.is_tmux_session_exists", return_value=False), \
+         patch("codogram.services.thread_lifecycle.shutil.rmtree") as mock_rmtree, \
+         patch("codogram.services.thread_lifecycle.subprocess.run") as mock_run, \
+         patch("codogram.services.thread_lifecycle.project_manager") as mock_pm:
 
-        await do_cleanup(mock_thread, mock_project)
+        await delete_thread_files(mock_thread, mock_project)
 
         # Should delete worktree directory
         mock_rmtree.assert_called_once_with(
@@ -385,69 +396,114 @@ async def test_do_cleanup_deletes_worktree_and_branch():
 
         # Should mark thread as deleted
         assert mock_thread.deleted is True
+        assert mock_thread.worktree_path is None
+
+
+def test_can_delete_returns_true_for_archived():
+    """can_delete should return True for archived, non-deleted threads."""
+    from codogram.services.thread_lifecycle import can_delete
+
+    mock_thread = MagicMock()
+    mock_thread.archived = True
+    mock_thread.deleted = False
+
+    assert can_delete(mock_thread) is True
+
+
+def test_can_delete_returns_false_for_active():
+    """can_delete should return False for non-archived threads."""
+    from codogram.services.thread_lifecycle import can_delete
+
+    mock_thread = MagicMock()
+    mock_thread.archived = False
+    mock_thread.deleted = False
+
+    assert can_delete(mock_thread) is False
 ```
 
 **Step 2: Run test to verify it fails**
 
-Run: `PYTHONPATH=src pytest tests/test_cleanup_utils.py::test_do_cleanup_deletes_worktree_and_branch -v`
-Expected: FAIL
+Run: `PYTHONPATH=src pytest tests/test_thread_lifecycle.py -v`
+Expected: FAIL - module not found
 
-**Step 3: Add do_cleanup function**
+**Step 3: Create thread_lifecycle service**
 
-Add to `src/codogram/utils/cleanup.py`:
+Create `src/codogram/services/thread_lifecycle.py`:
 
 ```python
+"""Thread lifecycle management: delete archived threads."""
 import shutil
+import subprocess
+
 from ..session_manager import ProjectState, ThreadInfo, project_manager
 from ..project_launcher import is_tmux_session_exists
+from ..utils.cleanup import validate_worktree_path
 
 
-async def do_cleanup(thread: ThreadInfo, project: ProjectState) -> None:
+def can_delete(thread: ThreadInfo) -> bool:
+    """Check if thread can be deleted.
+
+    Returns True if thread is archived and not already deleted.
+    """
+    return thread.archived and not thread.deleted
+
+
+async def delete_thread_files(thread: ThreadInfo, project: ProjectState) -> None:
     """Delete worktree directory and git branch.
 
+    Used by /cleanup command. Does NOT require Telegram bot.
+
     Args:
-        thread: Thread to cleanup
+        thread: Thread to delete
         project: Project state
 
     Raises:
         ValueError: If worktree path is invalid (safety check)
     """
-    # 0. Kill tmux if running
+    # Cancel background tasks (if any still running)
+    if thread.watcher_task:
+        thread.watcher_task.cancel()
+    if thread.poller_task:
+        thread.poller_task.cancel()
+    if thread.binding_task:
+        thread.binding_task.cancel()
+
+    # Kill tmux if running
     tmux_name = thread.get_tmux_session(project.project_name)
     if is_tmux_session_exists(tmux_name):
         subprocess.run(["tmux", "kill-session", "-t", tmux_name], capture_output=True)
 
-    # 1. Validate and delete worktree directory
+    # Validate and delete worktree directory
     if thread.worktree_path:
         if not validate_worktree_path(thread.worktree_path, project.cwd):
             raise ValueError(f"Invalid worktree path: {thread.worktree_path}")
         shutil.rmtree(thread.worktree_path, ignore_errors=True)
 
-    # 2. Delete git branch (thread.name is the branch name)
+    # Delete git branch
     subprocess.run(
         ["git", "branch", "-D", thread.name],
         cwd=project.cwd,
         capture_output=True
     )
 
-    # 3. Mark as deleted (keep ThreadInfo for history)
+    # Mark as deleted (keep ThreadInfo for history)
     thread.deleted = True
-    thread.worktree_path = None  # Clear path since deleted
+    thread.worktree_path = None
 
-    # 4. Save config
+    # Save config
     project_manager._save()
 ```
 
 **Step 4: Run test to verify it passes**
 
-Run: `PYTHONPATH=src pytest tests/test_cleanup_utils.py::test_do_cleanup_deletes_worktree_and_branch -v`
+Run: `PYTHONPATH=src pytest tests/test_thread_lifecycle.py -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add src/codogram/utils/cleanup.py tests/test_cleanup_utils.py
-git commit -m "feat(cleanup): add do_cleanup function"
+git add src/codogram/services/thread_lifecycle.py tests/test_thread_lifecycle.py
+git commit -m "feat(services): add delete_thread_files to thread_lifecycle"
 ```
 
 ---
@@ -458,11 +514,40 @@ git commit -m "feat(cleanup): add do_cleanup function"
 - Modify: `src/codogram/session_manager.py`
 - Test: `tests/test_session_manager.py`
 
-**Step 1: Check if deleted field exists**
+**Step 1: Write the failing test**
 
-Read session_manager.py to check if `deleted` field already exists in ThreadInfo.
+Add to `tests/test_session_manager.py`:
 
-**Step 2: Add deleted field if not present**
+```python
+def test_thread_deleted_field_serialization():
+    """deleted field should serialize/deserialize properly."""
+    from codogram.session_manager import ThreadInfo
+
+    # Default value
+    thread = ThreadInfo(name="test", thread_id=123)
+    assert thread.deleted is False
+
+    # Serialize
+    data = thread.to_dict()
+    assert "deleted" in data
+    assert data["deleted"] is False
+
+    # Mark as deleted
+    thread.deleted = True
+    data = thread.to_dict()
+    assert data["deleted"] is True
+
+    # Deserialize
+    restored = ThreadInfo.from_dict(data)
+    assert restored.deleted is True
+```
+
+**Step 2: Run test to verify it fails**
+
+Run: `PYTHONPATH=src pytest tests/test_session_manager.py::test_thread_deleted_field_serialization -v`
+Expected: FAIL - deleted field not found
+
+**Step 3: Add deleted field to ThreadInfo**
 
 Add to ThreadInfo dataclass:
 
@@ -470,14 +555,31 @@ Add to ThreadInfo dataclass:
 deleted: bool = False  # True after /cleanup
 ```
 
-**Step 3: Verify JSON serialization**
+**Step 4: Update to_dict method**
 
-The field should serialize/deserialize properly with existing to_dict/from_dict methods.
+Add to to_dict:
 
-**Step 4: Commit**
+```python
+"deleted": self.deleted,
+```
+
+**Step 5: Update from_dict method**
+
+Add to from_dict:
+
+```python
+deleted=data.get("deleted", False),
+```
+
+**Step 6: Run test to verify it passes**
+
+Run: `PYTHONPATH=src pytest tests/test_session_manager.py::test_thread_deleted_field_serialization -v`
+Expected: PASS
+
+**Step 7: Commit**
 
 ```bash
-git add src/codogram/session_manager.py
+git add src/codogram/session_manager.py tests/test_session_manager.py
 git commit -m "feat(session): add deleted field to ThreadInfo"
 ```
 
@@ -513,7 +615,7 @@ def mock_message():
 @pytest.mark.asyncio
 async def test_cleanup_no_args_shows_archived_list(mock_message):
     """Without args, /cleanup should list archived branches."""
-    from src.codogram.handlers.cleanup import cmd_cleanup
+    from codogram.handlers.cleanup import cmd_cleanup
 
     mock_queue = AsyncMock()
     mock_project = MagicMock()
@@ -532,8 +634,8 @@ async def test_cleanup_no_args_shows_archived_list(mock_message):
 
     mock_project.threads = {123: mock_thread1, None: mock_thread2}
 
-    with patch("src.codogram.handlers.cleanup.project_manager") as mock_pm, \
-         patch("src.codogram.handlers.cleanup.get_days_inactive", return_value=45):
+    with patch("codogram.handlers.cleanup.project_manager") as mock_pm, \
+         patch("codogram.handlers.cleanup.get_days_inactive", return_value=45):
         mock_pm.get_by_chat.return_value = mock_project
 
         await cmd_cleanup(mock_message, mock_queue)
@@ -562,11 +664,8 @@ from aiogram.filters import Command
 
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
-from ..utils.cleanup import (
-    get_days_inactive,
-    check_unmerged_commits,
-    do_cleanup,
-)
+from ..utils.cleanup import get_days_inactive, check_unmerged_commits
+from ..services.thread_lifecycle import delete_thread_files
 from ..git_utils import get_default_branch
 from pathlib import Path
 
@@ -724,7 +823,7 @@ async def on_confirm_old(callback: CallbackQuery, telegram_queue: TelegramQueue)
     deleted = []
     for thread in old_threads:
         try:
-            await do_cleanup(thread, project)
+            await delete_thread_files(thread, project)
             deleted.append(thread.name)
         except Exception as e:
             pass  # Continue with others
@@ -775,7 +874,7 @@ async def on_confirm_all(callback: CallbackQuery, telegram_queue: TelegramQueue)
     deleted = []
     for thread in archived:
         try:
-            await do_cleanup(thread, project)
+            await delete_thread_files(thread, project)
             deleted.append(thread.name)
         except Exception as e:
             pass
@@ -830,7 +929,7 @@ async def on_delete_specific(callback: CallbackQuery, telegram_queue: TelegramQu
     await callback.answer()
 
     try:
-        await do_cleanup(thread, project)
+        await delete_thread_files(thread, project)
         await telegram_queue.edit(callback.message, f"`[v]` Deleted: `{thread.name}`")
     except Exception as e:
         await telegram_queue.edit(callback.message, f"`[x]` Delete failed: {e}")
@@ -855,7 +954,7 @@ async def on_force_delete(callback: CallbackQuery, telegram_queue: TelegramQueue
     await callback.answer()
 
     try:
-        await do_cleanup(thread, project)
+        await delete_thread_files(thread, project)
         await telegram_queue.edit(callback.message, f"`[v]` Deleted: `{thread.name}`")
     except Exception as e:
         await telegram_queue.edit(callback.message, f"`[x]` Delete failed: {e}")
@@ -866,63 +965,35 @@ async def on_force_delete(callback: CallbackQuery, telegram_queue: TelegramQueue
 Run: `PYTHONPATH=src pytest tests/test_cleanup_handler.py -v`
 Expected: PASS
 
-**Step 5: Register router in main.py**
+**Step 5: Register router in handlers/__init__.py**
 
-Add import and include router in `src/codogram/main.py`:
+Add import in `src/codogram/handlers/__init__.py`:
 
 ```python
-from .handlers.cleanup import router as cleanup_router
+from . import cleanup
+```
 
-# In register_handlers:
-dp.include_router(cleanup_router)
+Add router registration in `register_handlers` function (before common.router):
+
+```python
+dp.include_router(cleanup.router)
 ```
 
 **Step 6: Verify all compiles**
 
-Run: `python -m py_compile src/codogram/handlers/cleanup.py src/codogram/main.py`
+Run: `python -m py_compile src/codogram/handlers/cleanup.py src/codogram/handlers/__init__.py`
 Expected: No output (success)
 
 **Step 7: Commit**
 
 ```bash
-git add src/codogram/handlers/cleanup.py src/codogram/main.py tests/test_cleanup_handler.py
+git add src/codogram/handlers/cleanup.py src/codogram/handlers/__init__.py tests/test_cleanup_handler.py
 git commit -m "feat(cleanup): add /cleanup command handler"
 ```
 
 ---
 
-## Task 7: Hide Deleted Threads from /help
-
-**Files:**
-- Modify: `src/codogram/handlers/settings.py`
-
-**Step 1: Find thread listing in /help**
-
-Search for where threads are listed in help output.
-
-**Step 2: Filter out deleted threads**
-
-Add filter to exclude threads with `deleted=True`:
-
-```python
-visible_threads = [t for t in project.threads.values() if not t.deleted]
-```
-
-**Step 3: Verify changes**
-
-Run: `python -m py_compile src/codogram/handlers/settings.py`
-Expected: No output (success)
-
-**Step 4: Commit**
-
-```bash
-git add src/codogram/handlers/settings.py
-git commit -m "feat(help): hide deleted threads from listings"
-```
-
----
-
-## Task 8: Integration Test - Cleanup
+## Task 7: Integration Test - Cleanup
 
 **Files:**
 - Test with Telegram MCP
@@ -974,11 +1045,15 @@ git commit -m "test: verify /cleanup integration"
 | 1 | Add get_days_inactive helper | utils/cleanup.py |
 | 2 | Add validate_worktree_path helper | utils/cleanup.py |
 | 3 | Add check_unmerged_commits helper | utils/cleanup.py |
-| 4 | Add do_cleanup function | utils/cleanup.py |
+| 4 | Add delete_thread_files function | services/thread_lifecycle.py |
 | 5 | Add deleted field to ThreadInfo | session_manager.py |
-| 6 | Create /cleanup handler | handlers/cleanup.py |
-| 7 | Hide deleted threads from /help | handlers/settings.py |
-| 8 | Integration test | - |
+| 6 | Create /cleanup handler | handlers/cleanup.py, handlers/__init__.py |
+| 7 | Integration test | - |
+
+**Architecture notes:**
+- Pure functions (validation, queries) in `utils/cleanup.py`
+- Orchestration (state mutation + I/O) in `services/thread_lifecycle.py`
+- Consistent with `archive_thread` in `services/branch.py`
 
 **Prerequisites:** menu-redesign and session-resume plans
 

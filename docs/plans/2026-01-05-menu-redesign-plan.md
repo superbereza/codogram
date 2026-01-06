@@ -91,37 +91,7 @@ git commit -m "feat(commands): add /thread and /branch aliases"
 
 ---
 
-## Task 3: Add Hidden Command Aliases
-
-**Files:**
-- Modify: `src/codogram/handlers/sessions.py`
-
-**Step 1: Add /new alias for /clear**
-
-The `/new` command already exists in sessions.py:55-58. Change it to be an alias for `/clear`:
-
-```python
-@router.message(Command("new"))
-async def cmd_new(message: Message, telegram_queue: TelegramQueue):
-    """Alias for /clear - clear context and start fresh."""
-    await cmd_clear(message, telegram_queue)
-```
-
-**Step 2: Verify changes**
-
-Run: `python -m py_compile src/codogram/handlers/sessions.py`
-Expected: No output (success)
-
-**Step 3: Commit**
-
-```bash
-git add src/codogram/handlers/sessions.py
-git commit -m "refactor(commands): make /new alias for /clear"
-```
-
----
-
-## Task 4: Add Deprecated Command Handlers
+## Task 3: Replace Deprecated Commands with Redirects
 
 **Files:**
 - Modify: `src/codogram/handlers/threads.py`
@@ -138,18 +108,24 @@ async def cmd_thread_delete(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, "`[i]` Use /finish to archive topics")
 ```
 
-**Step 2: Add /branch_finish redirect in branches.py**
+**Step 2: Replace /branch_finish handler in branches.py**
 
-After the /branch alias, add:
+Find and **replace** the existing `/branch_finish` handler (lines 190-228) with a simple redirect:
 
 ```python
-@router.message(Command("branch_finish_deprecated"))
-async def cmd_branch_finish_deprecated(message: Message, telegram_queue: TelegramQueue):
+@router.message(Command("branch_finish"))
+async def cmd_branch_finish(message: Message, telegram_queue: TelegramQueue):
     """Deprecated: redirect to /finish."""
     await telegram_queue.reply(message, "`[i]` Use /finish to complete branches")
 ```
 
-Note: Keep existing /branch_finish for now, it will be replaced by /finish in Task 6.
+Also **delete** all related callback handlers:
+- `on_branch_merge_selected` (bf_merge:)
+- `on_branch_do_merge` (bf_do_merge:)
+- `on_branch_delete_selected` (bf_delete:)
+- `on_branch_do_delete` (bf_do_delete:)
+
+These are replaced by `/finish` callbacks in the new handler.
 
 **Step 3: Verify changes**
 
@@ -160,12 +136,12 @@ Expected: No output (success)
 
 ```bash
 git add src/codogram/handlers/threads.py src/codogram/handlers/branches.py
-git commit -m "feat(commands): add deprecated command redirects"
+git commit -m "refactor(commands): replace /branch_finish with redirect to /finish"
 ```
 
 ---
 
-## Task 5: Modify do_branch_cleanup to Preserve Worktree
+## Task 4: Rename and Modify do_branch_cleanup -> archive_thread
 
 **Files:**
 - Modify: `src/codogram/services/branch.py:12-59`
@@ -181,8 +157,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.codogram.services.branch import do_branch_cleanup
-from src.codogram.session_manager import ProjectState, ThreadInfo
+from codogram.services.branch import archive_thread
+from codogram.session_manager import ProjectState, ThreadInfo
 
 
 @pytest.fixture
@@ -207,21 +183,19 @@ def mock_thread():
 
 
 @pytest.mark.asyncio
-async def test_do_branch_cleanup_preserves_worktree(mock_project, mock_thread):
-    """do_branch_cleanup should NOT delete worktree when keep_worktree=True."""
+async def test_archive_thread_preserves_worktree(mock_project, mock_thread):
+    """archive_thread should keep worktree and session_id for resume."""
     bot = AsyncMock()
 
-    with patch("src.codogram.services.branch.subprocess.run") as mock_run, \
-         patch("src.codogram.services.branch.remove_worktree") as mock_remove, \
-         patch("src.codogram.services.branch.project_manager") as mock_pm:
+    with patch("codogram.services.branch.subprocess.run") as mock_run, \
+         patch("codogram.services.branch.remove_worktree") as mock_remove, \
+         patch("codogram.services.branch.project_manager") as mock_pm:
 
-        await do_branch_cleanup(
+        await archive_thread(
             bot=bot,
             chat_id=-100123,
             project=mock_project,
             thread=mock_thread,
-            force=False,
-            keep_worktree=True,  # NEW parameter
         )
 
         # Should NOT call remove_worktree
@@ -230,42 +204,37 @@ async def test_do_branch_cleanup_preserves_worktree(mock_project, mock_thread):
         # Should still kill tmux
         mock_run.assert_called_once()
 
-        # worktree_path should be preserved
+        # worktree_path and session_id should be preserved
         assert mock_thread.worktree_path == "/tmp/test-project/.worktrees/feature-x"
+        assert mock_thread.archived is True
 ```
 
 **Step 2: Run test to verify it fails**
 
 Run: `PYTHONPATH=src pytest tests/test_branch_service.py -v`
-Expected: FAIL - `keep_worktree` parameter doesn't exist
+Expected: FAIL - `archive_thread` function doesn't exist
 
-**Step 3: Implement keep_worktree parameter**
+**Step 3: Rename do_branch_cleanup to archive_thread and simplify**
 
 Modify `src/codogram/services/branch.py`:
 
 ```python
-async def do_branch_cleanup(
+async def archive_thread(
     bot: Bot,
     chat_id: int,
     project: ProjectState,
     thread: ThreadInfo,
-    force: bool,
-    keep_worktree: bool = False,  # NEW: for /finish (preserve worktree)
 ) -> None:
-    """Clean up worktree, tmux, and archive topic.
+    """Archive thread: kill tmux, close topic, keep worktree for resume.
+
+    Used by /finish command. Does NOT delete worktree or git branch.
 
     Args:
         bot: Telegram bot instance
         chat_id: Chat ID for the topic
         project: Project state
-        thread: Thread to cleanup
-        force: If True, force delete branch even if unmerged
-        keep_worktree: If True, preserve worktree and git branch (for /finish)
+        thread: Thread to archive
     """
-    main_repo = Path(project.cwd)
-    worktree_path = Path(thread.worktree_path) if thread.worktree_path else None
-    branch_name = thread.name
-
     # Cancel background tasks
     if thread.watcher_task:
         thread.watcher_task.cancel()
@@ -278,23 +247,15 @@ async def do_branch_cleanup(
     tmux_name = thread.get_tmux_session(project.project_name)
     subprocess.run(["tmux", "kill-session", "-t", tmux_name], capture_output=True)
 
-    # Remove worktree and branch (only if not keeping)
-    if worktree_path and not keep_worktree:
-        remove_worktree(main_repo, worktree_path, branch_name, delete_branch=True, force=force)
-        thread.worktree_path = None
-
-    # Archive topic
+    # Archive topic in Telegram
     try:
         await bot.close_forum_topic(chat_id, thread.thread_id)
         await bot.edit_forum_topic(chat_id, thread.thread_id, icon_custom_emoji_id="5357315181649076022")
     except Exception:
         pass  # Topic may already be closed
 
-    # Update thread state
+    # Update thread state (keep worktree_path and session_id for resume!)
     thread.archived = True
-    # Only clear session_id if deleting worktree
-    if not keep_worktree:
-        thread.session_id = None
     project_manager._save()
 ```
 
@@ -303,52 +264,26 @@ async def do_branch_cleanup(
 Run: `PYTHONPATH=src pytest tests/test_branch_service.py -v`
 Expected: PASS
 
-**Step 5: Add test for default behavior (backward compatibility)**
+**Step 5: Update all callers to use new function name**
 
-Add to `tests/test_branch_service.py`:
+Search and replace `do_branch_cleanup` with `archive_thread` in:
+- `handlers/branches.py` (if any remaining)
+- `handlers/finish.py` (will be created in Task 5)
 
-```python
-@pytest.mark.asyncio
-async def test_do_branch_cleanup_deletes_worktree_by_default(mock_project, mock_thread):
-    """do_branch_cleanup should delete worktree by default (backward compat)."""
-    bot = AsyncMock()
-
-    with patch("src.codogram.services.branch.subprocess.run") as mock_run, \
-         patch("src.codogram.services.branch.remove_worktree") as mock_remove, \
-         patch("src.codogram.services.branch.project_manager") as mock_pm:
-
-        await do_branch_cleanup(
-            bot=bot,
-            chat_id=-100123,
-            project=mock_project,
-            thread=mock_thread,
-            force=False,
-            # keep_worktree not passed - defaults to False
-        )
-
-        # Should call remove_worktree
-        mock_remove.assert_called_once()
-```
-
-**Step 6: Run all tests**
-
-Run: `PYTHONPATH=src pytest tests/test_branch_service.py -v`
-Expected: All PASS
-
-**Step 7: Commit**
+**Step 6: Commit**
 
 ```bash
 git add src/codogram/services/branch.py tests/test_branch_service.py
-git commit -m "feat(branch): add keep_worktree param to do_branch_cleanup"
+git commit -m "refactor(branch): rename do_branch_cleanup to archive_thread"
 ```
 
 ---
 
-## Task 6: Create /finish Handler
+## Task 5: Create /finish Handler
 
 **Files:**
 - Create: `src/codogram/handlers/finish.py`
-- Modify: `src/codogram/main.py` (add router)
+- Modify: `src/codogram/handlers/__init__.py` (add router)
 - Test: `tests/test_finish_handler.py`
 
 **Step 1: Write the failing test**
@@ -377,7 +312,7 @@ def mock_message():
 @pytest.mark.asyncio
 async def test_finish_in_regular_topic_shows_confirmation(mock_message):
     """In regular topic (no worktree), /finish should show archive confirmation."""
-    from src.codogram.handlers.finish import cmd_finish
+    from codogram.handlers.finish import cmd_finish
 
     mock_queue = AsyncMock()
     mock_project = MagicMock()
@@ -387,15 +322,30 @@ async def test_finish_in_regular_topic_shows_confirmation(mock_message):
     mock_project.threads = {456: mock_thread}
     mock_project.get_thread = MagicMock(return_value=mock_thread)
 
-    with patch("src.codogram.handlers.finish.project_manager") as mock_pm:
+    with patch("codogram.handlers.finish.project_manager") as mock_pm:
         mock_pm.get_by_chat.return_value = mock_project
 
         await cmd_finish(mock_message, mock_queue)
 
-        # Should show confirmation
+        # Should show confirmation with "Archive" in text
         mock_queue.reply.assert_called_once()
         call_args = mock_queue.reply.call_args
-        assert "Archive" in call_args[0][1] or "archive" in str(call_args)
+        assert "Archive" in call_args[0][1]
+
+
+@pytest.mark.asyncio
+async def test_finish_in_general_shows_nothing_to_finish(mock_message):
+    """In General (thread_id=None), /finish should suggest /clear."""
+    from codogram.handlers.finish import cmd_finish
+
+    mock_message.message_thread_id = None
+    mock_queue = AsyncMock()
+
+    await cmd_finish(mock_message, mock_queue)
+
+    mock_queue.reply.assert_called_once()
+    call_args = mock_queue.reply.call_args
+    assert "Nothing to finish" in call_args[0][1]
 ```
 
 **Step 2: Run test to verify it fails**
@@ -417,8 +367,7 @@ from aiogram.filters import Command
 
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
-from .common import require_forum_group
-from ..services.branch import do_branch_cleanup
+from ..services.branch import archive_thread
 from ..git_utils import (
     has_uncommitted_changes,
     get_default_branch,
@@ -533,14 +482,12 @@ async def on_finish_archive(callback: CallbackQuery, telegram_queue: TelegramQue
     await telegram_queue.edit(callback.message, f"`[~]` Archiving {thread.name}...")
     await callback.answer()
 
-    # Use do_branch_cleanup with keep_worktree=True (no worktree anyway)
-    await do_branch_cleanup(
+    # Archive the thread (keeps worktree and session_id)
+    await archive_thread(
         bot=callback.bot,
         chat_id=callback.message.chat.id,
         project=project,
         thread=thread,
-        force=False,
-        keep_worktree=True,
     )
 
     await telegram_queue.edit(callback.message, f"`[v]` Topic `{thread.name}` archived")
@@ -632,14 +579,12 @@ async def on_finish_do_merge(callback: CallbackQuery, telegram_queue: TelegramQu
     push_result = push_branch(main_repo, target_branch)
     push_warning = "" if push_result.success else "\n`[!]` Push failed. Run `git push` manually."
 
-    # Archive (keep worktree!)
-    await do_branch_cleanup(
+    # Archive (keeps worktree for resume!)
+    await archive_thread(
         bot=callback.bot,
         chat_id=callback.message.chat.id,
         project=project,
         thread=thread,
-        force=False,
-        keep_worktree=True,  # KEY: preserve worktree for resume
     )
 
     await telegram_queue.edit(
@@ -666,13 +611,11 @@ async def on_finish_archive_branch(callback: CallbackQuery, telegram_queue: Tele
     await telegram_queue.edit(callback.message, f"`[~]` Archiving {thread.name}...")
     await callback.answer()
 
-    await do_branch_cleanup(
+    await archive_thread(
         bot=callback.bot,
         chat_id=callback.message.chat.id,
         project=project,
         thread=thread,
-        force=False,
-        keep_worktree=True,  # Preserve worktree
     )
 
     await telegram_queue.edit(
@@ -687,17 +630,19 @@ async def on_finish_archive_branch(callback: CallbackQuery, telegram_queue: Tele
 Run: `PYTHONPATH=src pytest tests/test_finish_handler.py -v`
 Expected: PASS
 
-**Step 5: Register router in main.py**
+**Step 5: Register router in handlers/__init__.py**
 
-Add import and include router in `src/codogram/main.py`:
+Modify `src/codogram/handlers/__init__.py`:
 
 ```python
-# After other handler imports (around line 26):
-from .handlers.finish import router as finish_router
+# Add import at top:
+from . import finish
 
-# In register_handlers function (around line 115):
-dp.include_router(finish_router)
+# In register_handlers function, add BEFORE common.router:
+dp.include_router(finish.router)
 ```
+
+**Important:** Router must be added before `common.router` because common has catch-all handlers.
 
 **Step 6: Verify all compiles**
 
@@ -713,49 +658,60 @@ git commit -m "feat(finish): add unified /finish command"
 
 ---
 
-## Task 7: Update /start to Handle Archived Topics
+## Task 6: Handle Archived Topics in /start Handler
 
 **Files:**
-- Modify: `src/codogram/services/start_flow.py`
-- Test: `tests/test_start_flow.py`
+- Modify: `src/codogram/handlers/start.py`
 
-**Step 1: Read current start_flow.py to understand structure**
+**Background:** `StartFlowService` is synchronous and returns `FlowResult`. Archived topic handling requires async Telegram API calls, so it must be in the handler layer.
 
-This task requires understanding the existing flow. Check if archived handling exists.
+**Step 1: Add archived handling in _launch_claude_in_thread**
 
-**Step 2: Add archived topic handling**
-
-In `handle_start` method, after thread lookup, add:
+In `src/codogram/handlers/start.py`, find `_launch_claude_in_thread` function and add at the beginning:
 
 ```python
-# Reopen archived topic
-if thread and thread.archived:
-    thread.archived = False
-    project_manager._save()
-    # Remove archive icon
-    try:
-        await self.bot.edit_forum_topic(
-            chat_id, thread_id, icon_custom_emoji_id=None
-        )
-    except Exception:
-        pass
+async def _launch_claude_in_thread(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
+    """Launch Claude in a specific thread."""
+    from ..launch_animation import launch_with_animation
+
+    project = project_manager.get_by_chat(message.chat.id)
+    if not project:
+        return
+
+    thread = project.threads.get(result.thread_id)
+    if not thread:
+        return
+
+    # Handle archived topic - reopen it
+    if thread.archived:
+        thread.archived = False
+        project_manager._save()
+        # Remove archive icon
+        try:
+            await message.bot.edit_forum_topic(
+                message.chat.id, result.thread_id, icon_custom_emoji_id=""
+            )
+        except Exception:
+            pass  # May fail if no icon was set
+
+    # ... rest of function unchanged
 ```
 
-**Step 3: Verify changes**
+**Step 2: Verify changes**
 
-Run: `python -m py_compile src/codogram/services/start_flow.py`
+Run: `python -m py_compile src/codogram/handlers/start.py`
 Expected: No output (success)
 
-**Step 4: Commit**
+**Step 3: Commit**
 
 ```bash
-git add src/codogram/services/start_flow.py
-git commit -m "feat(start): handle archived topic reopening"
+git add src/codogram/handlers/start.py
+git commit -m "feat(start): handle archived topic reopening in handler"
 ```
 
 ---
 
-## Task 8: Update /help to Show New Menu
+## Task 7: Update /help to Show New Menu
 
 **Files:**
 - Modify: `src/codogram/handlers/settings.py`
@@ -803,7 +759,7 @@ git commit -m "docs(help): update /help with new menu structure"
 
 ---
 
-## Task 9: Integration Test
+## Task 8: Integration Test
 
 **Files:**
 - Test with Telegram MCP
@@ -852,13 +808,12 @@ git commit -m "test: verify menu-redesign integration"
 |------|-------------|-------|
 | 1 | Update menu structure | main.py |
 | 2 | Add /thread, /branch aliases | threads.py, branches.py |
-| 3 | Make /new alias for /clear | sessions.py |
-| 4 | Add deprecated command redirects | threads.py, branches.py |
-| 5 | Add keep_worktree to do_branch_cleanup | services/branch.py |
-| 6 | Create /finish handler | handlers/finish.py, main.py |
-| 7 | Handle archived topics in /start | services/start_flow.py |
-| 8 | Update /help text | handlers/settings.py |
-| 9 | Integration test | - |
+| 3 | Replace deprecated commands with redirects | threads.py, branches.py |
+| 4 | Rename do_branch_cleanup -> archive_thread | services/branch.py |
+| 5 | Create /finish handler | handlers/finish.py, handlers/__init__.py |
+| 6 | Handle archived topics in /start | handlers/start.py |
+| 7 | Update /help text | handlers/settings.py |
+| 8 | Integration test | - |
 
 **Prerequisites:** None (this is the first plan)
 

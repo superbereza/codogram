@@ -53,15 +53,15 @@ def mock_thread():
 @pytest.mark.asyncio
 async def test_launch_with_session_id_uses_resume_flag(mock_project, mock_thread):
     """When session_id provided, should use 'claude --resume {id}'."""
-    from src.codogram.launch_animation import launch_with_animation
+    from codogram.launch_animation import launch_with_animation
 
     bot = AsyncMock()
     queue = AsyncMock()
     queue.send = AsyncMock(return_value=[123])
 
-    with patch("src.codogram.launch_animation.TmuxSession") as MockTmux, \
-         patch("src.codogram.launch_animation.project_manager"), \
-         patch("src.codogram.launch_animation._start_monitoring"):
+    with patch("codogram.launch_animation.TmuxSession") as MockTmux, \
+         patch("codogram.launch_animation.project_manager"), \
+         patch("codogram.launch_animation._start_monitoring"):
 
         mock_tmux = MagicMock()
         mock_tmux.exists.return_value = False
@@ -85,15 +85,15 @@ async def test_launch_with_session_id_uses_resume_flag(mock_project, mock_thread
 @pytest.mark.asyncio
 async def test_launch_with_cwd_uses_custom_directory(mock_project, mock_thread):
     """When cwd provided, TmuxSession should use that cwd."""
-    from src.codogram.launch_animation import launch_with_animation
+    from codogram.launch_animation import launch_with_animation
 
     bot = AsyncMock()
     queue = AsyncMock()
     queue.send = AsyncMock(return_value=[123])
 
-    with patch("src.codogram.launch_animation.TmuxSession") as MockTmux, \
-         patch("src.codogram.launch_animation.project_manager"), \
-         patch("src.codogram.launch_animation._start_monitoring"):
+    with patch("codogram.launch_animation.TmuxSession") as MockTmux, \
+         patch("codogram.launch_animation.project_manager"), \
+         patch("codogram.launch_animation._start_monitoring"):
 
         mock_tmux = MagicMock()
         mock_tmux.exists.return_value = False
@@ -212,7 +212,7 @@ Add to `tests/test_session_manager.py`:
 ```python
 def test_thread_has_valid_session():
     """ThreadInfo.has_valid_session checks jsonl exists."""
-    from src.codogram.session_manager import ThreadInfo
+    from codogram.session_manager import ThreadInfo
     from pathlib import Path
     import tempfile
 
@@ -282,7 +282,7 @@ git commit -m "feat(session): add has_valid_session method to ThreadInfo"
 ```python
 def test_thread_has_valid_worktree():
     """ThreadInfo.has_valid_worktree checks worktree exists."""
-    from src.codogram.session_manager import ThreadInfo
+    from codogram.session_manager import ThreadInfo
     import tempfile
     import os
 
@@ -413,8 +413,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 @pytest.mark.asyncio
 async def test_start_resumes_when_session_valid():
     """When thread has valid session, /start should resume."""
-    from src.codogram.handlers.start import _launch_claude_in_thread
-    from src.codogram.services.start_flow import FlowResult, FlowAction
+    from codogram.handlers.start import _launch_claude_in_thread
+    from codogram.services.start_flow import FlowResult, FlowAction
 
     # Setup mocks
     message = MagicMock()
@@ -441,9 +441,9 @@ async def test_start_resumes_when_session_valid():
     mock_project.project_name = "proj"
     mock_project.threads = {456: mock_thread}
 
-    with patch("src.codogram.handlers.start.project_manager") as mock_pm, \
-         patch("src.codogram.handlers.start.is_tmux_session_exists", return_value=False), \
-         patch("src.codogram.handlers.start.launch_with_animation") as mock_launch:
+    with patch("codogram.handlers.start.project_manager") as mock_pm, \
+         patch("codogram.handlers.start.is_tmux_session_exists", return_value=False), \
+         patch("codogram.handlers.start.launch_with_animation") as mock_launch:
 
         mock_pm.get_by_chat.return_value = mock_project
 
@@ -512,7 +512,7 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
                 text="Start new session",
                 callback_data=f"resume:start_new:{result.thread_id}"
             )],
-            [InlineKeyboardButton(text="Cancel", callback_data="cancel")]
+            [InlineKeyboardButton(text="Cancel", callback_data=f"resume:cancel:{result.thread_id}")]
         ])
         await telegram_queue.reply(
             message,
@@ -528,7 +528,7 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
                 text="Recreate worktree",
                 callback_data=f"resume:recreate:{result.thread_id}"
             )],
-            [InlineKeyboardButton(text="Cancel", callback_data="cancel")]
+            [InlineKeyboardButton(text="Cancel", callback_data=f"resume:cancel:{result.thread_id}")]
         ])
         await telegram_queue.reply(
             message,
@@ -632,16 +632,28 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
         await telegram_queue.edit(callback.message, "`[~]` Recreating worktree...")
         await callback.answer()
 
-        # Recreate worktree
-        from ..worktree import create_worktree
+        # Attach worktree to existing branch (not create new!)
         from pathlib import Path
+        import subprocess
 
         main_repo = Path(project.cwd)
         branch_name = thread.name
         worktree_path = main_repo / ".worktrees" / branch_name
 
         try:
-            create_worktree(main_repo, worktree_path, branch_name)
+            # Ensure .worktrees/ directory exists
+            worktree_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # git worktree add <path> <existing-branch>
+            result = subprocess.run(
+                ["git", "worktree", "add", str(worktree_path), branch_name],
+                cwd=str(main_repo),
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip())
+
             thread.worktree_path = str(worktree_path)
             project_manager._save()
 
@@ -688,6 +700,9 @@ worktree_path = main_repo.parent / f"{main_repo.name}-{branch_name}"
 
 # New: worktree inside .worktrees/
 worktree_path = main_repo / ".worktrees" / branch_name
+
+# Ensure .worktrees/ directory exists before creating worktree
+worktree_path.parent.mkdir(parents=True, exist_ok=True)
 ```
 
 **Step 3: Ensure .worktrees/ is in .gitignore**
