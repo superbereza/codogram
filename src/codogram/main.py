@@ -41,20 +41,17 @@ async def main():
 
     from aiogram.types import BotCommand
     await bot.set_my_commands([
-        BotCommand(command="start", description="Start Claude / show status"),
+        BotCommand(command="esc", description="Cancel current operation"),
+        BotCommand(command="auto_accept", description="Toggle auto-accept mode"),
+        BotCommand(command="thread", description="New topic in project directory"),
+        BotCommand(command="branch", description="New isolated feature branch + topic"),
         BotCommand(command="clear", description="Clear context, start fresh"),
-        # /new intentionally not in menu - same as /clear
-        BotCommand(command="thread_create", description="Create new Claude thread"),
-        BotCommand(command="thread_delete", description="Delete Claude thread (in topic)"),
-        BotCommand(command="branch_create", description="Create isolated git worktree + thread"),
-        BotCommand(command="branch_finish", description="Merge branch and cleanup worktree"),
-        BotCommand(command="restart", description="Kill and restart Claude tmux"),
-        BotCommand(command="settings", description="Show current settings"),
-        BotCommand(command="auto_accept", description="Toggle auto-accept (or reset all)"),
-        BotCommand(command="help", description="Show available commands"),
-        BotCommand(command="get_debug_ids", description="Show debug IDs (admin only)"),
-        BotCommand(command="esc", description="Send Escape to Claude"),
-        # /resume intentionally not in menu - just responds "not supported" if someone tries it
+        BotCommand(command="finish", description="Merge branch, archive topic"),
+        BotCommand(command="start", description="Connect Claude or show status"),
+        BotCommand(command="settings", description="View current settings"),
+        BotCommand(command="restart", description="Force restart Claude"),
+        BotCommand(command="my_chat_id", description="Show chat and thread IDs"),
+        BotCommand(command="help", description="List all commands"),
     ])
 
     # Define task starters
