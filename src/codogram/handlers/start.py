@@ -17,6 +17,7 @@ from ..start_flow import (
 )
 from ..telegram_queue import TelegramQueue
 from ..tmux_selector import create_tmux_selection_keyboard
+from ..project_launcher import is_tmux_session_exists
 
 router = Router(name="start")
 
@@ -239,6 +240,24 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
     thread = project.threads.get(result.thread_id)
     if not thread:
         return
+
+    # Check if tmux already running
+    tmux_name = thread.get_tmux_session(project.project_name)
+    actual_cwd = thread.worktree_path or project.cwd
+    if is_tmux_session_exists(tmux_name):
+        # Check if Claude is ready in tmux
+        from ..tmux import TmuxSession
+        tmux = TmuxSession(tmux_name, actual_cwd)
+        if tmux.is_claude_ready():
+            await telegram_queue.reply(
+                message,
+                f"`[v]` Already running\n\nAttach: `tmux attach -t {tmux_name}`"
+            )
+            return
+        else:
+            # tmux exists but Claude not ready - kill and restart
+            import subprocess
+            subprocess.run(["tmux", "kill-session", "-t", tmux_name], capture_output=True)
 
     # Handle archived topic - reopen it
     if thread.archived:
