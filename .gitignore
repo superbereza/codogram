@@ -10,3 +10,4 @@ docs/plans/*-logs-snapshot/
 tmp/
 logs/
 .worktrees/
+.mcp.json
