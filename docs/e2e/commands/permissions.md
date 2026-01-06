@@ -106,3 +106,28 @@ mcp__telegram__list_messages(chat_id=-1003356094635, limit=5)
 # Disable auto_accept
 mcp__telegram__send_message(chat_id=-1003356094635, message="/auto_accept")
 ```
+
+---
+
+## TC-PERMISSIONS-005: Poller detects "work in new folder" prompt
+
+**Tags:** critical, permissions, poller
+**Preconditions:** Branch topic with worktree, Claude starting fresh
+
+**Setup:**
+```bash
+# Create new branch topic or use existing one with fresh session
+# Kill any existing tmux for this branch
+```
+
+**Steps:**
+```python
+# Start fresh session in branch topic
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=BRANCH_TOPIC_ID, text="/start")
+# Wait 30s for Claude to prompt about new folder
+mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
+```
+
+**Expected:**
+- UI: Poller shows "Work in new folder?" or similar prompt with Yes/No buttons
+- State: Prompt detected from tmux screen, buttons delivered to correct topic

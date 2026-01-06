@@ -141,7 +141,21 @@ Full regression test after major refactoring:
 |----|----------|------|----------|--------|
 | F10 | Any | /clear | Очищает сессию, awaiting_new_session | |
 | F11 | Any | /esc | Отправляет Escape в tmux | |
-| F12 | Any | /resume (если есть) | Возобновляет сессию | |
+
+### 3.5 Session Resume (2026-01-06)
+
+| ID | Контекст | Precondition | Тест | Expected | Status |
+|----|----------|--------------|------|----------|--------|
+| R1 | Branch topic | session bound, tmux killed | /start | "[~] Resuming session...", context preserved | ✅ |
+| R2 | Regular topic | session bound, tmux killed | /start | "[~] Resuming session...", context preserved | ✅ |
+| R3 | General | session bound, tmux killed | /start | "[~] Resuming session...", context preserved | ✅ |
+| R4 | Any | session bound, tmux running | /start | Menu: Resume/Start new/Cancel | |
+| R5 | Any | session bound, jsonl deleted | /start | Starts new session (invalid session) | |
+| R6 | Branch | session bound, worktree deleted | /start | Shows worktree error, offers recreate | |
+| R7 | Any | no session (new thread) | /start | Starts new session, no resume menu | ✅ |
+| R8 | Any | session bound | /new | Resets session, starts fresh | ✅ |
+| R9 | Any | session bound | /clear | Resets session state | |
+| R10 | Any | tmux killed | session_id preserved in config | session_id NOT reset to None | ✅ |
 
 ### 3.5 Error Handling
 
