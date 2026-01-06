@@ -83,6 +83,7 @@ async def create_thread_with_session(
             project=project,
             thread=thread,
             queue=telegram_queue,
+            cwd=worktree_path,  # Use worktree path for branch topics
         )
     )
 

@@ -175,7 +175,8 @@ class HistoryWatcher:
         normalized = cwd.rstrip("/") or "/"
         while "//" in normalized:
             normalized = normalized.replace("//", "/")
-        project_hash = normalized.replace("/", "-")
+        # Claude replaces both "/" and "." with "-"
+        project_hash = normalized.replace("/", "-").replace(".", "-")
         return Path.home() / ".claude" / "projects" / project_hash
 
     async def _bind_thread_to_session(
@@ -309,8 +310,10 @@ async def poll_for_session_thread(
         try:
             # Scan ALL sessions for this cwd to find one with matching user message
             # Uses mtime filter to support both new and resumed sessions
+            # Use worktree_path for branches, project.cwd for regular threads
+            search_cwd = thread.worktree_path or project.cwd
             result = find_session_by_user_message(
-                project.cwd,
+                search_cwd,
                 thread.last_sent_message,
                 created_after=thread.start_requested_at,
             )
@@ -325,6 +328,10 @@ async def poll_for_session_thread(
                 thread.jsonl_path = str(jsonl_path)
                 thread.awaiting_new_session = False
                 thread.start_requested_at = None
+
+                # Save config after binding
+                from .session_manager import project_manager
+                project_manager._save()
 
                 # Start thread-specific watcher
                 if not thread.watcher_task or thread.watcher_task.done():

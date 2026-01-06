@@ -192,7 +192,8 @@ def compute_jsonl_path(cwd: str, session_id: str) -> Path:
     while "//" in normalized:
         normalized = normalized.replace("//", "/")
 
-    project_hash = normalized.replace("/", "-")
+    # Claude replaces both "/" and "." with "-"
+    project_hash = normalized.replace("/", "-").replace(".", "-")
     return Path.home() / ".claude" / "projects" / project_hash / f"{session_id}.jsonl"
 
 
@@ -217,7 +218,8 @@ def find_session_by_user_message(
     normalized = cwd.rstrip("/") or "/"
     while "//" in normalized:
         normalized = normalized.replace("//", "/")
-    project_hash = normalized.replace("/", "-")
+    # Claude replaces both "/" and "." with "-"
+    project_hash = normalized.replace("/", "-").replace(".", "-")
     project_dir = Path.home() / ".claude" / "projects" / project_hash
 
     if not project_dir.exists():
