@@ -85,6 +85,10 @@ cat .config.json | jq
 
 Claude can test the bot end-to-end using the Telegram MCP integration.
 
+**⚠️ IMPORTANT: Always ask user for test chat ID before E2E testing!**
+
+Never use the production codogram chat. Always confirm: "Which chat should I use for E2E testing?"
+
 ### Setup
 
 1. MCP configured in `.mcp.json`:
@@ -100,7 +104,7 @@ Claude can test the bot end-to-end using the Telegram MCP integration.
 }
 ```
 
-2. Create test chat with bot, note the chat ID
+2. Ask user for test chat ID before testing
 
 3. Add MCP user ID to ADMIN_IDS in `.env`
 
@@ -112,7 +116,7 @@ Claude can test the bot end-to-end using the Telegram MCP integration.
 # 2. Restart bot
 ./restart.sh
 
-# 3. Send command via MCP
+# 3. Ask user for test chat ID, then send command via MCP
 mcp__telegram__send_message(chat_id=TEST_CHAT_ID, message="/help")
 
 # 4. Read response
