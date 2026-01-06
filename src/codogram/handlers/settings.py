@@ -24,28 +24,26 @@ async def cmd_get_debug_ids(message: Message, telegram_queue: TelegramQueue):
 @router.message(Command("help"))
 async def cmd_help(message: Message, telegram_queue: TelegramQueue):
     """Show available commands."""
-    text = """**Commands**
+    text = """*Everyday:*
+/esc — Cancel current operation
+/auto\\_accept — Toggle auto\\-accept mode
 
-`/start` — Start Claude / show status
-`/new` — Start new Claude session
-`/restart` — Kill and restart Claude tmux
+*Create:*
+/thread — New topic in project directory
+/branch — New isolated feature branch \\+ topic
 
-**Threads**
-`/thread_create [name]` — Create new Claude thread
-`/thread_delete` — Delete thread (in topic)
+*Complete:*
+/clear — Clear context, start fresh
+/finish — Merge branch, archive topic
 
-**Git worktrees**
-`/branch_create [name]` — Create worktree + thread
-`/branch_finish` — Merge and cleanup
+*Settings:*
+/start — Connect Claude or show status
+/settings — View current settings
+/restart — Force restart Claude
+/my\\_chat\\_id — Show chat and thread IDs
 
-**Settings**
-`/settings` — Show current settings
-`/auto_accept` — Toggle auto-accept
-`/auto_accept reset all` — Reset all to off
-
-**Other**
-`/esc` — Send Escape to Claude
-`/get_debug_ids` — Show debug IDs"""
+*Help:*
+/help — This message"""
 
     await telegram_queue.reply(message, text)
 
