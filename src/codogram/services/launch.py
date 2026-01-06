@@ -107,7 +107,11 @@ async def _create_worktree_with_status(
     from ..worktree import create_worktree
 
     main_repo = Path(project.cwd)
-    worktree_path = main_repo.parent / f"{main_repo.name}-{branch_name}"
+    # Worktree inside .worktrees/ subdirectory
+    worktree_path = main_repo / ".worktrees" / branch_name
+
+    # Ensure .worktrees/ directory exists before creating worktree
+    worktree_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Status: creating branch
     await telegram_queue.send(
