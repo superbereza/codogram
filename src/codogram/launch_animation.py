@@ -67,9 +67,17 @@ async def launch_with_animation(
     project: ProjectState,
     thread: ThreadInfo,
     queue: TelegramQueue,
+    session_id: str | None = None,
+    cwd: str | None = None,
 ) -> bool:
-    """Launch Claude with animated status messages."""
-    if not project.cwd:
+    """Launch Claude with animated status messages.
+
+    Args:
+        session_id: If provided, uses 'claude --resume {session_id}' instead of 'claude'
+        cwd: If provided, uses this directory instead of project.cwd for the tmux session
+    """
+    actual_cwd = cwd or project.cwd
+    if not actual_cwd:
         await queue.send(
             chat_id,
             "`[x]` Project cwd not set. Re-register with /start",
@@ -79,7 +87,7 @@ async def launch_with_animation(
         return False
 
     tmux_name = thread.get_tmux_session(project.project_name)
-    tmux = TmuxSession(tmux_name, project.cwd)
+    tmux = TmuxSession(tmux_name, actual_cwd)
 
     try:
         thread.awaiting_new_session = True
@@ -92,8 +100,12 @@ async def launch_with_animation(
             tmux.create()
 
         # 2. Launch Claude
-        await queue.send(chat_id, "`[~]` Starting Claude...", thread_id=thread_id, parse_mode="MarkdownV2")
-        tmux.send("claude")
+        if session_id:
+            await queue.send(chat_id, "`[~]` Resuming session...", thread_id=thread_id, parse_mode="MarkdownV2")
+            tmux.send(f"claude --resume {session_id}")
+        else:
+            await queue.send(chat_id, "`[~]` Starting Claude...", thread_id=thread_id, parse_mode="MarkdownV2")
+            tmux.send("claude")
 
         # 2.5. Start poller early to catch trust prompts during startup
         await _start_monitoring(bot, project, thread, queue)
