@@ -52,7 +52,7 @@ async def cmd_finish(message: Message, telegram_queue: TelegramQueue):
     ])
     await telegram_queue.reply(
         message,
-        f"Archive topic `{thread.name}`?\n\n"
+        f"`[?]` Archive topic `{thread.name}`?\n\n"
         "This will close the topic and stop Claude session.",
         reply_markup=keyboard
     )
@@ -146,7 +146,7 @@ async def on_finish_archive(callback: CallbackQuery, telegram_queue: TelegramQue
 
     await archive_thread(callback.bot, callback.message.chat.id, project, thread)
 
-    await telegram_queue.edit(callback.message, f"`[ok]` Topic `{thread.name}` archived.")
+    await telegram_queue.edit(callback.message, f"`[v]` Topic `{thread.name}` archived.")
     await callback.answer()
 
 
@@ -180,7 +180,7 @@ async def on_finish_merge(callback: CallbackQuery, telegram_queue: TelegramQueue
 
     await telegram_queue.edit(
         callback.message,
-        f"Merge `{thread.name}` -> `{target_branch}`?\n\n"
+        f"`[?]` Merge `{thread.name}` -> `{target_branch}`?\n\n"
         "Choose push option:",
         reply_markup=keyboard
     )
@@ -244,9 +244,9 @@ async def on_finish_do_merge(callback: CallbackQuery, telegram_queue: TelegramQu
     remove_result = remove_worktree(main_repo, worktree_path, branch_name, delete_branch=True)
 
     if push_mode == "push":
-        status = f"`[ok]` Merged and pushed `{branch_name}` -> `{target_branch}`"
+        status = f"`[v]` Merged and pushed `{branch_name}` -> `{target_branch}`"
     else:
-        status = f"`[ok]` Merged `{branch_name}` -> `{target_branch}` (local only)"
+        status = f"`[v]` Merged `{branch_name}` -> `{target_branch}` (local only)"
 
     if not remove_result.success:
         status += f"\n`[!]` Worktree cleanup failed: {remove_result.error}"
@@ -284,13 +284,13 @@ async def on_finish_archive_branch(callback: CallbackQuery, telegram_queue: Tele
         remove_worktree(main_repo, worktree_path, thread.name, delete_branch=True, force=True)
         await telegram_queue.edit(
             callback.message,
-            f"`[ok]` Branch `{thread.name}` discarded and archived."
+            f"`[v]` Branch `{thread.name}` discarded and archived."
         )
     else:
         # Keep mode - worktree stays for potential resume
         await telegram_queue.edit(
             callback.message,
-            f"`[ok]` Branch `{thread.name}` archived.\n"
+            f"`[v]` Branch `{thread.name}` archived.\n"
             "Worktree kept for potential resume."
         )
 
