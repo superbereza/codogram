@@ -1,7 +1,7 @@
 # Session not saved + auto_accept persists unexpectedly
 
 **Найден:** markdown-fix thread in codogram chat
-**Severity:** minor
+**Severity:** major (session binding broken for external worktrees)
 **Status:** active
 
 ## Проблема 1: Сессия не сохранилась
@@ -26,15 +26,38 @@ Thread markdown-fix имеет:
 
 При этом другие worktree-треды имеют session_id (222, 260, 283).
 
-### Возможные причины
+### Root Cause
 
-1. Binding не дождался session_id из jsonl
-2. Worktree в отдельной директории (не `.worktrees/`) обрабатывается иначе
-3. Баг в предыдущей версии кода, уже пофикшен
+**History watcher ищет сессии не в той директории!**
 
-### TODO
+`history_watcher.py:_bind_awaiting_threads()` использует `project.cwd` для поиска сессий:
+```python
+project_dir = self._get_project_sessions_dir(project.cwd)
+# Ищет в: ~/.claude/projects/-home-superbereza-dev-codogram/
+```
 
-Проверить код binding для worktree в отдельной директории vs `.worktrees/`
+Но Claude в worktree создаёт сессию в директории worktree:
+```
+~/.claude/projects/-home-superbereza-dev-codogram-markdown-fix/7c2f5cff-....jsonl
+```
+
+**Watcher не видит сессию, потому что ищет не там!**
+
+### Фикс
+
+В `_bind_awaiting_threads` для тредов с `worktree_path` нужно искать сессии в директории worktree:
+
+```python
+# Determine which directory to search
+if thread.worktree_path:
+    search_dir = self._get_project_sessions_dir(thread.worktree_path)
+else:
+    search_dir = self._get_project_sessions_dir(project.cwd)
+```
+
+### Affected
+
+Любой тред с worktree в отдельной директории (не `.worktrees/` внутри project.cwd)
 
 ## Проблема 2: auto_accept сохраняется между запусками
 
