@@ -1,34 +1,28 @@
 """Branch/worktree operations."""
 import subprocess
-from pathlib import Path
 
 from aiogram import Bot
 
 from ..session_manager import project_manager, ProjectState, ThreadInfo
-from ..worktree import remove_worktree
 from ..logging_config import logger
 
 
-async def do_branch_cleanup(
+async def archive_thread(
     bot: Bot,
     chat_id: int,
     project: ProjectState,
     thread: ThreadInfo,
-    force: bool,
 ) -> None:
-    """Clean up worktree, tmux, and archive topic.
+    """Archive thread: kill tmux, close topic, keep worktree for resume.
+
+    Used by /finish command. Does NOT delete worktree or git branch.
 
     Args:
         bot: Telegram bot instance
         chat_id: Chat ID for the topic
         project: Project state
-        thread: Thread to cleanup
-        force: If True, force delete branch even if unmerged
+        thread: Thread to archive
     """
-    main_repo = Path(project.cwd)
-    worktree_path = Path(thread.worktree_path) if thread.worktree_path else None
-    branch_name = thread.name
-
     # Cancel background tasks
     if thread.watcher_task:
         thread.watcher_task.cancel()
@@ -41,21 +35,15 @@ async def do_branch_cleanup(
     tmux_name = thread.get_tmux_session(project.project_name)
     subprocess.run(["tmux", "kill-session", "-t", tmux_name], capture_output=True)
 
-    # Remove worktree and branch
-    if worktree_path:
-        remove_worktree(main_repo, worktree_path, branch_name, delete_branch=True, force=force)
-
-    # Archive topic
+    # Archive topic in Telegram
     try:
         await bot.close_forum_topic(chat_id, thread.thread_id)
         await bot.edit_forum_topic(chat_id, thread.thread_id, icon_custom_emoji_id="5357315181649076022")
     except Exception:
         pass  # Topic may already be closed
 
-    # Update thread state
+    # Update thread state (keep worktree_path and session_id for resume!)
     thread.archived = True
-    thread.worktree_path = None
-    thread.session_id = None
     project_manager._save()
 
 
