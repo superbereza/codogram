@@ -13,14 +13,28 @@ Thread markdown-fix имеет:
 
 При /start не предложился resume, потому что config не знает о сессии.
 
-### Возможные причины
-- Прошлый /start не привязал сессию
-- session_id был сброшен
+### Где хранится session_id
 
-### Improvement
-При /start если session_id=null но есть jsonl файлы для этого cwd:
-- Показать список найденных сессий
-- Предложить привязать одну из них
+В `.config.json` → `projects.PROJECT.threads.TOPIC_ID.session_id`
+
+Для markdown-fix (topic 8324):
+```json
+"session_id": null,
+"jsonl_path": null,
+"worktree_path": "/home/superbereza/dev/codogram-markdown-fix"
+```
+
+При этом другие worktree-треды имеют session_id (222, 260, 283).
+
+### Возможные причины
+
+1. Binding не дождался session_id из jsonl
+2. Worktree в отдельной директории (не `.worktrees/`) обрабатывается иначе
+3. Баг в предыдущей версии кода, уже пофикшен
+
+### TODO
+
+Проверить код binding для worktree в отдельной директории vs `.worktrees/`
 
 ## Проблема 2: auto_accept сохраняется между запусками
 
