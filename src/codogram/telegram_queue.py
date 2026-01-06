@@ -82,7 +82,7 @@ class TelegramQueue:
         self._workers: dict[int, asyncio.Task] = {}
         self._locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
-    async def enqueue(self, batch: OutgoingBatch | EditBatch | KeyboardBatch, timeout: float = 30.0) -> list[int] | None:
+    async def enqueue(self, batch: OutgoingBatch | EditBatch | KeyboardBatch, timeout: float = 120.0) -> list[int] | None:
         """Add batch to queue, wait for send.
 
         For OutgoingBatch: returns list of sent message IDs.
@@ -91,7 +91,7 @@ class TelegramQueue:
 
         Args:
             batch: The batch to send.
-            timeout: Maximum seconds to wait for send to complete. Defaults to 30.0.
+            timeout: Maximum seconds to wait for send to complete. Defaults to 120.0.
 
         Raises:
             TelegramQueueTimeout: If the operation times out.
