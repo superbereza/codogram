@@ -1,7 +1,7 @@
 """Handlers layer - thin routers delegating to services."""
 from aiogram import Dispatcher
 
-from . import permissions, start, threads, branches, sessions, settings, common, messages
+from . import permissions, start, threads, branches, sessions, settings, finish, common, messages
 
 
 def register_handlers(dp: Dispatcher):
@@ -21,5 +21,6 @@ def register_handlers(dp: Dispatcher):
     dp.include_router(branches.router)      # /branch_create, /branch_finish
     dp.include_router(sessions.router)      # /new, /clear, /esc, /resume
     dp.include_router(settings.router)      # /settings, /auto_accept, /help
+    dp.include_router(finish.router)        # /finish
     dp.include_router(common.router)        # cb_cancel
     dp.include_router(messages.router)      # Catch-all for tmux routing (LAST!)
