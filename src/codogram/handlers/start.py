@@ -2,7 +2,7 @@
 import asyncio
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
@@ -274,6 +274,45 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
     if thread.launch_task and not thread.launch_task.done():
         return
 
+    # Determine cwd (worktree or project)
+    cwd = thread.worktree_path if thread.has_valid_worktree() else None
+
+    # Check for session resume
+    session_id = None
+    if thread.has_valid_session():
+        session_id = thread.session_id
+    elif thread.session_id and not thread.has_valid_session():
+        # Session ID exists but jsonl missing - show error
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="Start new session",
+                callback_data=f"resume:start_new:{result.thread_id}"
+            )],
+            [InlineKeyboardButton(text="Cancel", callback_data=f"resume:cancel:{result.thread_id}")]
+        ])
+        await telegram_queue.reply(
+            message,
+            "`[!]` Previous session not found",
+            reply_markup=keyboard,
+        )
+        return
+
+    # Check worktree exists for branch topics
+    if thread.worktree_path and not thread.has_valid_worktree():
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="Recreate worktree",
+                callback_data=f"resume:recreate:{result.thread_id}"
+            )],
+            [InlineKeyboardButton(text="Cancel", callback_data=f"resume:cancel:{result.thread_id}")]
+        ])
+        await telegram_queue.reply(
+            message,
+            f"`[!]` Worktree not found: `{thread.worktree_path}`",
+            reply_markup=keyboard,
+        )
+        return
+
     thread.launch_task = asyncio.create_task(
         launch_with_animation(
             bot=message.bot,
@@ -282,6 +321,8 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
             project=project,
             thread=thread,
             queue=telegram_queue,
+            session_id=session_id,  # Pass session_id for resume
+            cwd=cwd,                # Pass worktree cwd for branches
         )
     )
 
