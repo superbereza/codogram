@@ -188,9 +188,23 @@ class TelegramQueue:
             )
             return []
 
-        # Expand messages with chunking
-        expanded_messages = []
+        # Convert GFM to MarkdownV2 BEFORE chunking (escaping can increase length)
+        converted_messages = []
         for msg in batch.messages:
+            if msg.get("parse_mode") == "MarkdownV2":
+                try:
+                    msg = {**msg, "text": telegramify_markdown.markdownify(
+                        msg.get("text", ""),
+                        max_line_length=None,
+                        normalize_whitespace=False
+                    )}
+                except Exception as e:
+                    logger.warning(f"markdownify failed: {e}")
+            converted_messages.append(msg)
+
+        # Expand messages with chunking (after conversion)
+        expanded_messages = []
+        for msg in converted_messages:
             text = msg.get("text", "")
             if len(text) > 4000:
                 chunks = chunk_message(text)
@@ -204,16 +218,6 @@ class TelegramQueue:
 
         try:
             for msg in expanded_messages:
-                # Convert GFM to MarkdownV2 using telegramify-markdown
-                if msg.get("parse_mode") == "MarkdownV2":
-                    try:
-                        msg["text"] = telegramify_markdown.markdownify(
-                            msg.get("text", ""),
-                            max_line_length=None,
-                            normalize_whitespace=False
-                        )
-                    except Exception as e:
-                        logger.warning(f"markdownify failed: {e}")
 
                 result = await self.bot.send_message(
                     chat_id=batch.chat_id,
