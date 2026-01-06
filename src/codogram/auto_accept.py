@@ -59,7 +59,7 @@ async def try_auto_accept(
     batch = OutgoingBatch(
         chat_id=chat_id,
         thread_id=thread_id,
-        messages=[{"text": f"🤖 Auto: {body_text}"}],
+        messages=[{"text": f"🤖 Auto: {body_text}", "parse_mode": "MarkdownV2"}],
     )
     await telegram_queue.enqueue_nowait(batch)
 
