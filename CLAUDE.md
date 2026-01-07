@@ -166,6 +166,41 @@ src/codogram/
 - Services не знают о Telegram API — работают с абстракциями
 - Domain models — чистые dataclasses без зависимостей
 
+## Worktree Development
+
+Проект использует git worktrees для изолированной разработки фич.
+
+**Важно:** Config хранится в `~/.codogram/config.json`, не в репозитории.
+
+### Запуск бота
+
+```bash
+# Из main (production):
+./restart.sh              # pip install + nohup
+
+# Из worktree (testing):
+./dev-run.sh              # PYTHONPATH + foreground
+```
+
+### Workflow тестирования из worktree
+
+```bash
+cd .worktrees/my-feature/
+./dev-run.sh              # Убивает main бота, запускает с кодом worktree
+# ... тестируем ...
+# Ctrl+C
+
+cd /path/to/main
+./restart.sh              # Восстанавливаем main бота
+```
+
+### Почему так
+
+- `pip install -e` из worktree ломает main бота (Path(__file__) указывает на worktree)
+- `dev-run.sh` использует PYTHONPATH — не трогает venv
+- Config в ~/.codogram/ — один для всех worktrees
+- .env остаётся в main, dev-run.sh находит его через `../../.env`
+
 ## Feature Development Flow
 
 При разработке новой фичи придерживаемся следующего процесса:
