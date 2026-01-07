@@ -360,7 +360,8 @@ git commit -m "refactor: use menu service for global commands"
 **Functions requiring menu registration:**
 1. `_connect_to_session` (line 348) — connect to existing tmux
 2. `_launch_claude` (line 180) — launch from message
-3. `_connect_to_session_from_callback` (line 360) — connect from callback
+3. `_launch_claude_from_callback` (line 207) — launch from callback (after git setup)
+4. `_connect_to_session_from_callback` (line 360) — connect from callback
 
 Note: `_launch_claude_in_thread` does NOT need menu registration — menu is already set at project level.
 
@@ -457,7 +458,30 @@ async def _launch_claude(message: Message, result: FlowResult, telegram_queue: T
     # ... rest unchanged
 ```
 
-**Step 6: Add menu registration to _connect_to_session_from_callback (line 360)**
+**Step 6: Add menu registration to _launch_claude_from_callback (line 207)**
+
+After `project = project_manager.get_by_chat(...)` check:
+```python
+async def _launch_claude_from_callback(callback: CallbackQuery, result: FlowResult, telegram_queue: TelegramQueue):
+    """Launch Claude session from callback context."""
+    from ..launch_animation import launch_with_animation
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        return
+
+    # Register menu based on chat type
+    await register_menu_for_chat(
+        callback.bot,
+        callback.message.chat.id,
+        is_forum=callback.message.chat.is_forum or False
+    )
+
+    thread = project.get_or_create_thread(None, "main")
+    # ... rest unchanged
+```
+
+**Step 7: Add menu registration to _connect_to_session_from_callback (line 360)**
 
 ```python
 async def _connect_to_session_from_callback(callback: CallbackQuery, result: FlowResult):
@@ -475,15 +499,15 @@ async def _connect_to_session_from_callback(callback: CallbackQuery, result: Flo
         )
 ```
 
-**Step 4: Run tests**
+**Step 8: Run tests**
 
-Run: `pytest tests/test_handlers_start.py -v`
+Run: `pytest tests/test_menu_registration.py tests/test_handlers_start.py -v`
 Expected: PASS
 
-**Step 5: Commit**
+**Step 9: Commit**
 
 ```bash
-git add src/codogram/handlers/start.py
+git add src/codogram/handlers/start.py tests/test_menu_registration.py
 git commit -m "feat: register scope-based menu on /start"
 ```
 
@@ -790,9 +814,9 @@ git status
 | 2 | Migration handler | handlers/migration.py, tests/test_migration_handler.py |
 | 3 | Register router | handlers/__init__.py |
 | 4 | Update main.py | main.py |
-| 5 | Menu on /start | handlers/start.py |
-| 6 | Fix poller chat_id | permission_poller.py, tests/test_permission_poller.py |
-| 7 | E2E tests | docs/e2e/commands/start.md |
+| 5 | Menu on /start (4 functions) | handlers/start.py, tests/test_menu_registration.py |
+| 6 | Fix poller chat_id (10 lines) | permission_poller.py, tests/test_permission_poller.py |
+| 7 | E2E tests (5 test cases) | docs/e2e/commands/start.md |
 | 8 | Verification | — |
 
-Total: ~8 tasks, ~45 minutes estimated
+Total: ~8 tasks, ~60 minutes estimated
