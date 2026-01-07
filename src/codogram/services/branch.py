@@ -38,12 +38,19 @@ async def archive_thread(
     # Archive topic in Telegram
     try:
         await bot.close_forum_topic(chat_id, thread.thread_id)
-        await bot.edit_forum_topic(chat_id, thread.thread_id, icon_custom_emoji_id="5357315181649076022")
-    except Exception:
-        pass  # Topic may already be closed
+        logger.info(f"Topic {thread.thread_id} closed")
+    except Exception as e:
+        logger.debug(f"close_forum_topic failed (may be already closed): {e}")
+
+    try:
+        await bot.edit_forum_topic(chat_id, thread.thread_id, icon_custom_emoji_id="5357315181649076022")  # 📁
+        logger.info(f"Topic {thread.thread_id} icon set to 📁")
+    except Exception as e:
+        logger.warning(f"Failed to set archive icon: {e}")
 
     # Update thread state (keep worktree_path and session_id for resume!)
     thread.archived = True
+    thread.notified_closed = True  # Prevent duplicate "session closed" from history_watcher
     project_manager._save()
 
 

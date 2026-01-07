@@ -37,27 +37,29 @@ async def _start_monitoring(
     thread: ThreadInfo,
     queue: TelegramQueue,
 ):
-    """Start poller after successful Claude launch.
+    """Start poller and watcher after successful Claude launch.
 
-    NOTE: We only start poller here, NOT binding_task/watcher because:
-    - poll_for_session_thread requires last_sent_message (line 265)
-    - On fresh launch, last_sent_message = None → returns immediately
-    - Binding happens when user sends first message (bot.py:1430-1437)
-    - poll_for_session_thread will start watcher when session is found
+    For NEW sessions: only starts poller. Watcher starts when session is bound
+    (after user sends first message and we find matching jsonl).
 
-    Poller can start immediately because it works with tmux directly,
-    doesn't need session_id or jsonl_path.
-
-    No duplication risk: poll_for_session_thread checks
-    `if not thread.poller_task or thread.poller_task.done():`
-    before starting poller (history_watcher.py:301).
+    For RESUMED sessions: starts both poller AND watcher immediately,
+    since we already have session_id and jsonl_path.
     """
     from .permission_poller import create_poller_task_for_thread
+    from .history_watcher import watch_thread_jsonl
 
+    # Always start poller (works with tmux directly)
     if not thread.poller_task or thread.poller_task.done():
         thread.poller_task = await create_poller_task_for_thread(
             bot, project, thread, queue
         )
+
+    # For resumed sessions, also start watcher immediately
+    if thread.session_id and thread.jsonl_path:
+        if not thread.watcher_task or thread.watcher_task.done():
+            thread.watcher_task = asyncio.create_task(
+                watch_thread_jsonl(bot, project, thread, queue)
+            )
 
 
 async def launch_with_animation(
@@ -92,6 +94,7 @@ async def launch_with_animation(
     try:
         thread.awaiting_new_session = True
         thread.start_requested_at = time.time()
+        thread.notified_closed = False  # Reset so we can notify again if this session dies
 
         # 1. Create tmux
         await queue.send(chat_id, "`[~]` Creating tmux session...", thread_id=thread_id, parse_mode="MarkdownV2")

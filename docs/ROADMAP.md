@@ -143,6 +143,12 @@ Layered architecture replacing monolithic bot.py (1500+ lines → 0):
 
 ## Backlog
 
+### Queue reliability improvements
+Improve TelegramQueue resilience:
+- **Retry on network errors** — `ServerDisconnectedError` currently not retried, message lost
+- **1 rps rate limiting** — proactive throttling to avoid hitting Telegram limits
+- **Exponential backoff** — for rate limit retries
+
 ### MCP trust prompt support
 Detect MCP server trust prompts (box-style UI):
 - Different from standard prompts: `❯` on separate line, options around it

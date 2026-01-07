@@ -105,7 +105,7 @@ async def _handle_result(
             await state.clear()
             await telegram_queue.reply(
                 message,
-                f"Thread `{result.thread_name}` running in `{result.tmux_session}`",
+                f"`[v]` Thread `{result.thread_name}` running\n\nAttach: `tmux attach -t {result.tmux_session}`",
             )
 
         case FlowAction.THREAD_LAUNCH:
@@ -259,17 +259,35 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
             import subprocess
             subprocess.run(["tmux", "kill-session", "-t", tmux_name], capture_output=True)
 
-    # Handle archived topic - reopen it
-    if thread.archived:
-        thread.archived = False
-        project_manager._save()
-        # Remove archive icon
+    # Always try to reopen topic and reset icon
+    if result.thread_id:
+        from ..logging_config import logger
+        was_reopened = False
+
+        # Try to reopen (may fail if already open - that's fine)
         try:
-            await message.bot.edit_forum_topic(
-                message.chat.id, result.thread_id, icon_custom_emoji_id=""
-            )
+            await message.bot.reopen_forum_topic(message.chat.id, result.thread_id)
+            logger.info(f"Topic {result.thread_id} reopened")
+            was_reopened = True
         except Exception:
-            pass  # May fail if no icon was set
+            pass  # Topic already open
+
+        # Reset icon to ballot box 🗳️ when topic is reopened
+        if was_reopened:
+            try:
+                # 🗳️ icon - empty string doesn't work in Telegram API
+                await message.bot.edit_forum_topic(
+                    message.chat.id, result.thread_id,
+                    icon_custom_emoji_id="5350387571199319521"
+                )
+                logger.info(f"Topic {result.thread_id} icon set to 🗳️")
+            except Exception as e:
+                logger.warning(f"Failed to set topic icon: {e}")
+
+        # Clear archived flag if it was set
+        if thread.archived:
+            thread.archived = False
+            project_manager._save()
 
     if thread.launch_task and not thread.launch_task.done():
         return

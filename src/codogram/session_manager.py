@@ -110,6 +110,9 @@ class ThreadInfo:
     # Auto-accept permissions:
     auto_accept: bool = False          # True = auto-accept permission prompts
 
+    # Runtime-only (not persisted):
+    notified_closed: bool = False      # True = already sent "session closed" notification
+
     def get_tmux_session(self, project_name: str) -> str:
         """Get tmux session name for this thread."""
         if self.name == "main":
@@ -215,6 +218,8 @@ class ProjectManager:
                         base_branch=thread_data.get("base_branch"),
                         archived=thread_data.get("archived", False),
                         auto_accept=thread_data.get("auto_accept", False),
+                        # Assume already notified if session exists but tmux likely dead
+                        notified_closed=bool(thread_data.get("session_id")),
                     )
 
                 # Migrate legacy → threads[None] if not already present
@@ -224,6 +229,7 @@ class ProjectManager:
                         name="main",
                         session_id=data.get("session_id"),
                         jsonl_path=data.get("jsonl_path"),
+                        notified_closed=bool(data.get("session_id")),
                     )
 
             self.projects[project_name] = project

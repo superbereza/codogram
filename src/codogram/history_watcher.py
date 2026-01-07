@@ -89,27 +89,31 @@ class HistoryWatcher:
 
                 # Check if tmux died
                 if thread.session_id and not tmux.exists():
-                    logger.warning(f"thread_tmux_died: project={project.project_name}, thread={thread.name}")
+                    # Only notify once per session death
+                    if not thread.notified_closed:
+                        logger.warning(f"thread_tmux_died: project={project.project_name}, thread={thread.name}")
 
-                    # Stop thread tasks
-                    if thread.watcher_task:
-                        thread.watcher_task.cancel()
-                        thread.watcher_task = None
-                    if thread.poller_task:
-                        thread.poller_task.cancel()
-                        thread.poller_task = None
+                        # Stop thread tasks
+                        if thread.watcher_task:
+                            thread.watcher_task.cancel()
+                            thread.watcher_task = None
+                        if thread.poller_task:
+                            thread.poller_task.cancel()
+                            thread.poller_task = None
 
-                    # Notify user through queue
-                    from .telegram_queue import OutgoingBatch
-                    try:
-                        batch = OutgoingBatch(
-                            chat_id=project.chat_id,
-                            thread_id=thread.thread_id,
-                            messages=[{"text": f"`[!]` Claude session closed: {thread.name}", "parse_mode": "MarkdownV2"}],
-                        )
-                        await self.telegram_queue.enqueue_nowait(batch)
-                    except Exception:
-                        pass
+                        # Notify user through queue
+                        from .telegram_queue import OutgoingBatch
+                        try:
+                            batch = OutgoingBatch(
+                                chat_id=project.chat_id,
+                                thread_id=thread.thread_id,
+                                messages=[{"text": f"`[!]` Claude session closed: {thread.name}", "parse_mode": "MarkdownV2"}],
+                            )
+                            await self.telegram_queue.enqueue_nowait(batch)
+                        except Exception:
+                            pass
+
+                        thread.notified_closed = True
 
                     # NOTE: Do NOT reset session_id/jsonl_path here!
                     # We keep them so /start can resume the session.
