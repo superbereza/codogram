@@ -183,10 +183,10 @@
 
 ### Отображение и управление состоянием сессии
 Показ и управление состоянием Claude сессии:
-- **/shift_tab команда** — переключение режима approval, репорт изменения
-- **/settings улучшения** — текущий режим, количество background tasks
-- **Индикатор контекстного окна** — сколько осталось до compact
-- Парсить статус бар и контекст из tmux capture-pane
+- **/shift_tab команда** — отправляет Shift+Tab в tmux, репортит изменение ("Allow once → Allow for session")
+- **/settings улучшения** — текущий режим approval, количество background tasks
+- **Индикатор контекстного окна** — сколько осталось до compact (парсить из jsonl или tmux screen)
+- Парсить статус бар из tmux capture-pane
 - Формат: "Mode: Accept edits | Background: 3 | Context: 45%"
 
 ### Activity indicators
@@ -207,7 +207,14 @@
 Исследование и улучшение отображения тулов:
 - **Tool progress display** — показ прогресса выполнения (сейчас парсится, но не показывается)
 - **Hidden tools filtering** — не показывать TodoWrite и другие internal тулы
-- **Инсайт:** В Claude первая строка статична (Task/Tool name), остальные бегут
+- **Инсайт:** В Claude первая строка статична (Task/Tool name), остальные бегут:
+  ```
+  Task(Implement Task 1: Screen Parser)
+    ⎿  Read 46 lines
+       Read 30 lines
+       Waiting…
+  ```
+- Из jsonl приходит первая строка — на ней можно якориться
 - Нужно исследовать какие тулы скрыты в CLI
 
 ### Reply support
@@ -261,6 +268,11 @@
 - `Claude started in claude-codogram-sublime`
 - `Connect: tmux attach -t claude-codogram-sublime`
 - Анпинить предыдущее при рестарте
+
+### Hardware stats
+Отображение CPU/RAM:
+- График или текстовый индикатор в /settings
+- Мониторинг потребления ресурсов Claude процессом
 
 ### Compacting indicator
 Отображение процесса компактинга контекста:

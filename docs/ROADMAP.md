@@ -183,10 +183,10 @@ Handle chat_id change when topics are enabled in existing group:
 
 ### Session state display & control
 Display and control Claude session state:
-- **/shift_tab command** — toggle approval mode, report change
-- **/settings enhancements** — current mode, background tasks count
-- **Context window indicator** — remaining space until compact
-- Parse status bar and context from tmux capture-pane
+- **/shift_tab command** — send Shift+Tab to tmux, report change ("Allow once → Allow for session")
+- **/settings enhancements** — current approval mode, background tasks count
+- **Context window indicator** — remaining space until compact (parse from jsonl or tmux screen)
+- Parse status bar from tmux capture-pane
 - Format: "Mode: Accept edits | Background: 3 | Context: 45%"
 
 ### Activity indicators
@@ -207,7 +207,14 @@ Detect MCP server trust prompts (box-style UI):
 Research and implement tool display improvements:
 - **Tool progress display** — show execution progress (currently parsed but not shown)
 - **Hidden tools filtering** — don't show TodoWrite and other internal tools
-- **Insight:** In Claude first line is static (Task/Tool name), rest scrolls
+- **Insight:** In Claude first line is static (Task/Tool name), rest scrolls:
+  ```
+  Task(Implement Task 1: Screen Parser)
+    ⎿  Read 46 lines
+       Read 30 lines
+       Waiting…
+  ```
+- First line from jsonl can be used as anchor
 - Need to research which tools are hidden in CLI
 
 ### Reply support
@@ -261,6 +268,11 @@ Pin message on session start:
 - `Claude started in claude-codogram-sublime`
 - `Connect: tmux attach -t claude-codogram-sublime`
 - Unpin previous on restart
+
+### Hardware stats
+Display CPU/RAM usage:
+- Graph or text indicator in /settings
+- Monitor Claude process resource consumption
 
 ### Compacting indicator
 Show context compacting progress:
