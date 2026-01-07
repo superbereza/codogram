@@ -202,6 +202,16 @@ Detect MCP server trust prompts (box-style UI):
 - "Enter to confirm · Esc to reject" footer
 - Need careful parsing to avoid false positives on numbered lists
 - See failed attempt: 2026-01-04 (broke permission detection everywhere)
+- See bug: [2026-01-07-mcp-trust-prompt-not-detected.md](bugs/active/2026-01-07-mcp-trust-prompt-not-detected.md)
+
+### Message queue until session ready
+Cache user messages while session is binding, send when ready:
+- After `/start` or `/branch`, session binding takes ~1-2 minutes
+- During this window messages go to tmux but responses don't appear
+- Solution: queue messages while `awaiting_new_session=True`
+- Send all queued messages when session binds
+- Show "⏳ Connecting..." feedback to user
+- See bug: [2026-01-07-session-not-immediately-active.md](bugs/active/2026-01-07-session-not-immediately-active.md)
 
 ### Tool visibility R&D
 Research and implement tool display improvements:
