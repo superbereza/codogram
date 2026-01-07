@@ -146,8 +146,64 @@ tail -f logs/codogram.log
 - **HTTP server**: Removed in favor of history.jsonl polling
 - **settings.json hooks**: No longer needed
 
+## Layered Architecture
+
+Проект использует слоистую архитектуру:
+
+```
+src/codogram/
+├── handlers/          # Thin routers — принимают Telegram events, делегируют в services
+├── services/          # Business logic — start_flow, branch, message_router, launch
+├── domain/            # Models, validators, FSM states
+├── middleware/        # Global middleware (AdminMiddleware)
+├── adapters/          # External integrations (telegram.py)
+├── keyboards/         # Inline keyboard builders
+└── *.py               # Core modules (tmux, watcher, poller, etc.)
+```
+
+**Принципы:**
+- Handlers не содержат бизнес-логику — только роутинг
+- Services не знают о Telegram API — работают с абстракциями
+- Domain models — чистые dataclasses без зависимостей
+
+## Feature Development Flow
+
+При разработке новой фичи придерживаемся следующего процесса:
+
+### 1. Brainstorming → Design
+Используем skill `superpowers:brainstorming` для проработки идеи:
+- Понимание требований через вопросы
+- Рассмотрение 2-3 подходов с trade-offs
+- Формирование дизайна по секциям с валидацией
+- Результат: `docs/designs/YYYY-MM-DD-<topic>.md`
+
+### 2. Planning → Implementation Plan
+Используем skill `superpowers:write-plan` для создания плана:
+- Декомпозиция на конкретные задачи
+- Учёт layered architecture
+- Результат: `docs/plans/YYYY-MM-DD-<topic>-plan.md`
+
+### 3. E2E Tests
+Перед/во время реализации прорабатываем E2E тесты:
+- Читаем `docs/e2e/CLAUDE.md` для понимания формата
+- Добавляем тесты в соответствующие файлы `docs/e2e/commands/`
+- Обновляем suites если нужно
+
+### 4. Implementation
+- Следуем плану и layered architecture
+- Код в соответствующих слоях
+- Тесты по ходу
+
+### 5. Completion
+После завершения фичи:
+- Переносим design в `docs/designs/done/`
+- Переносим plan в `docs/plans/done/` (если есть такая папка)
+- Актуализируем `docs/ROADMAP.md` и `docs/ROADMAP.ru.md`
+
 ## See also
 
 - `docs/setup.md` - Installation and setup guide
 - `docs/ONBOARDING.md` - Detailed onboarding for new Claude sessions
 - `docs/ROADMAP.md` - Future features and improvements
+- `docs/specs/tone-of-voice.md` - Message style guidelines
+- `docs/e2e/CLAUDE.md` - E2E testing guide
