@@ -250,6 +250,12 @@ Move all hardcoded strings to `src/codogram/strings.py`:
 
 ---
 
+### Manual topic registration
+When `/start` is called in a manually created topic:
+- If resume possible (archived topic with session_id) → resume without questions
+- Otherwise show menu: "Create thread" / "Create worktree"
+- Allows using standard Telegram UI for topic creation
+
 ### Queue reliability improvements
 Improve TelegramQueue resilience:
 - **Retry on network errors** — `ServerDisconnectedError` currently not retried, message lost

@@ -610,6 +610,15 @@ async def on_restart_confirm(callback: CallbackQuery, state: FSMContext, telegra
         await callback.answer("Session expired")
         return
 
+    # Cancel background tasks before killing tmux
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if project:
+        thread = project.get_thread(callback.message.message_thread_id)
+        if thread:
+            for task in [thread.launch_task, thread.watcher_task, thread.poller_task, thread.binding_task]:
+                if task and not task.done():
+                    task.cancel()
+
     result = start_flow.handle_restart_confirm(tmux_session)
 
     await _handle_callback_result(callback, state, result, telegram_queue)
