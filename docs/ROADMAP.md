@@ -157,6 +157,14 @@ Resume Claude session after crash or archived topic restore:
 - Worktrees preserved after /finish for easy resume
 - See [docs/designs/done/2026-01-05-session-resume.md](designs/done/2026-01-05-session-resume.md)
 
+### E2E test structure
+Manual E2E tests executed by Claude via Telegram MCP:
+- Test suites: smoke (~2 min), critical (~15 min), full (~30 min)
+- Tests organized by command: start, sessions, threads, branches, finish, permissions, watcher
+- MCP tools for sending commands, reading responses, clicking buttons
+- Bug documentation workflow with `docs/bugs/active/` reports
+- See [docs/designs/done/2026-01-06-e2e-test-structure.md](designs/done/2026-01-06-e2e-test-structure.md)
+
 ## Backlog
 
 ### Queue reliability improvements

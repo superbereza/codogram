@@ -73,3 +73,73 @@ mcp__telegram__list_messages(chat_id=-1003356094635, limit=10)
 **Expected:**
 - UI: Multiple messages if output > 4096 chars
 - State: All chunks delivered in order
+
+---
+
+## TC-WATCHER-004: Watcher starts for resumed session
+
+**Tags:** critical, watcher, resume
+**Preconditions:** Archived topic with session_id, tmux NOT running
+
+**Setup:**
+```bash
+# Ensure topic is archived and has session_id
+cat .config.json | jq '.projects["codogram-testing-area"].threads["TEST_TOPIC"]'
+# Should show: "archived": true, "session_id": "xxx"
+
+# Kill tmux if running
+tmux kill-session -t claude-codogram-testing-area-TEST_TOPIC 2>/dev/null || true
+```
+
+**Steps:**
+```python
+# 1. Resume session via /start in archived topic
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=TEST_TOPIC, text="/start")
+# Wait 30s for Claude to start and bind
+
+# 2. Send message that triggers tool call
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=TEST_TOPIC, text="List files in current directory")
+# Wait 30s
+
+# 3. Check for tool call output
+mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=TEST_TOPIC, limit=10)
+```
+
+**Expected:**
+- UI: Tool call output appears in topic (e.g., "Read" tool or file listing)
+- State: `thread.watcher_task` is not None and not done
+- Note: This test verifies fix for bug where watcher didn't start on resume
+
+---
+
+## TC-WATCHER-005: Watcher output after bot restart
+
+**Tags:** full, watcher, lifecycle
+**Preconditions:** Running session, bot about to restart
+
+**Setup:**
+```bash
+# Ensure active session
+tmux has-session -t claude-codogram-testing-area-main
+```
+
+**Steps:**
+```bash
+# 1. Restart bot
+./restart.sh
+
+# Wait 5s for bot to start
+```
+
+```python
+# 2. Send message that triggers tool call
+mcp__telegram__send_message(chat_id=-1003356094635, message="Echo test after restart")
+# Wait 30s
+
+# 3. Check for output
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=10)
+```
+
+**Expected:**
+- UI: Tool call output appears after bot restart
+- State: Watcher restarted by first user message

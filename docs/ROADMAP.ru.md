@@ -157,6 +157,14 @@
 - Worktrees сохраняются после /finish для удобного resume
 - См. [docs/designs/done/2026-01-05-session-resume.md](designs/done/2026-01-05-session-resume.md)
 
+### E2E тестовая структура
+Ручные E2E тесты, выполняемые Claude через Telegram MCP:
+- Тестовые наборы: smoke (~2 мин), critical (~15 мин), full (~30 мин)
+- Тесты по командам: start, sessions, threads, branches, finish, permissions, watcher
+- MCP инструменты для отправки команд, чтения ответов, нажатия кнопок
+- Workflow документирования багов с репортами в `docs/bugs/active/`
+- См. [docs/designs/done/2026-01-06-e2e-test-structure.md](designs/done/2026-01-06-e2e-test-structure.md)
+
 ## Backlog
 
 ### Улучшение надёжности очереди

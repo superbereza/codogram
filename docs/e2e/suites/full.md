@@ -45,6 +45,14 @@
 | ID | Название | Файл |
 |----|----------|------|
 | TC-WATCHER-003 | Long output chunking | commands/watcher.md |
+| TC-WATCHER-004 | Watcher starts for resumed session | commands/watcher.md |
+| TC-WATCHER-005 | Watcher output after bot restart | commands/watcher.md |
+
+### Permissions Extended
+| ID | Название | Файл |
+|----|----------|------|
+| TC-PERMISSIONS-005 | Poller detects new folder prompt | commands/permissions.md |
+| TC-PERMISSIONS-006 | Poller starts for resumed session | commands/permissions.md |
 
 ## Включённые тесты из Critical
 

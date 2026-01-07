@@ -131,3 +131,39 @@ mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
 **Expected:**
 - UI: Poller shows "Work in new folder?" or similar prompt with Yes/No buttons
 - State: Prompt detected from tmux screen, buttons delivered to correct topic
+
+---
+
+## TC-PERMISSIONS-006: Poller starts for resumed session
+
+**Tags:** critical, permissions, resume
+**Preconditions:** Archived topic with session_id, tmux NOT running
+
+**Setup:**
+```bash
+# Ensure topic is archived and has session_id
+cat .config.json | jq '.projects["codogram-testing-area"].threads["TEST_TOPIC"]'
+# Should show: "archived": true, "session_id": "xxx"
+
+# Kill tmux if running
+tmux kill-session -t claude-codogram-testing-area-TEST_TOPIC 2>/dev/null || true
+```
+
+**Steps:**
+```python
+# 1. Resume session via /start in archived topic
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=TEST_TOPIC, text="/start")
+# Wait 20s for Claude to start
+
+# 2. Send message that triggers permission
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=TEST_TOPIC, text="Run: echo poller test")
+# Wait 15s for permission prompt
+
+# 3. Check for permission buttons
+mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
+```
+
+**Expected:**
+- UI: Permission buttons appear in topic (Yes/No)
+- State: `thread.poller_task` is not None and not done
+- Note: This test verifies poller starts immediately on resume (not just on first message)
