@@ -167,34 +167,11 @@
 
 ## Backlog
 
-### Улучшение надёжности очереди
-Повышение устойчивости TelegramQueue:
-- **Retry на network errors** — `ServerDisconnectedError` сейчас не ретраится, сообщение теряется
-- **1 rps rate limiting** — проактивный троттлинг чтобы не попадать в лимиты Telegram
-- **Exponential backoff** — для retry при rate limit
-
-### Cleanup command
-Явное удаление архивных веток когда нужно место или git cleanup:
-- `/cleanup` — список архивных веток с днями неактивности
-- `/cleanup <branch>` — удалить конкретную ветку
-- Удаляет worktree и git branch, сохраняет session jsonl
-- См. [docs/designs/2026-01-05-cleanup-command.md](designs/2026-01-05-cleanup-command.md)
-
-### Поддержка MCP trust prompt
-Обнаружение промптов доверия MCP серверам (box-style UI):
-- Отличается от стандартных: `❯` на отдельной строке, опции вокруг
-- Box-символы `│` и `╰────╯` как рамка
-- Футер "Enter to confirm · Esc to reject"
-- Нужен аккуратный парсинг чтобы не ловить нумерованные списки
-- См. неудачную попытку: 2026-01-04 (сломало детекцию везде)
-
-### Детекция выхода Claude
-Обнаружение нормального выхода Claude (не краша):
-- Показывать `[~] Claude exited. Use /start to restart.`
-- Определять shell prompt после исчезновения Claude UI
-- Трекать `claude_was_active` чтобы избежать false positives на старте
-- Отличать shell prompt `❯` от Claude selector `❯ 1. Yes`
-- См. откаченную попытку: 8b6baf8 (были false positives)
+### Thread create UX
+Улучшить `/thread_create`:
+- Без аргумента → показать кнопки с вариантами имён (magic names)
+- Или поле ввода "Введите название"
+- Убрать необходимость вводить имя в той же строке
 
 ### Миграция группа → супергруппа
 Обработка смены chat_id при включении топиков в существующей группе:
@@ -204,9 +181,39 @@
 - Автообновление chat_id в конфиге при миграции
 - Уведомление пользователя об успешной миграции
 
-### GitHub Actions CI
-- Workflow для запуска тестов на PR
-- pytest + type checking
+### Отображение и управление состоянием сессии
+Показ и управление состоянием Claude сессии:
+- **/shift_tab команда** — переключение режима approval, репорт изменения
+- **/settings улучшения** — текущий режим, количество background tasks
+- **Индикатор контекстного окна** — сколько осталось до compact
+- Парсить статус бар и контекст из tmux capture-pane
+- Формат: "Mode: Accept edits | Background: 3 | Context: 45%"
+
+### Activity indicators
+Отображение что Claude думает/работает:
+- "thinking..." когда Claude обрабатывает
+- Throbber/typing indicator
+- Слова типа "Hmm", "Let me think"
+
+### Поддержка MCP trust prompt
+Обнаружение промптов доверия MCP серверам (box-style UI):
+- Отличается от стандартных: `❯` на отдельной строке, опции вокруг
+- Box-символы `│` и `╰────╯` как рамка
+- Футер "Enter to confirm · Esc to reject"
+- Нужен аккуратный парсинг чтобы не ловить нумерованные списки
+- См. неудачную попытку: 2026-01-04 (сломало детекцию везде)
+
+### Tool visibility R&D
+Исследование и улучшение отображения тулов:
+- **Tool progress display** — показ прогресса выполнения (сейчас парсится, но не показывается)
+- **Hidden tools filtering** — не показывать TodoWrite и другие internal тулы
+- **Инсайт:** В Claude первая строка статична (Task/Tool name), остальные бегут
+- Нужно исследовать какие тулы скрыты в CLI
+
+### Reply support
+При реплае на сообщение отправлять контекст в tmux:
+- Цитировать кусочек сообщения на которое ответили
+- Формат: `> цитата\n\nтекст ответа`
 
 ### Migrate strings to strings.py
 Перенести все захардкоженные строки в `src/codogram/strings.py`:
@@ -216,6 +223,33 @@
 - keyboards.py — кнопки
 - services/start_flow.py — кнопки wizard'а
 - См. `docs/specs/tone-of-voice.md` для гайдлайнов
+
+---
+
+### Улучшение надёжности очереди
+Повышение устойчивости TelegramQueue:
+- **Retry на network errors** — `ServerDisconnectedError` сейчас не ретраится, сообщение теряется
+- **1 rps rate limiting** — проактивный троттлинг чтобы не попадать в лимиты Telegram
+- **Exponential backoff** — для retry при rate limit
+
+### Детекция выхода Claude
+Обнаружение нормального выхода Claude (не краша):
+- Показывать `[~] Claude exited. Use /start to restart.`
+- Определять shell prompt после исчезновения Claude UI
+- Трекать `claude_was_active` чтобы избежать false positives на старте
+- Отличать shell prompt `❯` от Claude selector `❯ 1. Yes`
+- См. откаченную попытку: 8b6baf8 (были false positives)
+
+### Cleanup command
+Явное удаление архивных веток когда нужно место или git cleanup:
+- `/cleanup` — список архивных веток с днями неактивности
+- `/cleanup <branch>` — удалить конкретную ветку
+- Удаляет worktree и git branch, сохраняет session jsonl
+- См. [docs/designs/2026-01-05-cleanup-command.md](designs/2026-01-05-cleanup-command.md)
+
+### GitHub Actions CI
+- Workflow для запуска тестов на PR
+- pytest + type checking
 
 ### Voice → Whisper
 Голосовые сообщения через Whisper transcription:
@@ -228,12 +262,6 @@
 - `Connect: tmux attach -t claude-codogram-sublime`
 - Анпинить предыдущее при рестарте
 
-### Activity indicators
-Отображение что Claude думает/работает:
-- "thinking..." когда Claude обрабатывает
-- Throbber/typing indicator
-- Слова типа "Hmm", "Let me think"
-
 ### Compacting indicator
 Отображение процесса компактинга контекста:
 - Детектить compacting из tmux capture-pane
@@ -244,37 +272,6 @@
 - Syntax highlighting для кода
 - Collapsible для длинных выводов
 - Превью для файлов
-
-### Hidden tools filtering
-Не показывать тулы которых нет в CLI интерфейсе:
-- TodoWrite
-- Другие internal тулы
-- Нужно исследовать какие именно скрыты
-
-### /settings command enhancements
-Отображение текущего состояния Claude сессии:
-- Текущий режим approval (accept edits, allow all, etc.)
-- Количество background tasks
-- Парсить из tmux capture-pane статус бар
-- Формат: "Mode: Accept edits | Background: 3 tasks"
-- **Hardware stats** — график CPU/RAM использования
-
-### Thread create UX
-Улучшить `/thread_create`:
-- Без аргумента → показать кнопки с вариантами имён (magic names)
-- Или поле ввода "Введите название"
-- Убрать необходимость вводить имя в той же строке
-
-### /shift_tab command
-Команда для переключения режима approval:
-- Отправляет Shift+Tab в tmux
-- Репортит изменение режима: "Allow once → Allow for session"
-- Парсит текущий выбор из tmux capture-pane
-
-### Reply support
-При реплае на сообщение отправлять контекст в tmux:
-- Цитировать кусочек сообщения на которое ответили
-- Формат: `> цитата\n\nтекст ответа`
 
 ### Images and files support
 Поддержка отправки картинок и файлов от админа:
@@ -292,28 +289,10 @@
 - Сейчас добавляются в tmux с двумя слэшами, не отправляются
 - Нужен fallback в `on_message` или отдельный хэндлер
 
-### Tool progress display
-Показывать прогресс выполнения инструментов:
-- Расширить Task 5 в плане permission-detection
-- Сейчас `ToolProgress` парсится, но не отображается (pass)
-- **Инсайт:** В Claude первая строка статична (Task/Tool name), остальные бегут
-  ```
-  Task(Implement Task 1: Screen Parser)
-    ⎿  Read 46 lines
-       Read 30 lines
-       Waiting…
-  ```
-- Из jsonl приходит первая строка — на ней можно якориться
-
 ### Ultrathink mode
 `/ultrathink_mode` toggle, добавляет " ultrathink" к каждому сообщению:
 - Хранить в per-project settings
 - Показывать статус при /start
-
-### Context window indicator
-Показывать сколько осталось до compact:
-- Парсить из jsonl (если есть) или tmux screen
-- Показывать в /settings и/или в статусной строке
 
 ### Ctrl+B command
 `/ctrl_b` отправляет Ctrl+B в tmux:

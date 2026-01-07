@@ -167,11 +167,33 @@ Manual E2E tests executed by Claude via Telegram MCP:
 
 ## Backlog
 
-### Queue reliability improvements
-Improve TelegramQueue resilience:
-- **Retry on network errors** — `ServerDisconnectedError` currently not retried, message lost
-- **1 rps rate limiting** — proactive throttling to avoid hitting Telegram limits
-- **Exponential backoff** — for rate limit retries
+### Thread create UX
+Improve `/thread_create`:
+- Without argument → show buttons with name options (magic names)
+- Or input field "Enter name"
+- Remove need to enter name on same line
+
+### Group → Supergroup migration
+Handle chat_id change when topics are enabled in existing group:
+- Telegram changes chat_id when converting group to supergroup (forum)
+- Current behavior: project becomes orphaned, need to /start again
+- Solution: listen for `message.migrate_to_chat_id` event
+- Auto-update chat_id in config when migration detected
+- Notify user about successful migration
+
+### Session state display & control
+Display and control Claude session state:
+- **/shift_tab command** — toggle approval mode, report change
+- **/settings enhancements** — current mode, background tasks count
+- **Context window indicator** — remaining space until compact
+- Parse status bar and context from tmux capture-pane
+- Format: "Mode: Accept edits | Background: 3 | Context: 45%"
+
+### Activity indicators
+Show that Claude is thinking/working:
+- "thinking..." when Claude is processing
+- Throbber/typing indicator
+- Words like "Hmm", "Let me think"
 
 ### MCP trust prompt support
 Detect MCP server trust prompts (box-style UI):
@@ -180,6 +202,35 @@ Detect MCP server trust prompts (box-style UI):
 - "Enter to confirm · Esc to reject" footer
 - Need careful parsing to avoid false positives on numbered lists
 - See failed attempt: 2026-01-04 (broke permission detection everywhere)
+
+### Tool visibility R&D
+Research and implement tool display improvements:
+- **Tool progress display** — show execution progress (currently parsed but not shown)
+- **Hidden tools filtering** — don't show TodoWrite and other internal tools
+- **Insight:** In Claude first line is static (Task/Tool name), rest scrolls
+- Need to research which tools are hidden in CLI
+
+### Reply support
+When replying to message, send context to tmux:
+- Quote piece of message being replied to
+- Format: `> quote\n\nresponse text`
+
+### Migrate strings to strings.py
+Move all hardcoded strings to `src/codogram/strings.py`:
+- handlers/*.py — command responses
+- launch_animation.py — startup statuses
+- history_watcher.py — notifications
+- keyboards.py — buttons
+- services/start_flow.py — wizard buttons
+- See `docs/specs/tone-of-voice.md` for guidelines
+
+---
+
+### Queue reliability improvements
+Improve TelegramQueue resilience:
+- **Retry on network errors** — `ServerDisconnectedError` currently not retried, message lost
+- **1 rps rate limiting** — proactive throttling to avoid hitting Telegram limits
+- **Exponential backoff** — for rate limit retries
 
 ### Claude exit detection
 Detect when Claude exits normally (not crash):
@@ -196,26 +247,9 @@ Explicit deletion of archived branches when disk space or git cleanup needed:
 - Deletes worktree and git branch, preserves session jsonl
 - See [docs/designs/2026-01-05-cleanup-command.md](designs/2026-01-05-cleanup-command.md)
 
-### Group → Supergroup migration
-Handle chat_id change when topics are enabled in existing group:
-- Telegram changes chat_id when converting group to supergroup (forum)
-- Current behavior: project becomes orphaned, need to /start again
-- Solution: listen for `message.migrate_to_chat_id` event
-- Auto-update chat_id in config when migration detected
-- Notify user about successful migration
-
 ### GitHub Actions CI
 - Workflow for running tests on PR
 - pytest + type checking
-
-### Migrate strings to strings.py
-Move all hardcoded strings to `src/codogram/strings.py`:
-- handlers/*.py — command responses
-- launch_animation.py — startup statuses
-- history_watcher.py — notifications
-- keyboards.py — buttons
-- services/start_flow.py — wizard buttons
-- See `docs/specs/tone-of-voice.md` for guidelines
 
 ### Voice → Whisper
 Voice messages via Whisper transcription:
@@ -228,12 +262,6 @@ Pin message on session start:
 - `Connect: tmux attach -t claude-codogram-sublime`
 - Unpin previous on restart
 
-### Activity indicators
-Show that Claude is thinking/working:
-- "thinking..." when Claude is processing
-- Throbber/typing indicator
-- Words like "Hmm", "Let me think"
-
 ### Compacting indicator
 Show context compacting progress:
 - Detect compacting from tmux capture-pane
@@ -244,37 +272,6 @@ Beautiful tool results formatting:
 - Syntax highlighting for code
 - Collapsible for long outputs
 - File previews
-
-### Hidden tools filtering
-Don't show tools not in CLI interface:
-- TodoWrite
-- Other internal tools
-- Need to research which are hidden
-
-### /settings command enhancements
-Display current Claude session state:
-- Current approval mode (accept edits, allow all, etc.)
-- Number of background tasks
-- Parse status bar from tmux capture-pane
-- Format: "Mode: Accept edits | Background: 3 tasks"
-- **Hardware stats** — CPU/RAM usage graph
-
-### Thread create UX
-Improve `/thread_create`:
-- Without argument → show buttons with name options (magic names)
-- Or input field "Enter name"
-- Remove need to enter name on same line
-
-### /shift_tab command
-Command to toggle approval mode:
-- Sends Shift+Tab to tmux
-- Reports mode change: "Allow once → Allow for session"
-- Parses current selection from tmux capture-pane
-
-### Reply support
-When replying to message, send context to tmux:
-- Quote piece of message being replied to
-- Format: `> quote\n\nresponse text`
 
 ### Images and files support
 Support sending images and files from admin:
@@ -292,28 +289,10 @@ Default private chat with bot linked to codogram folder:
 - Currently added to tmux with double slashes, not sent
 - Need fallback in `on_message` or separate handler
 
-### Tool progress display
-Show tool execution progress:
-- Extend Task 5 in permission-detection plan
-- Currently `ToolProgress` is parsed but not displayed (pass)
-- **Insight:** In Claude first line is static (Task/Tool name), rest scrolls
-  ```
-  Task(Implement Task 1: Screen Parser)
-    ⎿  Read 46 lines
-       Read 30 lines
-       Waiting…
-  ```
-- First line from jsonl can be used as anchor
-
 ### Ultrathink mode
 `/ultrathink_mode` toggle, adds " ultrathink" to each message:
 - Store in per-project settings
 - Show status on /start
-
-### Context window indicator
-Show remaining space until compact:
-- Parse from jsonl (if available) or tmux screen
-- Show in /settings and/or status line
 
 ### Ctrl+B command
 `/ctrl_b` sends Ctrl+B to tmux:
