@@ -355,25 +355,63 @@ git commit -m "refactor: use menu service for global commands"
 
 **Files:**
 - Modify: `src/codogram/handlers/start.py`
-- Modify: `tests/test_handlers_start.py` (if exists)
+- Create: `tests/test_menu_registration.py`
 
-**Step 1: Identify insertion point**
+**Functions requiring menu registration:**
+1. `_connect_to_session` (line 348) — connect to existing tmux
+2. `_launch_claude` (line 180) — launch from message
+3. `_connect_to_session_from_callback` (line 360) — connect from callback
 
-After successful project registration in `cmd_start` (around line 385) and in `_launch_claude` helpers.
+Note: `_launch_claude_in_thread` does NOT need menu registration — menu is already set at project level.
 
-Best place: after `_handle_result` when result.action is CONNECT or LAUNCH.
+**Step 1: Write the failing test**
 
-Actually, simpler: add to `_launch_claude` and `_connect_to_session` after project is confirmed.
+```python
+# tests/test_menu_registration.py
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
-**Step 2: Add import at top of file**
+
+@pytest.mark.asyncio
+async def test_connect_to_session_registers_menu():
+    """_connect_to_session should call register_menu_for_chat."""
+    from codogram.handlers.start import _connect_to_session
+    from codogram.services.start_flow import FlowResult, FlowAction
+
+    message = MagicMock()
+    message.chat.id = 123
+    message.chat.is_forum = True
+    message.bot = AsyncMock()
+
+    result = FlowResult(action=FlowAction.CONNECT, tmux_session="claude-test")
+    telegram_queue = AsyncMock()
+
+    mock_project = MagicMock()
+    mock_project.chat_id = 123
+
+    with patch("codogram.handlers.start.project_manager") as pm, \
+         patch("codogram.handlers.start.register_menu_for_chat") as reg_menu:
+        pm.get_by_chat.return_value = mock_project
+        reg_menu.return_value = None
+
+        await _connect_to_session(message, result, telegram_queue)
+
+        reg_menu.assert_called_once_with(message.bot, 123, is_forum=True)
+```
+
+**Step 2: Run test to verify it fails**
+
+Run: `pytest tests/test_menu_registration.py -v`
+Expected: FAIL (register_menu_for_chat not imported/called)
+
+**Step 3: Add import at top of start.py**
 
 ```python
 from ..services.menu import register_menu_for_chat
 ```
 
-**Step 3: Add menu registration after project registration**
+**Step 4: Add menu registration to _connect_to_session (line 348)**
 
-In `_connect_to_session` (around line 348), after `project_manager._save()`:
 ```python
 async def _connect_to_session(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
     """Connect to existing tmux session."""
@@ -395,7 +433,47 @@ async def _connect_to_session(message: Message, result: FlowResult, telegram_que
         )
 ```
 
-Similar change in `_launch_claude` after getting project.
+**Step 5: Add menu registration to _launch_claude (line 180)**
+
+After `project = project_manager.get_by_chat(message.chat.id)` check:
+```python
+async def _launch_claude(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
+    """Launch Claude session from message context."""
+    from ..launch_animation import launch_with_animation
+
+    project = project_manager.get_by_chat(message.chat.id)
+    if not project:
+        await telegram_queue.reply(message, "Project not found", parse_mode=None)
+        return
+
+    # Register menu based on chat type
+    await register_menu_for_chat(
+        message.bot,
+        message.chat.id,
+        is_forum=message.chat.is_forum or False
+    )
+
+    thread = project.get_or_create_thread(None, "main")
+    # ... rest unchanged
+```
+
+**Step 6: Add menu registration to _connect_to_session_from_callback (line 360)**
+
+```python
+async def _connect_to_session_from_callback(callback: CallbackQuery, result: FlowResult):
+    """Connect to existing tmux session from callback."""
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if project:
+        project.tmux_session = result.tmux_session
+        project_manager._save()
+
+        # Register menu based on chat type
+        await register_menu_for_chat(
+            callback.bot,
+            callback.message.chat.id,
+            is_forum=callback.message.chat.is_forum or False
+        )
+```
 
 **Step 4: Run tests**
 
@@ -414,8 +492,19 @@ git commit -m "feat: register scope-based menu on /start"
 ## Task 6: Fix Permission Poller Dynamic chat_id
 
 **Files:**
-- Modify: `src/codogram/permission_poller.py:115,142-144,203-206,232-241,249-260,275-276`
+- Modify: `src/codogram/permission_poller.py`
 - Modify: `tests/test_permission_poller.py`
+
+**Lines to change:**
+- Line 115: DELETE `chat_id = project.chat_id` (cached assignment)
+- Line 143: `chat_id` → `project.chat_id` (crash detection batch)
+- Line 183: `chat_id` → `project.chat_id` (try_auto_accept call)
+- Line 204: `chat_id` → `project.chat_id` (DEBOUNCING batch)
+- Line 213: `chat_id` → `project.chat_id` (keyboard batch)
+- Line 235, 239: `chat_id` → `project.chat_id` (SHOWING cleanup delete_message)
+- Line 256, 260: `chat_id` → `project.chat_id` (SHOWING resend delete_message)
+- Line 275: `chat_id` → `project.chat_id` (resend batch)
+- Line 281: `chat_id` → `project.chat_id` (resend keyboard batch)
 
 **Step 1: Write the failing test**
 
@@ -639,7 +728,7 @@ git commit -m "docs: add E2E tests for migration feature"
 
 ## Task 8: Final Verification
 
-**Step 1: Run all tests**
+**Step 1: Run all unit tests**
 
 ```bash
 pytest -v
@@ -647,15 +736,44 @@ pytest -v
 
 Expected: All tests PASS
 
-**Step 2: Run bot and verify manually**
+**Step 2: Run specific regression tests**
+
+```bash
+# Menu service
+pytest tests/test_menu_service.py -v
+
+# Migration handler
+pytest tests/test_migration_handler.py -v
+
+# Menu registration
+pytest tests/test_menu_registration.py -v
+
+# Permission poller
+pytest tests/test_permission_poller.py -v
+
+# Start handlers (may be affected)
+pytest tests/test_handlers_start.py -v
+pytest tests/test_start_flow_service.py -v
+```
+
+**Step 3: Run bot and verify manually**
 
 ```bash
 ./restart.sh
+tail -f logs/codogram.log
 ```
 
 Check logs for any errors.
 
-**Step 3: Final commit (if any fixes needed)**
+**Step 4: E2E Regression (ask user for test chat)**
+
+Run E2E smoke suite from `docs/e2e/suites/smoke.md`:
+- TC-START-001..007 (start flow)
+- TC-THREAD-* (thread creation)
+- TC-BRANCH-* (branch creation)
+- TC-PERM-* (permission handling)
+
+**Step 5: Final commit (if any fixes needed)**
 
 ```bash
 git status
