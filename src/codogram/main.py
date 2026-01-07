@@ -50,7 +50,7 @@ async def main():
         BotCommand(command="start", description="Connect Claude or show status"),
         BotCommand(command="settings", description="View current settings"),
         BotCommand(command="restart", description="Force restart Claude"),
-        BotCommand(command="my_chat_id", description="Show chat and thread IDs"),
+        BotCommand(command="get_debug_ids", description="Show chat and thread IDs"),
         BotCommand(command="help", description="List all commands"),
     ])
 

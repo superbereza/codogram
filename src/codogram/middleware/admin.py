@@ -33,7 +33,7 @@ class AdminMiddleware(BaseMiddleware):
         dp.message.middleware(AdminMiddleware())
         dp.callback_query.middleware(AdminMiddleware())
 
-    Non-admins receive their ID automatically - no /my_chat_id needed.
+    Non-admins receive their ID automatically - no /get_debug_ids needed.
     """
 
     async def __call__(
