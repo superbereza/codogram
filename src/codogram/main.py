@@ -17,6 +17,7 @@ from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 from .logging_config import setup_logging, logger
 from .telegram_queue import TelegramQueue
+from .services.menu import BASIC_COMMANDS
 
 telegram_queue: TelegramQueue | None = None
 
@@ -39,20 +40,8 @@ async def main():
     # Register handler routers (all protected by AdminMiddleware)
     register_handlers(dp)
 
-    from aiogram.types import BotCommand
-    await bot.set_my_commands([
-        BotCommand(command="esc", description="Cancel current operation"),
-        BotCommand(command="auto_accept", description="Toggle auto-accept mode"),
-        BotCommand(command="thread", description="New topic in project directory"),
-        BotCommand(command="branch", description="New isolated feature branch + topic"),
-        BotCommand(command="clear", description="Clear context, start fresh"),
-        BotCommand(command="finish", description="Merge branch, archive topic"),
-        BotCommand(command="start", description="Connect Claude or show status"),
-        BotCommand(command="settings", description="View current settings"),
-        BotCommand(command="restart", description="Force restart Claude"),
-        BotCommand(command="get_debug_ids", description="Show chat and thread IDs"),
-        BotCommand(command="help", description="List all commands"),
-    ])
+    # Set global default menu (for new chats)
+    await bot.set_my_commands(BASIC_COMMANDS)
 
     # Define task starters
     async def start_poller(project: ProjectState) -> asyncio.Task:

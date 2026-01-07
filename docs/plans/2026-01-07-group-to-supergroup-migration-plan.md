@@ -81,34 +81,40 @@ Expected: FAIL with "ModuleNotFoundError: No module named 'codogram.services.men
 
 ```python
 # src/codogram/services/menu.py
-"""Menu registration service for scope-based bot commands."""
+"""Menu registration service for scope-based bot commands.
+
+Single source of truth for command definitions.
+BASIC_COMMANDS and FORUM_COMMANDS are derived from _ALL_COMMANDS.
+"""
 from aiogram import Bot
 from aiogram.types import BotCommand, BotCommandScopeChat
 
+# Single source: (command, description, is_basic)
+# is_basic=True → included in basic menu
+# All commands included in forum menu
+_ALL_COMMANDS = [
+    ("esc", "Cancel current operation", True),
+    ("auto_accept", "Toggle auto-accept mode", True),
+    ("thread", "New topic in project directory", True),
+    ("branch", "New isolated feature branch + topic", False),  # forum only
+    ("clear", "Clear context, start fresh", True),
+    ("finish", "Merge branch, archive topic", False),  # forum only
+    ("start", "Connect Claude or show status", True),
+    ("settings", "View current settings", True),
+    ("restart", "Force restart Claude", True),
+    ("get_debug_ids", "Show chat and thread IDs", True),
+    ("help", "List all commands", True),
+]
+
+# Derived lists (no duplication)
 BASIC_COMMANDS = [
-    BotCommand(command="esc", description="Cancel current operation"),
-    BotCommand(command="auto_accept", description="Toggle auto-accept mode"),
-    BotCommand(command="thread", description="New topic in project directory"),
-    BotCommand(command="clear", description="Clear context, start fresh"),
-    BotCommand(command="start", description="Connect Claude or show status"),
-    BotCommand(command="settings", description="View current settings"),
-    BotCommand(command="restart", description="Force restart Claude"),
-    BotCommand(command="get_debug_ids", description="Show chat and thread IDs"),
-    BotCommand(command="help", description="List all commands"),
+    BotCommand(command=cmd, description=desc)
+    for cmd, desc, is_basic in _ALL_COMMANDS if is_basic
 ]
 
 FORUM_COMMANDS = [
-    BotCommand(command="esc", description="Cancel current operation"),
-    BotCommand(command="auto_accept", description="Toggle auto-accept mode"),
-    BotCommand(command="thread", description="New topic in project directory"),
-    BotCommand(command="branch", description="New isolated feature branch + topic"),
-    BotCommand(command="clear", description="Clear context, start fresh"),
-    BotCommand(command="finish", description="Merge branch, archive topic"),
-    BotCommand(command="start", description="Connect Claude or show status"),
-    BotCommand(command="settings", description="View current settings"),
-    BotCommand(command="restart", description="Force restart Claude"),
-    BotCommand(command="get_debug_ids", description="Show chat and thread IDs"),
-    BotCommand(command="help", description="List all commands"),
+    BotCommand(command=cmd, description=desc)
+    for cmd, desc, _ in _ALL_COMMANDS
 ]
 
 
@@ -206,6 +212,7 @@ from ..logging_config import logger
 
 router = Router(name="migration")
 
+# TODO: Move to strings.py when centralizing message strings
 MIGRATION_MESSAGE = """`[v]` Topics enabled
 
 Multi-session mode unlocked:
@@ -357,13 +364,19 @@ git commit -m "refactor: use menu service for global commands"
 - Modify: `src/codogram/handlers/start.py`
 - Create: `tests/test_menu_registration.py`
 
-**Functions requiring menu registration:**
-1. `_connect_to_session` (line 348) — connect to existing tmux
-2. `_launch_claude` (line 180) — launch from message
-3. `_launch_claude_from_callback` (line 207) — launch from callback (after git setup)
-4. `_connect_to_session_from_callback` (line 360) — connect from callback
+**Why these 4 functions need menu registration:**
 
-Note: `_launch_claude_in_thread` does NOT need menu registration — menu is already set at project level.
+Menu must be registered when a project becomes "active" (user can interact with Claude).
+There are exactly 4 entry points where this happens:
+
+1. `_connect_to_session` — connect to existing tmux (from message)
+2. `_launch_claude` — launch new Claude (from message)
+3. `_launch_claude_from_callback` — launch new Claude (from callback after git setup)
+4. `_connect_to_session_from_callback` — connect to existing tmux (from callback)
+
+Note: `_launch_claude_in_thread` does NOT need menu registration — menu is already set at project level when main thread was created.
+
+**DRY approach:** Create a helper function to avoid copy-pasting registration code 4 times.
 
 **Step 1: Write the failing test**
 
@@ -373,45 +386,64 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
+def test_register_chat_menu_helper_exists():
+    """_register_chat_menu helper should exist."""
+    from codogram.handlers.start import _register_chat_menu
+    import asyncio
+    assert asyncio.iscoroutinefunction(_register_chat_menu)
+
+
 @pytest.mark.asyncio
-async def test_connect_to_session_registers_menu():
-    """_connect_to_session should call register_menu_for_chat."""
-    from codogram.handlers.start import _connect_to_session
-    from codogram.services.start_flow import FlowResult, FlowAction
+async def test_register_chat_menu_calls_service():
+    """_register_chat_menu should delegate to register_menu_for_chat."""
+    from codogram.handlers.start import _register_chat_menu
 
-    message = MagicMock()
-    message.chat.id = 123
-    message.chat.is_forum = True
-    message.bot = AsyncMock()
+    bot = AsyncMock()
+    chat = MagicMock()
+    chat.id = 123
+    chat.is_forum = True
 
-    result = FlowResult(action=FlowAction.CONNECT, tmux_session="claude-test")
-    telegram_queue = AsyncMock()
+    with patch("codogram.handlers.start.register_menu_for_chat") as reg_menu:
+        await _register_chat_menu(bot, chat)
+        reg_menu.assert_called_once_with(bot, 123, is_forum=True)
 
-    mock_project = MagicMock()
-    mock_project.chat_id = 123
 
-    with patch("codogram.handlers.start.project_manager") as pm, \
-         patch("codogram.handlers.start.register_menu_for_chat") as reg_menu:
-        pm.get_by_chat.return_value = mock_project
-        reg_menu.return_value = None
+@pytest.mark.asyncio
+async def test_register_chat_menu_handles_none_is_forum():
+    """_register_chat_menu should handle is_forum=None as False."""
+    from codogram.handlers.start import _register_chat_menu
 
-        await _connect_to_session(message, result, telegram_queue)
+    bot = AsyncMock()
+    chat = MagicMock()
+    chat.id = 456
+    chat.is_forum = None
 
-        reg_menu.assert_called_once_with(message.bot, 123, is_forum=True)
+    with patch("codogram.handlers.start.register_menu_for_chat") as reg_menu:
+        await _register_chat_menu(bot, chat)
+        reg_menu.assert_called_once_with(bot, 456, is_forum=False)
 ```
 
 **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/test_menu_registration.py -v`
-Expected: FAIL (register_menu_for_chat not imported/called)
+Expected: FAIL (_register_chat_menu not found)
 
-**Step 3: Add import at top of start.py**
+**Step 3: Add import and helper at top of start.py**
 
 ```python
 from ..services.menu import register_menu_for_chat
+
+
+async def _register_chat_menu(bot: Bot, chat) -> None:
+    """Register scope-based menu for chat.
+
+    Helper to avoid repeating registration logic in 4 entry points.
+    Called when project becomes active (connect or launch).
+    """
+    await register_menu_for_chat(bot, chat.id, is_forum=chat.is_forum or False)
 ```
 
-**Step 4: Add menu registration to _connect_to_session (line 348)**
+**Step 4: Add to _connect_to_session (line 348)**
 
 ```python
 async def _connect_to_session(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
@@ -421,12 +453,7 @@ async def _connect_to_session(message: Message, result: FlowResult, telegram_que
         project.tmux_session = result.tmux_session
         project_manager._save()
 
-        # Register menu based on chat type
-        await register_menu_for_chat(
-            message.bot,
-            message.chat.id,
-            is_forum=message.chat.is_forum or False
-        )
+        await _register_chat_menu(message.bot, message.chat)
 
         await telegram_queue.reply(
             message,
@@ -434,9 +461,8 @@ async def _connect_to_session(message: Message, result: FlowResult, telegram_que
         )
 ```
 
-**Step 5: Add menu registration to _launch_claude (line 180)**
+**Step 5: Add to _launch_claude (line 180)**
 
-After `project = project_manager.get_by_chat(message.chat.id)` check:
 ```python
 async def _launch_claude(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
     """Launch Claude session from message context."""
@@ -447,20 +473,14 @@ async def _launch_claude(message: Message, result: FlowResult, telegram_queue: T
         await telegram_queue.reply(message, "Project not found", parse_mode=None)
         return
 
-    # Register menu based on chat type
-    await register_menu_for_chat(
-        message.bot,
-        message.chat.id,
-        is_forum=message.chat.is_forum or False
-    )
+    await _register_chat_menu(message.bot, message.chat)
 
     thread = project.get_or_create_thread(None, "main")
     # ... rest unchanged
 ```
 
-**Step 6: Add menu registration to _launch_claude_from_callback (line 207)**
+**Step 6: Add to _launch_claude_from_callback (line 207)**
 
-After `project = project_manager.get_by_chat(...)` check:
 ```python
 async def _launch_claude_from_callback(callback: CallbackQuery, result: FlowResult, telegram_queue: TelegramQueue):
     """Launch Claude session from callback context."""
@@ -470,18 +490,13 @@ async def _launch_claude_from_callback(callback: CallbackQuery, result: FlowResu
     if not project:
         return
 
-    # Register menu based on chat type
-    await register_menu_for_chat(
-        callback.bot,
-        callback.message.chat.id,
-        is_forum=callback.message.chat.is_forum or False
-    )
+    await _register_chat_menu(callback.bot, callback.message.chat)
 
     thread = project.get_or_create_thread(None, "main")
     # ... rest unchanged
 ```
 
-**Step 7: Add menu registration to _connect_to_session_from_callback (line 360)**
+**Step 7: Add to _connect_to_session_from_callback (line 360)**
 
 ```python
 async def _connect_to_session_from_callback(callback: CallbackQuery, result: FlowResult):
@@ -491,12 +506,7 @@ async def _connect_to_session_from_callback(callback: CallbackQuery, result: Flo
         project.tmux_session = result.tmux_session
         project_manager._save()
 
-        # Register menu based on chat type
-        await register_menu_for_chat(
-            callback.bot,
-            callback.message.chat.id,
-            is_forum=callback.message.chat.is_forum or False
-        )
+        await _register_chat_menu(callback.bot, callback.message.chat)
 ```
 
 **Step 8: Run tests**
