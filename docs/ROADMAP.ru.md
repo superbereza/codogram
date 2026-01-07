@@ -47,8 +47,8 @@
 ### Multi-session topics
 - Telegram Forum Topics: каждый топик = отдельная Claude сессия
 - ThreadInfo dataclass для per-thread state
-- `/session_new [name]` — создать новый топик с Claude
-- `/session_close` — закрыть топик и убить tmux
+- `/thread_create [name]` — создать новый топик с Claude
+- `/thread_delete` — закрыть топик и убить tmux
 - Magic names для автонейминга (arcane, mystic, celestial...)
 - Thread-specific watcher и permission poller
 - Session binding по user message для каждого thread
@@ -141,7 +141,36 @@
 - 236 тестов, E2E регрессионное тестирование через Telegram MCP
 - См. [docs/designs/done/2025-12-27-bot-refactoring/](designs/done/2025-12-27-bot-refactoring/)
 
+### Редизайн меню
+Реорганизация команд бота для удобства:
+- Единый `/finish` для worktree и обычных топиков
+- Короткие алиасы: `/thread`, `/branch`
+- Deprecated команды редиректят: `/thread_delete` → "Use /finish"
+- Архивация топиков вместо удаления (закрытие + иконка 📁)
+- См. [docs/designs/done/2025-01-03-menu-redesign.md](designs/done/2025-01-03-menu-redesign.md)
+
+### Session resume
+Восстановление сессии Claude после краша или разархивации топика:
+- Хранение session_id в ThreadInfo
+- При /start в архивированном топике: `claude --resume <session_id>`
+- Сохраняет контекст диалога вместо старта с нуля
+- Worktrees сохраняются после /finish для удобного resume
+- См. [docs/designs/done/2026-01-05-session-resume.md](designs/done/2026-01-05-session-resume.md)
+
 ## Backlog
+
+### Улучшение надёжности очереди
+Повышение устойчивости TelegramQueue:
+- **Retry на network errors** — `ServerDisconnectedError` сейчас не ретраится, сообщение теряется
+- **1 rps rate limiting** — проактивный троттлинг чтобы не попадать в лимиты Telegram
+- **Exponential backoff** — для retry при rate limit
+
+### Cleanup command
+Явное удаление архивных веток когда нужно место или git cleanup:
+- `/cleanup` — список архивных веток с днями неактивности
+- `/cleanup <branch>` — удалить конкретную ветку
+- Удаляет worktree и git branch, сохраняет session jsonl
+- См. [docs/designs/2026-01-05-cleanup-command.md](designs/2026-01-05-cleanup-command.md)
 
 ### Поддержка MCP trust prompt
 Обнаружение промптов доверия MCP серверам (box-style UI):
@@ -159,20 +188,6 @@
 - Отличать shell prompt `❯` от Claude selector `❯ 1. Yes`
 - См. откаченную попытку: 8b6baf8 (были false positives)
 
-### Редизайн меню
-Реорганизация команд бота для удобства:
-- Группировка по назначению (повседневные, создание, завершение, настройки)
-- Короткие алиасы: `/thread`, `/branch`, `/finish`
-- Единый `/finish` для worktree и обычных топиков
-- Архивация топиков вместо удаления (закрытие + иконка)
-- См. [docs/designs/2025-01-03-menu-redesign.md](designs/2025-01-03-menu-redesign.md)
-
-### Resume сессии по session_id
-Восстановление сессии Claude после краша или разархивации топика:
-- Хранить session_id в ThreadInfo
-- При /start в архивированном топике или после краша: `claude --resume <session_id>`
-- Сохраняет контекст диалога вместо старта с нуля
-
 ### Миграция группа → супергруппа
 Обработка смены chat_id при включении топиков в существующей группе:
 - Telegram меняет chat_id при конвертации группы в супергруппу (форум)
@@ -187,11 +202,11 @@
 
 ### Migrate strings to strings.py
 Перенести все захардкоженные строки в `src/codogram/strings.py`:
-- bot.py — основной объём (~50 строк)
+- handlers/*.py — ответы на команды
 - launch_animation.py — статусы запуска
 - history_watcher.py — уведомления
 - keyboards.py — кнопки
-- start_flow.py — кнопки wizard'а
+- services/start_flow.py — кнопки wizard'а
 - См. `docs/specs/tone-of-voice.md` для гайдлайнов
 
 ### Voice → Whisper
@@ -201,8 +216,8 @@
 
 ### Pin startup message
 Пинить сообщение при запуске сессии:
-- `🚀 Claude запущен в claude-codogram-sublime`
-- `Подключиться: tmux attach -t claude-codogram-sublime`
+- `Claude started in claude-codogram-sublime`
+- `Connect: tmux attach -t claude-codogram-sublime`
 - Анпинить предыдущее при рестарте
 
 ### Activity indicators
@@ -228,7 +243,7 @@
 - Другие internal тулы
 - Нужно исследовать какие именно скрыты
 
-### /settings command
+### /settings command enhancements
 Отображение текущего состояния Claude сессии:
 - Текущий режим approval (accept edits, allow all, etc.)
 - Количество background tasks
@@ -316,7 +331,7 @@
 ### Fix bullet point rendering
 Заменить большую точку `•` на точку в code block:
 - `•` плохо рендерится в некоторых клиентах
-- Заменить на `\`•\`` или другой символ
+- Заменить на `` `•` `` или другой символ
 
 ## PoC / Research
 
