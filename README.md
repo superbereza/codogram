@@ -80,15 +80,15 @@ git pull
 
 | Command | Description |
 |---------|-------------|
-| `/start` | Connect current project |
-| `/start <name>` | Connect project by name |
-| `/stop` | Disconnect project |
-| `/status` | Show status |
-| `/my_chat_id` | Get your chat ID |
-| `/thread_create` | Create new topic with Claude session |
-| `/branch_create` | Create git worktree + topic (isolated branch) |
-| `/branch_create <name>` | Create worktree with specific branch name |
-| `/branch_finish` | Merge branch and cleanup worktree |
+| `/start` | Connect to Claude or show status |
+| `/thread` | Create new topic with Claude session |
+| `/branch` | Create git worktree + topic (isolated branch) |
+| `/finish` | Archive topic or merge branch |
+| `/esc` | Cancel current Claude operation (Ctrl+C) |
+| `/new` | Start new Claude session (clear context) |
+| `/auto_accept` | Toggle auto-accept for permission prompts |
+| `/settings` | View current settings |
+| `/help` | List all commands |
 
 ## Requirements
 
