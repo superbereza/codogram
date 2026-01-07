@@ -1,4 +1,11 @@
 # tests/test_migration_handler.py
+import os
+
+# Set env vars BEFORE importing codogram modules
+os.environ.setdefault("TELEGRAM_TOKEN", "test-token")
+os.environ.setdefault("ADMIN_IDS", "123")
+os.environ.setdefault("BASE_DIR", "/tmp")
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from codogram.handlers.migration import router, on_chat_migration, MIGRATION_MESSAGE
@@ -34,3 +41,35 @@ async def test_migration_ignores_unknown_chat():
 
     # Should not send any message
     telegram_queue.enqueue.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_migration_updates_project():
+    """Migration handler updates chat_id and sends notification."""
+    from codogram.handlers.migration import on_chat_migration
+
+    message = MagicMock()
+    message.chat.id = 111111
+    message.migrate_to_chat_id = 222222
+    message.bot = MagicMock()
+
+    mock_project = MagicMock()
+    mock_project.chat_id = 111111
+    mock_project.project_name = "test-project"
+
+    telegram_queue = AsyncMock()
+
+    with patch("codogram.handlers.migration.project_manager") as mock_pm, \
+         patch("codogram.handlers.migration.register_menu_for_chat") as mock_menu:
+        mock_pm.get_by_chat.return_value = mock_project
+
+        await on_chat_migration(message, telegram_queue)
+
+        # Verify chat_id updated
+        assert mock_project.chat_id == 222222
+        # Verify config saved
+        mock_pm._save.assert_called_once()
+        # Verify menu registered
+        mock_menu.assert_called_once_with(message.bot, 222222, is_forum=True)
+        # Verify notification sent
+        telegram_queue.enqueue.assert_called_once()
