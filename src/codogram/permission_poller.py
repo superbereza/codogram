@@ -112,7 +112,6 @@ async def permission_poller(
 
     # Create TmuxSession from context data
     tmux = TmuxSession(tmux_name, project.cwd)
-    chat_id = project.chat_id
 
     state = PollerState.IDLE
     debounce_start = 0.0
@@ -140,7 +139,7 @@ async def permission_poller(
             logger.error(f"{log_prefix}: Claude crashed! Reason: {crash_reason}")
             try:
                 batch = OutgoingBatch(
-                    chat_id=chat_id,
+                    chat_id=project.chat_id,
                     thread_id=thread_id,
                     messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
                 )
@@ -180,7 +179,7 @@ async def permission_poller(
                     if auto_accept_enabled:
                         if await try_auto_accept(
                             parsed.options, parsed.body, tmux,
-                            telegram_queue, chat_id, thread_id, context_name
+                            telegram_queue, project.chat_id, thread_id, context_name
                         ):
                             state = PollerState.IDLE
                             last_options = None
@@ -201,7 +200,7 @@ async def permission_poller(
 
                         # Send body through queue, get IDs for cleanup
                         batch = OutgoingBatch(
-                            chat_id=chat_id,
+                            chat_id=project.chat_id,
                             thread_id=thread_id,
                             messages=body_messages,
                         )
@@ -210,7 +209,7 @@ async def permission_poller(
                         # Keyboard through queue (rate limited)
                         kb = permission_keyboard(parsed.options, tmux_name)
                         kb_msg_ids = await telegram_queue.enqueue(KeyboardBatch(
-                            chat_id=chat_id,
+                            chat_id=project.chat_id,
                             text="👆",
                             reply_markup=kb,
                             thread_id=thread_id,
@@ -232,11 +231,11 @@ async def permission_poller(
                 if kb_msg_id and kb_msg_id in permission_messages:
                     for msg_id in permission_messages[kb_msg_id]:
                         try:
-                            await bot.delete_message(chat_id, msg_id)
+                            await bot.delete_message(project.chat_id, msg_id)
                         except Exception:
                             pass
                     try:
-                        await bot.delete_message(chat_id, kb_msg_id)
+                        await bot.delete_message(project.chat_id, kb_msg_id)
                     except Exception:
                         pass
                     permission_messages.pop(kb_msg_id, None)
@@ -253,11 +252,11 @@ async def permission_poller(
                     if kb_msg_id and kb_msg_id in permission_messages:
                         for msg_id in permission_messages[kb_msg_id]:
                             try:
-                                await bot.delete_message(chat_id, msg_id)
+                                await bot.delete_message(project.chat_id, msg_id)
                             except Exception:
                                 pass
                         try:
-                            await bot.delete_message(chat_id, kb_msg_id)
+                            await bot.delete_message(project.chat_id, kb_msg_id)
                         except Exception:
                             pass
                         permission_messages.pop(kb_msg_id, None)
@@ -272,13 +271,13 @@ async def permission_poller(
                     body_messages.append({"text": options_text})
 
                     # Send through queue
-                    batch = OutgoingBatch(chat_id=chat_id, thread_id=thread_id, messages=body_messages)
+                    batch = OutgoingBatch(chat_id=project.chat_id, thread_id=thread_id, messages=body_messages)
                     content_msg_ids = await telegram_queue.enqueue(batch)
 
                     # Keyboard through queue (rate limited)
                     kb = permission_keyboard(parsed.options, tmux_name)
                     kb_msg_ids = await telegram_queue.enqueue(KeyboardBatch(
-                        chat_id=chat_id,
+                        chat_id=project.chat_id,
                         text="👆",
                         reply_markup=kb,
                         thread_id=thread_id,
