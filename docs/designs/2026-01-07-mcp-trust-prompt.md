@@ -76,11 +76,13 @@ def _extract_options(lines: list[str]) -> tuple[list[str], list[str]]:
     for line in lines:
         if "❯" in line:
             in_options = True
-            match = re.match(r'.*❯\s*(\d+\.\s+.+)', line)
+            # NOTE: Keep exact regex from existing code
+            match = re.match(r'\s*❯\s*(\d+\.\s+.+)', line)
             if match:
                 options.append(match.group(1).strip())
         elif in_options:
-            match = re.match(r'\s*(\d+\.\s+.+)', line)
+            # NOTE: \s{2,} (2+ spaces) — NOT \s* — to avoid false positives
+            match = re.match(r'\s{2,}(\d+\.\s+.+)', line)
             if match:
                 options.append(match.group(1).strip())
             elif line.strip().startswith(("Esc", "Enter")):
