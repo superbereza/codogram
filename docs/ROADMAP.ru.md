@@ -165,6 +165,13 @@
 - Workflow документирования багов с репортами в `docs/bugs/active/`
 - См. [docs/designs/done/2026-01-06-e2e-test-structure.md](designs/done/2026-01-06-e2e-test-structure.md)
 
+### Безопасный конфиг для worktrees
+Конфиг перенесён в `~/.codogram/` для избежания проблем с worktrees:
+- `pip install -e` из worktree больше не ломает main бота
+- Новый `dev-run.sh` для тестирования из worktrees (использует PYTHONPATH)
+- Защита в `restart.sh` от запуска из worktree
+- См. [docs/designs/done/2026-01-07-worktree-safe-config.md](designs/done/2026-01-07-worktree-safe-config.md)
+
 ## Backlog
 
 ### Thread create UX
