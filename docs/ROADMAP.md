@@ -141,6 +141,22 @@ Layered architecture replacing monolithic bot.py (1500+ lines → 0):
 - 236 tests, E2E regression testing via Telegram MCP
 - See [docs/designs/done/2025-12-27-bot-refactoring/](designs/done/2025-12-27-bot-refactoring/)
 
+### Menu redesign
+Reorganized bot commands for better usability:
+- Unified `/finish` for both worktree and regular topics
+- Short aliases: `/thread`, `/branch`
+- Deprecated commands redirect: `/thread_delete` → "Use /finish"
+- Archive topics instead of delete (close + icon)
+- See [docs/designs/done/2025-01-03-menu-redesign.md](designs/done/2025-01-03-menu-redesign.md)
+
+### Session resume
+Resume Claude session after crash or archived topic restore:
+- Store session_id in ThreadInfo
+- On /start in archived topic: `claude --resume <session_id>`
+- Preserves conversation context instead of starting fresh
+- Worktrees preserved after /finish for easy resume
+- See [docs/designs/done/2026-01-05-session-resume.md](designs/done/2026-01-05-session-resume.md)
+
 ## Backlog
 
 ### Queue reliability improvements
@@ -165,19 +181,12 @@ Detect when Claude exits normally (not crash):
 - Must distinguish shell prompt `❯` from Claude selector `❯ 1. Yes`
 - See reverted attempt: 8b6baf8 (had issues with false positives)
 
-### Menu redesign
-Reorganize bot commands for better usability:
-- Group commands by purpose (everyday, create, complete, settings)
-- Short aliases: `/thread`, `/branch`, `/finish`
-- Unified `/finish` for both worktree and regular topics
-- Archive topics instead of delete (close + icon)
-- See [docs/designs/2025-01-03-menu-redesign.md](designs/2025-01-03-menu-redesign.md)
-
-### Session resume by session_id
-Resume Claude session after crash or archived topic restore:
-- Store session_id in ThreadInfo
-- On /start in archived topic or after crash: `claude --resume <session_id>`
-- Preserves conversation context instead of starting fresh
+### Cleanup command
+Explicit deletion of archived branches when disk space or git cleanup needed:
+- `/cleanup` — list archived branches with inactivity days
+- `/cleanup <branch>` — delete specific branch
+- Deletes worktree and git branch, preserves session jsonl
+- See [docs/designs/2026-01-05-cleanup-command.md](designs/2026-01-05-cleanup-command.md)
 
 ### Group → Supergroup migration
 Handle chat_id change when topics are enabled in existing group:
@@ -193,11 +202,11 @@ Handle chat_id change when topics are enabled in existing group:
 
 ### Migrate strings to strings.py
 Move all hardcoded strings to `src/codogram/strings.py`:
-- bot.py — main volume (~50 strings)
+- handlers/*.py — command responses
 - launch_animation.py — startup statuses
 - history_watcher.py — notifications
 - keyboards.py — buttons
-- start_flow.py — wizard buttons
+- services/start_flow.py — wizard buttons
 - See `docs/specs/tone-of-voice.md` for guidelines
 
 ### Voice → Whisper
