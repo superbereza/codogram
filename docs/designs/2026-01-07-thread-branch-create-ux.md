@@ -35,51 +35,144 @@ Bot:  creates branch "mystic" directly
 
 Replace "Branch" with "Thread" in messages.
 
-## State Management
+## Architecture
 
-Use existing `_flow_state`:
+Following layered architecture from CLAUDE.md:
 
-```python
-_flow_state[chat_id] = {
-    "state": "awaiting_branch_name",  # or "awaiting_thread_name"
-    "thread_id": message.message_thread_id,
-}
+```
+domain/
+  create_flow.py          # State and result types
+    - CreateType (enum): BRANCH, THREAD
+    - CreateFlowState (dataclass): type, thread_id
+    - CreateAction (enum): SHOW_PROMPT, CREATE, ERROR
+    - CreateResult (dataclass): action, name, error
+
+services/
+  create_flow.py          # Business logic
+    - CreateFlowService
+      - start_flow(type, has_name) -> CreateResult
+      - get_magic_name(project) -> str
+      - validate_name(name, project, type) -> (sanitized, error)
+      - create(type, project, name, ...) -> delegates to branch/launch service
+
+handlers/
+  branches.py             # Thin router, builds UI from CreateResult
+  threads.py              # Thin router, builds UI from CreateResult
+  create_flow.py          # NEW: shared callbacks and message handler
+    - on_magic_name(callback)
+    - on_cancel_prompt(callback)
+    - handle_name_message(message) - called from messages.py
+
+keyboards/
+  create_flow.py          # NEW: keyboard builders
+    - build_name_prompt_keyboard(type)
 ```
 
-**State cleared when:**
-- User sends name → create, clear
-- User clicks 🔮 Magic name → create with random, clear
-- User clicks [<<] Go back → delete message, clear
-- User sends other command → execute command, clear
+### State Management
 
-## Name Validation
+New module `domain/create_flow.py`:
 
-**Sanitization** (existing `git_utils.sanitize_branch_name`):
-- lowercase
-- spaces and `/` → dashes
-- remove all except `a-z`, `0-9`, `_`, `-`
+```python
+@dataclass
+class CreateFlowState:
+    type: CreateType  # BRANCH or THREAD
+    thread_id: int | None
 
-**Validation errors:**
-- Empty after sanitization → `[x]` Invalid name
-- Too long → `[x]` Name too long (max N chars)
-- Branch exists → `[x]` Branch `name` already exists
-- Worktree dir exists → `[x]` Directory already exists
-- Thread name taken → `[x]` Thread `name` already exists
+# Module-level state (like _flow_state in common.py)
+_create_state: dict[int, CreateFlowState] = {}  # chat_id -> state
+
+def get_state(chat_id: int) -> CreateFlowState | None
+def set_state(chat_id: int, state: CreateFlowState) -> None
+def clear_state(chat_id: int) -> None
+def has_pending_create(chat_id: int) -> bool
+```
+
+### Service Layer
+
+`services/create_flow.py`:
+
+```python
+class CreateFlowService:
+    def should_show_prompt(self, name_arg: str | None) -> bool:
+        """Returns True if no name provided."""
+        return name_arg is None
+
+    def get_magic_name(self, project) -> str:
+        """Generate random magic name not used by project."""
+        existing = {t.name for t in project.threads.values()}
+        return get_random_magic_name(existing)
+
+    def validate_name(self, name: str, project, create_type: CreateType) -> tuple[str | None, str | None]:
+        """Validate and sanitize name. Returns (sanitized, error)."""
+        sanitized = sanitize_branch_name(name)
+        if not sanitized:
+            return None, "`[x]` Invalid name"
+
+        # Check length (same for both)
+        max_len = max_branch_name_length(project.project_name)
+        if len(sanitized) > max_len:
+            return None, f"`[x]` Name too long (max {max_len} chars)"
+
+        # Check uniqueness
+        existing = {t.name for t in project.threads.values()}
+        if sanitized in existing:
+            return None, f"`[x]` Name `{sanitized}` already used"
+
+        return sanitized, None
+```
+
+### Handler Layer
+
+Handlers stay thin - delegate to service, build UI:
+
+```python
+# handlers/branches.py
+async def cmd_branch_create(message, queue):
+    # ... existing checks (forum, project, git repo) ...
+
+    args = message.text.split(maxsplit=1)
+    name_arg = args[1] if len(args) > 1 else None
+
+    if service.should_show_prompt(name_arg):
+        set_state(chat_id, CreateFlowState(CreateType.BRANCH, thread_id))
+        await queue.reply(message, "Branch name?\n\nSend name or pick random",
+                         reply_markup=build_name_prompt_keyboard(CreateType.BRANCH))
+        return
+
+    # Has name - validate and proceed
+    name, error = service.validate_name(name_arg, project, CreateType.BRANCH)
+    if error:
+        await queue.reply(message, error)
+        return
+
+    # ... rest of branch creation flow (uncommitted changes check, etc.) ...
+```
+
+### Unified Validation Rules
+
+Same rules for both branch and thread:
+1. sanitize_branch_name() - lowercase, spaces→dashes, remove invalid chars
+2. Check max length based on project name
+3. Check name not already used by existing thread
+
+Branch-specific checks (after name validation):
+- Git repo required
+- Uncommitted changes handling
+- Worktree directory check
 
 ## File Changes
 
-**`handlers/branches.py`:**
-- `cmd_branch_create`: show prompt when no argument
-- New callback `on_magic_name_branch`
+**New files:**
+- `src/codogram/domain/create_flow.py` - state and types
+- `src/codogram/services/create_flow.py` - business logic
+- `src/codogram/handlers/create_flow.py` - shared callbacks
+- `src/codogram/keyboards/create_flow.py` - keyboard builder
 
-**`handlers/threads.py`:**
-- `cmd_thread_create`: show prompt when no argument
-- New callback `on_magic_name_thread`
+**Modified files:**
+- `src/codogram/handlers/branches.py` - use service, show prompt
+- `src/codogram/handlers/threads.py` - use service, show prompt
+- `src/codogram/handlers/messages.py` - check create state before routing
+- `src/codogram/handlers/__init__.py` - register create_flow router
 
-**`handlers/messages.py`:**
-- Check `_flow_state` for `awaiting_branch_name` / `awaiting_thread_name`
-- If set → validate, sanitize, create
-- If not → send to tmux as usual
-
-**`handlers/common.py`:**
-- Optional shared `show_name_prompt()` for DRY
+**Removed from common.py:**
+- Move `_flow_state` usage for create flow to new domain module
