@@ -172,6 +172,15 @@ Config moved to `~/.codogram/` to avoid worktree issues:
 - `restart.sh` protection against running from worktree
 - See [docs/designs/done/2026-01-07-worktree-safe-config.md](designs/done/2026-01-07-worktree-safe-config.md)
 
+### Group → Supergroup migration
+Handle chat_id change when topics are enabled in existing group:
+- Telegram changes chat_id when converting group to supergroup (forum)
+- Listen for `message.migrate_to_chat_id` event
+- Auto-update chat_id in config when migration detected
+- Scope-based menu: basic for groups, extended (/branch, /finish) for forums
+- Menu registered on bot startup and on /start
+- See [docs/designs/done/2026-01-07-group-to-supergroup-migration.md](designs/done/2026-01-07-group-to-supergroup-migration.md)
+
 ## Backlog
 
 ### Thread create UX
@@ -179,14 +188,6 @@ Improve `/thread_create`:
 - Without argument → show buttons with name options (magic names)
 - Or input field "Enter name"
 - Remove need to enter name on same line
-
-### Group → Supergroup migration
-Handle chat_id change when topics are enabled in existing group:
-- Telegram changes chat_id when converting group to supergroup (forum)
-- Current behavior: project becomes orphaned, need to /start again
-- Solution: listen for `message.migrate_to_chat_id` event
-- Auto-update chat_id in config when migration detected
-- Notify user about successful migration
 
 ### Session state display & control
 Display and control Claude session state:
@@ -249,6 +250,12 @@ Move all hardcoded strings to `src/codogram/strings.py`:
 - See `docs/specs/tone-of-voice.md` for guidelines
 
 ---
+
+### Manual topic registration
+When `/start` is called in a manually created topic:
+- If resume possible (archived topic with session_id) → resume without questions
+- Otherwise show menu: "Create thread" / "Create worktree"
+- Allows using standard Telegram UI for topic creation
 
 ### Queue reliability improvements
 Improve TelegramQueue resilience:

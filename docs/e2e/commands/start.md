@@ -188,3 +188,103 @@ echo "After: $AFTER"
 **Expected:**
 - UI: "[!] Claude session closed" notification
 - State: session_id == BEFORE (not null, not changed)
+
+---
+
+## TC-START-008: /start in forum registers extended menu
+
+**Tags:** critical, start, menu
+**Preconditions:** Supergroup with topics enabled
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=FORUM_CHAT_ID, message="/start")
+# Wait 5s
+```
+
+**Expected:**
+- ASK USER: "Can you see /branch and /finish in bot menu?"
+
+---
+
+## TC-START-009: /start in regular group registers basic menu
+
+**Tags:** critical, start, menu
+**Preconditions:** Regular group (not forum)
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=REGULAR_GROUP_ID, message="/start")
+# Wait 5s
+```
+
+**Expected:**
+- ASK USER: "Confirm that /branch and /finish are NOT in bot menu"
+
+---
+
+## TC-START-010: Migration updates chat_id
+
+**Tags:** critical, start, migration
+**Preconditions:** Bot registered in regular group, active session
+
+**Setup:**
+```bash
+cat ~/.codogram/config.json | jq '.projects["<project>"].chat_id'
+# Note current chat_id
+```
+
+**Human action required:**
+ASK USER: "Please enable Topics in the test group:
+Settings → Topics → Enable. Let me know when done."
+
+**Steps:**
+1. After user confirms, wait 5s
+2. Check new chat_id:
+```bash
+cat ~/.codogram/config.json | jq '.projects["<project>"].chat_id'
+```
+3. Read messages in NEW chat:
+```python
+mcp__telegram__list_messages(chat_id=NEW_CHAT_ID, limit=5)
+```
+
+**Expected:**
+- chat_id changed in config
+- Notification: "[v] Topics enabled..." in new chat
+- ASK USER: "Can you see /branch and /finish in bot menu?"
+
+---
+
+## TC-START-011: Permission poller works after migration
+
+**Tags:** critical, start, migration, permissions
+**Preconditions:** TC-START-010 completed, Claude running
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=NEW_CHAT_ID, message="run ls /")
+# Wait 10s
+mcp__telegram__list_inline_buttons(chat_id=NEW_CHAT_ID)
+```
+
+**Expected:**
+- Permission prompt with Yes/No buttons in NEW chat
+
+---
+
+## TC-START-012: Watcher works after migration
+
+**Tags:** critical, start, migration, watcher
+**Preconditions:** TC-START-010 completed, Claude running
+
+**Steps:**
+1. Accept pending permission if any
+```python
+mcp__telegram__send_message(chat_id=NEW_CHAT_ID, message="read README.md")
+# Wait 15s
+mcp__telegram__list_messages(chat_id=NEW_CHAT_ID, limit=10)
+```
+
+**Expected:**
+- Tool call notification (● Read...) in NEW chat

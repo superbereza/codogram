@@ -17,6 +17,7 @@ from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 from .logging_config import setup_logging, logger
 from .telegram_queue import TelegramQueue
+from .services.menu import BASIC_COMMANDS, register_menu_for_chat
 
 telegram_queue: TelegramQueue | None = None
 
@@ -39,20 +40,8 @@ async def main():
     # Register handler routers (all protected by AdminMiddleware)
     register_handlers(dp)
 
-    from aiogram.types import BotCommand
-    await bot.set_my_commands([
-        BotCommand(command="esc", description="Cancel current operation"),
-        BotCommand(command="auto_accept", description="Toggle auto-accept mode"),
-        BotCommand(command="thread", description="New topic in project directory"),
-        BotCommand(command="branch", description="New isolated feature branch + topic"),
-        BotCommand(command="clear", description="Clear context, start fresh"),
-        BotCommand(command="finish", description="Merge branch, archive topic"),
-        BotCommand(command="start", description="Connect Claude or show status"),
-        BotCommand(command="settings", description="View current settings"),
-        BotCommand(command="restart", description="Force restart Claude"),
-        BotCommand(command="get_debug_ids", description="Show chat and thread IDs"),
-        BotCommand(command="help", description="List all commands"),
-    ])
+    # Set global default menu (for new chats)
+    await bot.set_my_commands(BASIC_COMMANDS)
 
     # Define task starters
     async def start_poller(project: ProjectState) -> asyncio.Task:
@@ -65,6 +54,15 @@ async def main():
 
     # Restore sessions from history.jsonl
     await project_manager.restore_projects(bot, start_poller, start_watcher, telegram_queue)
+
+    # Register menus for all known chats (forum chats get extended menu)
+    for project in project_manager.projects.values():
+        if project.chat_id:
+            try:
+                chat = await bot.get_chat(project.chat_id)
+                await register_menu_for_chat(bot, project.chat_id, is_forum=chat.is_forum or False)
+            except Exception as e:
+                logger.warning(f"Failed to register menu for {project.project_name}: {e}")
 
     # Start history watcher for session changes
     from .history_watcher import create_history_watcher

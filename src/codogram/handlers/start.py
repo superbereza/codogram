@@ -1,7 +1,7 @@
 """Start flow handlers - /start, /restart and related callbacks."""
 import asyncio
 
-from aiogram import Router, F
+from aiogram import Bot, Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -18,8 +18,18 @@ from ..start_flow import (
 from ..telegram_queue import TelegramQueue
 from ..tmux_selector import create_tmux_selection_keyboard
 from ..project_launcher import is_tmux_session_exists
+from ..services.menu import register_menu_for_chat
 
 router = Router(name="start")
+
+
+async def _register_chat_menu(bot: Bot, chat) -> None:
+    """Register scope-based menu for chat.
+
+    Helper to avoid repeating registration logic in 4 entry points.
+    Called when project becomes active (connect or launch).
+    """
+    await register_menu_for_chat(bot, chat.id, is_forum=chat.is_forum or False)
 
 
 # ===== Result Handlers =====
@@ -69,6 +79,7 @@ async def _handle_result(
 
         case FlowAction.SHOW_STATUS:
             await state.clear()
+            await _register_chat_menu(message.bot, message.chat)
             await telegram_queue.reply(
                 message,
                 f"Claude running: `{result.project}` in `{result.tmux_session}`",
@@ -103,6 +114,7 @@ async def _handle_result(
         # Thread-specific actions
         case FlowAction.THREAD_SHOW_STATUS:
             await state.clear()
+            await _register_chat_menu(message.bot, message.chat)
             await telegram_queue.reply(
                 message,
                 f"`[v]` Thread `{result.thread_name}` running\n\nAttach: `tmux attach -t {result.tmux_session}`",
@@ -186,6 +198,7 @@ async def _launch_claude(message: Message, result: FlowResult, telegram_queue: T
         await telegram_queue.reply(message, "Project not found", parse_mode=None)
         return
 
+    await _register_chat_menu(message.bot, message.chat)
     thread = project.get_or_create_thread(None, "main")
 
     if thread.launch_task and not thread.launch_task.done():
@@ -212,6 +225,7 @@ async def _launch_claude_from_callback(callback: CallbackQuery, result: FlowResu
     if not project:
         return
 
+    await _register_chat_menu(callback.bot, callback.message.chat)
     thread = project.get_or_create_thread(None, "main")
 
     if thread.launch_task and not thread.launch_task.done():
@@ -351,6 +365,7 @@ async def _connect_to_session(message: Message, result: FlowResult, telegram_que
     if project:
         project.tmux_session = result.tmux_session
         project_manager._save()
+        await _register_chat_menu(message.bot, message.chat)
         await telegram_queue.reply(
             message,
             f"Connected to `{result.tmux_session}`",
@@ -363,6 +378,7 @@ async def _connect_to_session_from_callback(callback: CallbackQuery, result: Flo
     if project:
         project.tmux_session = result.tmux_session
         project_manager._save()
+        await _register_chat_menu(callback.bot, callback.message.chat)
 
 
 # ===== Commands =====
@@ -609,6 +625,15 @@ async def on_restart_confirm(callback: CallbackQuery, state: FSMContext, telegra
     if not tmux_session:
         await callback.answer("Session expired")
         return
+
+    # Cancel background tasks before killing tmux
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if project:
+        thread = project.get_thread(callback.message.message_thread_id)
+        if thread:
+            for task in [thread.launch_task, thread.watcher_task, thread.poller_task, thread.binding_task]:
+                if task and not task.done():
+                    task.cancel()
 
     result = start_flow.handle_restart_confirm(tmux_session)
 
