@@ -30,20 +30,22 @@ async def cmd_help(message: Message, telegram_queue: TelegramQueue):
 
 *Create:*
 /thread — New topic in project directory
-/branch — New isolated feature branch \\+ topic
+/branch — New feature branch \\+ topic ⁽¹⁾
 
 *Complete:*
 /clear — Clear context, start fresh
-/finish — Merge branch, archive topic
+/finish — Merge branch, archive topic ⁽¹⁾
 
 *Settings:*
 /start — Connect Claude or show status
 /settings — View current settings
 /restart — Force restart Claude
-/my\\_chat\\_id — Show chat and thread IDs
+/get\\_debug\\_ids — Show chat and thread IDs
 
 *Help:*
-/help — This message"""
+/help — This message
+
+⁽¹⁾ _Only in chats with Topics enabled_"""
 
     await telegram_queue.reply(message, text)
 
