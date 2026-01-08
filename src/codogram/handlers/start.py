@@ -79,6 +79,7 @@ async def _handle_result(
 
         case FlowAction.SHOW_STATUS:
             await state.clear()
+            await _register_chat_menu(message.bot, message.chat)
             await telegram_queue.reply(
                 message,
                 f"Claude running: `{result.project}` in `{result.tmux_session}`",
@@ -113,6 +114,7 @@ async def _handle_result(
         # Thread-specific actions
         case FlowAction.THREAD_SHOW_STATUS:
             await state.clear()
+            await _register_chat_menu(message.bot, message.chat)
             await telegram_queue.reply(
                 message,
                 f"`[v]` Thread `{result.thread_name}` running\n\nAttach: `tmux attach -t {result.tmux_session}`",

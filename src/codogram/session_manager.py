@@ -73,7 +73,11 @@ def should_cleanup_project(project: 'ProjectState') -> bool:
                 pass
 
     if newest_mtime == 0:
-        return True  # No jsonl anywhere = cleanup
+        # No jsonl = never had a Claude session
+        # Don't cleanup if project has chat_id (registered from Telegram)
+        if project.chat_id is not None:
+            return False  # Keep newly registered projects
+        return True  # No jsonl and no chat_id = orphan, cleanup
 
     age_days = (time.time() - newest_mtime) / 86400
     return age_days > settings.project_cleanup_days
