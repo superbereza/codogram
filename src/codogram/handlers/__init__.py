@@ -1,7 +1,7 @@
 """Handlers layer - thin routers delegating to services."""
 from aiogram import Dispatcher
 
-from . import permissions, start, threads, branches, sessions, settings, finish, common, messages
+from . import permissions, start, threads, branches, sessions, settings, finish, common, messages, migration
 
 
 def register_handlers(dp: Dispatcher):
@@ -15,6 +15,7 @@ def register_handlers(dp: Dispatcher):
     - common.router has cb_cancel (generic cancel)
     - messages.router is catch-all (must be last)
     """
+    dp.include_router(migration.router)      # Migration events (must be early)
     dp.include_router(permissions.router)   # Permission callbacks
     dp.include_router(start.router)         # /start, /restart + FSM
     dp.include_router(threads.router)       # /thread_create, /thread_delete

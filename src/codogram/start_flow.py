@@ -46,7 +46,7 @@ def launch_confirm_keyboard() -> InlineKeyboardMarkup:
     """Keyboard for launch confirmation."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="Launch", callback_data="start:launch"),
+            InlineKeyboardButton(text="Launch", callback_data="start:launch_claude"),
             InlineKeyboardButton(text="Cancel", callback_data="start:cancel"),
         ]
     ])
