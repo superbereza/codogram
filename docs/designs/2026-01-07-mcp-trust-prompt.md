@@ -110,14 +110,16 @@ def _parse_mcp_trust_prompt(lines: list[str]) -> PermissionPrompt | None:
     ╰────────────────────────────────╯
        Enter to confirm · Esc to reject
     """
-    # Find box boundaries
+    # Find LAST box boundaries (in case of scrollback with multiple boxes)
+    # Takes last ╭, then first ╰ after it
     box_start = None
     box_end = None
     for i, line in enumerate(lines):
-        if "╭" in line and box_start is None:
-            box_start = i
-        if "╰" in line:
+        if "╭" in line:
+            box_start = i  # Override each time, taking last ╭
+        if "╰" in line and box_start is not None:
             box_end = i
+            break  # Take first ╰ after last ╭
 
     if box_start is None or box_end is None:
         return None

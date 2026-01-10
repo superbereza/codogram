@@ -96,6 +96,30 @@ def test_extract_options_empty():
     body_lines, options = _extract_options(lines)
     assert options == []
     assert len(body_lines) == 2
+
+def test_extract_options_reusable():
+    """_extract_options works in different contexts (MCP, regular, no-separator)."""
+    # MCP-style content (stripped from box)
+    mcp_lines = [
+        "New MCP server found in .mcp.json: telegram",
+        "",
+        "❯ 1. Use this and all future MCP servers",
+        "  2. Use this MCP server",
+        "  3. Continue without",
+    ]
+    body, opts = _extract_options(mcp_lines)
+    assert len(opts) == 3
+    assert "MCP server" in body[0]
+
+    # Regular permission style
+    regular_lines = [
+        "Do you want to create test.txt?",
+        " ❯ 1. Yes",
+        "   2. Yes, allow all",
+        " Esc to cancel",
+    ]
+    body2, opts2 = _extract_options(regular_lines)
+    assert opts2 == ["1. Yes", "2. Yes, allow all"]
 ```
 
 **Step 2: Run test to verify it fails**
@@ -146,6 +170,94 @@ Expected: ALL PASS
 ```bash
 git add src/codogram/screen.py tests/test_screen.py
 git commit -m "refactor(screen): extract _extract_options helper"
+```
+
+---
+
+## Task 2.5: Refactor existing functions to use _extract_options (DRY)
+
+**Files:**
+- Modify: `src/codogram/screen.py:52-81` (parse_screen)
+- Modify: `src/codogram/screen.py:84-113` (_parse_options_without_separator)
+- Test: `tests/test_screen.py`
+
+**Step 1: Write regression test**
+
+```python
+# Add to tests/test_screen.py
+
+def test_parse_screen_after_refactor():
+    """Existing behavior unchanged after _extract_options refactoring."""
+    # Regular permission prompt
+    result = parse_screen(PERMISSION_SCREEN)
+    assert isinstance(result, PermissionPrompt)
+    assert len(result.options) >= 2
+    assert "Yes" in result.options[0]
+    # Body should contain file info
+    assert "test.txt" in result.body
+```
+
+**Step 2: Run test to confirm it passes (before refactoring)**
+
+Run: `pytest tests/test_screen.py::test_parse_screen_after_refactor -v`
+Expected: PASS
+
+**Step 3: Refactor parse_screen to use _extract_options**
+
+```python
+# In parse_screen(), replace lines 52-81 with:
+
+    # Get lines after separator
+    after_sep = lines[last_sep_idx + 1:]
+
+    # Check: if there's ● after separator, it's not a permission prompt
+    for line in after_sep:
+        if re.match(r'^\s*●\s+\w+\(', line):
+            return _check_tool_progress(output)
+
+    # Use shared option extraction
+    body_lines, options = _extract_options(after_sep)
+
+    if not options:
+        return _check_tool_progress(output)
+
+    # Format body: replace ╌╌╌ with pretty separator
+    body = "\n".join(body_lines)
+    body = re.sub(r'╌{10,}', SEPARATOR_DASHED, body)
+    body = body.strip()
+
+    return PermissionPrompt(options=options, body=body)
+```
+
+**Step 4: Refactor _parse_options_without_separator**
+
+```python
+# Replace _parse_options_without_separator() with:
+
+def _parse_options_without_separator(lines: list[str]) -> PermissionPrompt | None:
+    """Parse permission prompt without solid separator (e.g., trust folder prompt).
+
+    Looks for ❯ with numbered options even without ──── separator.
+    """
+    body_lines, options = _extract_options(lines)
+
+    if not options:
+        return None
+
+    body = "\n".join(body_lines).strip()
+    return PermissionPrompt(options=options, body=body)
+```
+
+**Step 5: Run all tests to verify no regression**
+
+Run: `pytest tests/test_screen.py -v`
+Expected: ALL PASS
+
+**Step 6: Commit**
+
+```bash
+git add src/codogram/screen.py tests/test_screen.py
+git commit -m "refactor(screen): use _extract_options in existing functions (DRY)"
 ```
 
 ---
@@ -217,6 +329,46 @@ def test_parse_mcp_trust_prompt_no_options():
 ╰─────────────────────────╯
 """
     result = _parse_mcp_trust_prompt(no_options.split("\n"))
+    assert result is None
+
+def test_parse_mcp_trust_prompt_last_box():
+    """Multiple boxes on screen - should parse the LAST complete box."""
+    from codogram.screen import _parse_mcp_trust_prompt
+    multiple_boxes = """
+Some scrollback text
+
+╭─────────────────────────╮
+│ Old box from scrollback │
+│ ❯ 1. Old option         │
+╰─────────────────────────╯
+
+More text between boxes
+
+╭─────────────────────────────────────────────────────╮
+│ New MCP server found in .mcp.json: telegram         │
+│ ❯ 1. Use this and all future MCP servers            │
+│   2. Use this MCP server                            │
+╰─────────────────────────────────────────────────────╯
+   Enter to confirm
+"""
+    result = _parse_mcp_trust_prompt(multiple_boxes.split("\n"))
+    assert result is not None
+    # Should get options from the LAST box
+    assert "Use this and all future" in result.options[0]
+    assert "telegram" in result.body
+
+def test_parse_mcp_trust_prompt_false_positive():
+    """Box with ❯ but not in numbered format should return None."""
+    from codogram.screen import _parse_mcp_trust_prompt
+    false_positive = """
+╭─────────────────────────╮
+│ Some code output:       │
+│ ❯ Not a real option     │
+│ just arrow symbol       │
+╰─────────────────────────╯
+"""
+    result = _parse_mcp_trust_prompt(false_positive.split("\n"))
+    # No numbered options like "1. xxx" so should return None
     assert result is None
 ```
 
@@ -320,6 +472,26 @@ def test_parse_screen_regular_still_works():
     result = parse_screen(PERMISSION_SCREEN)
     assert isinstance(result, PermissionPrompt)
     assert result.prompt_type == PromptType.REGULAR
+
+def test_parse_screen_mcp_priority():
+    """MCP prompt should be detected even if regular patterns also present."""
+    # Screen with both MCP box AND regular separator
+    mixed_screen = """
+Some tool output
+──────────────────────────────────────────────────────
+Some text after separator
+
+╭─────────────────────────────────────────────────────╮
+│ New MCP server found in .mcp.json: telegram         │
+│ ❯ 1. Use this and all future MCP servers            │
+│   2. Use this MCP server                            │
+╰─────────────────────────────────────────────────────╯
+   Enter to confirm
+"""
+    result = parse_screen(mixed_screen)
+    assert isinstance(result, PermissionPrompt)
+    # MCP should take priority (parsed first)
+    assert result.prompt_type == PromptType.MCP_TRUST
 ```
 
 **Step 2: Run test to verify MCP detection fails**
@@ -424,6 +596,13 @@ async def test_try_auto_accept_regular_still_works():
 
     assert result is True
     tmux.send_key.assert_called_once_with("1")
+
+def test_auto_accept_types_whitelist():
+    """Only REGULAR should be in AUTO_ACCEPT_TYPES whitelist."""
+    from codogram.auto_accept import AUTO_ACCEPT_TYPES
+    assert AUTO_ACCEPT_TYPES == {PromptType.REGULAR}
+    # MCP_TRUST should NOT be in whitelist
+    assert PromptType.MCP_TRUST not in AUTO_ACCEPT_TYPES
 ```
 
 **Step 2: Run test to verify it fails**
@@ -510,7 +689,7 @@ git commit -m "feat(poller): pass prompt_type to try_auto_accept"
 
 ---
 
-## Task 7: Add E2E test documentation
+## Task 8: Add E2E test documentation
 
 **Files:**
 - Modify: `docs/e2e/commands/permissions.md`
@@ -569,7 +748,7 @@ git commit -m "docs(e2e): add MCP trust prompt test cases"
 
 ---
 
-## Task 8: Update bug status and ROADMAP
+## Task 9: Update bug status and ROADMAP
 
 **Files:**
 - Move: `docs/bugs/active/2026-01-07-mcp-trust-prompt-not-detected.md` → `docs/bugs/done/`
@@ -594,7 +773,7 @@ git commit -m "docs: mark MCP trust prompt bug as fixed"
 
 ---
 
-## Task 9: Final verification
+## Task 10: Final verification
 
 **Step 1: Run all tests**
 
