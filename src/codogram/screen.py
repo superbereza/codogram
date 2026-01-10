@@ -118,11 +118,23 @@ def _parse_mcp_trust_prompt(lines: list[str]) -> PermissionPrompt | None:
 
 
 def parse_screen(output: str) -> ScreenState:
-    """Parse tmux capture-pane output to detect state."""
+    """Parse tmux capture-pane output to detect state.
 
+    Parsing order (most specific first):
+    1. MCP trust prompt (box-style) — ╭╮╯╰│ characters
+    2. Regular permission prompt — ──── separator + ❯ options
+    3. Permission without separator — ❯ options only (trust folder)
+    4. Tool progress — ● or ✶ markers
+    5. Idle — default
+    """
     lines = output.split("\n")
 
-    # Find last solid separator ────
+    # 1. Try MCP trust prompt first (most specific)
+    mcp_result = _parse_mcp_trust_prompt(lines)
+    if mcp_result:
+        return mcp_result
+
+    # 2. Find last solid separator ────
     last_sep_idx = -1
     for i, line in enumerate(lines):
         if "─" * 10 in line:

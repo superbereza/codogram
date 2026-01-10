@@ -191,3 +191,37 @@ def test_parse_mcp_trust_prompt_false_positive():
     result = _parse_mcp_trust_prompt(false_positive.split("\n"))
     assert result is None
 
+
+# Integration tests: parse_screen() with MCP prompts
+
+def test_parse_screen_detects_mcp_prompt():
+    """parse_screen should detect MCP trust prompt."""
+    result = parse_screen(MCP_TRUST_SCREEN)
+    assert isinstance(result, PermissionPrompt)
+    assert result.prompt_type == PromptType.MCP_TRUST
+    assert len(result.options) == 3
+
+def test_parse_screen_regular_still_works():
+    """Regular prompts should still work and have REGULAR type."""
+    result = parse_screen(PERMISSION_SCREEN)
+    assert isinstance(result, PermissionPrompt)
+    assert result.prompt_type == PromptType.REGULAR
+
+def test_parse_screen_mcp_priority():
+    """MCP prompt should be detected even if regular patterns also present."""
+    mixed_screen = """
+Some tool output
+──────────────────────────────────────────────────────
+Some text after separator
+
+╭─────────────────────────────────────────────────────╮
+│ New MCP server found in .mcp.json: telegram         │
+│ ❯ 1. Use this and all future MCP servers            │
+│   2. Use this MCP server                            │
+╰─────────────────────────────────────────────────────╯
+   Enter to confirm
+"""
+    result = parse_screen(mixed_screen)
+    assert isinstance(result, PermissionPrompt)
+    assert result.prompt_type == PromptType.MCP_TRUST
+
