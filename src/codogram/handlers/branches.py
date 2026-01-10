@@ -7,7 +7,7 @@ from aiogram.filters import Command
 
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
-from .common import require_forum_group, _flow_state
+from .common import require_forum_group, clear_flow_state
 from ..services.branch import do_branch_create
 from ..magic_names import get_random_magic_name
 from ..git_utils import (
@@ -181,7 +181,8 @@ async def on_branch_commit_request(callback: CallbackQuery, telegram_queue: Tele
 async def on_branch_redirect(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle redirect to /branch_create."""
     chat_id = callback.message.chat.id
-    _flow_state.pop(chat_id, None)
+    thread_id = callback.message.message_thread_id
+    clear_flow_state(chat_id, thread_id)
 
     await telegram_queue.edit(
         callback.message,

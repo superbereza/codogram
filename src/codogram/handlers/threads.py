@@ -5,7 +5,7 @@ from aiogram.filters import Command
 
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
-from .common import require_forum_group, _flow_state
+from .common import require_forum_group, set_flow_state, get_flow_state, clear_flow_state
 from ..magic_names import get_random_magic_name
 from ..services.launch import create_thread_with_session
 
@@ -54,10 +54,10 @@ async def cmd_thread_create(message: Message, telegram_queue: TelegramQueue):
 
     if non_worktree_threads:
         # Store pending thread name for confirmation
-        _flow_state[chat_id] = {
-            "state": "thread_create_pending",
+        set_flow_state(chat_id, message.message_thread_id, {
+            "type": "thread_create_pending",
             "name": name,
-        }
+        })
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Create in main repo", callback_data="thread_create_confirm")],
             [InlineKeyboardButton(text="Use /branch_create instead", callback_data="branch_create_redirect")],
@@ -87,14 +87,15 @@ async def cmd_thread_create(message: Message, telegram_queue: TelegramQueue):
 async def on_thread_create_confirm(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle thread_create confirmation (create in main anyway)."""
     chat_id = callback.message.chat.id
-    state = _flow_state.get(chat_id)
+    thread_id = callback.message.message_thread_id
+    state = get_flow_state(chat_id, thread_id)
 
-    if not state or state.get("state") != "thread_create_pending":
+    if not state or state.get("type") != "thread_create_pending":
         await callback.answer("Session expired")
         return
 
     name = state.get("name")
-    _flow_state.pop(chat_id, None)
+    clear_flow_state(chat_id, thread_id)
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
