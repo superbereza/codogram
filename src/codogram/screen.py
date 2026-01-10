@@ -88,26 +88,8 @@ def parse_screen(output: str) -> ScreenState:
         if re.match(r'^\s*●\s+\w+\(', line):
             return _check_tool_progress(output)
 
-    # Find ❯ for options
-    options = []
-    body_lines = []
-    in_options = False
-
-    for line in after_sep:
-        if "❯" in line:
-            in_options = True
-            match = re.match(r'\s*❯\s*(\d+\.\s+.+)', line)
-            if match:
-                options.append(match.group(1).strip())
-        elif in_options:
-            match = re.match(r'\s{2,}(\d+\.\s+.+)', line)
-            if match:
-                options.append(match.group(1).strip())
-            elif line.strip().startswith("Esc"):
-                break
-        else:
-            # Before ❯ - this is body
-            body_lines.append(line)
+    # Use shared option extraction
+    body_lines, options = _extract_options(after_sep)
 
     if not options:
         return _check_tool_progress(output)
@@ -125,25 +107,7 @@ def _parse_options_without_separator(lines: list[str]) -> PermissionPrompt | Non
 
     Looks for ❯ with numbered options even without ──── separator.
     """
-    options = []
-    body_lines = []
-    in_options = False
-
-    for line in lines:
-        if "❯" in line:
-            in_options = True
-            match = re.match(r'\s*❯\s*(\d+\.\s+.+)', line)
-            if match:
-                options.append(match.group(1).strip())
-        elif in_options:
-            match = re.match(r'\s{2,}(\d+\.\s+.+)', line)
-            if match:
-                options.append(match.group(1).strip())
-            elif line.strip().startswith(("Esc", "Enter")):
-                break
-        else:
-            # Before ❯ - this is body
-            body_lines.append(line)
+    body_lines, options = _extract_options(lines)
 
     if not options:
         return None

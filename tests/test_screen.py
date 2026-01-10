@@ -81,3 +81,14 @@ def test_extract_options_reusable():
     body2, opts2 = _extract_options(regular_lines)
     assert opts2 == ["1. Yes", "2. Yes, allow all"]
 
+
+def test_parse_screen_after_refactor():
+    """Existing behavior unchanged after _extract_options refactoring."""
+    # Regular permission prompt
+    result = parse_screen(PERMISSION_SCREEN)
+    assert isinstance(result, PermissionPrompt)
+    assert len(result.options) >= 2
+    assert "Yes" in result.options[0]
+    # Body should contain file info
+    assert "test.txt" in result.body
+
