@@ -28,6 +28,37 @@ ScreenState = PermissionPrompt | ToolProgress | Idle
 # Separators for display
 SEPARATOR_DASHED = " " + "- " * 18
 
+
+def _extract_options(lines: list[str]) -> tuple[list[str], list[str]]:
+    """Extract options from lines containing selector.
+
+    Returns:
+        (body_lines, options) tuple
+    """
+    options = []
+    body_lines = []
+    in_options = False
+
+    for line in lines:
+        if "❯" in line:
+            in_options = True
+            # NOTE: Keep exact regex from existing code
+            match = re.match(r'\s*❯\s*(\d+\.\s+.+)', line)
+            if match:
+                options.append(match.group(1).strip())
+        elif in_options:
+            # NOTE: \s{2,} (2+ spaces) - NOT \s* - to avoid false positives
+            match = re.match(r'\s{2,}(\d+\.\s+.+)', line)
+            if match:
+                options.append(match.group(1).strip())
+            elif line.strip().startswith(("Esc", "Enter")):
+                break
+        else:
+            body_lines.append(line)
+
+    return body_lines, options
+
+
 def parse_screen(output: str) -> ScreenState:
     """Parse tmux capture-pane output to detect state."""
 
