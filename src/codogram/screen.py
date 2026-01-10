@@ -59,6 +59,64 @@ def _extract_options(lines: list[str]) -> tuple[list[str], list[str]]:
     return body_lines, options
 
 
+def _parse_mcp_trust_prompt(lines: list[str]) -> PermissionPrompt | None:
+    """Parse MCP server trust prompt (box-style UI).
+
+    Format:
+    ╭────────────────────────────────╮
+    │ New MCP server found...        │
+    │ ❯ 1. Use this and all future   │
+    │   2. Use this MCP server       │
+    ╰────────────────────────────────╯
+       Enter to confirm · Esc to reject
+
+    Returns PermissionPrompt with MCP_TRUST type, or None if not MCP prompt.
+    """
+    # Find ALL complete boxes, then use the LAST one
+    boxes = []  # List of (start_idx, end_idx) tuples
+    box_start = None
+    for i, line in enumerate(lines):
+        if "╭" in line:
+            box_start = i
+        elif "╰" in line and box_start is not None:
+            boxes.append((box_start, i))
+            box_start = None  # Reset for next box
+
+    if not boxes:
+        return None
+
+    # Use the LAST complete box
+    box_start, box_end = boxes[-1]
+
+    # Extract content between │...│
+    content_lines = []
+    for line in lines[box_start + 1 : box_end]:
+        if "│" in line:
+            # Split by │ and take middle content
+            parts = line.split("│")
+            if len(parts) >= 3:
+                # Keep original spacing for option detection
+                content_lines.append(parts[1])
+            elif len(parts) == 2:
+                content_lines.append(parts[1])
+
+    if not content_lines:
+        return None
+
+    body_lines, options = _extract_options(content_lines)
+
+    if not options:
+        return None
+
+    # Strip body lines for clean output
+    body = "\n".join(line.strip() for line in body_lines).strip()
+    return PermissionPrompt(
+        options=options,
+        body=body,
+        prompt_type=PromptType.MCP_TRUST
+    )
+
+
 def parse_screen(output: str) -> ScreenState:
     """Parse tmux capture-pane output to detect state."""
 

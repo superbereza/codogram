@@ -92,3 +92,102 @@ def test_parse_screen_after_refactor():
     # Body should contain file info
     assert "test.txt" in result.body
 
+
+# MCP Trust Prompt Tests
+
+MCP_TRUST_SCREEN = """
+╭──────────────────────────────────────────────────────────────────────╮
+│ New MCP server found in .mcp.json: telegram                         │
+│                                                                      │
+│ ❯ 1. Use this and all future MCP servers in this project            │
+│   2. Use this MCP server                                            │
+│   3. Continue without using this MCP server                         │
+╰──────────────────────────────────────────────────────────────────────╯
+   Enter to confirm · Esc to reject
+"""
+
+def test_parse_mcp_trust_prompt_basic():
+    """MCP trust prompt should be detected."""
+    from codogram.screen import _parse_mcp_trust_prompt
+    lines = MCP_TRUST_SCREEN.split("\n")
+    result = _parse_mcp_trust_prompt(lines)
+    assert result is not None
+    assert isinstance(result, PermissionPrompt)
+    assert len(result.options) == 3
+    assert "Use this and all future" in result.options[0]
+
+def test_parse_mcp_trust_prompt_type():
+    """MCP prompt should have MCP_TRUST type."""
+    from codogram.screen import _parse_mcp_trust_prompt
+    lines = MCP_TRUST_SCREEN.split("\n")
+    result = _parse_mcp_trust_prompt(lines)
+    assert result.prompt_type == PromptType.MCP_TRUST
+
+def test_parse_mcp_trust_prompt_body():
+    """MCP prompt body should contain server name."""
+    from codogram.screen import _parse_mcp_trust_prompt
+    lines = MCP_TRUST_SCREEN.split("\n")
+    result = _parse_mcp_trust_prompt(lines)
+    assert "telegram" in result.body or "MCP server" in result.body
+
+def test_parse_mcp_trust_prompt_incomplete():
+    """Incomplete box (no bottom corner) should return None."""
+    from codogram.screen import _parse_mcp_trust_prompt
+    incomplete = """
+╭─────────────────────────╮
+│ Some content            │
+│ ❯ 1. Option             │
+"""
+    result = _parse_mcp_trust_prompt(incomplete.split("\n"))
+    assert result is None
+
+def test_parse_mcp_trust_prompt_no_options():
+    """Box without numbered options should return None."""
+    from codogram.screen import _parse_mcp_trust_prompt
+    no_options = """
+╭─────────────────────────╮
+│ Just a box              │
+│ No options here         │
+╰─────────────────────────╯
+"""
+    result = _parse_mcp_trust_prompt(no_options.split("\n"))
+    assert result is None
+
+def test_parse_mcp_trust_prompt_last_box():
+    """Multiple boxes on screen - should parse the LAST complete box."""
+    from codogram.screen import _parse_mcp_trust_prompt
+    multiple_boxes = """
+Some scrollback text
+
+╭─────────────────────────╮
+│ Old box from scrollback │
+│ ❯ 1. Old option         │
+╰─────────────────────────╯
+
+More text between boxes
+
+╭─────────────────────────────────────────────────────╮
+│ New MCP server found in .mcp.json: telegram         │
+│ ❯ 1. Use this and all future MCP servers            │
+│   2. Use this MCP server                            │
+╰─────────────────────────────────────────────────────╯
+   Enter to confirm
+"""
+    result = _parse_mcp_trust_prompt(multiple_boxes.split("\n"))
+    assert result is not None
+    assert "Use this and all future" in result.options[0]
+    assert "telegram" in result.body
+
+def test_parse_mcp_trust_prompt_false_positive():
+    """Box with arrow but not in numbered format should return None."""
+    from codogram.screen import _parse_mcp_trust_prompt
+    false_positive = """
+╭─────────────────────────╮
+│ Some code output:       │
+│ ❯ Not a real option     │
+│ just arrow symbol       │
+╰─────────────────────────╯
+"""
+    result = _parse_mcp_trust_prompt(false_positive.split("\n"))
+    assert result is None
+
