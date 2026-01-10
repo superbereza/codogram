@@ -179,7 +179,8 @@ async def permission_poller(
                     if auto_accept_enabled:
                         if await try_auto_accept(
                             parsed.options, parsed.body, tmux,
-                            telegram_queue, project.chat_id, thread_id, context_name
+                            telegram_queue, project.chat_id, thread_id, context_name,
+                            prompt_type=parsed.prompt_type,
                         ):
                             state = PollerState.IDLE
                             last_options = None
