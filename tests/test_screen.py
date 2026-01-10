@@ -1,5 +1,5 @@
 import pytest
-from codogram.screen import parse_screen, PermissionPrompt, ToolProgress, Idle
+from codogram.screen import parse_screen, PermissionPrompt, ToolProgress, Idle, PromptType
 
 PERMISSION_SCREEN = """
 ● Write(test.txt)
@@ -27,4 +27,10 @@ def test_parse_idle():
     idle_screen = "> some prompt\n──────────────"
     result = parse_screen(idle_screen)
     assert isinstance(result, Idle)
+
+def test_regular_prompt_has_regular_type():
+    """Existing permission prompts should have REGULAR type."""
+    result = parse_screen(PERMISSION_SCREEN)
+    assert isinstance(result, PermissionPrompt)
+    assert result.prompt_type == PromptType.REGULAR
 

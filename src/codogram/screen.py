@@ -1,10 +1,18 @@
 import re
 from dataclasses import dataclass
+from enum import Enum
+
+
+class PromptType(Enum):
+    REGULAR = "regular"
+    MCP_TRUST = "mcp_trust"
+
 
 @dataclass
 class PermissionPrompt:
     options: list[str]  # ["1. Yes", "2. Yes, allow all..."]
     body: str = ""      # Everything between ──── and ❯ (description + content + question)
+    prompt_type: PromptType = PromptType.REGULAR
 
 @dataclass
 class ToolProgress:
