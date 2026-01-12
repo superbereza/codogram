@@ -1,5 +1,5 @@
 import pytest
-from codogram.screen import parse_screen, PermissionPrompt, ToolProgress, Idle, PromptType, _extract_options
+from codogram.screen import parse_screen, PermissionPrompt, ToolProgress, Idle, PromptType, _extract_options, StatusBar, parse_status_bar
 
 PERMISSION_SCREEN = """
 ● Write(test.txt)
@@ -224,4 +224,90 @@ Some text after separator
     result = parse_screen(mixed_screen)
     assert isinstance(result, PermissionPrompt)
     assert result.prompt_type == PromptType.MCP_TRUST
+
+
+# StatusBar Tests
+
+class TestParseStatusBar:
+    def test_parse_accept_edits_mode(self):
+        output = """
+──────────────────────────────────────────────────────────────────────
+>
+──────────────────────────────────────────────────────────────────────
+  ⏵⏵ accept edits on (shift+tab to               Context left until
+  cycle)                                         auto-compact: 45%
+"""
+        result = parse_status_bar(output)
+        assert result.approval_mode == "accept edits"
+        assert result.context_percent == 45
+
+    def test_parse_plan_mode(self):
+        output = """
+──────────────────────────────────────────────────────────────────────
+>
+──────────────────────────────────────────────────────────────────────
+  ⏸ plan mode on (shift+tab to cycle)
+"""
+        result = parse_status_bar(output)
+        assert result.approval_mode == "plan mode"
+
+    def test_parse_default_mode(self):
+        output = """
+──────────────────────────────────────────────────────────────────────
+>
+──────────────────────────────────────────────────────────────────────
+  ? for shortcuts
+"""
+        result = parse_status_bar(output)
+        assert result.approval_mode is None  # default mode
+
+    def test_parse_background_tasks(self):
+        output = """
+──────────────────────────────────────────────────────────────────────
+>
+──────────────────────────────────────────────────────────────────────
+  ⏵⏵ accept edits on · 2 background tasks
+"""
+        result = parse_status_bar(output)
+        assert result.background_tasks == 2
+
+    def test_parse_no_background_tasks(self):
+        output = """
+──────────────────────────────────────────────────────────────────────
+>
+──────────────────────────────────────────────────────────────────────
+  ⏵⏵ accept edits on (shift+tab to cycle)
+"""
+        result = parse_status_bar(output)
+        assert result.background_tasks == 0
+
+    def test_parse_context_not_displayed(self):
+        output = """
+──────────────────────────────────────────────────────────────────────
+>
+──────────────────────────────────────────────────────────────────────
+  1 background task
+"""
+        result = parse_status_bar(output)
+        assert result.context_percent is None
+
+    def test_parse_empty_output(self):
+        """Empty output returns default values."""
+        result = parse_status_bar("")
+        assert result.approval_mode is None  # default mode
+        assert result.background_tasks == 0
+        assert result.context_percent is None
+
+    def test_parse_only_background_tasks(self):
+        """When only background tasks visible (during generation)."""
+        output = """
+──────────────────────────────────────────────────────────────────────
+>
+──────────────────────────────────────────────────────────────────────
+  2 background tasks
+"""
+        result = parse_status_bar(output)
+        assert result.approval_mode is None  # default mode
+        assert result.background_tasks == 2
+        assert result.context_percent is None
 
