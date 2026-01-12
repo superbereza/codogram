@@ -2,6 +2,7 @@
 import re
 from typing import TYPE_CHECKING
 
+from .screen import PromptType
 from .telegram_queue import OutgoingBatch
 from .tmux import TmuxSession
 from .logging_config import logger
@@ -10,6 +11,9 @@ if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
 AUTO_ACCEPT_PHRASES = ["yes", "allow"]
+
+# Only auto-accept regular prompts (not MCP trust prompts for security)
+AUTO_ACCEPT_TYPES = {PromptType.REGULAR}
 
 
 def select_option(options: list[str]) -> str | None:
@@ -44,11 +48,17 @@ async def try_auto_accept(
     chat_id: int,
     thread_id: int | None,
     context_name: str,
+    prompt_type: PromptType = PromptType.REGULAR,
 ) -> bool:
     """Try to auto-accept a permission prompt.
 
     Returns True if auto-accepted, False if manual mode needed.
     """
+    # Security: only auto-accept whitelisted prompt types
+    if prompt_type not in AUTO_ACCEPT_TYPES:
+        logger.debug(f"Auto-accept: skipping {prompt_type.value} prompt")
+        return False
+
     selected = select_option(options)
     if selected is None:
         return False

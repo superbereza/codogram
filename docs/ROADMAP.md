@@ -181,13 +181,32 @@ Handle chat_id change when topics are enabled in existing group:
 - Menu registered on bot startup and on /start
 - See [docs/designs/done/2026-01-07-group-to-supergroup-migration.md](designs/done/2026-01-07-group-to-supergroup-migration.md)
 
-## Backlog
+### MCP trust prompt support
+Detect and display MCP server trust prompts:
+- Box-style UI parsing with `╭╮╯╰│` characters
+- `PromptType` enum for extensible prompt classification
+- MCP prompts shown in Telegram with same buttons as regular prompts
+- Auto-accept bypassed for MCP prompts (security)
+- See [docs/designs/done/2026-01-07-mcp-trust-prompt.md](designs/done/2026-01-07-mcp-trust-prompt.md)
 
-### Thread create UX
-Improve `/thread_create`:
-- Without argument → show buttons with name options (magic names)
-- Or input field "Enter name"
-- Remove need to enter name on same line
+### Atomic permission message batches
+Fix permission messages interleaving with launch_animation:
+- Add `reply_markup` field to `OutgoingBatch` (applied to last message)
+- Permission poller sends body + options + keyboard in single atomic enqueue
+- Prevents other messages from appearing between permission parts
+- See [docs/bugs/fixed/2026-01-12-permission-messages-interleaving.md](bugs/fixed/2026-01-12-permission-messages-interleaving.md)
+
+### Thread/Branch create UX
+Improved `/thread` and `/branch` name input:
+- Without argument → show prompt "Thread/Branch name?" with buttons
+- [🔮 Magic name] button generates random name (arcane, mystic...)
+- User can type custom name as text message
+- [<<] Go back cancels the flow
+- With argument → validates and creates directly (unchanged)
+- Flow state cleared on any new command
+- See [docs/designs/done/2026-01-07-thread-branch-create-ux.md](designs/done/2026-01-07-thread-branch-create-ux.md)
+
+## Backlog
 
 ### Session state display & control
 Display and control Claude session state:
@@ -206,15 +225,6 @@ Show that Claude is thinking/working:
 - Random verbs: "Hatching", "Enchanting", "Conjuring", etc.
 - Parse from tmux capture-pane
 - Show typing indicator or status in Telegram
-
-### MCP trust prompt support
-Detect MCP server trust prompts (box-style UI):
-- Different from standard prompts: `❯` on separate line, options around it
-- Box characters `│` and `╰────╯` border
-- "Enter to confirm · Esc to reject" footer
-- Need careful parsing to avoid false positives on numbered lists
-- See failed attempt: 2026-01-04 (broke permission detection everywhere)
-- See bug: [2026-01-07-mcp-trust-prompt-not-detected.md](bugs/active/2026-01-07-mcp-trust-prompt-not-detected.md)
 
 ### Message queue until session ready
 Cache user messages while session is binding, send when ready:
@@ -334,9 +344,10 @@ Default private chat with bot linked to codogram folder:
 - Store in per-project settings
 - Show status on /start
 
-### Ctrl+B command
-`/ctrl_b` sends Ctrl+B to tmux:
-- Useful for vim-mode or tmux prefix
+### Background process command
+`/ctrl_b` sends Ctrl+B twice to background running processes:
+- Sequence: Ctrl+B → sleep(0.1) → Ctrl+B
+- Useful when Claude spawns long-running tasks
 
 ### Silent push notifications
 Silent pushes for regular messages, loud for permissions and stops:

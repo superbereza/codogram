@@ -167,3 +167,99 @@ mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
 - UI: Permission buttons appear in topic (Yes/No)
 - State: `thread.poller_task` is not None and not done
 - Note: This test verifies poller starts immediately on resume (not just on first message)
+
+---
+
+## TC-PERMISSIONS-007: MCP trust prompt detected (box-style)
+
+**Tags:** critical, permissions, mcp
+**Preconditions:** Project with `.mcp.json` containing untrusted server
+
+**Setup:**
+```bash
+# Ensure project has .mcp.json with a new MCP server
+# The server should NOT be in trusted list yet
+cat test-project/.mcp.json
+# Should contain an MCP server config
+
+# Kill any existing session to trigger fresh MCP prompt
+tmux kill-session -t claude-codogram-test-mcp 2>/dev/null || true
+```
+
+**Steps:**
+```python
+# 1. Start fresh session (triggers MCP trust prompt)
+mcp__telegram__send_message(chat_id=TEST_CHAT_ID, message="/start")
+# Wait 30s for Claude to show MCP trust prompt
+
+# 2. Check for MCP trust buttons
+mcp__telegram__list_inline_buttons(chat_id=TEST_CHAT_ID)
+```
+
+**Expected:**
+- UI: Permission buttons appear with MCP server options:
+  - "1. Use this and all future MCP servers in this project"
+  - "2. Use this MCP server"
+  - "3. Continue without using this MCP server"
+- State: Prompt parsed as `PromptType.MCP_TRUST`
+- Note: Box-style UI with `╭╮╯╰│` characters parsed correctly
+
+---
+
+## TC-PERMISSIONS-008: MCP trust prompt NOT auto-accepted
+
+**Tags:** critical, permissions, mcp, auto_accept
+**Preconditions:** auto_accept enabled, MCP trust prompt visible
+
+**Setup:**
+```python
+# Enable auto_accept
+mcp__telegram__send_message(chat_id=TEST_CHAT_ID, message="/auto_accept")
+# Wait 2s
+mcp__telegram__list_messages(chat_id=TEST_CHAT_ID, limit=2)
+```
+
+**Steps:**
+```python
+# 1. Trigger MCP trust prompt (start fresh session with .mcp.json)
+# Kill tmux first
+# bash: tmux kill-session -t claude-codogram-test-mcp
+
+# 2. Wait 30s for MCP prompt to appear
+mcp__telegram__list_inline_buttons(chat_id=TEST_CHAT_ID)
+```
+
+**Expected:**
+- UI: Permission buttons still visible (NOT auto-accepted)
+- State: auto_accept=true in config, but MCP prompts are bypassed
+- Log: "Auto-accept: skipping mcp_trust prompt" in logs/codogram.log
+
+**Cleanup:**
+```python
+# Disable auto_accept
+mcp__telegram__send_message(chat_id=TEST_CHAT_ID, message="/auto_accept")
+```
+
+---
+
+## TC-PERMISSIONS-009: MCP trust prompt button click works
+
+**Tags:** critical, permissions, mcp
+**Preconditions:** MCP trust prompt visible with buttons
+
+**Steps:**
+```python
+# 1. Find MCP trust buttons
+mcp__telegram__list_inline_buttons(chat_id=TEST_CHAT_ID)
+
+# 2. Click option 2 (Use this MCP server)
+mcp__telegram__press_inline_button(chat_id=TEST_CHAT_ID, button_text="2. Use this MCP server")
+
+# 3. Wait 10s for response
+mcp__telegram__list_messages(chat_id=TEST_CHAT_ID, limit=5)
+```
+
+**Expected:**
+- UI: Button click acknowledged, MCP server connected
+- State: "2" sent to tmux via send-keys
+- Note: Claude proceeds with the selected MCP option

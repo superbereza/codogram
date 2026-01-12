@@ -181,13 +181,32 @@
 - Меню регистрируется при старте бота и при /start
 - См. [docs/designs/done/2026-01-07-group-to-supergroup-migration.md](designs/done/2026-01-07-group-to-supergroup-migration.md)
 
-## Backlog
+### Поддержка MCP trust prompt
+Обнаружение и отображение промптов доверия MCP серверам:
+- Парсинг box-style UI с символами `╭╮╯╰│`
+- Enum `PromptType` для расширяемой классификации типов промптов
+- MCP промпты показываются в Telegram с теми же кнопками что обычные
+- Auto-accept обходится для MCP промптов (безопасность)
+- См. [docs/designs/done/2026-01-07-mcp-trust-prompt.md](designs/done/2026-01-07-mcp-trust-prompt.md)
 
-### Thread create UX
-Улучшить `/thread_create`:
-- Без аргумента → показать кнопки с вариантами имён (magic names)
-- Или поле ввода "Введите название"
-- Убрать необходимость вводить имя в той же строке
+### Атомарные батчи permission сообщений
+Фикс перемешивания permission сообщений с launch_animation:
+- Добавлено поле `reply_markup` в `OutgoingBatch` (применяется к последнему сообщению)
+- Permission poller отправляет body + options + keyboard одним атомарным enqueue
+- Другие сообщения не могут вклиниться между частями permission prompt
+- См. [docs/bugs/fixed/2026-01-12-permission-messages-interleaving.md](bugs/fixed/2026-01-12-permission-messages-interleaving.md)
+
+### Thread/Branch create UX
+Улучшенный ввод имени для `/thread` и `/branch`:
+- Без аргумента → показать промпт "Thread/Branch name?" с кнопками
+- Кнопка [🔮 Magic name] генерирует случайное имя (arcane, mystic...)
+- Пользователь может ввести своё имя текстом
+- [<<] Go back отменяет операцию
+- С аргументом → валидирует и создаёт напрямую (без изменений)
+- Flow state очищается при любой новой команде
+- См. [docs/designs/done/2026-01-07-thread-branch-create-ux.md](designs/done/2026-01-07-thread-branch-create-ux.md)
+
+## Backlog
 
 ### Отображение и управление состоянием сессии
 Показ и управление состоянием Claude сессии:
@@ -202,15 +221,6 @@
 - "thinking..." когда Claude обрабатывает
 - Throbber/typing indicator
 - Слова типа "Hmm", "Let me think"
-
-### Поддержка MCP trust prompt
-Обнаружение промптов доверия MCP серверам (box-style UI):
-- Отличается от стандартных: `❯` на отдельной строке, опции вокруг
-- Box-символы `│` и `╰────╯` как рамка
-- Футер "Enter to confirm · Esc to reject"
-- Нужен аккуратный парсинг чтобы не ловить нумерованные списки
-- См. неудачную попытку: 2026-01-04 (сломало детекцию везде)
-- См. баг: [2026-01-07-mcp-trust-prompt-not-detected.md](bugs/active/2026-01-07-mcp-trust-prompt-not-detected.md)
 
 ### Очередь сообщений до готовности сессии
 Кэширование сообщений пользователя пока сессия привязывается:
@@ -330,9 +340,10 @@
 - Хранить в per-project settings
 - Показывать статус при /start
 
-### Ctrl+B command
-`/ctrl_b` отправляет Ctrl+B в tmux:
-- Полезно для vim-mode или tmux prefix
+### Background process command
+`/ctrl_b` отправляет Ctrl+B дважды для фонового запуска процессов:
+- Последовательность: Ctrl+B → sleep(0.1) → Ctrl+B
+- Полезно когда Claude запускает долгие задачи
 
 ### Silent push notifications
 Тихие пуши на обычные сообщения, громкие на permissions и остановку:

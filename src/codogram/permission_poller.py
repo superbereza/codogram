@@ -8,7 +8,7 @@ from aiogram import Bot
 if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
-from .telegram_queue import OutgoingBatch, KeyboardBatch
+from .telegram_queue import OutgoingBatch
 from .screen import parse_screen, PermissionPrompt, is_claude_ready
 from .keyboards import permission_keyboard
 from .state import permission_messages
@@ -179,7 +179,8 @@ async def permission_poller(
                     if auto_accept_enabled:
                         if await try_auto_accept(
                             parsed.options, parsed.body, tmux,
-                            telegram_queue, project.chat_id, thread_id, context_name
+                            telegram_queue, project.chat_id, thread_id, context_name,
+                            prompt_type=parsed.prompt_type,
                         ):
                             state = PollerState.IDLE
                             last_options = None
@@ -188,35 +189,35 @@ async def permission_poller(
                     logger.debug(f"{log_prefix} DEBOUNCING->SHOWING: sending to Telegram")
                     logger.debug(f"{log_prefix}: body preview: {parsed.body[:200]}...")
                     try:
-                        # Build batch of body messages
-                        body_messages = []
+                        # Build batch of all messages (atomic send)
+                        messages = []
                         if parsed.body:
                             body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                            body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
+                            messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                         # Options as text
                         options_text = "\n".join(parsed.options)
-                        body_messages.append({"text": options_text})
+                        messages.append({"text": options_text})
 
-                        # Send body through queue, get IDs for cleanup
+                        # 👆 as last message (will get keyboard via reply_markup)
+                        messages.append({"text": "👆"})
+
+                        # Single atomic enqueue with keyboard on last message
+                        kb = permission_keyboard(parsed.options, tmux_name)
                         batch = OutgoingBatch(
                             chat_id=project.chat_id,
                             thread_id=thread_id,
-                            messages=body_messages,
-                        )
-                        content_msg_ids = await telegram_queue.enqueue(batch)
-
-                        # Keyboard through queue (rate limited)
-                        kb = permission_keyboard(parsed.options, tmux_name)
-                        kb_msg_ids = await telegram_queue.enqueue(KeyboardBatch(
-                            chat_id=project.chat_id,
-                            text="👆",
+                            messages=messages,
                             reply_markup=kb,
-                            thread_id=thread_id,
-                        ))
-                        kb_msg_id = kb_msg_ids[0] if kb_msg_ids else None
+                        )
+                        msg_ids = await telegram_queue.enqueue(batch)
+
+                        # Last message is keyboard, rest are content
+                        kb_msg_id = msg_ids[-1] if msg_ids else None
+                        content_msg_ids = msg_ids[:-1] if len(msg_ids) > 1 else []
                         if kb_msg_id:
                             permission_messages[kb_msg_id] = content_msg_ids
+                            logger.debug(f"{log_prefix}: saved permission_messages[{kb_msg_id}] = {content_msg_ids}")
 
                         state = PollerState.SHOWING
                         last_body = parsed.body
@@ -261,28 +262,31 @@ async def permission_poller(
                             pass
                         permission_messages.pop(kb_msg_id, None)
 
-                    # Build new body messages
-                    body_messages = []
+                    # Build new messages (atomic send)
+                    messages = []
                     if parsed.body:
                         body_text = SEPARATOR_SOLID + "\n" + parsed.body
-                        body_messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
+                        messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                     options_text = "\n".join(parsed.options)
-                    body_messages.append({"text": options_text})
+                    messages.append({"text": options_text})
 
-                    # Send through queue
-                    batch = OutgoingBatch(chat_id=project.chat_id, thread_id=thread_id, messages=body_messages)
-                    content_msg_ids = await telegram_queue.enqueue(batch)
+                    # 👆 as last message (will get keyboard via reply_markup)
+                    messages.append({"text": "👆"})
 
-                    # Keyboard through queue (rate limited)
+                    # Single atomic enqueue with keyboard on last message
                     kb = permission_keyboard(parsed.options, tmux_name)
-                    kb_msg_ids = await telegram_queue.enqueue(KeyboardBatch(
+                    batch = OutgoingBatch(
                         chat_id=project.chat_id,
-                        text="👆",
-                        reply_markup=kb,
                         thread_id=thread_id,
-                    ))
-                    kb_msg_id = kb_msg_ids[0] if kb_msg_ids else None
+                        messages=messages,
+                        reply_markup=kb,
+                    )
+                    msg_ids = await telegram_queue.enqueue(batch)
+
+                    # Last message is keyboard, rest are content
+                    kb_msg_id = msg_ids[-1] if msg_ids else None
+                    content_msg_ids = msg_ids[:-1] if len(msg_ids) > 1 else []
                     if kb_msg_id:
                         permission_messages[kb_msg_id] = content_msg_ids
 
