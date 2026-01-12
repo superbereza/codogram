@@ -18,6 +18,7 @@ _ALL_COMMANDS = [
     ("finish", "Merge branch, archive topic", False),  # forum only
     ("start", "Connect Claude or show status", True),
     ("settings", "View current settings", True),
+    ("shift_tab", "Cycle Claude approval mode", True),
     ("restart", "Force restart Claude", True),
     ("get_debug_ids", "Show chat and thread IDs", True),
     ("help", "List all commands", True),

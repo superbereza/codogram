@@ -39,6 +39,7 @@ async def cmd_help(message: Message, telegram_queue: TelegramQueue):
 *Settings:*
 /start — Connect Claude or show status
 /settings — View current settings
+/shift\\_tab — Cycle Claude approval mode
 /restart — Force restart Claude
 /get\\_debug\\_ids — Show chat and thread IDs
 
