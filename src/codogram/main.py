@@ -12,6 +12,7 @@ from aiogram import Bot, Dispatcher
 
 from .config import settings
 from .middleware.admin import AdminMiddleware
+from .middleware.clear_create_state import ClearCreateStateMiddleware
 from .handlers import register_handlers
 from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
@@ -36,6 +37,9 @@ async def main():
     # Global admin check - protects ALL routers
     dp.message.middleware(AdminMiddleware())
     dp.callback_query.middleware(AdminMiddleware())
+
+    # Clear create flow state when any command is sent
+    dp.message.middleware(ClearCreateStateMiddleware())
 
     # Register handler routers (all protected by AdminMiddleware)
     register_handlers(dp)

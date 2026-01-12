@@ -196,13 +196,17 @@
 - Другие сообщения не могут вклиниться между частями permission prompt
 - См. [docs/bugs/fixed/2026-01-12-permission-messages-interleaving.md](bugs/fixed/2026-01-12-permission-messages-interleaving.md)
 
-## Backlog
+### Thread/Branch create UX
+Улучшенный ввод имени для `/thread` и `/branch`:
+- Без аргумента → показать промпт "Thread/Branch name?" с кнопками
+- Кнопка [🔮 Magic name] генерирует случайное имя (arcane, mystic...)
+- Пользователь может ввести своё имя текстом
+- [<<] Go back отменяет операцию
+- С аргументом → валидирует и создаёт напрямую (без изменений)
+- Flow state очищается при любой новой команде
+- См. [docs/designs/done/2026-01-07-thread-branch-create-ux.md](designs/done/2026-01-07-thread-branch-create-ux.md)
 
-### Thread create UX
-Улучшить `/thread_create`:
-- Без аргумента → показать кнопки с вариантами имён (magic names)
-- Или поле ввода "Введите название"
-- Убрать необходимость вводить имя в той же строке
+## Backlog
 
 ### Отображение и управление состоянием сессии
 Показ и управление состоянием Claude сессии:

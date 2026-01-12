@@ -196,13 +196,17 @@ Fix permission messages interleaving with launch_animation:
 - Prevents other messages from appearing between permission parts
 - See [docs/bugs/fixed/2026-01-12-permission-messages-interleaving.md](bugs/fixed/2026-01-12-permission-messages-interleaving.md)
 
-## Backlog
+### Thread/Branch create UX
+Improved `/thread` and `/branch` name input:
+- Without argument → show prompt "Thread/Branch name?" with buttons
+- [🔮 Magic name] button generates random name (arcane, mystic...)
+- User can type custom name as text message
+- [<<] Go back cancels the flow
+- With argument → validates and creates directly (unchanged)
+- Flow state cleared on any new command
+- See [docs/designs/done/2026-01-07-thread-branch-create-ux.md](designs/done/2026-01-07-thread-branch-create-ux.md)
 
-### Thread create UX
-Improve `/thread_create`:
-- Without argument → show buttons with name options (magic names)
-- Or input field "Enter name"
-- Remove need to enter name on same line
+## Backlog
 
 ### Session state display & control
 Display and control Claude session state:
