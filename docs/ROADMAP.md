@@ -329,9 +329,10 @@ Default private chat with bot linked to codogram folder:
 - Store in per-project settings
 - Show status on /start
 
-### Ctrl+B command
-`/ctrl_b` sends Ctrl+B to tmux:
-- Useful for vim-mode or tmux prefix
+### Background process command
+`/ctrl_b` sends Ctrl+B twice to background running processes:
+- Sequence: Ctrl+B → sleep(0.1) → Ctrl+B
+- Useful when Claude spawns long-running tasks
 
 ### Silent push notifications
 Silent pushes for regular messages, loud for permissions and stops:

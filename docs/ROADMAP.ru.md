@@ -329,9 +329,10 @@
 - Хранить в per-project settings
 - Показывать статус при /start
 
-### Ctrl+B command
-`/ctrl_b` отправляет Ctrl+B в tmux:
-- Полезно для vim-mode или tmux prefix
+### Background process command
+`/ctrl_b` отправляет Ctrl+B дважды для фонового запуска процессов:
+- Последовательность: Ctrl+B → sleep(0.1) → Ctrl+B
+- Полезно когда Claude запускает долгие задачи
 
 ### Silent push notifications
 Тихие пуши на обычные сообщения, громкие на permissions и остановку:
