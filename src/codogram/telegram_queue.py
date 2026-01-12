@@ -27,7 +27,8 @@ class OutgoingBatch:
     """Batch of messages to send atomically."""
     chat_id: int
     thread_id: int | None
-    messages: list[dict]  # [{text, parse_mode, reply_markup?}, ...]
+    messages: list[dict]  # [{text, parse_mode}, ...]
+    reply_markup: InlineKeyboardMarkup | None = None  # Applied to LAST message
 
 
 @dataclass
@@ -217,12 +218,18 @@ class TelegramQueue:
         sent_ids: list[int] = []
 
         try:
-            for msg in expanded_messages:
+            for i, msg in enumerate(expanded_messages):
+                is_last = (i == len(expanded_messages) - 1)
+
+                # Apply batch-level reply_markup to the last message
+                send_kwargs = {**msg}
+                if is_last and batch.reply_markup:
+                    send_kwargs["reply_markup"] = batch.reply_markup
 
                 result = await self.bot.send_message(
                     chat_id=batch.chat_id,
                     message_thread_id=batch.thread_id,
-                    **msg,
+                    **send_kwargs,
                 )
                 sent_ids.append(result.message_id)
             return sent_ids
