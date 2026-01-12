@@ -218,6 +218,7 @@ async def permission_poller(
                         kb_msg_id = kb_msg_ids[0] if kb_msg_ids else None
                         if kb_msg_id:
                             permission_messages[kb_msg_id] = content_msg_ids
+                            logger.debug(f"{log_prefix}: saved permission_messages[{kb_msg_id}] = {content_msg_ids}")
 
                         state = PollerState.SHOWING
                         last_body = parsed.body

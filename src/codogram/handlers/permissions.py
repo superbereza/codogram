@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery
 from ..session_manager import project_manager
 from ..tmux import TmuxSession
 from ..state import permission_messages
+from ..logging_config import logger
 
 router = Router(name="permissions")
 
@@ -58,15 +59,19 @@ async def _cleanup_permission_messages(callback: CallbackQuery):
     kb_msg_id = callback.message.message_id
 
     # Delete content messages
+    logger.debug(f"cleanup: kb_msg_id={kb_msg_id}, permission_messages keys={list(permission_messages.keys())}")
     content_ids = permission_messages.pop(kb_msg_id, [])
+    logger.debug(f"cleanup: content_ids={content_ids}")
     for msg_id in content_ids:
         try:
             await callback.bot.delete_message(chat_id, msg_id)
-        except Exception:
-            pass
+            logger.debug(f"cleanup: deleted content msg {msg_id}")
+        except Exception as e:
+            logger.warning(f"cleanup: failed to delete content msg {msg_id}: {e}")
 
     # Delete keyboard message
     try:
         await callback.message.delete()
-    except Exception:
-        pass
+        logger.debug(f"cleanup: deleted keyboard msg {kb_msg_id}")
+    except Exception as e:
+        logger.warning(f"cleanup: failed to delete keyboard msg {kb_msg_id}: {e}")
