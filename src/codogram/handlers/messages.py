@@ -8,6 +8,7 @@ from ..services.message_router import MessageRouterService, RouteAction
 from ..session_manager import project_manager, ThreadInfo
 from ..telegram_queue import TelegramQueue
 from ..logging_config import logger
+from .create_flow import handle_name_input
 
 router = Router(name="messages")
 
@@ -38,6 +39,11 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
         return
 
     chat_id = message.chat.id
+
+    # Check if awaiting name input for create flow
+    if await handle_name_input(message, telegram_queue):
+        return
+
     thread_id = message.message_thread_id
 
     # Route the message

@@ -6,7 +6,9 @@ from aiogram.filters import Command
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
 from .common import require_forum_group, set_flow_state, get_flow_state, clear_flow_state
-from ..magic_names import get_random_magic_name
+from ..domain.create_flow import CreateType
+from ..keyboards.create_flow import build_name_prompt_keyboard
+from ..services.create_flow import create_flow_service
 from ..services.launch import create_thread_with_session
 
 router = Router(name="threads")
@@ -40,11 +42,25 @@ async def cmd_thread_create(message: Message, telegram_queue: TelegramQueue):
 
     # Parse optional name from command
     args = message.text.split(maxsplit=1)
-    if len(args) > 1:
-        name = args[1].strip().lower()
-    else:
-        existing_names = {t.name for t in project.threads.values()}
-        name = get_random_magic_name(existing_names)
+    name_arg = args[1].strip() if len(args) > 1 else None
+
+    if create_flow_service.should_show_prompt(name_arg):
+        set_flow_state(chat_id, message.message_thread_id, {
+            "type": "awaiting_create_name",
+            "create_type": "thread",
+        })
+        await telegram_queue.reply(
+            message,
+            "Thread name?\n\nSend name or pick random",
+            reply_markup=build_name_prompt_keyboard(CreateType.THREAD),
+        )
+        return
+
+    # Validate name
+    name, error = create_flow_service.validate_name(name_arg, project)
+    if error:
+        await telegram_queue.reply(message, error)
+        return
 
     # Check if any non-worktree threads exist (excluding main)
     non_worktree_threads = [

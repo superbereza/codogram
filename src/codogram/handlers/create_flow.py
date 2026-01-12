@@ -45,7 +45,7 @@ async def on_create_magic(callback: CallbackQuery, telegram_queue: TelegramQueue
     if create_type == CreateType.BRANCH:
         await _do_create_branch(callback.bot, chat_id, thread_id, project, name, telegram_queue)
     else:
-        await _do_create_thread(callback.bot, chat_id, project, name, telegram_queue)
+        await _do_create_thread(callback.bot, chat_id, thread_id, project, name, telegram_queue)
 
     await callback.answer()
 
@@ -79,7 +79,7 @@ async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> 
     if create_type == CreateType.BRANCH:
         await _do_create_branch(message.bot, chat_id, thread_id, project, name, telegram_queue)
     else:
-        await _do_create_thread(message.bot, chat_id, project, name, telegram_queue)
+        await _do_create_thread(message.bot, chat_id, thread_id, project, name, telegram_queue)
 
     return True
 
@@ -115,7 +115,7 @@ async def _do_create_branch(
     await do_branch_create(bot, chat_id, project, name, default_branch)
 
 
-async def _do_create_thread(bot, chat_id: int, project, name: str, telegram_queue: TelegramQueue):
+async def _do_create_thread(bot, chat_id: int, thread_id: int | None, project, name: str, telegram_queue: TelegramQueue):
     """Create thread with given name."""
     thread = await create_thread_with_session(
         bot=bot,
@@ -124,4 +124,4 @@ async def _do_create_thread(bot, chat_id: int, project, name: str, telegram_queu
         name=name,
     )
     if not thread:
-        await telegram_queue.send(chat_id, "`[x]` Error creating topic")
+        await telegram_queue.send(chat_id, "`[x]` Error creating topic", thread_id=thread_id)

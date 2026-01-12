@@ -41,138 +41,141 @@ Following layered architecture from CLAUDE.md:
 
 ```
 domain/
-  create_flow.py          # State and result types
+  create_flow.py          # Types only (no state)
     - CreateType (enum): BRANCH, THREAD
-    - CreateFlowState (dataclass): type, thread_id
-    - CreateAction (enum): SHOW_PROMPT, CREATE, ERROR
-    - CreateResult (dataclass): action, name, error
 
 services/
-  create_flow.py          # Business logic
+  create_flow.py          # Business logic + singleton
     - CreateFlowService
-      - start_flow(type, has_name) -> CreateResult
+      - should_show_prompt(name_arg) -> bool
       - get_magic_name(project) -> str
-      - validate_name(name, project, type) -> (sanitized, error)
-      - create(type, project, name, ...) -> delegates to branch/launch service
+      - validate_name(name, project) -> (sanitized, error)
+      - check_branch_preconditions(project, name) -> (can, error, warning)
+    - create_flow_service  # module-level singleton
+
+middleware/
+  clear_create_state.py   # Clears state on any command
+    - ClearCreateStateMiddleware
 
 handlers/
-  branches.py             # Thin router, builds UI from CreateResult
-  threads.py              # Thin router, builds UI from CreateResult
-  create_flow.py          # NEW: shared callbacks and message handler
-    - on_magic_name(callback)
-    - on_cancel_prompt(callback)
-    - handle_name_message(message) - called from messages.py
+  common.py               # State with (chat_id, thread_id) key
+    - get_flow_state(chat_id, thread_id)
+    - set_flow_state(chat_id, thread_id, state)
+    - clear_flow_state(chat_id, thread_id)
+    - clear_flow_state_by_type(chat_id, thread_id, type)
+  create_flow.py          # Shared callbacks and name input
+    - on_create_cancel(callback)
+    - on_create_magic(callback)
+    - handle_name_input(message) -> bool
+  branches.py             # Thin router
+  threads.py              # Thin router
 
 keyboards/
-  create_flow.py          # NEW: keyboard builders
+  create_flow.py          # Keyboard builder + constants
+    - CALLBACK_MAGIC_PREFIX = "create_magic:"
+    - CALLBACK_CANCEL = "create_cancel"
     - build_name_prompt_keyboard(type)
 ```
 
 ### State Management
 
-New module `domain/create_flow.py`:
+Reuse existing `_flow_state` in `handlers/common.py` with new key structure:
 
 ```python
-@dataclass
-class CreateFlowState:
-    type: CreateType  # BRANCH or THREAD
-    thread_id: int | None
+# Key: (chat_id, thread_id) instead of just chat_id
+_flow_state: dict[tuple[int, int | None], dict] = {}
 
-# Module-level state (like _flow_state in common.py)
-_create_state: dict[int, CreateFlowState] = {}  # chat_id -> state
-
-def get_state(chat_id: int) -> CreateFlowState | None
-def set_state(chat_id: int, state: CreateFlowState) -> None
-def clear_state(chat_id: int) -> None
-def has_pending_create(chat_id: int) -> bool
+# State structure for create flow:
+{
+    "type": "awaiting_create_name",
+    "create_type": "branch"  # or "thread"
+}
 ```
 
-### Service Layer
+**Why (chat_id, thread_id)?**
+- Different topics in same chat don't conflict
+- `/branch` in topic A doesn't affect `/thread` in topic B
 
-`services/create_flow.py`:
+### Middleware Layer
+
+`ClearCreateStateMiddleware` runs before all handlers:
+
+```
+User message → Middleware → Handler
+                  ↓
+         if starts with "/"
+         and state type == "awaiting_create_name"
+                  ↓
+            clear state
+```
+
+**Why middleware?**
+- Single place, all commands covered
+- New handlers automatically protected
+- Handlers don't need to know about create flow state
+
+**What it clears:**
+- Only `awaiting_create_name` state
+- Other state types (`thread_create_pending`) untouched
+
+### Service Layer
 
 ```python
 class CreateFlowService:
     def should_show_prompt(self, name_arg: str | None) -> bool:
-        """Returns True if no name provided."""
-        return name_arg is None
+        """Returns True if no name or whitespace only."""
+        if name_arg is None:
+            return True
+        return not name_arg.strip()
 
     def get_magic_name(self, project) -> str:
         """Generate random magic name not used by project."""
         existing = {t.name for t in project.threads.values()}
         return get_random_magic_name(existing)
 
-    def validate_name(self, name: str, project, create_type: CreateType) -> tuple[str | None, str | None]:
+    def validate_name(self, name: str, project) -> tuple[str | None, str | None]:
         """Validate and sanitize name. Returns (sanitized, error)."""
-        sanitized = sanitize_branch_name(name)
-        if not sanitized:
-            return None, "`[x]` Invalid name"
+        # 1. Sanitize
+        # 2. Check length
+        # 3. Check uniqueness
+        ...
 
-        # Check length (same for both)
-        max_len = max_branch_name_length(project.project_name)
-        if len(sanitized) > max_len:
-            return None, f"`[x]` Name too long (max {max_len} chars)"
+    def check_branch_preconditions(self, project, name: str) -> tuple[bool, str | None, str | None]:
+        """Check git repo and uncommitted changes.
+        Returns (can_create, error, warning).
+        - error: fatal, cannot proceed
+        - warning: can proceed with confirmation (uncommitted changes)
+        """
+        ...
 
-        # Check uniqueness
-        existing = {t.name for t in project.threads.values()}
-        if sanitized in existing:
-            return None, f"`[x]` Name `{sanitized}` already used"
-
-        return sanitized, None
-```
-
-### Handler Layer
-
-Handlers stay thin - delegate to service, build UI:
-
-```python
-# handlers/branches.py
-async def cmd_branch_create(message, queue):
-    # ... existing checks (forum, project, git repo) ...
-
-    args = message.text.split(maxsplit=1)
-    name_arg = args[1] if len(args) > 1 else None
-
-    if service.should_show_prompt(name_arg):
-        set_state(chat_id, CreateFlowState(CreateType.BRANCH, thread_id))
-        await queue.reply(message, "Branch name?\n\nSend name or pick random",
-                         reply_markup=build_name_prompt_keyboard(CreateType.BRANCH))
-        return
-
-    # Has name - validate and proceed
-    name, error = service.validate_name(name_arg, project, CreateType.BRANCH)
-    if error:
-        await queue.reply(message, error)
-        return
-
-    # ... rest of branch creation flow (uncommitted changes check, etc.) ...
+# Module-level singleton
+create_flow_service = CreateFlowService()
 ```
 
 ### Unified Validation Rules
 
 Same rules for both branch and thread:
-1. sanitize_branch_name() - lowercase, spaces→dashes, remove invalid chars
+1. `sanitize_branch_name()` - lowercase, spaces→dashes, remove invalid chars
 2. Check max length based on project name
 3. Check name not already used by existing thread
 
-Branch-specific checks (after name validation):
-- Git repo required
-- Uncommitted changes handling
-- Worktree directory check
+Branch-specific checks (in service, after name validation):
+- Git repo required → error
+- Uncommitted changes → warning (show options)
 
 ## File Changes
 
 **New files:**
-- `src/codogram/domain/create_flow.py` - state and types
-- `src/codogram/services/create_flow.py` - business logic
+- `src/codogram/domain/create_flow.py` - CreateType enum only
+- `src/codogram/services/create_flow.py` - business logic + singleton
+- `src/codogram/middleware/clear_create_state.py` - clears state on commands
 - `src/codogram/handlers/create_flow.py` - shared callbacks
-- `src/codogram/keyboards/create_flow.py` - keyboard builder
+- `src/codogram/keyboards/create_flow.py` - keyboard builder + constants
 
 **Modified files:**
+- `src/codogram/handlers/common.py` - state functions with (chat_id, thread_id) key
 - `src/codogram/handlers/branches.py` - use service, show prompt
 - `src/codogram/handlers/threads.py` - use service, show prompt
 - `src/codogram/handlers/messages.py` - check create state before routing
 - `src/codogram/handlers/__init__.py` - register create_flow router
-
-**Removed from common.py:**
-- Move `_flow_state` usage for create flow to new domain module
+- `src/codogram/main.py` - register middleware

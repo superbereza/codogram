@@ -7,13 +7,13 @@ from aiogram.filters import Command
 
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
-from .common import require_forum_group, clear_flow_state
+from .common import require_forum_group, clear_flow_state, set_flow_state
 from ..services.branch import do_branch_create
-from ..magic_names import get_random_magic_name
+from ..services.create_flow import create_flow_service
+from ..domain.create_flow import CreateType
+from ..keyboards.create_flow import build_name_prompt_keyboard
 from ..git_utils import (
     is_git_repo,
-    sanitize_branch_name,
-    max_branch_name_length,
     has_uncommitted_changes,
     get_default_branch,
     branch_exists,
@@ -51,18 +51,23 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
     args = message.text.split(maxsplit=1)
     branch_name = args[1] if len(args) > 1 else None
 
-    # Generate magic name if not provided
-    if not branch_name:
-        existing_names = {t.name for t in project.threads.values()}
-        branch_name = get_random_magic_name(existing_names)
+    # Show name prompt if not provided
+    if create_flow_service.should_show_prompt(branch_name):
+        set_flow_state(message.chat.id, message.message_thread_id, {
+            "type": "awaiting_create_name",
+            "create_type": "branch",
+        })
+        await telegram_queue.reply(
+            message,
+            "Branch name?\n\nSend name or pick random",
+            reply_markup=build_name_prompt_keyboard(CreateType.BRANCH),
+        )
+        return
 
-    # Sanitize branch name
-    branch_name = sanitize_branch_name(branch_name)
-
-    # Check length
-    max_len = max_branch_name_length(project.project_name)
-    if len(branch_name) > max_len:
-        await telegram_queue.reply(message, f"`[x]` Name too long (max {max_len} chars for this project)")
+    # Validate and sanitize name
+    branch_name, error = create_flow_service.validate_name(branch_name, project)
+    if error:
+        await telegram_queue.reply(message, error)
         return
 
     # Check if branch already exists
