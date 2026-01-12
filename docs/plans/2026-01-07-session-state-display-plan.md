@@ -88,6 +88,26 @@ class TestParseStatusBar:
 """
         result = parse_status_bar(output)
         assert result.context_percent is None
+
+    def test_parse_empty_output(self):
+        """Empty output returns default values."""
+        result = parse_status_bar("")
+        assert result.approval_mode is None  # default mode
+        assert result.background_tasks == 0
+        assert result.context_percent is None
+
+    def test_parse_only_background_tasks(self):
+        """When only background tasks visible (during generation)."""
+        output = """
+──────────────────────────────────────────────────────────────────────
+>
+──────────────────────────────────────────────────────────────────────
+  2 background tasks
+"""
+        result = parse_status_bar(output)
+        assert result.approval_mode is None  # default mode
+        assert result.background_tasks == 2
+        assert result.context_percent is None
 ```
 
 **Step 2: Run test to verify it fails**
@@ -502,10 +522,12 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
         service = SessionStateService()
         result = service.get_status(tmux)
 
-        if result.success and result.status_bar:
+        if not result.success:
+            lines.append(f"Claude: {result.error}")
+        else:
             sb = result.status_bar
 
-            # Approval mode
+            # Approval mode (None = default mode)
             if sb.approval_mode == "accept edits":
                 mode_text = "⏵⏵ accept edits on"
             elif sb.approval_mode == "plan mode":
@@ -527,8 +549,8 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
                 lines.append(f"context left until autocompact: {sb.context_percent}%")
             else:
                 lines.append("context left until autocompact: not displayed")
-        else:
-            lines.append("Claude status: not available")
+    else:
+        lines.append("Claude: not connected")
 
     await telegram_queue.reply(message, "\n".join(lines))
 ```
