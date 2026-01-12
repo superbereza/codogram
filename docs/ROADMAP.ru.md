@@ -189,6 +189,13 @@
 - Auto-accept обходится для MCP промптов (безопасность)
 - См. [docs/designs/done/2026-01-07-mcp-trust-prompt.md](designs/done/2026-01-07-mcp-trust-prompt.md)
 
+### Атомарные батчи permission сообщений
+Фикс перемешивания permission сообщений с launch_animation:
+- Добавлено поле `reply_markup` в `OutgoingBatch` (применяется к последнему сообщению)
+- Permission poller отправляет body + options + keyboard одним атомарным enqueue
+- Другие сообщения не могут вклиниться между частями permission prompt
+- См. [docs/bugs/fixed/2026-01-12-permission-messages-interleaving.md](bugs/fixed/2026-01-12-permission-messages-interleaving.md)
+
 ## Backlog
 
 ### Thread create UX

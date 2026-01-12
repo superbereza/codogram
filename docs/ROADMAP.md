@@ -189,6 +189,13 @@ Detect and display MCP server trust prompts:
 - Auto-accept bypassed for MCP prompts (security)
 - See [docs/designs/done/2026-01-07-mcp-trust-prompt.md](designs/done/2026-01-07-mcp-trust-prompt.md)
 
+### Atomic permission message batches
+Fix permission messages interleaving with launch_animation:
+- Add `reply_markup` field to `OutgoingBatch` (applied to last message)
+- Permission poller sends body + options + keyboard in single atomic enqueue
+- Prevents other messages from appearing between permission parts
+- See [docs/bugs/fixed/2026-01-12-permission-messages-interleaving.md](bugs/fixed/2026-01-12-permission-messages-interleaving.md)
+
 ## Backlog
 
 ### Thread create UX
