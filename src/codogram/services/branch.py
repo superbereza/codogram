@@ -23,13 +23,10 @@ async def archive_thread(
         project: Project state
         thread: Thread to archive
     """
-    # Cancel background tasks
-    if thread.watcher_task:
-        thread.watcher_task.cancel()
-    if thread.poller_task:
-        thread.poller_task.cancel()
-    if thread.binding_task:
-        thread.binding_task.cancel()
+    # Cancel all background tasks
+    for task in [thread.launch_task, thread.watcher_task, thread.poller_task, thread.binding_task]:
+        if task and not task.done():
+            task.cancel()
 
     # Kill tmux
     tmux_name = thread.get_tmux_session(project.project_name)
