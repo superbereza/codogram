@@ -20,6 +20,7 @@ def mock_callback():
     cb.message.chat = MagicMock(spec=Chat)
     cb.message.chat.id = -100123
     cb.message.message_thread_id = 456
+    cb.message.delete = AsyncMock()
     cb.answer = AsyncMock()
     cb.bot = MagicMock()
     return cb
@@ -49,7 +50,7 @@ async def test_cancel_deletes_message_and_clears_state(mock_callback):
     await on_create_cancel(mock_callback, mock_queue)
 
     assert get_flow_state(-100123, 456) is None
-    mock_queue.delete.assert_called_once_with(mock_callback.message)
+    mock_callback.message.delete.assert_called_once()
     mock_callback.answer.assert_called_once()
 
 
@@ -75,7 +76,7 @@ async def test_magic_branch_creates_branch(mock_callback):
         await on_create_magic(mock_callback, mock_queue)
 
         assert get_flow_state(-100123, 456) is None
-        mock_queue.delete.assert_called_once()
+        mock_callback.message.delete.assert_called_once()
         mock_create.assert_called_once()
 
 

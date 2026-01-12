@@ -19,7 +19,7 @@ router = Router(name="create_flow")
 async def on_create_cancel(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle cancel - delete prompt and clear state."""
     clear_flow_state(callback.message.chat.id, callback.message.message_thread_id)
-    await telegram_queue.delete(callback.message)
+    await callback.message.delete()
     await callback.answer()
 
 
@@ -40,7 +40,7 @@ async def on_create_magic(callback: CallbackQuery, telegram_queue: TelegramQueue
 
     name = create_flow_service.get_magic_name(project)
 
-    await telegram_queue.delete(callback.message)
+    await callback.message.delete()
 
     if create_type == CreateType.BRANCH:
         await _do_create_branch(callback.bot, chat_id, thread_id, project, name, telegram_queue)
