@@ -548,30 +548,64 @@ git commit -m "feat(settings): show Claude session state in /settings"
 
 ---
 
-## Task 5: Add /shift_tab to bot commands menu
+## Task 5: Add /shift_tab to bot menu and /help
 
 **Files:**
-- Modify: `src/codogram/main.py:43-55`
+- Modify: `src/codogram/services/menu.py:12-24`
+- Modify: `src/codogram/handlers/settings.py:27-46`
 
-**Step 1: Add shift_tab to bot commands**
+**Step 1: Add shift_tab to menu.py**
 
-Edit `src/codogram/main.py`, add after line 51 (after "settings" command):
+Edit `src/codogram/services/menu.py`, add to `_ALL_COMMANDS` list after line 20 (after "settings"):
 
 ```python
-        BotCommand(command="shift_tab", description="Cycle Claude approval mode"),
+    ("shift_tab", "Cycle Claude approval mode", True),
 ```
 
-**Step 2: Run bot and verify command appears in menu**
+**Step 2: Add shift_tab to /help command**
+
+Edit `src/codogram/handlers/settings.py`, in `cmd_help` function, add after `/settings` line:
+
+```python
+/shift\\_tab — Cycle Claude approval mode
+```
+
+Full updated help text:
+```python
+    text = """*Everyday:*
+/esc — Cancel current operation
+/auto\\_accept — Toggle auto\\-accept mode
+
+*Create:*
+/thread — New topic in project directory
+/branch — New isolated feature branch \\+ topic
+
+*Complete:*
+/clear — Clear context, start fresh
+/finish — Merge branch, archive topic
+
+*Settings:*
+/start — Connect Claude or show status
+/settings — View current settings
+/shift\\_tab — Cycle Claude approval mode
+/restart — Force restart Claude
+/my\\_chat\\_id — Show chat and thread IDs
+
+*Help:*
+/help — This message"""
+```
+
+**Step 3: Run bot and verify**
 
 Run: `./dev-run.sh`
-Test: Check Telegram bot menu shows /shift_tab
-Expected: Command visible in menu
+Test: Check Telegram bot menu shows /shift_tab, check /help includes it
+Expected: Command visible in menu and help
 
-**Step 3: Commit**
+**Step 4: Commit**
 
 ```bash
-git add src/codogram/main.py
-git commit -m "feat(main): add /shift_tab to bot command menu"
+git add src/codogram/services/menu.py src/codogram/handlers/settings.py
+git commit -m "feat(menu): add /shift_tab to bot menu and help"
 ```
 
 ---
@@ -633,5 +667,5 @@ git commit -m "test: verify session state display E2E"
 | 2 | SessionStateService | services/session_state.py, test |
 | 3 | /shift_tab handler | handlers/shift_tab.py, __init__.py |
 | 4 | Enhance /settings | handlers/settings.py |
-| 5 | Bot menu | main.py |
+| 5 | Bot menu + help | services/menu.py, handlers/settings.py |
 | 6 | E2E testing | manual via MCP |
