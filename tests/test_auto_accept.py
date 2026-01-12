@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from codogram.auto_accept import select_option, try_auto_accept
+from codogram.auto_accept import select_option, try_auto_accept, AUTO_ACCEPT_TYPES
+from codogram.screen import PromptType
 
 # Tests for select_option
 def test_select_option_picks_yes():
@@ -78,3 +79,32 @@ async def test_try_auto_accept_empty_body():
     assert result is True
     call_args = queue.enqueue_nowait.call_args[0][0]
     assert "[no details]" in call_args.messages[0]["text"]
+
+
+# Tests for prompt type whitelist
+def test_auto_accept_types_whitelist():
+    """Only REGULAR prompts should be auto-accepted."""
+    assert PromptType.REGULAR in AUTO_ACCEPT_TYPES
+    assert PromptType.MCP_TRUST not in AUTO_ACCEPT_TYPES
+
+
+@pytest.mark.asyncio
+async def test_try_auto_accept_skips_mcp_trust():
+    """MCP trust prompts should not be auto-accepted."""
+    tmux = MagicMock()
+    queue = AsyncMock()
+
+    result = await try_auto_accept(
+        options=["1. Yes", "2. No"],  # Would normally be accepted
+        body="Allow MCP server?",
+        tmux=tmux,
+        telegram_queue=queue,
+        chat_id=123,
+        thread_id=None,
+        context_name="test-project",
+        prompt_type=PromptType.MCP_TRUST,
+    )
+
+    assert result is False
+    tmux.send_key.assert_not_called()
+    queue.enqueue_nowait.assert_not_called()

@@ -181,6 +181,14 @@ Handle chat_id change when topics are enabled in existing group:
 - Menu registered on bot startup and on /start
 - See [docs/designs/done/2026-01-07-group-to-supergroup-migration.md](designs/done/2026-01-07-group-to-supergroup-migration.md)
 
+### MCP trust prompt support
+Detect and display MCP server trust prompts:
+- Box-style UI parsing with `╭╮╯╰│` characters
+- `PromptType` enum for extensible prompt classification
+- MCP prompts shown in Telegram with same buttons as regular prompts
+- Auto-accept bypassed for MCP prompts (security)
+- See [docs/designs/done/2026-01-07-mcp-trust-prompt.md](designs/done/2026-01-07-mcp-trust-prompt.md)
+
 ## Backlog
 
 ### Thread create UX
@@ -202,15 +210,6 @@ Show that Claude is thinking/working:
 - "thinking..." when Claude is processing
 - Throbber/typing indicator
 - Words like "Hmm", "Let me think"
-
-### MCP trust prompt support
-Detect MCP server trust prompts (box-style UI):
-- Different from standard prompts: `❯` on separate line, options around it
-- Box characters `│` and `╰────╯` border
-- "Enter to confirm · Esc to reject" footer
-- Need careful parsing to avoid false positives on numbered lists
-- See failed attempt: 2026-01-04 (broke permission detection everywhere)
-- See bug: [2026-01-07-mcp-trust-prompt-not-detected.md](bugs/active/2026-01-07-mcp-trust-prompt-not-detected.md)
 
 ### Message queue until session ready
 Cache user messages while session is binding, send when ready:

@@ -1,10 +1,18 @@
 import re
 from dataclasses import dataclass
+from enum import Enum
+
+
+class PromptType(Enum):
+    REGULAR = "regular"
+    MCP_TRUST = "mcp_trust"
+
 
 @dataclass
 class PermissionPrompt:
     options: list[str]  # ["1. Yes", "2. Yes, allow all..."]
     body: str = ""      # Everything between ──── and ❯ (description + content + question)
+    prompt_type: PromptType = PromptType.REGULAR
 
 @dataclass
 class ToolProgress:
@@ -20,12 +28,113 @@ ScreenState = PermissionPrompt | ToolProgress | Idle
 # Separators for display
 SEPARATOR_DASHED = " " + "- " * 18
 
-def parse_screen(output: str) -> ScreenState:
-    """Parse tmux capture-pane output to detect state."""
 
+def _extract_options(lines: list[str]) -> tuple[list[str], list[str]]:
+    """Extract options from lines containing selector.
+
+    Returns:
+        (body_lines, options) tuple
+    """
+    options = []
+    body_lines = []
+    in_options = False
+
+    for line in lines:
+        if "❯" in line:
+            in_options = True
+            # NOTE: Keep exact regex from existing code
+            match = re.match(r'\s*❯\s*(\d+\.\s+.+)', line)
+            if match:
+                options.append(match.group(1).strip())
+        elif in_options:
+            # NOTE: \s{2,} (2+ spaces) - NOT \s* - to avoid false positives
+            match = re.match(r'\s{2,}(\d+\.\s+.+)', line)
+            if match:
+                options.append(match.group(1).strip())
+            elif line.strip().startswith(("Esc", "Enter")):
+                break
+        else:
+            body_lines.append(line)
+
+    return body_lines, options
+
+
+def _parse_mcp_trust_prompt(lines: list[str]) -> PermissionPrompt | None:
+    """Parse MCP server trust prompt (box-style UI).
+
+    Format:
+    ╭────────────────────────────────╮
+    │ New MCP server found...        │
+    │ ❯ 1. Use this and all future   │
+    │   2. Use this MCP server       │
+    ╰────────────────────────────────╯
+       Enter to confirm · Esc to reject
+
+    Returns PermissionPrompt with MCP_TRUST type, or None if not MCP prompt.
+    """
+    # Find ALL complete boxes, then use the LAST one
+    boxes = []  # List of (start_idx, end_idx) tuples
+    box_start = None
+    for i, line in enumerate(lines):
+        if "╭" in line:
+            box_start = i
+        elif "╰" in line and box_start is not None:
+            boxes.append((box_start, i))
+            box_start = None  # Reset for next box
+
+    if not boxes:
+        return None
+
+    # Use the LAST complete box
+    box_start, box_end = boxes[-1]
+
+    # Extract content between │...│
+    content_lines = []
+    for line in lines[box_start + 1 : box_end]:
+        if "│" in line:
+            # Split by │ and take middle content
+            parts = line.split("│")
+            if len(parts) >= 3:
+                # Keep original spacing for option detection
+                content_lines.append(parts[1])
+            elif len(parts) == 2:
+                content_lines.append(parts[1])
+
+    if not content_lines:
+        return None
+
+    body_lines, options = _extract_options(content_lines)
+
+    if not options:
+        return None
+
+    # Strip body lines for clean output
+    body = "\n".join(line.strip() for line in body_lines).strip()
+    return PermissionPrompt(
+        options=options,
+        body=body,
+        prompt_type=PromptType.MCP_TRUST
+    )
+
+
+def parse_screen(output: str) -> ScreenState:
+    """Parse tmux capture-pane output to detect state.
+
+    Parsing order (most specific first):
+    1. MCP trust prompt (box-style) — ╭╮╯╰│ characters
+    2. Regular permission prompt — ──── separator + ❯ options
+    3. Permission without separator — ❯ options only (trust folder)
+    4. Tool progress — ● or ✶ markers
+    5. Idle — default
+    """
     lines = output.split("\n")
 
-    # Find last solid separator ────
+    # 1. Try MCP trust prompt first (most specific)
+    mcp_result = _parse_mcp_trust_prompt(lines)
+    if mcp_result:
+        return mcp_result
+
+    # 2. Find last solid separator ────
     last_sep_idx = -1
     for i, line in enumerate(lines):
         if "─" * 10 in line:
@@ -49,26 +158,8 @@ def parse_screen(output: str) -> ScreenState:
         if re.match(r'^\s*●\s+\w+\(', line):
             return _check_tool_progress(output)
 
-    # Find ❯ for options
-    options = []
-    body_lines = []
-    in_options = False
-
-    for line in after_sep:
-        if "❯" in line:
-            in_options = True
-            match = re.match(r'\s*❯\s*(\d+\.\s+.+)', line)
-            if match:
-                options.append(match.group(1).strip())
-        elif in_options:
-            match = re.match(r'\s{2,}(\d+\.\s+.+)', line)
-            if match:
-                options.append(match.group(1).strip())
-            elif line.strip().startswith("Esc"):
-                break
-        else:
-            # Before ❯ - this is body
-            body_lines.append(line)
+    # Use shared option extraction
+    body_lines, options = _extract_options(after_sep)
 
     if not options:
         return _check_tool_progress(output)
@@ -86,25 +177,7 @@ def _parse_options_without_separator(lines: list[str]) -> PermissionPrompt | Non
 
     Looks for ❯ with numbered options even without ──── separator.
     """
-    options = []
-    body_lines = []
-    in_options = False
-
-    for line in lines:
-        if "❯" in line:
-            in_options = True
-            match = re.match(r'\s*❯\s*(\d+\.\s+.+)', line)
-            if match:
-                options.append(match.group(1).strip())
-        elif in_options:
-            match = re.match(r'\s{2,}(\d+\.\s+.+)', line)
-            if match:
-                options.append(match.group(1).strip())
-            elif line.strip().startswith(("Esc", "Enter")):
-                break
-        else:
-            # Before ❯ - this is body
-            body_lines.append(line)
+    body_lines, options = _extract_options(lines)
 
     if not options:
         return None

@@ -181,6 +181,14 @@
 - Меню регистрируется при старте бота и при /start
 - См. [docs/designs/done/2026-01-07-group-to-supergroup-migration.md](designs/done/2026-01-07-group-to-supergroup-migration.md)
 
+### Поддержка MCP trust prompt
+Обнаружение и отображение промптов доверия MCP серверам:
+- Парсинг box-style UI с символами `╭╮╯╰│`
+- Enum `PromptType` для расширяемой классификации типов промптов
+- MCP промпты показываются в Telegram с теми же кнопками что обычные
+- Auto-accept обходится для MCP промптов (безопасность)
+- См. [docs/designs/done/2026-01-07-mcp-trust-prompt.md](designs/done/2026-01-07-mcp-trust-prompt.md)
+
 ## Backlog
 
 ### Thread create UX
@@ -202,15 +210,6 @@
 - "thinking..." когда Claude обрабатывает
 - Throbber/typing indicator
 - Слова типа "Hmm", "Let me think"
-
-### Поддержка MCP trust prompt
-Обнаружение промптов доверия MCP серверам (box-style UI):
-- Отличается от стандартных: `❯` на отдельной строке, опции вокруг
-- Box-символы `│` и `╰────╯` как рамка
-- Футер "Enter to confirm · Esc to reject"
-- Нужен аккуратный парсинг чтобы не ловить нумерованные списки
-- См. неудачную попытку: 2026-01-04 (сломало детекцию везде)
-- См. баг: [2026-01-07-mcp-trust-prompt-not-detected.md](bugs/active/2026-01-07-mcp-trust-prompt-not-detected.md)
 
 ### Очередь сообщений до готовности сессии
 Кэширование сообщений пользователя пока сессия привязывается:
