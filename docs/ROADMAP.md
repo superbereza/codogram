@@ -259,6 +259,13 @@ Research and implement tool display improvements:
 - First line from jsonl can be used as anchor
 - Need to research which tools are hidden in CLI
 
+### Claude error detection
+Detect when Claude Code exits with error (API errors, network issues, etc.):
+- Research how errors are displayed in tmux (API error, connection issues)
+- Parse tmux capture-pane for error patterns
+- Send error text to user: "⚠️ Claude error: <error text>. Figure it out and /start"
+- Detect shell prompt appearing after Claude was active
+
 ### Reply support
 When replying to message, send context to tmux:
 - Quote piece of message being replied to
