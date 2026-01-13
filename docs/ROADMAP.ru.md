@@ -206,6 +206,14 @@
 - Flow state очищается при любой новой команде
 - См. [docs/designs/done/2026-01-07-thread-branch-create-ux.md](designs/done/2026-01-07-thread-branch-create-ux.md)
 
+### Отображение и управление состоянием сессии
+Показ и управление состоянием Claude сессии:
+- **/shift_tab команда** — отправляет Shift+Tab в tmux, переключает approval mode
+- **/settings улучшения** — показывает approval mode, background tasks, context usage
+- **Парсинг статус бара** — парсинг строки под input box (только в idle)
+- **Отмена permission при отправке** — отменяет активный permission prompt перед отправкой сообщения
+- См. [docs/designs/done/2026-01-07-session-state-display.md](designs/done/2026-01-07-session-state-display.md)
+
 ## Backlog
 
 ### Фикс gh repo create без коммитов
@@ -215,14 +223,6 @@ Error: GitHub creation failed: gh error: --push enabled but no commits found
 ```
 - Нужно создать initial commit перед push
 - Добавить `git commit --allow-empty -m "Initial commit"` или создать README
-
-### Отображение и управление состоянием сессии
-Показ и управление состоянием Claude сессии:
-- **/shift_tab команда** — отправляет Shift+Tab в tmux, репортит изменение ("Allow once → Allow for session")
-- **/settings улучшения** — текущий режим approval, количество background tasks
-- **Индикатор контекстного окна** — сколько осталось до compact (парсить из jsonl или tmux screen)
-- Парсить статус бар из tmux capture-pane
-- Формат: "Mode: Accept edits | Background: 3 | Context: 45%"
 
 ### Activity indicators
 Отображение что Claude думает/работает:

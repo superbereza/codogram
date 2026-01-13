@@ -206,6 +206,14 @@ Improved `/thread` and `/branch` name input:
 - Flow state cleared on any new command
 - See [docs/designs/done/2026-01-07-thread-branch-create-ux.md](designs/done/2026-01-07-thread-branch-create-ux.md)
 
+### Session state display & control
+Display and control Claude session state:
+- **/shift_tab command** — send Shift+Tab to tmux, cycle approval mode
+- **/settings enhancements** — show approval mode, background tasks, context usage
+- **Status bar parsing** — parse line below input box (idle only)
+- **Permission cancel on send** — cancel active permission before sending message
+- See [docs/designs/done/2026-01-07-session-state-display.md](designs/done/2026-01-07-session-state-display.md)
+
 ## Backlog
 
 ### Fix gh repo create initial commit
@@ -215,16 +223,6 @@ Error: GitHub creation failed: gh error: --push enabled but no commits found
 ```
 - Need to create initial commit before pushing
 - Add `git commit --allow-empty -m "Initial commit"` or create README
-
-### Session state display & control
-Display and control Claude session state:
-- **/shift_tab command** — send Shift+Tab to tmux, report new mode
-- **/settings enhancements** — show current approval mode and context usage
-- **Status bar parsing** — parse line BELOW input box (only visible in idle):
-  - Left: `⏵⏵ accept edits on (shift+tab to cycle)` — approval mode
-  - Right: `Context left until auto-compact: 0%` — context usage
-- No background tasks count in status bar (not displayed by Claude CLI)
-- No model indicator in status bar
 
 ### Activity indicators
 Show that Claude is thinking/working:
