@@ -78,6 +78,16 @@ def git_init_with_github(path: str, private: bool = True) -> LaunchResult:
         if not init_result.success:
             return init_result
 
+        # Initial commit (required for gh repo create --push)
+        result = subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "Initial commit"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return LaunchResult(success=False, error=f"git commit error: {result.stderr}")
+
         # gh repo create
         visibility = "--private" if private else "--public"
         result = subprocess.run(

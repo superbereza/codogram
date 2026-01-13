@@ -222,15 +222,11 @@ Handle deleted worktrees gracefully instead of crashing:
 - "Resume in main" archives topic (feature work is done)
 - See [docs/designs/done/2026-01-12-stale-worktree-recovery.md](designs/done/2026-01-12-stale-worktree-recovery.md)
 
-## Backlog
-
 ### Fix gh repo create initial commit
-`gh repo create --push` fails on empty repo:
-```
-Error: GitHub creation failed: gh error: --push enabled but no commits found
-```
-- Need to create initial commit before pushing
-- Add `git commit --allow-empty -m "Initial commit"` or create README
+`gh repo create --push` was failing on empty repo with "no commits found".
+- Added `git commit --allow-empty -m "Initial commit"` before `gh repo create --push`
+
+## Backlog
 
 ### Activity indicators
 Show that Claude is thinking/working:

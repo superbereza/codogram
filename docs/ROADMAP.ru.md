@@ -222,15 +222,11 @@
 - "Resume in main" архивирует топик (работа над фичей завершена)
 - См. [docs/designs/done/2026-01-12-stale-worktree-recovery.md](designs/done/2026-01-12-stale-worktree-recovery.md)
 
-## Backlog
-
 ### Фикс gh repo create без коммитов
-`gh repo create --push` падает на пустом репо:
-```
-Error: GitHub creation failed: gh error: --push enabled but no commits found
-```
-- Нужно создать initial commit перед push
-- Добавить `git commit --allow-empty -m "Initial commit"` или создать README
+`gh repo create --push` падал на пустом репо с ошибкой "no commits found".
+- Добавлен `git commit --allow-empty -m "Initial commit"` перед `gh repo create --push`
+
+## Backlog
 
 ### Activity indicators
 Отображение что Claude думает/работает:
