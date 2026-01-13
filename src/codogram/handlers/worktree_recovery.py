@@ -37,13 +37,13 @@ class WorktreeRecoveryHandler:
             logger.warning("Malformed callback data: %s", callback.data)
             await callback.message.edit_text("`[x]` Invalid callback data")
             return
-        thread = self.project_manager.get_thread(thread_id)
+
+        project = self.project_manager.get_project()
+        thread = project.get_thread(thread_id)
 
         if not thread:
             await callback.message.edit_text("`[x]` Thread not found")
             return
-
-        project = self.project_manager.get_project()
         success, path = create_worktree(Path(project.cwd), thread.name)
 
         if success:
@@ -68,13 +68,13 @@ class WorktreeRecoveryHandler:
             logger.warning("Malformed callback data: %s", callback.data)
             await callback.message.edit_text("`[x]` Invalid callback data")
             return
-        thread = self.project_manager.get_thread(thread_id)
+
+        project = self.project_manager.get_project()
+        thread = project.get_thread(thread_id)
 
         if not thread:
             await callback.message.edit_text("`[x]` Thread not found")
             return
-
-        project = self.project_manager.get_project()
         success, path = create_branch_with_worktree(Path(project.cwd), thread.name)
 
         if success:
@@ -99,13 +99,13 @@ class WorktreeRecoveryHandler:
             logger.warning("Malformed callback data: %s", callback.data)
             await callback.message.edit_text("`[x]` Invalid callback data")
             return
-        thread = self.project_manager.get_thread(thread_id)
+
+        project = self.project_manager.get_project()
+        thread = project.get_thread(thread_id)
 
         if not thread:
             await callback.message.edit_text("`[x]` Thread not found")
             return
-
-        project = self.project_manager.get_project()
         await archive_thread(self.bot, callback.message.chat.id, project, thread)
         await callback.message.edit_text(
             "`[v]` Topic archived\n\n"
