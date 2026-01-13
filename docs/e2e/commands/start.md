@@ -288,3 +288,145 @@ mcp__telegram__list_messages(chat_id=NEW_CHAT_ID, limit=10)
 
 **Expected:**
 - Tool call notification (● Read...) in NEW chat
+
+---
+
+## TC-START-013: /start detects stale worktree
+
+**Tags:** critical, start, worktree, recovery
+**Preconditions:** Branch topic with worktree_path that doesn't exist
+
+**Setup:**
+```bash
+# Create branch topic with worktree
+mcp__telegram__send_message(chat_id=-1003356094635, message="/branch stale-test")
+# Wait 30s for session to bind
+# Kill tmux
+tmux kill-session -t claude-codogram-testing-area-stale-test 2>/dev/null || true
+# Delete worktree directory
+rm -rf /home/superbereza/dev/codogram/.worktrees/stale-test
+```
+
+**Steps:**
+```python
+# Find the topic's thread_id first
+mcp__telegram__list_topics(chat_id=-1003356094635, search_query="stale-test")
+# Send /start in that topic
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=TOPIC_ID, text="/start")
+# Wait 3s
+mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
+```
+
+**Expected:**
+- UI: Warning "[!] Worktree missing" with recovery options
+- Buttons: "Recreate worktree", "Create new branch", "Resume in main", "Cancel"
+
+---
+
+## TC-START-014: Stale worktree - Recreate worktree
+
+**Tags:** critical, start, worktree, recovery
+**Preconditions:** TC-START-013 setup complete, git branch exists
+
+**Setup:**
+```bash
+# Ensure branch exists
+git branch -l | grep stale-test
+```
+
+**Steps:**
+```python
+# Press "Recreate worktree" button
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="Recreate worktree")
+# Wait 20s for Claude to launch
+mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=TOPIC_ID, limit=5)
+```
+
+**Expected:**
+- UI: Recovery message deleted, Claude launching animation
+- State: Worktree recreated at .worktrees/stale-test
+- State: Claude session bound to topic
+
+**Verify:**
+```bash
+ls -la /home/superbereza/dev/codogram/.worktrees/stale-test
+```
+
+---
+
+## TC-START-015: Stale worktree - Create new branch
+
+**Tags:** critical, start, worktree, recovery
+**Preconditions:** Stale worktree detected, git branch does NOT exist
+
+**Setup:**
+```bash
+# Delete the git branch
+git branch -D stale-test 2>/dev/null || true
+# Setup stale worktree state
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=TOPIC_ID, text="/start")
+# Wait 3s
+```
+
+**Steps:**
+```python
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="Create new branch")
+# Wait 20s
+mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=TOPIC_ID, limit=5)
+```
+
+**Expected:**
+- UI: Recovery message deleted, Claude launching animation
+- State: New branch created with worktree
+- State: Claude session bound to topic
+
+**Verify:**
+```bash
+git branch -l | grep stale-test
+ls -la /home/superbereza/dev/codogram/.worktrees/stale-test
+```
+
+---
+
+## TC-START-016: Stale worktree - Resume in main
+
+**Tags:** critical, start, worktree, recovery
+**Preconditions:** Stale worktree detected
+
+**Setup:**
+```bash
+# Ensure stale worktree state
+rm -rf /home/superbereza/dev/codogram/.worktrees/stale-test
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=TOPIC_ID, text="/start")
+# Wait 3s
+```
+
+**Steps:**
+```python
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="Resume in main")
+# Wait 3s
+mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=TOPIC_ID, limit=3)
+```
+
+**Expected:**
+- UI: "[v] Topic archived. Use General or /thread for new session."
+- State: Topic closed (archived icon 📁)
+- State: No new Claude session started
+
+---
+
+## TC-START-017: Stale worktree - Cancel
+
+**Tags:** smoke, start, worktree, recovery
+**Preconditions:** Stale worktree recovery message shown
+
+**Steps:**
+```python
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="Cancel")
+# Wait 1s
+mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=TOPIC_ID, limit=3)
+```
+
+**Expected:**
+- UI: Recovery message deleted
+- State: No changes, topic remains in same state
