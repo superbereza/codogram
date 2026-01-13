@@ -86,6 +86,13 @@ def create_worktree(project_cwd: Path, branch_name: str) -> tuple[bool, str]:
     worktree_path = project_cwd / ".worktrees" / branch_name
 
     try:
+        # Prune stale worktrees first (handles "missing but registered" case)
+        subprocess.run(
+            ["git", "worktree", "prune"],
+            cwd=project_cwd,
+            capture_output=True,
+        )
+
         result = subprocess.run(
             ["git", "worktree", "add", str(worktree_path), branch_name],
             cwd=project_cwd,
@@ -107,6 +114,13 @@ def create_branch_with_worktree(project_cwd: Path, branch_name: str) -> tuple[bo
     worktree_path = project_cwd / ".worktrees" / branch_name
 
     try:
+        # Prune stale worktrees first (handles "missing but registered" case)
+        subprocess.run(
+            ["git", "worktree", "prune"],
+            cwd=project_cwd,
+            capture_output=True,
+        )
+
         # Create worktree with new branch
         result = subprocess.run(
             ["git", "worktree", "add", "-b", branch_name, str(worktree_path)],
