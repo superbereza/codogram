@@ -28,6 +28,9 @@
 | 19 | TC-BRANCHES-001 | /branch создаёт worktree + topic | commands/branches.md |
 | 20 | TC-FINISH-001 | /finish archive topic | commands/finish.md |
 | 21 | TC-FINISH-002 | /finish merge branch | commands/finish.md |
+| 22 | TC-SETTINGS-002 | /settings показывает session state | commands/settings.md |
+| 23 | TC-SETTINGS-005 | /shift_tab переключает mode | commands/settings.md |
+| 24 | TC-PERMISSIONS-010 | Message cancels permission prompt | commands/permissions.md |
 
 ## Подготовка
 
@@ -44,4 +47,4 @@ cd /tmp/test-branch-repo && git status
 
 ## Критерий успеха
 
-Все 21 тест PASS = основной функционал работает, регрессий нет.
+Все 24 теста PASS = основной функционал работает, регрессий нет.

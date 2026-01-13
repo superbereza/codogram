@@ -263,3 +263,44 @@ mcp__telegram__list_messages(chat_id=TEST_CHAT_ID, limit=5)
 - UI: Button click acknowledged, MCP server connected
 - State: "2" sent to tmux via send-keys
 - Note: Claude proceeds with the selected MCP option
+
+---
+
+## TC-PERMISSIONS-010: Message cancels active permission prompt
+
+**Tags:** critical, permissions
+**Preconditions:** Permission prompt visible (Yes/No buttons displayed)
+
+**Context:**
+Previously, sending a message while a permission prompt was active would accidentally accept the permission (Enter key selected Yes). This was fixed in commit 671cca0.
+
+**Setup:**
+```python
+# Trigger permission prompt
+mcp__telegram__send_message(chat_id=-1003356094635, message="Run: echo setup test")
+# Wait 15s for permission prompt
+mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
+# Should see Yes/No buttons
+```
+
+**Steps:**
+```python
+# Send a new message while permission is active
+mcp__telegram__send_message(chat_id=-1003356094635, message="This is a new instruction")
+# Wait 5s
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=5)
+```
+
+**Expected:**
+- UI: Permission prompt cancelled, new message appears in Claude input
+- State:
+  - tmux shows message in Claude input (NOT auto-accepted)
+  - logs/codogram.log shows "Permission prompt cancelled" or similar
+  - Permission buttons disappear from Telegram
+- Bug prevention: Message should NOT trigger Yes/No selection
+
+**Verification:**
+```bash
+# Check tmux - should show new message in prompt area, NOT tool execution
+tmux capture-pane -t claude-codogram-testing-area -p | grep "This is a new instruction"
+```
