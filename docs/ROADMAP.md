@@ -208,6 +208,14 @@ Improved `/thread` and `/branch` name input:
 
 ## Backlog
 
+### Fix gh repo create initial commit
+`gh repo create --push` fails on empty repo:
+```
+Error: GitHub creation failed: gh error: --push enabled but no commits found
+```
+- Need to create initial commit before pushing
+- Add `git commit --allow-empty -m "Initial commit"` or create README
+
 ### Session state display & control
 Display and control Claude session state:
 - **/shift_tab command** — send Shift+Tab to tmux, report change ("Allow once → Allow for session")

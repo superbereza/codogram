@@ -208,6 +208,14 @@
 
 ## Backlog
 
+### Фикс gh repo create без коммитов
+`gh repo create --push` падает на пустом репо:
+```
+Error: GitHub creation failed: gh error: --push enabled but no commits found
+```
+- Нужно создать initial commit перед push
+- Добавить `git commit --allow-empty -m "Initial commit"` или создать README
+
 ### Отображение и управление состоянием сессии
 Показ и управление состоянием Claude сессии:
 - **/shift_tab команда** — отправляет Shift+Tab в tmux, репортит изменение ("Allow once → Allow for session")
