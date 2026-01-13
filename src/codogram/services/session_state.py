@@ -60,9 +60,9 @@ class SessionStateService:
         old_status = parse_status_bar(output_before)
         old_mode = old_status.approval_mode
 
-        # Send Shift+Tab
+        # Send Shift+Tab (BTab in tmux terminology)
         try:
-            tmux.send_key("S-Tab")
+            tmux.send_key("BTab")
         except Exception as e:
             return CycleResult(success=False, error=f"Failed to send key: {e}")
 

@@ -18,12 +18,14 @@ def _get_tmux_for_context(chat_id: int, thread_id: int | None) -> TmuxSession | 
     if not project:
         return None
 
-    if thread_id and project.threads:
+    # Check thread first (thread_id can be None for General topic)
+    if project.threads:
         thread = project.threads.get(thread_id)
         if thread:
             tmux_name = thread.get_tmux_session(project.project_name)
             return TmuxSession(tmux_name, thread.worktree_path or project.cwd)
 
+    # Fallback to project-level tmux (legacy)
     if project.tmux_session:
         return TmuxSession(project.tmux_session, project.cwd)
 

@@ -43,7 +43,7 @@ class TestSessionStateService:
         assert "not found" in result.error.lower()
 
     def test_cycle_mode_sends_shift_tab(self):
-        """Service should send S-Tab and return new mode."""
+        """Service should send BTab and return new mode."""
         mock_tmux = Mock()
         mock_tmux.exists.return_value = True
         # First capture: accept edits (before), second capture: plan mode (after)
@@ -59,7 +59,7 @@ class TestSessionStateService:
         with patch("codogram.services.session_state.time.sleep"):
             result = service.cycle_approval_mode(mock_tmux)
 
-        mock_tmux.send_key.assert_called_once_with("S-Tab")
+        mock_tmux.send_key.assert_called_once_with("BTab")
         assert result.success is True
         assert result.new_mode == "plan mode"
 
