@@ -42,6 +42,7 @@ async def _send_session_command(
     thread.awaiting_new_session = True
     thread.start_requested_at = time.time()
     thread.last_sent_message = None
+    thread.session_id = None  # Clear so next message triggers rebinding
     project_manager._save()
 
     # Send command to tmux
