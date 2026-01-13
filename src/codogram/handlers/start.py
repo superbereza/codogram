@@ -1,12 +1,16 @@
 """Start flow handlers - /start, /restart and related callbacks."""
 import asyncio
 
+from pathlib import Path
+
 from aiogram import Bot, Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 from ..domain.states import StartFlow, RestartFlow
+from ..domain.worktree_state import WorktreeState, get_worktree_state
+from ..keyboards.keyboards import worktree_recovery_keyboard
 from ..services.start_flow import StartFlowService, FlowAction, FlowResult
 from ..session_manager import project_manager
 from ..start_flow import (
@@ -386,10 +390,50 @@ async def _connect_to_session_from_callback(callback: CallbackQuery, result: Flo
 @router.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /start command."""
+    thread_id = message.message_thread_id
+
+    # Check for stale worktree in topic before delegating to flow
+    if thread_id is not None:
+        project = project_manager.get_by_chat(message.chat.id)
+        if project:
+            thread = project.threads.get(thread_id)
+            if thread and thread.worktree_path:
+                wt_state = get_worktree_state(thread, Path(project.cwd))
+                if wt_state != WorktreeState.OK:
+                    # Show recovery options
+                    try:
+                        relative_path = Path(thread.worktree_path).relative_to(Path(project.cwd))
+                    except ValueError:
+                        relative_path = thread.worktree_path
+
+                    if wt_state == WorktreeState.MISSING_WITH_BRANCH:
+                        text = (
+                            f"`[!]` Worktree not found: `{relative_path}`\n\n"
+                            f"Branch `{thread.name}` exists.\n\n"
+                            "- Recreate worktree - recreate folder and resume session\n"
+                            "- Resume in main - archive topic, continue in main\n"
+                            "- Cancel"
+                        )
+                    else:
+                        text = (
+                            f"`[!]` Worktree not found: `{relative_path}`\n\n"
+                            f"Branch `{thread.name}` not found (merged?).\n\n"
+                            "- Create new - create branch + worktree, resume session\n"
+                            "- Resume in main - archive topic, continue in main\n"
+                            "- Cancel"
+                        )
+
+                    await telegram_queue.enqueue(
+                        chat_id=message.chat.id,
+                        text=text,
+                        message_thread_id=thread.thread_id,
+                        reply_markup=worktree_recovery_keyboard(thread.thread_id, wt_state),
+                    )
+                    return
+
     start_flow = StartFlowService(project_manager, None)
 
     args = message.text.split()[1:] if message.text else []
-    thread_id = message.message_thread_id
 
     result = start_flow.handle_start(
         chat_id=message.chat.id,
