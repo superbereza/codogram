@@ -11,6 +11,7 @@ from .common import require_forum_group, clear_flow_state, set_flow_state
 from ..services.branch import do_branch_create
 from ..services.create_flow import create_flow_service
 from ..domain.create_flow import CreateType
+from ..domain.worktree_state import WorktreeState, get_worktree_state
 from ..keyboards.create_flow import build_name_prompt_keyboard
 from ..git_utils import (
     is_git_repo,
@@ -47,9 +48,20 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
         await telegram_queue.reply(message, "`[x]` Git repository required for /branch_create")
         return
 
+    # Check for stale worktree early (before name prompt)
+    current_thread = project.threads.get(message.message_thread_id)
+    stale_worktree = False
+    if current_thread and current_thread.worktree_path:
+        state = get_worktree_state(current_thread, Path(project.cwd))
+        if state != WorktreeState.OK:
+            stale_worktree = True
+
     # Parse name argument
     args = message.text.split(maxsplit=1)
     branch_name = args[1] if len(args) > 1 else None
+
+    # Get default branch for messages
+    default_branch = get_default_branch(Path(project.cwd))
 
     # Show name prompt if not provided
     if create_flow_service.should_show_prompt(branch_name):
@@ -57,11 +69,21 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
             "type": "awaiting_create_name",
             "create_type": "branch",
         })
-        await telegram_queue.reply(
-            message,
-            "Branch name?\n\nSend name or pick random",
-            reply_markup=build_name_prompt_keyboard(CreateType.BRANCH),
-        )
+        if stale_worktree:
+            # Show warning with name prompt
+            await telegram_queue.reply(
+                message,
+                f"`[!]` Worktree not found, using {default_branch} as base\n\n"
+                "Branch name?\n\n"
+                "Send name or pick random",
+                reply_markup=build_name_prompt_keyboard(CreateType.BRANCH),
+            )
+        else:
+            await telegram_queue.reply(
+                message,
+                "Branch name?\n\nSend name or pick random",
+                reply_markup=build_name_prompt_keyboard(CreateType.BRANCH),
+            )
         return
 
     # Validate and sanitize name
@@ -82,13 +104,9 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
         await telegram_queue.reply(message, f"`[x]` Directory already exists: `{worktree_dir}`")
         return
 
-    # Get default branch
-    default_branch = get_default_branch(Path(project.cwd))
-
     # Check if creating from worktree topic or main
-    current_thread = project.threads.get(message.message_thread_id)
-    if current_thread and current_thread.worktree_path:
-        # From worktree topic - show base branch selection
+    if current_thread and current_thread.worktree_path and not stale_worktree:
+        # From healthy worktree topic - show base branch selection
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=f"From {default_branch}", callback_data=f"bc_base:{branch_name}:{default_branch}")],
             [InlineKeyboardButton(text=f"From {current_thread.name}", callback_data=f"bc_base:{branch_name}:{current_thread.name}")],

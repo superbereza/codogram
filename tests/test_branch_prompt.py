@@ -49,7 +49,8 @@ async def test_branch_without_arg_shows_prompt(mock_message, mock_project, mock_
     mock_message.text = "/branch"
 
     with patch("codogram.handlers.branches.project_manager") as mock_pm, \
-         patch("codogram.handlers.branches.is_git_repo", return_value=True):
+         patch("codogram.handlers.branches.is_git_repo", return_value=True), \
+         patch("codogram.handlers.branches.get_default_branch", return_value="main"):
         mock_pm.get_by_chat.return_value = mock_project
 
         await cmd_branch_create(mock_message, mock_queue)
@@ -107,7 +108,8 @@ async def test_branch_with_invalid_name_shows_error(mock_message, mock_project, 
     mock_message.text = "/branch " + "a" * 100
 
     with patch("codogram.handlers.branches.project_manager") as mock_pm, \
-         patch("codogram.handlers.branches.is_git_repo", return_value=True):
+         patch("codogram.handlers.branches.is_git_repo", return_value=True), \
+         patch("codogram.handlers.branches.get_default_branch", return_value="main"):
         mock_pm.get_by_chat.return_value = mock_project
 
         await cmd_branch_create(mock_message, mock_queue)
@@ -128,7 +130,8 @@ async def test_branch_create_also_shows_prompt(mock_message, mock_project, mock_
     mock_message.text = "/branch_create"
 
     with patch("codogram.handlers.branches.project_manager") as mock_pm, \
-         patch("codogram.handlers.branches.is_git_repo", return_value=True):
+         patch("codogram.handlers.branches.is_git_repo", return_value=True), \
+         patch("codogram.handlers.branches.get_default_branch", return_value="main"):
         mock_pm.get_by_chat.return_value = mock_project
 
         await cmd_branch_create(mock_message, mock_queue)
@@ -149,7 +152,8 @@ async def test_branch_with_duplicate_name_shows_error(mock_message, mock_project
 
     with patch("codogram.handlers.branches.project_manager") as mock_pm, \
          patch("codogram.handlers.branches.is_git_repo", return_value=True), \
-         patch("codogram.handlers.branches.branch_exists", return_value=True):
+         patch("codogram.handlers.branches.branch_exists", return_value=True), \
+         patch("codogram.handlers.branches.get_default_branch", return_value="main"):
         mock_pm.get_by_chat.return_value = mock_project
 
         await cmd_branch_create(mock_message, mock_queue)
