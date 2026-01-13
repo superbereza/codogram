@@ -39,6 +39,7 @@ async def cmd_help(message: Message, telegram_queue: TelegramQueue):
 *Settings:*
 /start — Connect Claude or show status
 /settings — View current settings
+/shift\\_tab — Cycle Claude approval mode
 /restart — Force restart Claude
 /get\\_debug\\_ids — Show chat and thread IDs
 
@@ -52,7 +53,10 @@ async def cmd_help(message: Message, telegram_queue: TelegramQueue):
 
 @router.message(Command("settings"))
 async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
-    """Show current settings."""
+    """Show current settings including Claude session state."""
+    from ..tmux import TmuxSession
+    from ..services.session_state import SessionStateService
+
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
@@ -63,24 +67,60 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
 
     thread = None
     if project.threads:
-        # thread_id is None for General, or int for topics
-        # In-memory key is None (not "null" string)
         thread = project.threads.get(thread_id)
 
+    # Get auto-accept status
     if thread:
         auto_status = "⚡ ON" if thread.auto_accept else "OFF"
-        text = (
-            f"**Settings** (thread `{thread.name}`)\n\n"
-            f"Auto-accept: {auto_status}"
-        )
+        context_name = thread.name
+        tmux_name = thread.get_tmux_session(project.project_name)
+        cwd = thread.worktree_path or project.cwd
     else:
         auto_status = "⚡ ON" if project.auto_accept else "OFF"
-        text = (
-            f"**Settings** (`{project.project_name}`)\n\n"
-            f"Auto-accept: {auto_status}"
-        )
+        context_name = project.project_name
+        tmux_name = project.tmux_session
+        cwd = project.cwd
 
-    await telegram_queue.reply(message, text)
+    lines = [f"**Settings** (`{context_name}`)", ""]
+    lines.append(f"Auto-accept: {auto_status}")
+
+    # Get Claude session state from tmux
+    if tmux_name:
+        tmux = TmuxSession(tmux_name, cwd)
+        service = SessionStateService()
+        result = service.get_status(tmux)
+
+        if not result.success:
+            lines.append(f"Claude: {result.error}")
+        else:
+            sb = result.status_bar
+
+            # Approval mode (None = default mode)
+            if sb.approval_mode == "accept edits":
+                mode_text = "⏵⏵ accept edits on"
+            elif sb.approval_mode == "plan mode":
+                mode_text = "⏸ plan mode on"
+            else:
+                mode_text = "default mode on"
+            lines.append(f"{mode_text}, (/shift\\_tab to cycle)")
+
+            # Background tasks
+            if sb.background_tasks == 0:
+                lines.append("no background tasks")
+            elif sb.background_tasks == 1:
+                lines.append("1 background task")
+            else:
+                lines.append(f"{sb.background_tasks} background tasks")
+
+            # Context
+            if sb.context_percent is not None:
+                lines.append(f"context left until autocompact: {sb.context_percent}%")
+            else:
+                lines.append("context left until autocompact: not displayed")
+    else:
+        lines.append("Claude: not connected")
+
+    await telegram_queue.reply(message, "\n".join(lines))
 
 
 @router.message(Command("auto_accept"))

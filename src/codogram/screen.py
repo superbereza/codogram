@@ -25,6 +25,14 @@ class Idle:
 
 ScreenState = PermissionPrompt | ToolProgress | Idle
 
+
+@dataclass
+class StatusBar:
+    """Claude CLI status bar state."""
+    approval_mode: str | None  # "accept edits", "plan mode", None (default)
+    background_tasks: int      # 0, 1, 2...
+    context_percent: int | None  # 0-100 or None if not displayed
+
 # Separators for display
 SEPARATOR_DASHED = " " + "- " * 18
 
@@ -230,3 +238,47 @@ def is_claude_ready(output: str) -> bool:
         return True
 
     return False
+
+
+def parse_status_bar(output: str) -> StatusBar:
+    """Parse Claude CLI status bar from tmux capture-pane output.
+
+    Status bar is below the input box (after last ──── separator).
+    """
+    lines = output.split("\n")
+
+    # Find last separator (bottom of input box)
+    last_sep_idx = -1
+    for i, line in enumerate(lines):
+        if "─" * 10 in line:
+            last_sep_idx = i
+
+    # Get lines after last separator (status bar area)
+    status_lines = lines[last_sep_idx + 1:] if last_sep_idx >= 0 else []
+    status_text = "\n".join(status_lines)
+
+    # Parse approval mode by emoji detection
+    approval_mode: str | None = None
+    if "⏵⏵" in status_text:
+        approval_mode = "accept edits"
+    elif "⏸" in status_text:
+        approval_mode = "plan mode"
+    # else: default mode (None)
+
+    # Parse background tasks
+    background_tasks = 0
+    bg_match = re.search(r'(\d+)\s+background\s+tasks?', status_text)
+    if bg_match:
+        background_tasks = int(bg_match.group(1))
+
+    # Parse context percentage
+    context_percent: int | None = None
+    ctx_match = re.search(r'auto-compact:\s*(\d+)%', status_text)
+    if ctx_match:
+        context_percent = int(ctx_match.group(1))
+
+    return StatusBar(
+        approval_mode=approval_mode,
+        background_tasks=background_tasks,
+        context_percent=context_percent,
+    )

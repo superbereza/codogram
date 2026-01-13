@@ -218,17 +218,21 @@ Error: GitHub creation failed: gh error: --push enabled but no commits found
 
 ### Session state display & control
 Display and control Claude session state:
-- **/shift_tab command** — send Shift+Tab to tmux, report change ("Allow once → Allow for session")
-- **/settings enhancements** — current approval mode, background tasks count
-- **Context window indicator** — remaining space until compact (parse from jsonl or tmux screen)
-- Parse status bar from tmux capture-pane
-- Format: "Mode: Accept edits | Background: 3 | Context: 45%"
+- **/shift_tab command** — send Shift+Tab to tmux, report new mode
+- **/settings enhancements** — show current approval mode and context usage
+- **Status bar parsing** — parse line BELOW input box (only visible in idle):
+  - Left: `⏵⏵ accept edits on (shift+tab to cycle)` — approval mode
+  - Right: `Context left until auto-compact: 0%` — context usage
+- No background tasks count in status bar (not displayed by Claude CLI)
+- No model indicator in status bar
 
 ### Activity indicators
 Show that Claude is thinking/working:
-- "thinking..." when Claude is processing
-- Throbber/typing indicator
-- Words like "Hmm", "Let me think"
+- Generation indicator appears ABOVE input box in tmux
+- Format: `· Hatching… (esc to interrupt · 42s · ↓ 0 tokens)`
+- Random verbs: "Hatching", "Enchanting", "Conjuring", etc.
+- Parse from tmux capture-pane
+- Show typing indicator or status in Telegram
 
 ### Message queue until session ready
 Cache user messages while session is binding, send when ready:

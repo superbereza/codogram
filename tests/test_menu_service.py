@@ -4,13 +4,13 @@ from codogram.services.menu import BASIC_COMMANDS, FORUM_COMMANDS, register_menu
 
 
 def test_basic_commands_count():
-    """Basic menu has 9 commands (no /branch, /finish)."""
-    assert len(BASIC_COMMANDS) == 9
+    """Basic menu has 10 commands (no /branch, /finish)."""
+    assert len(BASIC_COMMANDS) == 10
 
 
 def test_forum_commands_count():
-    """Forum menu has 11 commands (includes /branch, /finish)."""
-    assert len(FORUM_COMMANDS) == 11
+    """Forum menu has 12 commands (includes /branch, /finish)."""
+    assert len(FORUM_COMMANDS) == 12
 
 
 def test_basic_commands_order():
@@ -18,7 +18,7 @@ def test_basic_commands_order():
     commands = [c.command for c in BASIC_COMMANDS]
     assert commands == [
         "esc", "auto_accept", "thread", "clear",
-        "start", "settings", "restart", "get_debug_ids", "help"
+        "start", "settings", "shift_tab", "restart", "get_debug_ids", "help"
     ]
 
 
@@ -27,7 +27,7 @@ def test_forum_commands_order():
     commands = [c.command for c in FORUM_COMMANDS]
     assert commands == [
         "esc", "auto_accept", "thread", "branch", "clear", "finish",
-        "start", "settings", "restart", "get_debug_ids", "help"
+        "start", "settings", "shift_tab", "restart", "get_debug_ids", "help"
     ]
 
 
