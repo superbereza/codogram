@@ -38,9 +38,12 @@ class WorktreeRecoveryHandler:
             await callback.message.edit_text("`[x]` Invalid callback data")
             return
 
-        project = self.project_manager.get_project()
-        thread = project.get_thread(thread_id)
+        project = self.project_manager.get_by_chat(callback.message.chat.id)
+        if not project:
+            await callback.message.edit_text("`[x]` Project not found")
+            return
 
+        thread = project.get_thread(thread_id)
         if not thread:
             await callback.message.edit_text("`[x]` Thread not found")
             return
@@ -48,7 +51,7 @@ class WorktreeRecoveryHandler:
 
         if success:
             thread.worktree_path = path
-            self.project_manager.save()
+            self.project_manager._save()
             await callback.message.delete()
             await self._start_claude_session(callback.message, thread)
         else:
@@ -69,9 +72,12 @@ class WorktreeRecoveryHandler:
             await callback.message.edit_text("`[x]` Invalid callback data")
             return
 
-        project = self.project_manager.get_project()
-        thread = project.get_thread(thread_id)
+        project = self.project_manager.get_by_chat(callback.message.chat.id)
+        if not project:
+            await callback.message.edit_text("`[x]` Project not found")
+            return
 
+        thread = project.get_thread(thread_id)
         if not thread:
             await callback.message.edit_text("`[x]` Thread not found")
             return
@@ -79,7 +85,7 @@ class WorktreeRecoveryHandler:
 
         if success:
             thread.worktree_path = path
-            self.project_manager.save()
+            self.project_manager._save()
             await callback.message.delete()
             await self._start_claude_session(callback.message, thread)
         else:
@@ -100,9 +106,12 @@ class WorktreeRecoveryHandler:
             await callback.message.edit_text("`[x]` Invalid callback data")
             return
 
-        project = self.project_manager.get_project()
-        thread = project.get_thread(thread_id)
+        project = self.project_manager.get_by_chat(callback.message.chat.id)
+        if not project:
+            await callback.message.edit_text("`[x]` Project not found")
+            return
 
+        thread = project.get_thread(thread_id)
         if not thread:
             await callback.message.edit_text("`[x]` Thread not found")
             return

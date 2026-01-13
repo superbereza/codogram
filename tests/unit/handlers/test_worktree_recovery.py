@@ -36,7 +36,7 @@ class TestWorktreeRecoveryCallbacks:
         thread = ThreadInfo(thread_id=123, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
         mock_project = MagicMock(cwd="/repo")
         mock_project.get_thread.return_value = thread
-        recovery_handler.project_manager.get_project.return_value = mock_project
+        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
         with patch("codogram.handlers.worktree_recovery.create_worktree") as mock_create:
             mock_create.return_value = (True, "/repo/.worktrees/my-feature")
@@ -52,7 +52,7 @@ class TestWorktreeRecoveryCallbacks:
         thread = ThreadInfo(thread_id=123, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
         mock_project = MagicMock(cwd="/repo")
         mock_project.get_thread.return_value = thread
-        recovery_handler.project_manager.get_project.return_value = mock_project
+        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
         with patch("codogram.handlers.worktree_recovery.create_branch_with_worktree") as mock_create:
             mock_create.return_value = (True, "/repo/.worktrees/my-feature")
@@ -68,7 +68,7 @@ class TestWorktreeRecoveryCallbacks:
         thread = ThreadInfo(thread_id=123, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
         mock_project = MagicMock(cwd="/repo")
         mock_project.get_thread.return_value = thread
-        recovery_handler.project_manager.get_project.return_value = mock_project
+        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
         with patch("codogram.handlers.worktree_recovery.archive_thread", new_callable=AsyncMock) as mock_archive:
             await recovery_handler.handle_wr_main(mock_callback)
@@ -96,7 +96,7 @@ class TestWorktreeRecoveryCallbacks:
         thread = ThreadInfo(thread_id=123, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
         mock_project = MagicMock(cwd="/repo")
         mock_project.get_thread.return_value = thread
-        recovery_handler.project_manager.get_project.return_value = mock_project
+        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
         with patch("codogram.handlers.worktree_recovery.create_worktree") as mock_create:
             mock_create.return_value = (False, "branch already checked out")
@@ -118,7 +118,7 @@ class TestWorktreeRecoveryEdgeCases:
         mock_callback.data = "wr_recreate:999"
         mock_project = MagicMock()
         mock_project.get_thread.return_value = None
-        recovery_handler.project_manager.get_project.return_value = mock_project
+        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
         await recovery_handler.handle_wr_recreate(mock_callback)
 
@@ -132,7 +132,7 @@ class TestWorktreeRecoveryEdgeCases:
         mock_callback.data = "wr_create:999"
         mock_project = MagicMock()
         mock_project.get_thread.return_value = None
-        recovery_handler.project_manager.get_project.return_value = mock_project
+        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
         await recovery_handler.handle_wr_create(mock_callback)
 
@@ -146,7 +146,7 @@ class TestWorktreeRecoveryEdgeCases:
         mock_callback.data = "wr_main:999"
         mock_project = MagicMock()
         mock_project.get_thread.return_value = None
-        recovery_handler.project_manager.get_project.return_value = mock_project
+        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
         await recovery_handler.handle_wr_main(mock_callback)
 
