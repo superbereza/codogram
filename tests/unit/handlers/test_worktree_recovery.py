@@ -144,3 +144,36 @@ class TestWorktreeRecoveryEdgeCases:
         call_args = mock_callback.message.edit_text.call_args
         text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
         assert "not found" in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_wr_recreate_malformed_callback_data(self, recovery_handler, mock_callback):
+        """wr_recreate handles malformed callback data gracefully."""
+        mock_callback.data = "wr_recreate:"  # Missing thread_id
+
+        await recovery_handler.handle_wr_recreate(mock_callback)
+
+        call_args = mock_callback.message.edit_text.call_args
+        text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
+        assert "invalid" in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_wr_create_malformed_callback_data(self, recovery_handler, mock_callback):
+        """wr_create handles malformed callback data gracefully."""
+        mock_callback.data = "wr_create:not_a_number"
+
+        await recovery_handler.handle_wr_create(mock_callback)
+
+        call_args = mock_callback.message.edit_text.call_args
+        text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
+        assert "invalid" in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_wr_main_malformed_callback_data(self, recovery_handler, mock_callback):
+        """wr_main handles malformed callback data gracefully."""
+        mock_callback.data = "wr_main"  # No colon or thread_id
+
+        await recovery_handler.handle_wr_main(mock_callback)
+
+        call_args = mock_callback.message.edit_text.call_args
+        text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
+        assert "invalid" in text.lower()

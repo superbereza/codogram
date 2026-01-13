@@ -1,5 +1,6 @@
 # src/codogram/handlers/worktree_recovery.py
 """Worktree recovery callbacks for stale worktree handling."""
+import logging
 from pathlib import Path
 
 from aiogram import Bot, F, Router
@@ -8,6 +9,16 @@ from aiogram.types import CallbackQuery
 from codogram.services.branch import archive_thread, create_worktree, create_branch_with_worktree
 from codogram.session_manager import ProjectManager
 from codogram.telegram_queue import TelegramQueue
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_thread_id(callback_data: str) -> int | None:
+    """Parse thread_id from callback data like 'wr_recreate:123'."""
+    try:
+        return int(callback_data.split(":")[1])
+    except (IndexError, ValueError):
+        return None
 
 
 class WorktreeRecoveryHandler:
@@ -21,7 +32,11 @@ class WorktreeRecoveryHandler:
     async def handle_wr_recreate(self, callback: CallbackQuery) -> None:
         """Recreate worktree from existing branch."""
         await callback.answer()
-        thread_id = int(callback.data.split(":")[1])
+        thread_id = _parse_thread_id(callback.data)
+        if thread_id is None:
+            logger.warning("Malformed callback data: %s", callback.data)
+            await callback.message.edit_text("`[x]` Invalid callback data")
+            return
         thread = self.project_manager.get_thread(thread_id)
 
         if not thread:
@@ -48,7 +63,11 @@ class WorktreeRecoveryHandler:
     async def handle_wr_create(self, callback: CallbackQuery) -> None:
         """Create new branch and worktree."""
         await callback.answer()
-        thread_id = int(callback.data.split(":")[1])
+        thread_id = _parse_thread_id(callback.data)
+        if thread_id is None:
+            logger.warning("Malformed callback data: %s", callback.data)
+            await callback.message.edit_text("`[x]` Invalid callback data")
+            return
         thread = self.project_manager.get_thread(thread_id)
 
         if not thread:
@@ -75,7 +94,11 @@ class WorktreeRecoveryHandler:
     async def handle_wr_main(self, callback: CallbackQuery) -> None:
         """Resume in main by archiving topic."""
         await callback.answer()
-        thread_id = int(callback.data.split(":")[1])
+        thread_id = _parse_thread_id(callback.data)
+        if thread_id is None:
+            logger.warning("Malformed callback data: %s", callback.data)
+            await callback.message.edit_text("`[x]` Invalid callback data")
+            return
         thread = self.project_manager.get_thread(thread_id)
 
         if not thread:
