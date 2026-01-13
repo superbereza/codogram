@@ -81,10 +81,22 @@ class TmuxSession:
 
     def send_key(self, key: str) -> None:
         """Send a special key (Escape, Enter, C-c, etc.) to tmux session."""
+        logger.info(f"tmux_send_key: session={self.name} key={key}")
+        _log_tmux_debug(f"{'='*60}")
+        _log_tmux_debug(f"SEND_KEY session={self.name} key={key}")
+
+        before = self._capture_last_lines(20)
+        _log_tmux_debug(f"BEFORE:\n{before}")
+
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, key],
             check=True
         )
+        time.sleep(0.1)
+
+        after = self._capture_last_lines(20)
+        _log_tmux_debug(f"AFTER:\n{after}")
+        _log_tmux_debug("DONE\n")
 
     def exists(self) -> bool:
         """Check if tmux session exists.
