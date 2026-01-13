@@ -2,7 +2,7 @@
 
 **Date:** 2026-01-13
 **Severity:** Critical
-**Status:** Active
+**Status:** Fixed
 
 ## Symptom
 
@@ -67,28 +67,32 @@ Compare to 05:28:26 when NO permission prompt was active - message went through 
 
 ## Fix
 
-Before sending, check if permission prompt is active:
+Added `_cancel_permission_if_active()` method to `TmuxSession`:
 
 ```python
-def send(self, text: str) -> None:
-    # Check if permission prompt is active
-    screen = self.capture_pane()
-    if self._has_permission_prompt(screen):
-        logger.warning(f"Cannot send - permission prompt active")
-        # Option 1: Don't send, notify caller
-        raise PermissionPromptActiveError()
-        # Option 2: Send Escape first to cancel prompt
-        # self.send_key("Escape")
-        # time.sleep(0.1)
+def _cancel_permission_if_active(self, max_attempts: int = 3) -> bool:
+    """Cancel permission prompt if active."""
+    from .screen import parse_screen, PermissionPrompt
 
-    # ... existing send logic ...
+    for attempt in range(max_attempts):
+        output = self.capture_pane()
+        state = parse_screen(output)
+
+        if not isinstance(state, PermissionPrompt):
+            return True
+
+        subprocess.run(["tmux", "send-keys", "-t", self.name, "Escape"], check=True)
+        time.sleep(0.2)
+
+    return False
 ```
 
-Or integrate with permission_poller - if prompt detected, don't allow text messages.
+Called at the start of `send()` before sending C-c/text/Enter.
 
-## Workaround
-
-User must cancel permission prompt (press Cancel button in Telegram) before sending messages.
+Now when user sends a message while permission prompt is active:
+1. `parse_screen()` detects the prompt
+2. Escape is sent to cancel it
+3. Message is delivered to Claude normally
 
 ## Related
 

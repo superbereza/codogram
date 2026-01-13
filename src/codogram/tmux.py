@@ -36,6 +36,9 @@ class TmuxSession:
         before = self._capture_last_lines(20)
         _log_tmux_debug(f"BEFORE:\n{before}")
 
+        # Step 0: Cancel permission prompt if active
+        self._cancel_permission_if_active()
+
         # Step 1: Send C-c
         _log_tmux_debug("[1] Sending C-c...")
         subprocess.run(
@@ -78,6 +81,43 @@ class TmuxSession:
             text=True
         )
         return result.stdout if result.returncode == 0 else f"<capture failed: {result.stderr}>"
+
+    def _cancel_permission_if_active(self, max_attempts: int = 3) -> bool:
+        """Cancel permission prompt if active.
+
+        Sends Escape and waits for prompt to clear.
+        Returns True if prompt was cancelled or wasn't active.
+        Returns False if failed to cancel after max_attempts.
+        """
+        from .screen import parse_screen, PermissionPrompt
+
+        for attempt in range(max_attempts):
+            output = self.capture_pane()
+            state = parse_screen(output)
+
+            if not isinstance(state, PermissionPrompt):
+                if attempt > 0:
+                    _log_tmux_debug(f"[0] Permission prompt cleared after {attempt} Escape(s)")
+                return True
+
+            _log_tmux_debug(f"[0] Permission prompt detected, sending Escape (attempt {attempt + 1})")
+            logger.info(f"tmux_send: cancelling permission prompt (attempt {attempt + 1})")
+
+            subprocess.run(
+                ["tmux", "send-keys", "-t", self.name, "Escape"],
+                check=True
+            )
+            time.sleep(0.2)  # Wait for Claude to process Escape
+
+        # Final check
+        output = self.capture_pane()
+        state = parse_screen(output)
+        if isinstance(state, PermissionPrompt):
+            _log_tmux_debug(f"[0] WARNING: Permission prompt still active after {max_attempts} attempts!")
+            logger.warning(f"tmux_send: permission prompt still active after {max_attempts} Escape attempts")
+            return False
+
+        return True
 
     def send_key(self, key: str) -> None:
         """Send a special key (Escape, Enter, C-c, etc.) to tmux session."""
