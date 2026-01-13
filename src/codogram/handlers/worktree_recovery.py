@@ -127,13 +127,27 @@ class WorktreeRecoveryHandler:
         await callback.message.delete()
 
     async def _start_claude_session(self, message, thread) -> None:
-        """Start Claude session in recovered worktree.
+        """Start Claude session in recovered worktree."""
+        import asyncio
+        from ..launch_animation import launch_with_animation
 
-        Note: This delegates to StartHandler._start_claude_session.
-        Implemented during integration.
-        """
-        # Will be connected during router setup
-        pass
+        project = self.project_manager.get_by_chat(message.chat.id)
+        if not project:
+            return
+
+        cwd = thread.worktree_path if thread and thread.worktree_path else None
+
+        thread.launch_task = asyncio.create_task(
+            launch_with_animation(
+                bot=self.bot,
+                chat_id=message.chat.id,
+                thread_id=thread.thread_id,
+                project=project,
+                thread=thread,
+                queue=self.queue,
+                cwd=cwd,
+            )
+        )
 
 
 def register_worktree_recovery_handlers(router: Router, handler: WorktreeRecoveryHandler) -> None:
