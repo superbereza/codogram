@@ -1,5 +1,6 @@
 """Branch/worktree operations."""
 import subprocess
+from pathlib import Path
 
 from aiogram import Bot
 
@@ -75,3 +76,46 @@ async def do_branch_create(
     )
 
     return thread
+
+
+def create_worktree(project_cwd: Path, branch_name: str) -> tuple[bool, str]:
+    """Create worktree for existing branch.
+
+    Returns (success, path_or_error).
+    """
+    worktree_path = project_cwd / ".worktrees" / branch_name
+
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "add", str(worktree_path), branch_name],
+            cwd=project_cwd,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return False, result.stderr.strip()
+        return True, str(worktree_path)
+    except Exception as e:
+        return False, str(e)
+
+
+def create_branch_with_worktree(project_cwd: Path, branch_name: str) -> tuple[bool, str]:
+    """Create new branch and worktree.
+
+    Returns (success, path_or_error).
+    """
+    worktree_path = project_cwd / ".worktrees" / branch_name
+
+    try:
+        # Create worktree with new branch
+        result = subprocess.run(
+            ["git", "worktree", "add", "-b", branch_name, str(worktree_path)],
+            cwd=project_cwd,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return False, result.stderr.strip()
+        return True, str(worktree_path)
+    except Exception as e:
+        return False, str(e)
