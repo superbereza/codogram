@@ -32,4 +32,5 @@ mkdir -p ./logs
 
 # Run with local src (not installed package)
 echo "Starting bot from: $PWD/src"
-PYTHONPATH=src python -m codogram.main
+echo "Logs: ./logs/codogram.log"
+PYTHONPATH=src PYTHONUNBUFFERED=1 python -m codogram.main 2>&1 | tee -a ./logs/codogram.log

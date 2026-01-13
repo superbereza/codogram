@@ -16,28 +16,35 @@ async def on_permission_callback(callback: CallbackQuery):
 
     Note: Admin check done by global AdminMiddleware on dp level.
     """
+    logger.info(f"permission_callback: data={callback.data} from user={callback.from_user.id}")
+
     # Parse callback data: perm:{action}:{tmux_session}
     parts = callback.data.split(":", 2)
     if len(parts) < 3:
+        logger.warning(f"permission_callback: invalid format data={callback.data}")
         await callback.answer("Invalid callback format")
         return
 
     action = parts[1]
     tmux_session = parts[2]
+    logger.debug(f"permission_callback: action={action} tmux={tmux_session}")
 
     # Find project
     project = project_manager.get_by_tmux(tmux_session)
     if not project:
+        logger.warning(f"permission_callback: project not found for tmux={tmux_session}")
         await callback.answer("Session not found")
         return
 
     if not project.cwd:
+        logger.warning(f"permission_callback: project has no cwd tmux={tmux_session}")
         await callback.answer("Project has no cwd")
         return
 
     # Check tmux exists
     tmux = TmuxSession(tmux_session, project.cwd)
     if not tmux.exists():
+        logger.warning(f"permission_callback: tmux session closed tmux={tmux_session}")
         await callback.answer("Tmux session closed")
         return
 
@@ -45,6 +52,7 @@ async def on_permission_callback(callback: CallbackQuery):
     await _cleanup_permission_messages(callback)
 
     # Send key to tmux
+    logger.info(f"permission_callback: sending key={action if action != 'esc' else 'Escape'} to tmux={tmux_session}")
     if action == "esc":
         tmux.send_key("Escape")
     else:
