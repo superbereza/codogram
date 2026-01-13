@@ -214,6 +214,14 @@ Display and control Claude session state:
 - **Permission cancel on send** — cancel active permission before sending message
 - See [docs/designs/done/2026-01-07-session-state-display.md](designs/done/2026-01-07-session-state-display.md)
 
+### Stale worktree recovery
+Handle deleted worktrees gracefully instead of crashing:
+- `/resume`, `/start` — detect stale worktree_path, offer: recreate / resume in main / cancel
+- `/finish` — warning + archive topic without git cleanup
+- `/branch` — fallback to main as base branch
+- "Resume in main" archives topic (feature work is done)
+- See [docs/designs/done/2026-01-12-stale-worktree-recovery.md](designs/done/2026-01-12-stale-worktree-recovery.md)
+
 ## Backlog
 
 ### Fix gh repo create initial commit
@@ -268,14 +276,6 @@ Move all hardcoded strings to `src/codogram/strings.py`:
 - keyboards.py — buttons
 - services/start_flow.py — wizard buttons
 - See `docs/specs/tone-of-voice.md` for guidelines
-
-### Stale worktree recovery
-Handle deleted worktrees gracefully instead of crashing:
-- `/resume`, `/start` — detect stale worktree_path, offer: recreate / resume in main / cancel
-- `/finish` — warning + archive topic without git cleanup
-- `/branch` — fallback to main as base branch
-- "Resume in main" archives topic (feature work is done)
-- See [docs/designs/2026-01-12-stale-worktree-recovery.md](designs/2026-01-12-stale-worktree-recovery.md)
 
 ---
 

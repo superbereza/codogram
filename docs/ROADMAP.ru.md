@@ -214,6 +214,14 @@
 - **Отмена permission при отправке** — отменяет активный permission prompt перед отправкой сообщения
 - См. [docs/designs/done/2026-01-07-session-state-display.md](designs/done/2026-01-07-session-state-display.md)
 
+### Восстановление stale worktree
+Обработка удалённых worktrees вместо краша:
+- `/resume`, `/start` — детект stale worktree_path, предложить: пересоздать / resume in main / отмена
+- `/finish` — warning + архивировать без git cleanup
+- `/branch` — fallback на main как base branch
+- "Resume in main" архивирует топик (работа над фичей завершена)
+- См. [docs/designs/done/2026-01-12-stale-worktree-recovery.md](designs/done/2026-01-12-stale-worktree-recovery.md)
+
 ## Backlog
 
 ### Фикс gh repo create без коммитов
@@ -266,14 +274,6 @@ Error: GitHub creation failed: gh error: --push enabled but no commits found
 - keyboards.py — кнопки
 - services/start_flow.py — кнопки wizard'а
 - См. `docs/specs/tone-of-voice.md` для гайдлайнов
-
-### Восстановление stale worktree
-Обработка удалённых worktrees вместо краша:
-- `/resume`, `/start` — детект stale worktree_path, предложить: пересоздать / resume in main / отмена
-- `/finish` — warning + архивировать без git cleanup
-- `/branch` — fallback на main как base branch
-- "Resume in main" архивирует топик (работа над фичей завершена)
-- См. [docs/designs/2026-01-12-stale-worktree-recovery.md](designs/2026-01-12-stale-worktree-recovery.md)
 
 ---
 
