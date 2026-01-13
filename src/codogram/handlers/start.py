@@ -19,7 +19,7 @@ from ..start_flow import (
     git_visibility_keyboard,
     restart_confirm_keyboard,
 )
-from ..telegram_queue import TelegramQueue
+from ..telegram_queue import TelegramQueue, OutgoingBatch
 from ..tmux_selector import create_tmux_selection_keyboard
 from ..project_launcher import is_tmux_session_exists
 from ..services.menu import register_menu_for_chat
@@ -423,12 +423,13 @@ async def cmd_start(message: Message, state: FSMContext, telegram_queue: Telegra
                             "• Cancel"
                         )
 
-                    await telegram_queue.enqueue(
+                    batch = OutgoingBatch(
                         chat_id=message.chat.id,
-                        text=text,
-                        message_thread_id=thread.thread_id,
+                        thread_id=thread.thread_id,
+                        messages=[{"text": text}],
                         reply_markup=worktree_recovery_keyboard(thread.thread_id, wt_state),
                     )
+                    await telegram_queue.enqueue(batch)
                     return
 
     start_flow = StartFlowService(project_manager, None)
