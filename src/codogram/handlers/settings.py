@@ -81,8 +81,8 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
         tmux_name = project.tmux_session
         cwd = project.cwd
 
-    lines = [f"**Settings** (`{context_name}`)", ""]
-    lines.append(f"Auto-accept: {auto_status}")
+    lines = [f"session state (`{context_name}`)"]
+    lines.append(f"• auto-accept: {auto_status}")
 
     # Get Claude session state from tmux
     if tmux_name:
@@ -91,7 +91,7 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
         result = service.get_status(tmux)
 
         if not result.success:
-            lines.append(f"Claude: {result.error}")
+            lines.append(f"• claude: {result.error}")
         else:
             sb = result.status_bar
 
@@ -102,23 +102,23 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
                 mode_text = "⏸ plan mode on"
             else:
                 mode_text = "default mode on"
-            lines.append(f"{mode_text}, (/shift\\_tab to cycle)")
+            lines.append(f"• mode: {mode_text}, (/shift\\_tab to cycle)")
 
             # Background tasks
             if sb.background_tasks == 0:
-                lines.append("no background tasks")
+                lines.append("• no background tasks")
             elif sb.background_tasks == 1:
-                lines.append("1 background task")
+                lines.append("• 1 background task")
             else:
-                lines.append(f"{sb.background_tasks} background tasks")
+                lines.append(f"• {sb.background_tasks} background tasks")
 
             # Context
             if sb.context_percent is not None:
-                lines.append(f"context left until autocompact: {sb.context_percent}%")
+                lines.append(f"• context left until autocompact: {sb.context_percent}%")
             else:
-                lines.append("context left until autocompact: not displayed")
+                lines.append("• context left until autocompact: not displayed")
     else:
-        lines.append("Claude: not connected")
+        lines.append("• claude: not connected")
 
     await telegram_queue.reply(message, "\n".join(lines))
 
