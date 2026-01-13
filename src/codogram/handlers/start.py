@@ -410,17 +410,17 @@ async def cmd_start(message: Message, state: FSMContext, telegram_queue: Telegra
                         text = (
                             f"`[!]` Worktree not found: `{relative_path}`\n\n"
                             f"Branch `{thread.name}` exists.\n\n"
-                            "- Recreate worktree - recreate folder and resume session\n"
-                            "- Resume in main - archive topic, continue in main\n"
-                            "- Cancel"
+                            "• Recreate worktree — recreate folder and resume session\n"
+                            "• Resume in main — archive topic, continue in main\n"
+                            "• Cancel"
                         )
                     else:
                         text = (
                             f"`[!]` Worktree not found: `{relative_path}`\n\n"
                             f"Branch `{thread.name}` not found (merged?).\n\n"
-                            "- Create new - create branch + worktree, resume session\n"
-                            "- Resume in main - archive topic, continue in main\n"
-                            "- Cancel"
+                            "• Create new — create branch + worktree, resume session\n"
+                            "• Resume in main — archive topic, continue in main\n"
+                            "• Cancel"
                         )
 
                     await telegram_queue.enqueue(
