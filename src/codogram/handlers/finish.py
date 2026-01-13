@@ -68,6 +68,22 @@ async def _show_branch_finish_options(
     worktree_path = Path(thread.worktree_path)
     main_repo = Path(project.cwd)
 
+    # Check for stale worktree (deleted externally)
+    if not worktree_path.exists():
+        # Try to compute relative path for display, fallback to absolute
+        try:
+            display_path = worktree_path.relative_to(main_repo)
+        except ValueError:
+            display_path = worktree_path
+
+        await telegram_queue.reply(
+            message,
+            f"`[!]` Worktree not found: `{display_path}`\n\n"
+            "Archiving topic without git cleanup.",
+        )
+        await archive_thread(message.bot, message.chat.id, project, thread)
+        return
+
     # Check for uncommitted changes
     if has_uncommitted_changes(worktree_path):
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
