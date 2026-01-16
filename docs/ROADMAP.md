@@ -228,6 +228,39 @@ Handle deleted worktrees gracefully instead of crashing:
 
 ## Backlog
 
+### File downloads from Claude
+Download files created by Claude during work:
+- Detect file creation notifications in Claude output
+- Offer download button in Telegram
+- Support common file types (code, configs, images)
+- Auto-detect new files in project directory
+
+### Images and files input
+Support sending images and files from admin to Claude:
+- Save to temp/project folder
+- Send file path to tmux
+- Possibly: inline images via base64
+
+### Safe chat context
+Provide safe context from chat history to Claude:
+- Extract relevant conversation context
+- Sanitize sensitive data before sending
+- Format as structured context block
+
+### Isolated safe environment
+Create sandbox environment for risky operations:
+- Docker/container-based isolation
+- Separate filesystem for experiments
+- Easy cleanup after session
+
+### Inline suggests / hint buttons
+Quick action buttons and suggestions in chat:
+- Context-aware suggestion buttons
+- Common commands as inline buttons
+- Hints based on current session state
+
+---
+
 ### Activity indicators
 Show that Claude is thinking/working:
 - Generation indicator appears ABOVE input box in tmux
@@ -339,12 +372,6 @@ Beautiful tool results formatting:
 - Syntax highlighting for code
 - Collapsible for long outputs
 - File previews
-
-### Images and files support
-Support sending images and files from admin:
-- Save to temp/project folder
-- Send file path to tmux
-- Possibly: inline images via base64
 
 ### Self-hosting: default chat = bot project
 Default private chat with bot linked to codogram folder:
