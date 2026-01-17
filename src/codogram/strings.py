@@ -100,6 +100,7 @@ CLAUDE_NO_RESTART = "No active session to restart."
 
 LAUNCH_IN_PROGRESS = "Launch already in progress..."
 CANCELLED = "Cancelled"
+INVALID_CALLBACK = "Invalid callback"
 TOPICS_REQUIRED = "This chat doesn't support topics. Enable Topics in group settings."
 TOPIC_CREATE_ERROR = "Error creating topic: {error}"
 TOPIC_DELETE_ERROR = "Error deleting topic: {error}"
@@ -229,6 +230,65 @@ Worktree kept for potential resume."""
 FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages."
 
 Run /finish again after commit."""
+
+
+# --- Start Flow ---
+
+START_SESSION_EXPIRED = "Session expired. Start again with /start"
+START_PROJECT_NAME_PROMPT = "Send project name:"
+START_DIR_CHOICE_PROMPT = "Directory `{path}` not found.\n\nWhat to do?"
+START_GIT_SETUP_PROMPT = "Git setup?"
+START_LAUNCH_CONFIRM = "Run Claude in `{path}`?"
+START_CLAUDE_RUNNING = "Claude running: `{project}` in `{tmux_session}`"
+START_TMUX_SELECT = "Multiple tmux sessions found. Select one:"
+START_ERROR = "Error: {error}"
+START_LAUNCHING = "Launching Claude..."
+START_CONNECTED = "Connected to `{tmux_session}`"
+START_SESSION_KILLED = "Session killed. Use /start to restart."
+
+START_THREAD_RUNNING = f"""{STATUS_OK} Thread `{{thread_name}}` running
+
+Attach: `tmux attach -t {{tmux_session}}`"""
+
+START_ALREADY_RUNNING = f"""{STATUS_OK} Already running
+
+Attach: `tmux attach -t {{tmux_name}}`"""
+
+START_THREAD_UPGRADED = "Thread upgraded to `{thread_name}`"
+START_TOPIC_REGISTERED = "Topic registered as `{thread_name}`"
+
+START_SESSION_NOT_FOUND = f"{STATUS_WARN} Previous session not found"
+
+START_WORKTREE_NOT_FOUND = f"{STATUS_WARN} Worktree not found: `{{path}}`"
+
+START_WORKTREE_NOT_FOUND_BRANCH_EXISTS = f"""{STATUS_WARN} Worktree not found: `{{path}}`
+
+Branch `{{branch}}` exists.
+
+* Recreate worktree - recreate folder and resume session
+* Resume in main - archive topic, continue in main
+* Cancel"""
+
+START_WORKTREE_NOT_FOUND_BRANCH_MISSING = f"""{STATUS_WARN} Worktree not found: `{{path}}`
+
+Branch `{{branch}}` not found (merged?).
+
+* Create new - create branch + worktree, resume session
+* Resume in main - archive topic, continue in main
+* Cancel"""
+
+START_NEW_SESSION = f"{STATUS_PENDING} Starting new session..."
+START_RECREATING_WORKTREE = f"{STATUS_PENDING} Recreating worktree..."
+START_WORKTREE_RECREATED = f"{STATUS_OK} Worktree recreated. Use /start to launch."
+START_WORKTREE_RECREATE_FAILED = f"{STATUS_ERR} Failed to recreate: {{error}}"
+
+START_PATH_PROMPT = "Send project directory path:"
+START_CLONE_URL_PROMPT = """Send repository URL:
+* SSH: `git@github.com:user/repo.git`
+* HTTPS: `https://github.com/user/repo.git`"""
+
+START_GIT_VISIBILITY_PROMPT = "Repository visibility?"
+START_RESTART_CONFIRM = "Restart session `{tmux_session}`?"
 
 
 # --- Branch Operations ---
