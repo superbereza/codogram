@@ -145,8 +145,10 @@ async def on_finish_archive(callback: CallbackQuery, telegram_queue: TelegramQue
     """Archive regular topic (non-worktree)."""
     _, thread_id_str = callback.data.split(":")
     thread_id = int(thread_id_str)
+    chat_id = callback.message.chat.id
+    msg_thread_id = callback.message.message_thread_id
 
-    project = project_manager.get_by_chat(callback.message.chat.id)
+    project = project_manager.get_by_chat(chat_id)
     if not project:
         await callback.answer("Project not found")
         return
@@ -156,12 +158,14 @@ async def on_finish_archive(callback: CallbackQuery, telegram_queue: TelegramQue
         await callback.answer("Thread not found")
         return
 
+    # 1. Remove buttons (edit)
     await telegram_queue.edit(callback.message, strings.FINISH_ARCHIVING.format(name=thread.name))
-
-    await archive_thread(callback.bot, callback.message.chat.id, project, thread)
-
-    await telegram_queue.edit(callback.message, strings.FINISH_ARCHIVED.format(name=thread.name))
     await callback.answer()
+
+    await archive_thread(callback.bot, chat_id, project, thread)
+
+    # 2. Final status (send)
+    await telegram_queue.send(chat_id, strings.FINISH_ARCHIVED.format(name=thread.name), thread_id=msg_thread_id)
 
 
 @router.callback_query(F.data.startswith("finish_merge:"))
@@ -207,8 +211,10 @@ async def on_finish_do_merge(callback: CallbackQuery, telegram_queue: TelegramQu
     thread_id = int(parts[1])
     target_branch = parts[2]
     push_mode = parts[3]  # "push" or "local"
+    chat_id = callback.message.chat.id
+    msg_thread_id = callback.message.message_thread_id
 
-    project = project_manager.get_by_chat(callback.message.chat.id)
+    project = project_manager.get_by_chat(chat_id)
     if not project:
         await callback.answer("Project not found")
         return
@@ -222,41 +228,43 @@ async def on_finish_do_merge(callback: CallbackQuery, telegram_queue: TelegramQu
     worktree_path = Path(thread.worktree_path)
     branch_name = thread.name
 
+    # 1. Remove buttons (edit)
     await telegram_queue.edit(
         callback.message,
         strings.FINISH_MERGING.format(branch=branch_name, target=target_branch)
     )
+    await callback.answer()
 
     # Perform merge
     result = merge_branch(main_repo, branch_name, target_branch)
     if not result.success:
-        await telegram_queue.edit(
-            callback.message,
-            strings.FINISH_MERGE_FAILED.format(error=result.error)
+        await telegram_queue.send(
+            chat_id,
+            strings.FINISH_MERGE_FAILED.format(error=result.error),
+            thread_id=msg_thread_id
         )
-        await callback.answer()
         return
 
     # Push if requested
     if push_mode == "push":
-        await telegram_queue.edit(
-            callback.message, strings.FINISH_PUSHING.format(target=target_branch)
+        await telegram_queue.send(
+            chat_id, strings.FINISH_PUSHING.format(target=target_branch), thread_id=msg_thread_id
         )
         push_result = push_branch(main_repo, target_branch)
         if not push_result.success:
-            await telegram_queue.edit(
-                callback.message,
-                strings.FINISH_PUSH_FAILED.format(error=push_result.error, target=target_branch)
+            await telegram_queue.send(
+                chat_id,
+                strings.FINISH_PUSH_FAILED.format(error=push_result.error, target=target_branch),
+                thread_id=msg_thread_id
             )
-            await callback.answer()
             return
 
     # Archive thread
-    await telegram_queue.edit(callback.message, strings.FINISH_ARCHIVING_TOPIC)
-    await archive_thread(callback.bot, callback.message.chat.id, project, thread)
+    await telegram_queue.send(chat_id, strings.FINISH_ARCHIVING_TOPIC, thread_id=msg_thread_id)
+    await archive_thread(callback.bot, chat_id, project, thread)
 
     # Remove worktree and branch
-    await telegram_queue.edit(callback.message, strings.FINISH_CLEANING_WORKTREE)
+    await telegram_queue.send(chat_id, strings.FINISH_CLEANING_WORKTREE, thread_id=msg_thread_id)
     remove_result = remove_worktree(main_repo, worktree_path, branch_name, delete_branch=True)
 
     if push_mode == "push":
@@ -267,8 +275,8 @@ async def on_finish_do_merge(callback: CallbackQuery, telegram_queue: TelegramQu
     if not remove_result.success:
         status += strings.FINISH_WORKTREE_CLEANUP_FAILED.format(error=remove_result.error)
 
-    await telegram_queue.edit(callback.message, status)
-    await callback.answer()
+    # Final status (send)
+    await telegram_queue.send(chat_id, status, thread_id=msg_thread_id)
 
 
 @router.callback_query(F.data.startswith("finish_archive_branch:"))
@@ -277,8 +285,10 @@ async def on_finish_archive_branch(callback: CallbackQuery, telegram_queue: Tele
     parts = callback.data.split(":")
     thread_id = int(parts[1])
     mode = parts[2]  # "keep" or "discard"
+    chat_id = callback.message.chat.id
+    msg_thread_id = callback.message.message_thread_id
 
-    project = project_manager.get_by_chat(callback.message.chat.id)
+    project = project_manager.get_by_chat(chat_id)
     if not project:
         await callback.answer("Project not found")
         return
@@ -288,28 +298,32 @@ async def on_finish_archive_branch(callback: CallbackQuery, telegram_queue: Tele
         await callback.answer("Thread not found")
         return
 
+    # 1. Remove buttons (edit)
     await telegram_queue.edit(callback.message, strings.FINISH_ARCHIVING.format(name=thread.name))
+    await callback.answer()
 
     # Archive topic (closes topic, kills tmux)
-    await archive_thread(callback.bot, callback.message.chat.id, project, thread)
+    await archive_thread(callback.bot, chat_id, project, thread)
 
     # If discard mode, remove worktree with force
     if mode == "discard" and thread.worktree_path:
         main_repo = Path(project.cwd)
         worktree_path = Path(thread.worktree_path)
         remove_worktree(main_repo, worktree_path, thread.name, delete_branch=True, force=True)
-        await telegram_queue.edit(
-            callback.message,
-            strings.FINISH_DISCARDED_ARCHIVED.format(branch=thread.name)
+        # 2. Final status (send)
+        await telegram_queue.send(
+            chat_id,
+            strings.FINISH_DISCARDED_ARCHIVED.format(branch=thread.name),
+            thread_id=msg_thread_id
         )
     else:
         # Keep mode - worktree stays for potential resume
-        await telegram_queue.edit(
-            callback.message,
-            strings.FINISH_ARCHIVED_KEPT.format(branch=thread.name)
+        # 2. Final status (send)
+        await telegram_queue.send(
+            chat_id,
+            strings.FINISH_ARCHIVED_KEPT.format(branch=thread.name),
+            thread_id=msg_thread_id
         )
-
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("finish_commit:"))
