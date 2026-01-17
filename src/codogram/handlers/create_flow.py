@@ -85,7 +85,11 @@ async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> 
 
     create_type = CreateType(create_type_str)
     if create_type == CreateType.BRANCH:
-        await _do_create_branch(message.bot, chat_id, thread_id, project, name, telegram_queue)
+        # Show "Creating..." status
+        await telegram_queue.reply(message, strings.BRANCH_CREATING.format(name=name))
+        result = await _do_create_branch(message.bot, chat_id, thread_id, project, name, telegram_queue)
+        if result:
+            await telegram_queue.send(chat_id, strings.BRANCH_CREATED.format(name=name), thread_id=thread_id)
     else:
         # Show "Creating..." status
         await telegram_queue.reply(message, strings.THREAD_CREATING.format(name=name))
