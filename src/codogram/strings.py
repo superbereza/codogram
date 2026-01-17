@@ -63,6 +63,9 @@ THREAD_NOT_LINKED = "This topic is not linked to a Claude session"
 THREAD_TOPIC_ONLY = "This command can only be used in a topic"
 THREAD_CONNECT_HINT = "Use /start or /session_new to connect Claude to this topic"
 
+THREAD_CREATING = f"{STATUS_PENDING} Creating thread `{{name}}`..."
+THREAD_CREATED = f"{STATUS_OK} Thread `{{name}}` created"
+
 
 # --- Directory/Git ---
 
