@@ -94,12 +94,13 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
 
             # Approval mode
             if sb.approval_mode == "accept edits":
-                mode_text = "accept edits"
+                mode_text = "⏵⏵ accept edits"
             elif sb.approval_mode == "plan mode":
-                mode_text = "plan mode"
+                mode_text = "⏸ plan mode"
             else:
                 mode_text = "default"
             lines.append(f"• mode: {mode_text}")
+            lines.append("  (use /shift_tab to cycle)")
             lines.append(f"• background tasks: {sb.background_tasks}")
 
             if sb.context_percent is not None:
@@ -210,67 +211,99 @@ async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, f"Verbose output: {status}")
 
 
-@router.callback_query(F.data.startswith("settings:"))
+@router.callback_query(F.data.startswith("set:"))
 async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle settings keyboard button presses."""
-    from ..tmux import TmuxSession
-    from ..services.session_state import SessionStateService
+    from ..keyboards.settings import _short_id
     from ..keyboards import settings_keyboard
 
     data = callback.data
-    parts = data.split(":", 2)
+    parts = data.split(":")
+
+    # Handle close action (no short_id needed)
+    if len(parts) >= 2 and parts[1] == "close":
+        await callback.message.delete()
+        await callback.answer()
+        return
+
     if len(parts) < 3:
         await callback.answer("Invalid callback")
         return
 
-    action = parts[1]  # auto_accept, verbose, or mode
-    tmux_name = parts[2]
+    action = parts[1]  # aa (auto_accept), v (verbose), m (mode)
+    short_id = parts[2]
 
-    # Find project by tmux name
-    project = project_manager.get_by_tmux(tmux_name)
+    # Find project and thread by short ID
+    project = None
+    thread = None
+    tmux_name = None
+    for p in project_manager.projects.values():
+        for t in p.threads.values():
+            t_tmux = t.get_tmux_session(p.project_name)
+            if _short_id(t_tmux) == short_id:
+                project = p
+                thread = t
+                tmux_name = t_tmux
+                break
+        if project:
+            break
+        # Check project-level tmux
+        p_tmux = f"claude-{p.project_name}"
+        if _short_id(p_tmux) == short_id:
+            project = p
+            tmux_name = p_tmux
+            break
+
     if not project:
         await callback.answer("Project not found")
         return
 
-    # Find thread
-    thread = None
-    for t in project.threads.values():
-        if t.get_tmux_session(project.project_name) == tmux_name:
-            thread = t
-            break
-
-    if action == "auto_accept":
+    if action == "aa":
         if thread:
             thread.auto_accept = not thread.auto_accept
-            status = "on" if thread.auto_accept else "off"
+            status = "● on" if thread.auto_accept else "○ off"
         else:
             project.auto_accept = not project.auto_accept
-            status = "on" if project.auto_accept else "off"
+            status = "● on" if project.auto_accept else "○ off"
         project_manager._save()
         await callback.answer(f"Auto-accept: {status}")
 
-    elif action == "verbose":
+    elif action == "v":
         if thread:
             thread.verbose = not thread.verbose
-            status = "on" if thread.verbose else "off"
+            status = "● on" if thread.verbose else "○ off"
         else:
             project.verbose = not project.verbose
-            status = "on" if project.verbose else "off"
+            status = "● on" if project.verbose else "○ off"
         project_manager._save()
         await callback.answer(f"Verbose: {status}")
 
-    elif action == "mode":
-        cwd = (thread.worktree_path if thread else None) or project.cwd
-        if not cwd:
-            await callback.answer("No cwd configured")
-            return
+    elif action == "m":
+        from ..tmux import TmuxSession
+        from ..services.session_state import SessionStateService
+
+        # Get cwd for tmux
+        if thread:
+            cwd = thread.worktree_path or project.cwd
+        else:
+            cwd = project.cwd
+
         tmux = TmuxSession(tmux_name, cwd)
         service = SessionStateService()
         result = service.cycle_approval_mode(tmux)
-        if result.success:
-            await callback.answer(f"Mode: {result.new_mode or 'default'}")
-        else:
+
+        if not result.success:
             await callback.answer(result.error)
+            # Still update the message to refresh state
+        else:
+            # Format mode for answer
+            if result.new_mode == "accept edits":
+                mode_text = "⏵⏵ accept edits"
+            elif result.new_mode == "plan mode":
+                mode_text = "⏸ plan mode"
+            else:
+                mode_text = "default"
+            await callback.answer(f"Mode: {mode_text}")
 
     # Update the settings message using shared helper
     text = _build_settings_text(project, thread, tmux_name)

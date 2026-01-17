@@ -1,6 +1,12 @@
 """Settings inline keyboard."""
 
+import hashlib
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+
+def _short_id(tmux_session: str) -> str:
+    """Generate short ID from tmux session name (12 chars max)."""
+    return hashlib.md5(tmux_session.encode()).hexdigest()[:12]
 
 
 def settings_keyboard(tmux_session: str) -> InlineKeyboardMarkup:
@@ -15,17 +21,22 @@ def settings_keyboard(tmux_session: str) -> InlineKeyboardMarkup:
         - /verbose
         - /shift_tab
     """
+    sid = _short_id(tmux_session)
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="/auto_accept",
-            callback_data=f"settings:auto_accept:{tmux_session}"
+            callback_data=f"set:aa:{sid}"
         )],
         [InlineKeyboardButton(
             text="/verbose",
-            callback_data=f"settings:verbose:{tmux_session}"
+            callback_data=f"set:v:{sid}"
         )],
         [InlineKeyboardButton(
             text="/shift_tab",
-            callback_data=f"settings:mode:{tmux_session}"
+            callback_data=f"set:m:{sid}"
+        )],
+        [InlineKeyboardButton(
+            text="close",
+            callback_data="set:close"
         )],
     ])

@@ -243,6 +243,16 @@
 - Защита от path traversal и лимит 20MB
 - См. [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
 
+### Verbose mode и улучшения /settings
+Per-thread/per-project toggle verbose output и UX настроек:
+- `/verbose` — toggle verbose output on/off (индикаторы ● on / ○ off)
+- `/settings` inline кнопки для быстрых переключений (/auto_accept, /verbose, /shift_tab, close)
+- Короткие hash ID в callback data (фикс для длинных имён tmux сессий)
+- Отображение mode с эмодзи: ⏵⏵ accept edits, ⏸ plan mode, default
+- Подсказка "(use /shift_tab to cycle)" в настройках
+- Кнопка close удаляет сообщение с настройками
+- См. [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
+
 ## In Progress
 
 ### Robust /start flow

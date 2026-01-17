@@ -87,6 +87,8 @@ git pull
 | `/esc` | Cancel current Claude operation (Ctrl+C) |
 | `/new` | Start new Claude session (clear context) |
 | `/auto_accept` | Toggle auto-accept for permission prompts |
+| `/shift_tab` | Cycle Claude approval mode |
+| `/verbose` | Toggle verbose output |
 | `/settings` | View current settings |
 | `/help` | List all commands |
 

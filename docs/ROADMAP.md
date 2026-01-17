@@ -243,6 +243,16 @@ Send images and files from Telegram to Claude:
 - Path traversal protection and 20MB size limit
 - See [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
 
+### Verbose mode & settings improvements
+Per-thread/per-project verbose output toggle and /settings UX:
+- `/verbose` — toggle verbose output on/off (● on / ○ off indicators)
+- `/settings` inline buttons for quick toggles (/auto_accept, /verbose, /shift_tab, close)
+- Short hash IDs in callback data (fix for long tmux session names)
+- Mode display with emojis: ⏵⏵ accept edits, ⏸ plan mode, default
+- Hint text "(use /shift_tab to cycle)" in settings
+- Close button deletes settings message
+- See [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
+
 ## In Progress
 
 ### Robust /start flow

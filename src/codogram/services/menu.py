@@ -12,13 +12,13 @@ from aiogram.types import BotCommand, BotCommandScopeChat
 _ALL_COMMANDS = [
     ("esc", "Cancel current operation", True),
     ("auto_accept", "Toggle auto-accept mode", True),
+    ("shift_tab", "Cycle Claude approval mode", True),
     ("thread", "New topic in project directory", True),
     ("branch", "New isolated feature branch + topic", False),  # forum only
     ("clear", "Clear context, start fresh", True),
     ("finish", "Merge branch, archive topic", False),  # forum only
     ("start", "Connect Claude or show status", True),
     ("settings", "View current settings", True),
-    ("shift_tab", "Cycle Claude approval mode", True),
     ("restart", "Force restart Claude", True),
     ("get_debug_ids", "Show chat and thread IDs", True),
     ("help", "List all commands", True),
