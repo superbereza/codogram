@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
 from .telegram_queue import OutgoingBatch
-from .screen import parse_screen, PermissionPrompt, is_claude_ready
+from .screen import parse_screen, PermissionPrompt, is_claude_ready, extract_input_text, PASTED_PATTERN
 from .keyboards import permission_keyboard
 from .state import permission_messages
 from .session_manager import ProjectState, ThreadInfo
@@ -121,6 +121,10 @@ async def permission_poller(
     content_msg_ids: list[int] = []
     kb_msg_id: int | None = None
 
+    # Stuck message detection state
+    stuck_input_text: str | None = None
+    stuck_seen_count: int = 0
+
     debounce_time = settings.permission_poller_debounce
     poll_interval = settings.permission_poller_interval
 
@@ -148,6 +152,42 @@ async def permission_poller(
             except Exception:
                 pass
             return  # Exit poller
+
+        # Stuck message detection (before permission state machine)
+        input_text = extract_input_text(screen)
+        if input_text:
+            last_msg = thread.last_sent_message if thread else None
+
+            is_potentially_stuck = (
+                PASTED_PATTERN.match(input_text) is not None or
+                (last_msg is not None and input_text == last_msg)
+            )
+
+            if is_potentially_stuck:
+                if input_text == stuck_input_text:
+                    stuck_seen_count += 1
+                else:
+                    stuck_input_text = input_text
+                    stuck_seen_count = 1
+
+                # Debounce: seen twice in a row = stuck, send Enter
+                if stuck_seen_count >= 2:
+                    logger.info(f"{log_prefix}: stuck message detected ({stuck_seen_count}x), sending Enter")
+                    tmux.send_key("Enter")
+                    # Clear state
+                    stuck_input_text = None
+                    stuck_seen_count = 0
+                    # Clear last_sent_message to prevent re-triggering
+                    if thread:
+                        thread.last_sent_message = None
+            else:
+                # Not a stuck message, reset
+                stuck_input_text = None
+                stuck_seen_count = 0
+        else:
+            # No input text, reset
+            stuck_input_text = None
+            stuck_seen_count = 0
 
         is_permission = isinstance(parsed, PermissionPrompt)
 
