@@ -881,3 +881,54 @@ class TestIsSetupPhase:
         project = ProjectState(project_name="test")
         project.session_id = "legacy-session"
         assert is_setup_phase(project) is False
+
+
+class TestCleanupProject:
+    """Tests for cleanup_project() helper."""
+
+    def test_cleanup_project_kills_tmux(self):
+        """cleanup_project should kill tmux for all threads."""
+        from unittest.mock import MagicMock, patch
+        from codogram.services.start_flow import cleanup_project
+        from codogram.session_manager import ProjectState, ThreadInfo
+
+        project = ProjectState(project_name="test", cwd="/test/path")
+        project.threads[None] = ThreadInfo(thread_id=None, name="main")
+        project.threads[123] = ThreadInfo(thread_id=123, name="feature")
+
+        with patch('codogram.services.start_flow.is_tmux_session_exists') as exists, \
+             patch('codogram.services.start_flow.kill_tmux_session') as kill, \
+             patch('codogram.session_manager.project_manager') as pm:
+
+            exists.return_value = True
+            pm.projects = {"test": project}
+
+            result = cleanup_project(project, delete_directory=False)
+
+            # Should kill tmux for both threads
+            assert kill.call_count == 2
+            assert result.success is True
+
+    def test_cleanup_project_reports_failed_deletion(self):
+        """cleanup_project should report if directory deletion fails."""
+        from unittest.mock import MagicMock, patch
+        from codogram.services.start_flow import cleanup_project
+        from codogram.session_manager import ProjectState, ThreadInfo
+
+        project = ProjectState(project_name="test", cwd="/nonexistent/protected/path")
+        project.threads[None] = ThreadInfo(thread_id=None, name="main")
+
+        with patch('codogram.services.start_flow.is_tmux_session_exists') as exists, \
+             patch('codogram.services.start_flow.kill_tmux_session') as kill, \
+             patch('codogram.session_manager.project_manager') as pm, \
+             patch('codogram.services.start_flow.Path') as MockPath:
+
+            exists.return_value = False
+            pm.projects = {"test": project}
+            # Simulate directory still exists after rmtree
+            MockPath.return_value.exists.return_value = True
+
+            result = cleanup_project(project, delete_directory=True)
+
+            assert result.success is False
+            assert "could not delete" in result.error.lower()

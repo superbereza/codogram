@@ -1,9 +1,12 @@
 """StartFlowService - business logic for /start flow."""
+import shutil
+import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .. import strings
 from ..domain.validators import (
     is_valid_project_name,
     sanitize_project_name,
@@ -35,6 +38,64 @@ def is_setup_phase(project: "ProjectState") -> bool:
         return False
 
     return True
+
+
+@dataclass
+class CleanupResult:
+    """Result of project cleanup operation."""
+    success: bool
+    error: str | None = None
+
+
+def cleanup_project(project: "ProjectState", delete_directory: bool) -> CleanupResult:
+    """Full project cleanup.
+
+    Args:
+        project: Project to cleanup
+        delete_directory: Whether to delete the project directory
+
+    Returns:
+        CleanupResult with success=False if directory deletion failed
+    """
+    # 1. Kill all tmux sessions (main + topics)
+    for thread in project.threads.values():
+        tmux_name = thread.get_tmux_session(project.project_name)
+        if is_tmux_session_exists(tmux_name):
+            kill_tmux_session(tmux_name)
+
+    # 2. Remove worktrees (if any)
+    if project.cwd:
+        for thread in project.threads.values():
+            if thread.worktree_path:
+                try:
+                    subprocess.run(
+                        ["git", "worktree", "remove", "--force", thread.worktree_path],
+                        cwd=project.cwd,
+                        capture_output=True,
+                    )
+                except Exception:
+                    pass  # Best effort
+
+    # 3. Delete main directory (if requested)
+    cleanup_failed = False
+    if delete_directory and project.cwd:
+        shutil.rmtree(project.cwd, ignore_errors=True)
+        # Verify deletion succeeded
+        if Path(project.cwd).exists():
+            cleanup_failed = True
+
+    # 4. Remove from config
+    from ..session_manager import project_manager
+    if project.project_name in project_manager.projects:
+        del project_manager.projects[project.project_name]
+        project_manager._save()
+
+    if cleanup_failed:
+        return CleanupResult(
+            success=False,
+            error=strings.RESET_CLEANUP_FAILED.format(path=project.cwd)
+        )
+    return CleanupResult(success=True)
 
 
 class FlowAction(Enum):
