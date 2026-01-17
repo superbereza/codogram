@@ -2,6 +2,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from freezegun import freeze_time
+
 
 class TestDomainTypes:
     def test_file_info_creation(self):
@@ -148,3 +150,58 @@ class TestExtractInfo:
         result = service.extract_info(message)
 
         assert result is None
+
+
+class TestBuildPath:
+    @freeze_time("2026-01-17 04:35:12")
+    def test_build_path_basic(self, tmp_path):
+        from codogram.services.file_input import FileInputService
+
+        service = FileInputService()
+        path = service._build_path(
+            cwd=str(tmp_path),
+            thread_name="celestial",
+            thread_id=1328,
+            user_id=456,
+            extension="png"
+        )
+
+        assert path.parent.exists()
+        assert "celestial" in str(path)
+        assert "20260117-043512" in str(path)
+        assert "thread_1328" in str(path)
+        assert "user_456" in str(path)
+        assert path.suffix == ".png"
+
+    @freeze_time("2026-01-17 04:35:12")
+    def test_build_path_main_thread(self, tmp_path):
+        from codogram.services.file_input import FileInputService
+
+        service = FileInputService()
+        path = service._build_path(
+            cwd=str(tmp_path),
+            thread_name="main",
+            thread_id=None,
+            user_id=123,
+            extension="jpg"
+        )
+
+        assert "main" in str(path)
+        assert "thread_main" in str(path)
+
+    def test_build_path_traversal_blocked(self, tmp_path):
+        from codogram.services.file_input import FileInputService
+
+        service = FileInputService()
+
+        try:
+            service._build_path(
+                cwd=str(tmp_path),
+                thread_name="../../../etc",
+                thread_id=1,
+                user_id=1,
+                extension="txt"
+            )
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "outside" in str(e).lower()

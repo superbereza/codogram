@@ -1,5 +1,6 @@
 """File input service for handling images and documents from Telegram."""
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Awaitable, Callable
 
@@ -69,3 +70,39 @@ class FileInputService:
             )
 
         return None
+
+    def _build_path(
+        self,
+        cwd: str,
+        thread_name: str,
+        thread_id: int | None,
+        user_id: int,
+        extension: str
+    ) -> Path:
+        """Build safe file path with validation.
+
+        Creates parent directories. Validates path is inside input-files.
+
+        Raises:
+            ValueError: If path traversal detected
+        """
+        # Generate filename
+        dt = datetime.now().strftime("%Y%m%d-%H%M%S")
+        tid = f"thread_{thread_id}" if thread_id else "thread_main"
+        filename = f"{dt}-{tid}-user_{user_id}.{extension}"
+
+        # Build path
+        base = Path(cwd) / "tmp" / "input-files"
+        path = base / thread_name / filename
+
+        # Create directories
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Validate - prevent path traversal
+        resolved = path.resolve()
+        base_resolved = base.resolve()
+
+        if not resolved.is_relative_to(base_resolved):
+            raise ValueError(f"Path {resolved} is outside allowed directory {base_resolved}")
+
+        return path
