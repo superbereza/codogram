@@ -2,6 +2,8 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
+THINKING_SPINNERS = "·✶✻✽*✢"
+
 
 class PromptType(Enum):
     REGULAR = "regular"
@@ -282,3 +284,26 @@ def parse_status_bar(output: str) -> StatusBar:
         background_tasks=background_tasks,
         context_percent=context_percent,
     )
+
+
+def parse_thinking_status(output: str) -> str | None:
+    """Parse thinking status line as-is.
+
+    Formats vary:
+    - · Wibbling… (ctrl+c to interrupt)
+    - ✶ Wibbling… (ctrl+c to interrupt · 30s · ↓ 914 tokens · thinking)
+    - ✻ Cooked for 35s
+
+    Returns raw line with command injection:
+    - 'ctrl+c to interrupt' → '/esc to interrupt'
+    - 'esc to interrupt' → '/esc to interrupt'
+    """
+    for line in output.split("\n"):
+        stripped = line.strip()
+        if stripped and stripped[0] in THINKING_SPINNERS:
+            # Replace ctrl+c first, then esc (but only standalone, not /esc)
+            result = stripped.replace("ctrl+c to interrupt", "/esc to interrupt")
+            # Use regex to replace only standalone "esc to interrupt" (not "/esc")
+            result = re.sub(r'(?<!/)(esc to interrupt)', r'/\1', result)
+            return result
+    return None
