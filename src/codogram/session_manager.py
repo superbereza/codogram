@@ -1,10 +1,12 @@
 # src/codogram/session_manager.py
 import asyncio
+import fcntl
+import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .config import settings, load_config, save_config
+from .config import settings, load_config, get_config_path
 from .project_resolver import get_project_name
 from .tmux import TmuxSession
 from .history_reader import find_session_for_project, compute_jsonl_path
@@ -259,57 +261,85 @@ class ProjectManager:
             self.projects[project_name] = project
 
     def _save(self) -> None:
-        """Persist to disk."""
-        projects_data = {}
-        for name, p in self.projects.items():
-            if p.chat_id is None:
-                continue
-            project_data = {
-                "chat_id": p.chat_id,
-                "cwd": p.cwd,
-                "auto_accept": p.auto_accept,
-                "verbose": p.verbose,
-                "feat_thinking_status": p.feat_thinking_status,
-                "feat_suggestions": p.feat_suggestions,
-            }
+        """Persist to disk with file locking."""
+        config_path = get_config_path()
 
-            # Backward compat: duplicate threads[None] to legacy fields
-            if None in p.threads:
-                main_thread = p.threads[None]
-                project_data["session_id"] = main_thread.session_id
-                project_data["jsonl_path"] = main_thread.jsonl_path
+        # Ensure file exists
+        if not config_path.exists():
+            config_path.write_text("{}")
 
-            # Save all threads with full state
-            if p.threads:
-                threads_dict = {}
-                for tid, t in p.threads.items():
-                    thread_data = {
-                        "name": t.name,
-                        "topic_name": t.topic_name,
-                        "session_id": t.session_id,
-                        "jsonl_path": t.jsonl_path,
-                        "awaiting_new_session": t.awaiting_new_session,
-                        "start_requested_at": t.start_requested_at,
+        with open(config_path, "r+") as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                # Read current state
+                f.seek(0)
+                try:
+                    current = json.load(f)
+                except json.JSONDecodeError:
+                    current = {}
+
+                # Build projects data
+                projects_data = {}
+                for name, p in self.projects.items():
+                    if p.chat_id is None:
+                        continue
+                    project_data = {
+                        "chat_id": p.chat_id,
+                        "cwd": p.cwd,
+                        "auto_accept": p.auto_accept,
+                        "verbose": p.verbose,
+                        "feat_thinking_status": p.feat_thinking_status,
+                        "feat_suggestions": p.feat_suggestions,
                     }
-                    # Worktree fields - only save if set
-                    if t.worktree_path:
-                        thread_data["worktree_path"] = t.worktree_path
-                    if t.base_branch:
-                        thread_data["base_branch"] = t.base_branch
-                    if t.archived:
-                        thread_data["archived"] = t.archived
-                    if t.auto_accept:
-                        thread_data["auto_accept"] = t.auto_accept
-                    if t.verbose:
-                        thread_data["verbose"] = t.verbose
-                    if t.feat_thinking_status:
-                        thread_data["feat_thinking_status"] = t.feat_thinking_status
-                    threads_dict[str(tid) if tid is not None else "null"] = thread_data
-                project_data["threads"] = threads_dict
-            projects_data[name] = project_data
-        self._config["projects"] = projects_data
-        self._config.pop("sessions", None)
-        save_config(self._config)
+
+                    # Backward compat: duplicate threads[None] to legacy fields
+                    if None in p.threads:
+                        main_thread = p.threads[None]
+                        project_data["session_id"] = main_thread.session_id
+                        project_data["jsonl_path"] = main_thread.jsonl_path
+
+                    # Save all threads with full state
+                    if p.threads:
+                        threads_dict = {}
+                        for tid, t in p.threads.items():
+                            thread_data = {
+                                "name": t.name,
+                                "topic_name": t.topic_name,
+                                "session_id": t.session_id,
+                                "jsonl_path": t.jsonl_path,
+                                "awaiting_new_session": t.awaiting_new_session,
+                                "start_requested_at": t.start_requested_at,
+                            }
+                            # Worktree fields - only save if set
+                            if t.worktree_path:
+                                thread_data["worktree_path"] = t.worktree_path
+                            if t.base_branch:
+                                thread_data["base_branch"] = t.base_branch
+                            if t.archived:
+                                thread_data["archived"] = t.archived
+                            if t.auto_accept:
+                                thread_data["auto_accept"] = t.auto_accept
+                            if t.verbose:
+                                thread_data["verbose"] = t.verbose
+                            if t.feat_thinking_status:
+                                thread_data["feat_thinking_status"] = t.feat_thinking_status
+                            threads_dict[str(tid) if tid is not None else "null"] = thread_data
+                        project_data["threads"] = threads_dict
+                    projects_data[name] = project_data
+
+                # Update config
+                current["projects"] = projects_data
+                current.pop("sessions", None)
+
+                # Write back
+                f.seek(0)
+                f.truncate()
+                json.dump(current, f, indent=2)
+
+                # Update internal state
+                self._config = current
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
     def get_or_create(self, project_name: str) -> ProjectState:
         """Get existing project or create new one."""
