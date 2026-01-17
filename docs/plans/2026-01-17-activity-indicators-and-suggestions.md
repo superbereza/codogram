@@ -4,7 +4,7 @@
 
 **Goal:** Show Claude's thinking status and input suggestions in Telegram.
 
-**Architecture:** Parse tmux capture-pane for thinking status (spinner lines) and suggestions (input box content). Use TelegramQueue with replace_key for deduplication and edit/delete operations. Thinking status as editable message, suggestions as ReplyKeyboardMarkup attached to Claude's response via SuggestionProvider mediator pattern.
+**Architecture:** Parse tmux capture-pane for thinking status (spinner lines) and suggestions (input box content). Use TelegramQueue with replace_key for deduplication and edit/delete operations. Thinking status as editable message, suggestions as "💡" message with ReplyKeyboardMarkup.
 
 **Tech Stack:** Python 3.12, aiogram 3.x, asyncio, collections.deque
 
@@ -861,250 +861,63 @@ git commit -m "feat: add /ctrl_c command to interrupt Claude"
 
 ---
 
-## Task 9: Create SuggestionProvider mediator class
-
-**Files:**
-- Create: `src/codogram/suggestion_provider.py`
-- Test: `tests/test_suggestion_provider.py`
-
-**Step 1: Write the failing test**
-
-```python
-# tests/test_suggestion_provider.py
-import pytest
-import asyncio
-from codogram.suggestion_provider import SuggestionProvider
-
-
-@pytest.mark.asyncio
-async def test_set_and_get_suggestion():
-    """Provider should store and return suggestion."""
-    provider = SuggestionProvider()
-
-    provider.set_suggestion(123, 456, "run the tests")
-    result = await provider.wait_for_suggestion(123, 456, timeout=0.1)
-
-    assert result == "run the tests"
-
-
-@pytest.mark.asyncio
-async def test_get_suggestion_clears_it():
-    """Getting suggestion should clear it (one-time use)."""
-    provider = SuggestionProvider()
-
-    provider.set_suggestion(123, 456, "run the tests")
-    await provider.wait_for_suggestion(123, 456, timeout=0.1)
-    result = await provider.wait_for_suggestion(123, 456, timeout=0.1)
-
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_wait_for_suggestion_returns_none_on_timeout():
-    """Should return None if no suggestion within timeout."""
-    provider = SuggestionProvider()
-
-    result = await provider.wait_for_suggestion(123, 456, timeout=0.1)
-
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_wait_unblocks_when_suggestion_set():
-    """Waiting should unblock when suggestion is set."""
-    provider = SuggestionProvider()
-
-    async def set_later():
-        await asyncio.sleep(0.05)
-        provider.set_suggestion(123, 456, "late suggestion")
-
-    asyncio.create_task(set_later())
-    result = await provider.wait_for_suggestion(123, 456, timeout=1.0)
-
-    assert result == "late suggestion"
-
-
-@pytest.mark.asyncio
-async def test_clear_suggestion():
-    """Setting None should clear suggestion."""
-    provider = SuggestionProvider()
-
-    provider.set_suggestion(123, 456, "test")
-    provider.set_suggestion(123, 456, None)
-    result = await provider.wait_for_suggestion(123, 456, timeout=0.1)
-
-    assert result is None
-```
-
-**Step 2: Run tests to verify they fail**
-
-Run: `cd /home/superbereza/dev/codogram && ./venv/bin/pytest tests/test_suggestion_provider.py -v`
-Expected: FAIL with "No module named 'codogram.suggestion_provider'"
-
-**Step 3: Implement SuggestionProvider**
-
-```python
-# src/codogram/suggestion_provider.py
-"""SuggestionProvider - mediator between Poller (producer) and Watcher (consumer)."""
-import asyncio
-
-
-class SuggestionProvider:
-    """Bridge between Poller (producer) and Watcher (consumer).
-
-    Poller calls set_suggestion() when it detects a suggestion in tmux.
-    Watcher calls wait_for_suggestion() before sending Claude's response.
-    """
-
-    def __init__(self):
-        self._suggestions: dict[str, str] = {}  # key → suggestion
-        self._events: dict[str, asyncio.Event] = {}
-
-    def _key(self, chat_id: int, thread_id: int | None) -> str:
-        return f"{chat_id}:{thread_id}"
-
-    def set_suggestion(self, chat_id: int, thread_id: int | None, suggestion: str | None) -> None:
-        """Called by Poller when suggestion found/cleared."""
-        key = self._key(chat_id, thread_id)
-        if suggestion:
-            self._suggestions[key] = suggestion
-            # Wake up any waiting consumer
-            if key in self._events:
-                self._events[key].set()
-        else:
-            self._suggestions.pop(key, None)
-
-    async def wait_for_suggestion(
-        self, chat_id: int, thread_id: int | None, timeout: float = 1.0
-    ) -> str | None:
-        """Called by Watcher before sending response.
-
-        Waits up to `timeout` seconds for a suggestion to appear.
-        Returns suggestion (and clears it) or None if timeout.
-        """
-        key = self._key(chat_id, thread_id)
-
-        # If suggestion already available, return immediately
-        if key in self._suggestions:
-            return self._suggestions.pop(key)
-
-        # Wait for suggestion to be set
-        event = self._events.setdefault(key, asyncio.Event())
-        event.clear()
-        try:
-            await asyncio.wait_for(event.wait(), timeout)
-            return self._suggestions.pop(key, None)
-        except asyncio.TimeoutError:
-            return None
-
-
-# Global singleton
-suggestion_provider = SuggestionProvider()
-```
-
-**Step 4: Run tests to verify they pass**
-
-Run: `cd /home/superbereza/dev/codogram && ./venv/bin/pytest tests/test_suggestion_provider.py -v`
-Expected: All PASS
-
-**Step 5: Commit**
-
-```bash
-git add src/codogram/suggestion_provider.py tests/test_suggestion_provider.py
-git commit -m "feat: add SuggestionProvider mediator class"
-```
-
----
-
-## Task 9b: Add suggestion detection to permission_poller
+## Task 9: Add input suggestion handling to permission_poller
 
 **Files:**
 - Modify: `src/codogram/permission_poller.py`
 
-**Step 1: Import suggestion_provider and parse function**
+**Step 1: Import ReplyKeyboardMarkup and parse function**
 
 ```python
-from .suggestion_provider import suggestion_provider
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from .screen import parse_input_suggestion
 ```
 
-**Step 2: Add suggestion detection in main loop**
+**Step 2: Add suggestion state (module-level or in poller)**
 
-After thinking status logic, add:
+```python
+# Track last suggestion per thread to avoid duplicates
+_last_suggestions: dict[str, str | None] = {}
+```
+
+**Step 3: Add suggestion logic after thinking status**
 
 ```python
 # Parse input suggestion (only when not thinking)
 if not thinking_text:
     suggestion = parse_input_suggestion(screen)
-    # Set suggestion in provider (watcher will pick it up)
-    suggestion_provider.set_suggestion(project.chat_id, thread_id, suggestion)
-```
+    key = f"{project.chat_id}:{thread_id}"
 
-**Step 3: Commit**
+    if suggestion and suggestion != _last_suggestions.get(key):
+        # New suggestion — send 💡 with ReplyKeyboard
+        batch = OutgoingBatch(
+            chat_id=project.chat_id,
+            thread_id=thread_id,
+            messages=[{"text": "💡"}],
+            reply_markup=ReplyKeyboardMarkup(
+                keyboard=[[KeyboardButton(text=suggestion)]],
+                resize_keyboard=True,
+                one_time_keyboard=True,
+            ),
+        )
+        await telegram_queue.enqueue_nowait(batch)
+        _last_suggestions[key] = suggestion
 
-```bash
-git add src/codogram/permission_poller.py
-git commit -m "feat(poller): detect suggestions and publish to SuggestionProvider"
-```
-
----
-
-## Task 10: Integrate SuggestionProvider into Watcher
-
-**Files:**
-- Modify: `src/codogram/watcher.py`
-
-**Step 1: Import SuggestionProvider**
-
-```python
-from .suggestion_provider import suggestion_provider
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-```
-
-**Step 2: Find where response is sent to Telegram**
-
-Locate the code in watcher that sends Claude's response to Telegram (likely via OutgoingBatch).
-
-**Step 3: Add suggestion waiting before sending response**
-
-Before sending the response batch, wait for suggestion:
-
-```python
-# Wait briefly for suggestion from poller
-suggestion = await suggestion_provider.wait_for_suggestion(
-    chat_id=project.chat_id,
-    thread_id=thread_id,
-    timeout=1.0  # Wait up to 1 second
-)
-
-# Attach ReplyKeyboard if suggestion found
-reply_markup = None
-if suggestion:
-    reply_markup = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=suggestion)]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    )
-
-batch = OutgoingBatch(
-    chat_id=project.chat_id,
-    thread_id=thread_id,
-    messages=[{"text": response_text}],
-    reply_markup=reply_markup,  # Attached to response message
-)
-await telegram_queue.enqueue(batch)
+    elif not suggestion:
+        # Suggestion gone
+        _last_suggestions[key] = None
 ```
 
 **Step 4: Commit**
 
 ```bash
-git add src/codogram/watcher.py
-git commit -m "feat(watcher): attach suggestion keyboard to Claude's response"
+git add src/codogram/permission_poller.py
+git commit -m "feat(poller): send suggestion as 💡 message with ReplyKeyboard"
 ```
 
 ---
 
-## Task 11: E2E Testing
+## Task 10: E2E Testing
 
 **Step 1: Test thinking status**
 
@@ -1124,17 +937,12 @@ git commit -m "feat(watcher): attach suggestion keyboard to Claude's response"
 
 1. Send message that will trigger a suggestion (e.g., ask Claude to run tests)
 2. Wait for Claude response
-3. Verify: ReplyKeyboard appears ATTACHED to the response message (not separate)
+3. Verify: "💡" message appears with ReplyKeyboard button
 4. Click suggestion button
 5. Verify: text sent to Claude
 6. Verify: keyboard disappears (one_time_keyboard behavior)
 
-**Step 4: Test suggestion timing**
-
-1. Verify suggestion appears even if there's a small delay between response and suggestion detection
-2. Verify that if no suggestion found within 1 second, response is sent without keyboard
-
-**Step 5: Final commit**
+**Step 4: Final commit**
 
 ```bash
 git add -A
@@ -1155,7 +963,5 @@ git commit -m "feat: activity indicators and input suggestions complete"
 | 6 | parse_input_suggestion | screen.py |
 | 7 | Thinking status in poller | permission_poller.py |
 | 8 | /ctrl_c command | handlers/ctrl_c.py |
-| 9 | SuggestionProvider mediator | suggestion_provider.py |
-| 9b | Suggestion detection in poller | permission_poller.py |
-| 10 | Suggestion keyboard in watcher | watcher.py |
-| 11 | E2E testing | manual |
+| 9 | Suggestion in poller | permission_poller.py |
+| 10 | E2E testing | manual |

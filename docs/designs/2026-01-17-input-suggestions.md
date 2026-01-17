@@ -9,7 +9,7 @@ Show Claude's input suggestions in Telegram as clickable buttons.
 - Format: `❯ посмотри что залогировалось                    ↵ send`
 
 **What user sees in Telegram:**
-- Claude's response arrives with ReplyKeyboardMarkup (suggestion as button)
+- "💡" message arrives with ReplyKeyboardMarkup (suggestion as button)
 - Click → text sent to Claude
 - Keyboard auto-hides after use (one_time_keyboard)
 
@@ -33,74 +33,36 @@ def parse_input_suggestion(output: str) -> str | None:
 - Match pattern: `❯\s*(.+?)\s*↵ send`
 - Exclude empty input (`❯` only)
 
-## SuggestionProvider Mediator
-
-Bridge between Poller (producer) and Watcher (consumer). Suggestion is sent WITH Claude's response, not as separate message.
-
-**Class:**
-```python
-class SuggestionProvider:
-    """Bridge between Poller (producer) and Watcher (consumer)."""
-
-    def __init__(self):
-        self._suggestions: dict[str, str] = {}  # key → suggestion
-        self._events: dict[str, asyncio.Event] = {}
-
-    def set_suggestion(self, chat_id: int, thread_id: int | None, suggestion: str | None):
-        """Called by Poller when suggestion found/cleared."""
-        key = f"{chat_id}:{thread_id}"
-        if suggestion:
-            self._suggestions[key] = suggestion
-            if key in self._events:
-                self._events[key].set()
-        else:
-            self._suggestions.pop(key, None)
-
-    async def wait_for_suggestion(self, chat_id: int, thread_id: int | None, timeout: float = 1.0) -> str | None:
-        """Called by Watcher before sending response."""
-        key = f"{chat_id}:{thread_id}"
-
-        if key in self._suggestions:
-            return self._suggestions.pop(key)
-
-        event = self._events.setdefault(key, asyncio.Event())
-        event.clear()
-        try:
-            await asyncio.wait_for(event.wait(), timeout)
-            return self._suggestions.pop(key, None)
-        except asyncio.TimeoutError:
-            return None
-```
-
 ## Processing in permission_poller
 
-**Logic (producer):**
+**State:**
 ```python
-suggestion = parse_input_suggestion(screen)
-suggestion_provider.set_suggestion(project.chat_id, thread_id, suggestion)
+last_suggestion: dict[str, str | None] = {}  # "chat:thread" → suggestion
 ```
 
-## Processing in watcher
-
-**Logic (consumer):**
+**Logic:**
 ```python
-# Before sending response
-suggestion = await suggestion_provider.wait_for_suggestion(chat_id, thread_id, timeout=1.0)
+suggestion = parse_input_suggestion(screen)
+key = f"{project.chat_id}:{thread_id}"
 
-reply_markup = None
-if suggestion:
-    reply_markup = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=suggestion)]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
+if suggestion and suggestion != last_suggestion.get(key):
+    # New suggestion — send 💡 with ReplyKeyboard
+    batch = OutgoingBatch(
+        chat_id=project.chat_id,
+        thread_id=thread_id,
+        messages=[{"text": "💡"}],
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text=suggestion)]],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        ),
     )
+    await telegram_queue.enqueue_nowait(batch)
+    last_suggestion[key] = suggestion
 
-batch = OutgoingBatch(
-    chat_id=chat_id,
-    thread_id=thread_id,
-    messages=[{"text": response}],
-    reply_markup=reply_markup,
-)
+elif not suggestion:
+    # Suggestion gone
+    last_suggestion[key] = None
 ```
 
 ## Keyboard Removal
