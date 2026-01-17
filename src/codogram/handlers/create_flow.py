@@ -41,14 +41,19 @@ async def on_create_magic(callback: CallbackQuery, telegram_queue: TelegramQueue
 
     name = create_flow_service.get_magic_name(project)
 
-    await callback.message.delete()
+    # Show "Creating..." status (edit removes buttons)
+    if create_type == CreateType.BRANCH:
+        await telegram_queue.edit(callback.message, strings.BRANCH_CREATING.format(name=name))
+    else:
+        await telegram_queue.edit(callback.message, strings.THREAD_CREATING.format(name=name))
+    await callback.answer()
 
     if create_type == CreateType.BRANCH:
         await _do_create_branch(callback.bot, chat_id, thread_id, project, name, telegram_queue)
     else:
-        await _do_create_thread(callback.bot, chat_id, thread_id, project, name, telegram_queue)
-
-    await callback.answer()
+        result = await _do_create_thread(callback.bot, chat_id, thread_id, project, name, telegram_queue)
+        if result:
+            await telegram_queue.send(chat_id, strings.THREAD_CREATED.format(name=name), thread_id=thread_id)
 
 
 async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> bool:
@@ -80,7 +85,11 @@ async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> 
     if create_type == CreateType.BRANCH:
         await _do_create_branch(message.bot, chat_id, thread_id, project, name, telegram_queue)
     else:
-        await _do_create_thread(message.bot, chat_id, thread_id, project, name, telegram_queue)
+        # Show "Creating..." status
+        await telegram_queue.reply(message, strings.THREAD_CREATING.format(name=name))
+        result = await _do_create_thread(message.bot, chat_id, thread_id, project, name, telegram_queue)
+        if result:
+            await telegram_queue.send(chat_id, strings.THREAD_CREATED.format(name=name), thread_id=thread_id)
 
     return True
 
@@ -117,7 +126,7 @@ async def _do_create_branch(
 
 
 async def _do_create_thread(bot, chat_id: int, thread_id: int | None, project, name: str, telegram_queue: TelegramQueue):
-    """Create thread with given name."""
+    """Create thread with given name. Returns thread if successful, None otherwise."""
     thread = await create_thread_with_session(
         bot=bot,
         chat_id=chat_id,
@@ -126,3 +135,5 @@ async def _do_create_thread(bot, chat_id: int, thread_id: int | None, project, n
     )
     if not thread:
         await telegram_queue.send(chat_id, strings.CREATE_TOPIC_ERROR, thread_id=thread_id)
+        return None
+    return thread
