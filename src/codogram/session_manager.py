@@ -208,6 +208,7 @@ class ProjectManager:
                 project.chat_id = data.get("chat_id")
                 project.cwd = data.get("cwd")
                 project.auto_accept = data.get("auto_accept", False)
+                project.verbose = data.get("verbose", False)
 
                 # Load explicit threads first
                 threads_data = data.get("threads", {})
@@ -228,6 +229,7 @@ class ProjectManager:
                         base_branch=thread_data.get("base_branch"),
                         archived=thread_data.get("archived", False),
                         auto_accept=thread_data.get("auto_accept", False),
+                        verbose=thread_data.get("verbose", False),
                         # Assume already notified if session exists but tmux likely dead
                         notified_closed=bool(thread_data.get("session_id")),
                     )
@@ -250,7 +252,7 @@ class ProjectManager:
         for name, p in self.projects.items():
             if p.chat_id is None:
                 continue
-            project_data = {"chat_id": p.chat_id, "cwd": p.cwd, "auto_accept": p.auto_accept}
+            project_data = {"chat_id": p.chat_id, "cwd": p.cwd, "auto_accept": p.auto_accept, "verbose": p.verbose}
 
             # Backward compat: duplicate threads[None] to legacy fields
             if None in p.threads:
@@ -279,6 +281,8 @@ class ProjectManager:
                         thread_data["archived"] = t.archived
                     if t.auto_accept:
                         thread_data["auto_accept"] = t.auto_accept
+                    if t.verbose:
+                        thread_data["verbose"] = t.verbose
                     threads_dict[str(tid) if tid is not None else "null"] = thread_data
                 project_data["threads"] = threads_dict
             projects_data[name] = project_data
