@@ -178,11 +178,13 @@ async def permission_poller(
                 if elapsed >= debounce_time:
                     # Check auto-accept (read dynamically - may have changed since poller started)
                     auto_accept_enabled = thread.auto_accept if thread else project.auto_accept
+                    verbose_enabled = thread.verbose if thread else project.verbose
                     if auto_accept_enabled:
                         if await try_auto_accept(
                             parsed.options, parsed.body, tmux,
                             telegram_queue, project.chat_id, thread_id, context_name,
                             prompt_type=parsed.prompt_type,
+                            verbose=verbose_enabled,
                         ):
                             # Go to SHOWING to reuse existing dedup logic
                             # (wait for prompt to disappear before accepting new ones)
