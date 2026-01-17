@@ -45,3 +45,12 @@ def test_truncate_body_none():
 def test_truncate_body_empty():
     """Empty string returns empty string."""
     assert truncate_body("", verbose=False) == ""
+
+
+def test_truncate_body_trailing_newline():
+    """Trailing newline should not cause extra truncation."""
+    # 5 lines with trailing newline - should NOT be truncated
+    text = "line0\nline1\nline2\nline3\nline4\n"
+    result = truncate_body(text, verbose=False)
+    assert result == text  # unchanged
+    assert "[truncated]" not in result

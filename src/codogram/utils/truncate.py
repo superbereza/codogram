@@ -19,7 +19,7 @@ def truncate_body(text: str | None, verbose: bool) -> str | None:
     if verbose:
         return text
 
-    lines = text.split("\n")
+    lines = text.splitlines()
     if len(lines) <= MAX_LINES:
         return text
 
