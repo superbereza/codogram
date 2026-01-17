@@ -9,9 +9,9 @@ Show Claude's input suggestions in Telegram as clickable buttons.
 - Format: `❯ посмотри что залогировалось                    ↵ send`
 
 **What user sees in Telegram:**
-- ReplyKeyboardMarkup with suggestion text as button
+- Claude's response arrives with ReplyKeyboardMarkup (suggestion as button)
 - Click → text sent to Claude
-- After any message sent → keyboard removed
+- Keyboard auto-hides after use (one_time_keyboard)
 
 ## Parsing in screen.py
 
@@ -33,56 +33,79 @@ def parse_input_suggestion(output: str) -> str | None:
 - Match pattern: `❯\s*(.+?)\s*↵ send`
 - Exclude empty input (`❯` only)
 
-## Processing in permission_poller
+## SuggestionProvider Mediator
 
-**New state:**
+Bridge between Poller (producer) and Watcher (consumer). Suggestion is sent WITH Claude's response, not as separate message.
+
+**Class:**
 ```python
-suggestion_shown: bool = False
-last_suggestion: str | None = None
+class SuggestionProvider:
+    """Bridge between Poller (producer) and Watcher (consumer)."""
+
+    def __init__(self):
+        self._suggestions: dict[str, str] = {}  # key → suggestion
+        self._events: dict[str, asyncio.Event] = {}
+
+    def set_suggestion(self, chat_id: int, thread_id: int | None, suggestion: str | None):
+        """Called by Poller when suggestion found/cleared."""
+        key = f"{chat_id}:{thread_id}"
+        if suggestion:
+            self._suggestions[key] = suggestion
+            if key in self._events:
+                self._events[key].set()
+        else:
+            self._suggestions.pop(key, None)
+
+    async def wait_for_suggestion(self, chat_id: int, thread_id: int | None, timeout: float = 1.0) -> str | None:
+        """Called by Watcher before sending response."""
+        key = f"{chat_id}:{thread_id}"
+
+        if key in self._suggestions:
+            return self._suggestions.pop(key)
+
+        event = self._events.setdefault(key, asyncio.Event())
+        event.clear()
+        try:
+            await asyncio.wait_for(event.wait(), timeout)
+            return self._suggestions.pop(key, None)
+        except asyncio.TimeoutError:
+            return None
 ```
 
-**Logic:**
+## Processing in permission_poller
+
+**Logic (producer):**
 ```python
 suggestion = parse_input_suggestion(screen)
+suggestion_provider.set_suggestion(project.chat_id, thread_id, suggestion)
+```
 
-if suggestion and suggestion != last_suggestion:
-    # Show new suggestion
-    batch = OutgoingBatch(
-        chat_id=chat_id,
-        thread_id=thread_id,
-        messages=[{"text": "💡"}],
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text=suggestion)]],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        ),
+## Processing in watcher
+
+**Logic (consumer):**
+```python
+# Before sending response
+suggestion = await suggestion_provider.wait_for_suggestion(chat_id, thread_id, timeout=1.0)
+
+reply_markup = None
+if suggestion:
+    reply_markup = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=suggestion)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
     )
-    await telegram_queue.enqueue(batch)
-    suggestion_shown = True
-    last_suggestion = suggestion
 
-elif suggestion_shown and not suggestion:
-    # Suggestion gone (user typed something)
-    # Remove keyboard on next user message
-    suggestion_shown = False
-    last_suggestion = None
+batch = OutgoingBatch(
+    chat_id=chat_id,
+    thread_id=thread_id,
+    messages=[{"text": response}],
+    reply_markup=reply_markup,
+)
 ```
 
 ## Keyboard Removal
 
-When user sends any message to the thread:
-```python
-# In message handler
-if suggestion_shown_for_thread(thread_id):
-    await bot.send_message(
-        chat_id=chat_id,
-        message_thread_id=thread_id,
-        text="✓",  # or invisible character
-        reply_markup=ReplyKeyboardRemove(),
-    )
-```
-
-**Alternative:** Track in permission_poller — when input box has user text (not suggestion), send ReplyKeyboardRemove.
+Automatic via `one_time_keyboard=True` — keyboard hides after user clicks button or sends any message.
 
 ## Thread Independence
 
