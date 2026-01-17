@@ -295,7 +295,7 @@ class TestFormatMessage:
             cwd="/project"
         )
 
-        assert msg == "📎 ./tmp/input-files/main/test.png"
+        assert msg == "See file: ./tmp/input-files/main/test.png"
 
     def test_format_single_file_with_caption(self):
         from codogram.services.file_input import FileInputService
@@ -307,7 +307,7 @@ class TestFormatMessage:
             cwd="/project"
         )
 
-        assert msg == "Check this mockup\n\n📎 ./tmp/input-files/celestial/design.png"
+        assert msg == "Check this mockup\n\nSee file: ./tmp/input-files/celestial/design.png"
 
     def test_format_multiple_files(self):
         from codogram.services.file_input import FileInputService
@@ -322,5 +322,5 @@ class TestFormatMessage:
             cwd="/project"
         )
 
-        expected = "Review these\n\n📎 ./tmp/input-files/main/a.png\n📎 ./tmp/input-files/main/b.png"
+        expected = "Review these\n\nSee file: ./tmp/input-files/main/a.png\nSee file: ./tmp/input-files/main/b.png"
         assert msg == expected

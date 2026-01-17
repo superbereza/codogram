@@ -166,9 +166,9 @@ class FileInputService:
         for p in paths:
             try:
                 rel = p.relative_to(cwd_path)
-                path_lines.append(f"📎 ./{rel}")
+                path_lines.append(f"See file: ./{rel}")
             except ValueError:
-                path_lines.append(f"📎 {p}")
+                path_lines.append(f"See file: {p}")
 
         paths_str = "\n".join(path_lines)
 

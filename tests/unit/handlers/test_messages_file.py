@@ -59,7 +59,7 @@ class TestFileMessageHandler:
             mock_file_svc.save_file = AsyncMock(return_value=FileInputResult(
                 success=True, path=tmp_path / "test.jpg"
             ))
-            mock_file_svc.format_message.return_value = "Check this\n\n📎 ./test.jpg"
+            mock_file_svc.format_message.return_value = "Check this\n\nSee file: ./test.jpg"
 
             mock_router.send_to_tmux.return_value = True
 
@@ -98,7 +98,7 @@ class TestFileMessageHandler:
 
             telegram_queue.reply.assert_called_once()
             reply_text = telegram_queue.reply.call_args[0][1]
-            assert "video" in reply_text.lower() or "audio" in reply_text.lower()
+            assert "whisper" in reply_text.lower()
 
     @pytest.mark.asyncio
     async def test_audio_rejected(self):
@@ -210,7 +210,7 @@ class TestFileMessageHandler:
             # Should show error to user
             telegram_queue.reply.assert_called_once()
             reply_text = telegram_queue.reply.call_args[0][1]
-            assert "download failed" in reply_text.lower()
+            assert "download failed" in reply_text.lower() or "try again" in reply_text.lower()
 
     @pytest.mark.asyncio
     async def test_file_too_large_shows_message(self, tmp_path):

@@ -9,6 +9,7 @@ from ..services.file_input import FileInputService
 from ..session_manager import project_manager, ThreadInfo
 from ..telegram_queue import TelegramQueue
 from ..logging_config import logger
+from .. import strings
 from .create_flow import handle_name_input
 
 router = Router(name="messages")
@@ -19,9 +20,9 @@ _file_input = FileInputService()
 
 # Error messages for file operations
 _FILE_ERROR_MESSAGES = {
-    "too_large": "File too large (max 20MB)",
-    "download_failed": "Download failed, please try again",
-    "path_error": "Failed to save file",
+    "too_large": strings.FILE_TOO_LARGE,
+    "download_failed": strings.FILE_DOWNLOAD_FAILED,
+    "path_error": strings.FILE_DOWNLOAD_FAILED,
 }
 
 
@@ -35,9 +36,9 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
     text = message.text
     has_file = bool(message.photo or message.document)
 
-    # Block video/audio with friendly message
-    if message.video or message.audio or message.voice:
-        await telegram_queue.reply(message, "Video and audio not supported yet. Coming soon with Whisper!")
+    # Block video/audio
+    if message.video or message.video_note or message.audio or message.voice:
+        await telegram_queue.reply(message, strings.FILE_AUDIO_VIDEO_NOT_SUPPORTED)
         return
 
     # Skip empty messages (no text and no file)
@@ -114,7 +115,7 @@ async def _send_content(message: Message, result, telegram_queue: TelegramQueue)
     if message.photo or message.document:
         file_info = _file_input.extract_info(message)
         if not file_info:
-            await telegram_queue.reply(message, "File type not supported")
+            await telegram_queue.reply(message, strings.FILE_TYPE_NOT_SUPPORTED)
             return True  # Error shown, don't show "No active session"
 
         # Create download callback
