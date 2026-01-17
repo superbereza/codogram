@@ -511,7 +511,7 @@ Some previous output
 ────────────────────────────────────────
 """
     result = parse_thinking_status(output)
-    assert result == "· Wibbling… (/esc)"
+    assert result == "· Wibbling… (/esc to interrupt)"
 
 
 def test_parse_thinking_status_with_details():
@@ -521,14 +521,14 @@ def test_parse_thinking_status_with_details():
 ────────────────────────────────────────
 """
     result = parse_thinking_status(output)
-    assert result == "✶ Hatching… (/esc · 30s · ↓ 914 tokens · thinking)"
+    assert result == "✶ Hatching… (/esc to interrupt · 30s · ↓ 914 tokens · thinking)"
 
 
 def test_parse_thinking_status_esc():
     """Parse with esc instead of ctrl+c."""
     output = "· Thinking… (esc to interrupt · 5s)"
     result = parse_thinking_status(output)
-    assert result == "· Thinking… (/esc · 5s)"
+    assert result == "· Thinking… (/esc to interrupt · 5s)"
 
 
 def test_parse_thinking_status_cooked():
@@ -571,14 +571,14 @@ def parse_thinking_status(output: str) -> str | None:
     - ✻ Cooked for 35s
 
     Returns raw line with command injection:
-    - 'esc to interrupt' → '/esc'
-    - 'ctrl+c to interrupt' → '/esc'
+    - 'ctrl+c to interrupt' → '/esc to interrupt'
+    - 'esc to interrupt' → '/esc to interrupt'
     """
     for line in output.split("\n"):
         stripped = line.strip()
         if stripped and stripped[0] in THINKING_SPINNERS:
-            result = stripped.replace("esc to interrupt", "/esc")
-            result = result.replace("ctrl+c to interrupt", "/esc")
+            result = stripped.replace("ctrl+c to interrupt", "/esc to interrupt")
+            result = result.replace("esc to interrupt", "/esc to interrupt")
             return result
     return None
 ```
@@ -844,7 +844,7 @@ git commit -m "feat(poller): send suggestion as 💡 message with ReplyKeyboard"
 
 1. Start bot: `cd /home/superbereza/dev/codogram/.worktrees/show-thinking-status && ./dev-run.sh`
 2. Send message to Claude in Telegram
-3. Verify: thinking status message appears with spinner (e.g., "· Thinking… (/esc)")
+3. Verify: thinking status message appears with spinner (e.g., "· Thinking… (/esc to interrupt)")
 4. Verify: message updates every ~3 sec with new time/tokens
 5. Verify: message deleted when Claude responds
 

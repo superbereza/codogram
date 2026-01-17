@@ -56,20 +56,20 @@ def parse_thinking_status(output: str) -> str | None:
     - ✻ Cooked for 35s
 
     Returns raw line with command injection:
-    - 'esc to interrupt' → '/esc'
-    - 'ctrl+c to interrupt' → '/esc'
+    - 'ctrl+c to interrupt' → '/esc to interrupt'
+    - 'esc to interrupt' → '/esc to interrupt'
     """
     for line in output.split("\n"):
         stripped = line.strip()
         if stripped and stripped[0] in THINKING_SPINNERS:
-            result = stripped.replace("esc to interrupt", "/esc")
-            result = result.replace("ctrl+c to interrupt", "/esc")
+            result = stripped.replace("ctrl+c to interrupt", "/esc to interrupt")
+            result = result.replace("esc to interrupt", "/esc to interrupt")
             return result
     return None
 ```
 
 **Output examples:**
-- `✶ Wibbling… (/esc · 30s · ↓ 914 tokens · thinking)`
+- `✶ Wibbling… (/esc to interrupt · 30s · ↓ 914 tokens · thinking)`
 - `✻ Cooked for 35s`
 
 **Not part of ScreenState** — separate function like `parse_status_bar()`.
