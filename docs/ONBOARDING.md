@@ -53,7 +53,7 @@ codogram/
 │   ├── middleware/           # Admin check middleware
 │   ├── tmux.py               # Tmux session interaction
 │   └── screen.py             # Parse tmux screen content
-└── restart.sh                # Restart bot script
+└── stop-and-restart.sh       # Restart bot script
 ```
 
 ## Как дебажить
@@ -77,7 +77,7 @@ ps aux | grep codogram
 ### Перезапустить бота
 
 ```bash
-./restart.sh
+./stop-and-restart.sh
 ```
 
 ### Проверить конфиг
@@ -92,7 +92,7 @@ cat .config.json | jq
 
 1. Проверить запущен ли: `ps aux | grep codogram`
 2. Проверить логи: `tail -20 ~/dev/personal-agent/tmp/codogram-logs/poller-debug.log`
-3. Перезапустить: `./restart.sh`
+3. Перезапустить: `./stop-and-restart.sh`
 
 ### Permission prompts не появляются
 
@@ -116,7 +116,7 @@ source ~/dev/codogram/venv/bin/activate
 python -m pytest tests/ -v
 
 # Перезапустить бота
-./restart.sh
+./stop-and-restart.sh
 
 # Git log
 git log --oneline -10

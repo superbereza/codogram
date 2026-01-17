@@ -68,3 +68,26 @@ def test_permission_poller_no_cached_chat_id():
             assert "chat_id = project.chat_id" not in first_lines, \
                 "chat_id should not be cached at function start"
             break
+
+
+def test_permission_poller_uses_truncate_body():
+    """permission_poller.py should import and use truncate_body for verbose setting."""
+    import ast
+    from pathlib import Path
+
+    # Read source file
+    test_dir = Path(__file__).parent
+    source_file = test_dir.parent / "src" / "codogram" / "permission_poller.py"
+    source = source_file.read_text()
+
+    # Check import exists
+    assert "from .utils.truncate import truncate_body" in source, \
+        "permission_poller should import truncate_body"
+
+    # Check truncate_body is called
+    assert "truncate_body(" in source, \
+        "permission_poller should call truncate_body"
+
+    # Check verbose setting is read
+    assert "verbose" in source, \
+        "permission_poller should use verbose setting"

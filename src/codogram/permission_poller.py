@@ -19,6 +19,7 @@ from .logging_config import logger
 from .auto_accept import try_auto_accept
 from .config import settings
 from . import strings
+from .utils.truncate import truncate_body
 
 
 class PollerState(Enum):
@@ -327,11 +328,13 @@ async def permission_poller(
                 if elapsed >= debounce_time:
                     # Check auto-accept (read dynamically - may have changed since poller started)
                     auto_accept_enabled = thread.auto_accept if thread else project.auto_accept
+                    verbose_enabled = thread.verbose if thread else project.verbose
                     if auto_accept_enabled:
                         if await try_auto_accept(
                             parsed.options, parsed.body, tmux,
                             telegram_queue, project.chat_id, thread_id, context_name,
                             prompt_type=parsed.prompt_type,
+                            verbose=verbose_enabled,
                         ):
                             # Go to SHOWING to reuse existing dedup logic
                             # (wait for prompt to disappear before accepting new ones)
@@ -342,10 +345,14 @@ async def permission_poller(
                     logger.debug(f"{log_prefix} DEBOUNCING->SHOWING: sending to Telegram")
                     logger.debug(f"{log_prefix}: body preview: {parsed.body[:200]}...")
                     try:
+                        # Get verbose setting from context
+                        verbose_enabled = thread.verbose if thread else project.verbose
+                        display_body = truncate_body(parsed.body, verbose=verbose_enabled)
+
                         # Build batch of all messages (atomic send)
                         messages = []
-                        if parsed.body:
-                            body_text = SEPARATOR_SOLID + "\n" + parsed.body
+                        if display_body:
+                            body_text = SEPARATOR_SOLID + "\n" + display_body
                             messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                         # Options as text
@@ -415,10 +422,14 @@ async def permission_poller(
                             pass
                         permission_messages.pop(kb_msg_id, None)
 
+                    # Get verbose setting from context
+                    verbose_enabled = thread.verbose if thread else project.verbose
+                    display_body = truncate_body(parsed.body, verbose=verbose_enabled)
+
                     # Build new messages (atomic send)
                     messages = []
-                    if parsed.body:
-                        body_text = SEPARATOR_SOLID + "\n" + parsed.body
+                    if display_body:
+                        body_text = SEPARATOR_SOLID + "\n" + display_body
                         messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
                     options_text = "\n".join(parsed.options)

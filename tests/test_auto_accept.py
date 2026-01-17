@@ -108,3 +108,28 @@ async def test_try_auto_accept_skips_mcp_trust():
     assert result is False
     tmux.send_key.assert_not_called()
     queue.enqueue_nowait.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_try_auto_accept_truncates_in_short_mode():
+    """Body should be truncated when verbose=False."""
+    tmux = MagicMock()
+    queue = AsyncMock()
+
+    long_body = "\n".join([f"line{i}" for i in range(10)])
+
+    result = await try_auto_accept(
+        options=["1. Yes"],
+        body=long_body,
+        tmux=tmux,
+        telegram_queue=queue,
+        chat_id=123,
+        thread_id=None,
+        context_name="test",
+        verbose=False,
+    )
+
+    assert result is True
+    call_args = queue.enqueue_nowait.call_args[0][0]
+    sent_text = call_args.messages[0]["text"]
+    assert "[truncated]" in sent_text

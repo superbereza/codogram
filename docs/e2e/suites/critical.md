@@ -31,12 +31,14 @@
 | 22 | TC-SETTINGS-002 | /settings показывает session state | commands/settings.md |
 | 23 | TC-SETTINGS-005 | /shift_tab переключает mode | commands/settings.md |
 | 24 | TC-PERMISSIONS-010 | Message cancels permission prompt | commands/permissions.md |
+| 25 | TC-SETTINGS-008 | /settings новый формат с inline кнопками | commands/settings.md |
+| 26 | TC-SETTINGS-009 | /verbose toggle | commands/settings.md |
 
 ## Подготовка
 
 ```bash
 # Бот запущен
-./restart.sh
+./stop-and-restart.sh
 
 # Тестовый репозиторий существует
 cd /tmp/test-branch-repo && git status
@@ -47,4 +49,4 @@ cd /tmp/test-branch-repo && git status
 
 ## Критерий успеха
 
-Все 24 теста PASS = основной функционал работает, регрессий нет.
+Все 26 тестов PASS = основной функционал работает, регрессий нет.

@@ -60,7 +60,7 @@ cp .env.example .env
 ### Запусти
 
 ```bash
-./restart.sh
+./stop-and-restart.sh
 ```
 
 ### Используй
@@ -73,7 +73,7 @@ cp .env.example .env
 
 ```bash
 git pull
-./restart.sh
+./stop-and-restart.sh
 ```
 
 ## Команды
@@ -87,6 +87,8 @@ git pull
 | `/esc` | Отменить текущую операцию Claude (Ctrl+C) |
 | `/new` | Начать новую сессию Claude (очистить контекст) |
 | `/auto_accept` | Включить/выключить авто-подтверждение промптов |
+| `/shift_tab` | Переключить режим подтверждений Claude |
+| `/verbose` | Включить/выключить подробный вывод |
 | `/settings` | Показать текущие настройки |
 | `/help` | Список всех команд |
 

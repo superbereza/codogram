@@ -169,7 +169,7 @@
 Конфиг перенесён в `~/.codogram/` для избежания проблем с worktrees:
 - `pip install -e` из worktree больше не ломает main бота
 - Новый `dev-run.sh` для тестирования из worktrees (использует PYTHONPATH)
-- Защита в `restart.sh` от запуска из worktree
+- Защита в `stop-and-restart.sh` от запуска из worktree
 - См. [docs/designs/done/2026-01-07-worktree-safe-config.md](designs/done/2026-01-07-worktree-safe-config.md)
 
 ### Миграция группа → супергруппа
@@ -243,6 +243,16 @@
 - Защита от path traversal и лимит 20MB
 - См. [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
 
+### Verbose mode и улучшения /settings
+Per-thread/per-project toggle verbose output и UX настроек:
+- `/verbose` — toggle verbose output on/off (индикаторы ● on / ○ off)
+- `/settings` inline кнопки для быстрых переключений (/auto_accept, /verbose, /shift_tab, close)
+- Короткие hash ID в callback data (фикс для длинных имён tmux сессий)
+- Отображение mode с эмодзи: ⏵⏵ accept edits, ⏸ plan mode, default
+- Подсказка "(use /shift_tab to cycle)" в настройках
+- Кнопка close удаляет сообщение с настройками
+- См. [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
+
 ## In Progress
 
 ### Robust /start flow
@@ -263,13 +273,6 @@
 - Context-aware на основе содержимого сообщения
 - Быстрые follow-up действия
 
-### Упрощённый вывод и скрытые тулы
-Чистый вывод по умолчанию:
-- Не вываливать полный текст permission при auto-accept
-- Скрывать tool calls по умолчанию (TodoWrite, Read и т.д.)
-- Команда `/silent` для переключения видимости тулов
-- Фильтровать TOOL_USE, TOOL_RESULT, показывать только TEXT
-
 ### Activity indicators
 Отображение что Claude думает/работает:
 - Индикатор генерации над input box в tmux
@@ -289,6 +292,11 @@
 - Прояснить терминологию thread/branch/topic
 - Понятные названия в меню
 - Консистентное именование во всех командах
+
+### Reply support
+При реплае на сообщение отправлять контекст в tmux:
+- Цитировать кусочек сообщения на которое ответили
+- Формат: `> цитата\n\nтекст ответа`
 
 ### Ролевая модель и регистрация чата
 Минимальная система прав для многопользовательского доступа:
@@ -318,14 +326,11 @@
 - Простое восстановление если что-то сломалось
 - Нужен R&D по лучшему подходу
 
-### Очередь сообщений до готовности сессии
-Кэширование сообщений пользователя пока сессия привязывается:
-- После `/start` или `/branch` привязка сессии занимает ~1-2 минуты
-- В это окно сообщения уходят в tmux, но ответы не приходят в Telegram
-- Решение: кэшировать сообщения пока `awaiting_new_session=True`
-- Отправить все накопленные когда сессия привяжется
-- Показывать "⏳ Подключение..." пользователю
-- См. баг: [2026-01-07-session-not-immediately-active.md](bugs/active/2026-01-07-session-not-immediately-active.md)
+### Скрытые tool calls
+Скрывать internal tool calls по умолчанию:
+- Скрывать tool calls (TodoWrite, Read и т.д.) из вывода
+- Команда `/silent` для переключения видимости тулов
+- Фильтровать TOOL_USE, TOOL_RESULT, показывать только TEXT
 
 ### Tool visibility R&D
 Исследование и улучшение отображения тулов:
@@ -348,10 +353,14 @@
 - Отправить текст ошибки юзеру: "⚠️ Claude ошибка: <текст>. Разберись и /start"
 - Детектить появление shell prompt после активного Claude
 
-### Reply support
-При реплае на сообщение отправлять контекст в tmux:
-- Цитировать кусочек сообщения на которое ответили
-- Формат: `> цитата\n\nтекст ответа`
+### Очередь сообщений до готовности сессии
+Кэширование сообщений пользователя пока сессия привязывается:
+- После `/start` или `/branch` привязка сессии занимает ~1-2 минуты
+- В это окно сообщения уходят в tmux, но ответы не приходят в Telegram
+- Решение: кэшировать сообщения пока `awaiting_new_session=True`
+- Отправить все накопленные когда сессия привяжется
+- Показывать "⏳ Подключение..." пользователю
+- См. баг: [2026-01-07-session-not-immediately-active.md](bugs/active/2026-01-07-session-not-immediately-active.md)
 
 ---
 

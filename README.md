@@ -60,7 +60,7 @@ cp .env.example .env
 ### Run
 
 ```bash
-./restart.sh
+./stop-and-restart.sh
 ```
 
 ### Use
@@ -73,7 +73,7 @@ cp .env.example .env
 
 ```bash
 git pull
-./restart.sh
+./stop-and-restart.sh
 ```
 
 ## Commands
@@ -87,6 +87,8 @@ git pull
 | `/esc` | Cancel current Claude operation (Ctrl+C) |
 | `/new` | Start new Claude session (clear context) |
 | `/auto_accept` | Toggle auto-accept for permission prompts |
+| `/shift_tab` | Cycle Claude approval mode |
+| `/verbose` | Toggle verbose output |
 | `/settings` | View current settings |
 | `/help` | List all commands |
 

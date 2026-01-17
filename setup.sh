@@ -628,7 +628,7 @@ echo -e "${NC}"
 
 echo ""
 echo "To start the bot:"
-echo -e "  ${YELLOW}./restart.sh${NC}"
+echo -e "  ${YELLOW}./stop-and-restart.sh${NC}"
 echo ""
 echo "Then in Telegram:"
 echo "  1. Open chat with your bot (or create a group with it)"

@@ -126,7 +126,7 @@ tmux has-session -t claude-codogram-testing-area-main
 **Steps:**
 ```bash
 # 1. Restart bot
-./restart.sh
+./stop-and-restart.sh
 
 # Wait 5s for bot to start
 ```
@@ -143,3 +143,61 @@ mcp__telegram__list_messages(chat_id=-1003356094635, limit=10)
 **Expected:**
 - UI: Tool call output appears after bot restart
 - State: Watcher restarted by first user message
+
+---
+
+## TC-WATCHER-006: Tool call truncated in short mode (verbose=off)
+
+**Tags:** full, watcher, verbose
+**Preconditions:** verbose=off (default), active session
+
+**Setup:**
+```python
+# Ensure verbose is off
+mcp__telegram__send_message(chat_id=-1003356094635, message="/settings")
+# Wait 2s - verify "verbose: ○ off"
+```
+
+**Steps:**
+```python
+# Trigger tool call with long output (e.g., Bash with multiline command)
+mcp__telegram__send_message(chat_id=-1003356094635, message="Run: for i in {1..20}; do echo line$i; done")
+# Wait 30s for tool call to appear
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=5)
+```
+
+**Expected:**
+- UI: Tool call body shows max 5 lines + `[truncated]` indicator
+- State: verbose=false in config
+
+---
+
+## TC-WATCHER-007: Tool call full in verbose mode (verbose=on)
+
+**Tags:** full, watcher, verbose
+**Preconditions:** verbose=on enabled, active session
+
+**Setup:**
+```python
+# Enable verbose
+mcp__telegram__send_message(chat_id=-1003356094635, message="/verbose")
+# Wait 2s - verify "Verbose output: ● on"
+```
+
+**Steps:**
+```python
+# Trigger tool call with long output
+mcp__telegram__send_message(chat_id=-1003356094635, message="Run: for i in {1..20}; do echo line$i; done")
+# Wait 30s for tool call to appear
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=5)
+```
+
+**Expected:**
+- UI: Tool call body shows ALL lines (no truncation, no `[truncated]`)
+- State: verbose=true in config
+
+**Cleanup:**
+```python
+# Disable verbose
+mcp__telegram__send_message(chat_id=-1003356094635, message="/verbose")
+```

@@ -17,8 +17,8 @@ def test_basic_commands_order():
     """Basic commands follow the defined order."""
     commands = [c.command for c in BASIC_COMMANDS]
     assert commands == [
-        "esc", "auto_accept", "thread", "clear",
-        "start", "settings", "shift_tab", "restart", "get_debug_ids", "help"
+        "esc", "auto_accept", "shift_tab", "thread", "clear",
+        "start", "settings", "restart", "get_debug_ids", "help"
     ]
 
 
@@ -26,8 +26,8 @@ def test_forum_commands_order():
     """Forum commands follow the defined order with branch/finish."""
     commands = [c.command for c in FORUM_COMMANDS]
     assert commands == [
-        "esc", "auto_accept", "thread", "branch", "clear", "finish",
-        "start", "settings", "shift_tab", "restart", "get_debug_ids", "help"
+        "esc", "auto_accept", "shift_tab", "thread", "branch", "clear", "finish",
+        "start", "settings", "restart", "get_debug_ids", "help"
     ]
 
 

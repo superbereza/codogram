@@ -6,6 +6,7 @@ from .screen import PromptType
 from .telegram_queue import OutgoingBatch
 from .tmux import TmuxSession
 from .logging_config import logger
+from .utils.truncate import truncate_body
 
 if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
@@ -49,6 +50,7 @@ async def try_auto_accept(
     thread_id: int | None,
     context_name: str,
     prompt_type: PromptType = PromptType.REGULAR,
+    verbose: bool = False,
 ) -> bool:
     """Try to auto-accept a permission prompt.
 
@@ -63,7 +65,7 @@ async def try_auto_accept(
     if selected is None:
         return False
 
-    body_text = body if body else "[no details]"
+    body_text = truncate_body(body, verbose=verbose) if body else "[no details]"
     logger.info(f"auto_accept {context_name} option={selected}")
 
     batch = OutgoingBatch(

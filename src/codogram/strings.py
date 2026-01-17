@@ -256,7 +256,8 @@ FINISH_WORKTREE_CLEANUP_FAILED = f"\n{STATUS_WARN} Worktree cleanup failed: {{er
 
 FINISH_DISCARDED_ARCHIVED = f"{STATUS_OK} Branch `{{branch}}` discarded and archived"
 FINISH_ARCHIVED_KEPT = f"""{STATUS_OK} Branch `{{branch}}` archived
-Worktree kept for potential resume"""
+Worktree kept for potential resume
+Use /start to resume"""
 
 FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
 

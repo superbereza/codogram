@@ -356,3 +356,51 @@ def test_thread_has_valid_worktree():
     with tempfile.TemporaryDirectory() as tmpdir:
         thread.worktree_path = tmpdir
         assert thread.has_valid_worktree() is True
+
+
+def test_thread_info_verbose_default():
+    """ThreadInfo.verbose defaults to False (short mode)."""
+    from codogram.session_manager import ThreadInfo
+    thread = ThreadInfo(thread_id=None, name="main")
+    assert thread.verbose is False
+
+
+def test_project_state_verbose_default():
+    """ProjectState.verbose defaults to False (short mode)."""
+    from codogram.session_manager import ProjectState
+    project = ProjectState(project_name="test")
+    assert project.verbose is False
+
+
+def test_verbose_persisted_in_config(tmp_path, monkeypatch):
+    """verbose field should be saved and loaded from config."""
+    import json
+    from codogram.session_manager import ProjectManager
+    from codogram import config
+
+    # Use temp config
+    test_config = tmp_path / "config.json"
+    monkeypatch.setattr(config, "CONFIG_PATH", test_config)
+    monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
+
+    # Create manager and set verbose
+    manager = ProjectManager()
+    project = manager.get_or_create("test-project")
+    project.chat_id = 123
+    project.cwd = "/tmp/test"
+    thread = project.get_or_create_thread(None, "main")
+    thread.verbose = True
+    project.verbose = True
+    manager._save()
+
+    # Reload and check saved data
+    saved = json.loads(test_config.read_text())
+    assert saved["projects"]["test-project"]["verbose"] is True
+    assert saved["projects"]["test-project"]["threads"]["null"]["verbose"] is True
+
+    # Create new manager (simulates restart) and check loaded values
+    manager2 = ProjectManager()
+    project2 = manager2.projects.get("test-project")
+    assert project2.verbose is True
+    thread2 = project2.get_thread(None)
+    assert thread2.verbose is True

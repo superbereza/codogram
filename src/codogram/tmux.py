@@ -170,6 +170,9 @@ class TmuxSession:
                 ["tmux", "new-session", "-d", "-s", self.name, "-c", self.cwd],
                 check=True
             )
+            # Wait for shell to initialize (zsh config, oh-my-zsh, etc.)
+            # Without this, first character of next command may be lost
+            time.sleep(0.5)
 
     def attach_command(self) -> str:
         return f"tmux attach -t {self.name}"

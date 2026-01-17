@@ -100,7 +100,7 @@ ADMIN_IDS=123456789,987654321
 source venv/bin/activate
 
 # Запусти бота
-./restart.sh
+./stop-and-restart.sh
 ```
 
 ### Автозапуск (Linux systemd)
@@ -175,7 +175,7 @@ launchctl list | grep codogram
 
 Codogram работает без настройки Claude:
 
-1. Запусти бота: `./restart.sh`
+1. Запусти бота: `./stop-and-restart.sh`
 2. Открой tmux и запусти Claude Code в проекте
 3. Отправь `/start` в Telegram
 4. Готово!
@@ -221,7 +221,7 @@ ps aux | grep codogram
 tail -20 logs/codogram.log
 
 # Перезапусти
-./restart.sh
+./stop-and-restart.sh
 ```
 
 ### Permission prompts не появляются

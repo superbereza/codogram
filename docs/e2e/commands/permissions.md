@@ -304,3 +304,129 @@ mcp__telegram__list_messages(chat_id=-1003356094635, limit=5)
 # Check tmux - should show new message in prompt area, NOT tool execution
 tmux capture-pane -t claude-codogram-testing-area -p | grep "This is a new instruction"
 ```
+
+---
+
+## TC-PERMISSIONS-011: Permission body truncated in short mode (verbose=off)
+
+**Tags:** full, permissions, verbose
+**Preconditions:** verbose=off (default), permission prompt with long body
+
+**Setup:**
+```python
+# Ensure verbose is off
+mcp__telegram__send_message(chat_id=-1003356094635, message="/settings")
+# Wait 2s - verify "verbose: ○ off"
+```
+
+**Steps:**
+```python
+# Trigger permission that produces long body (e.g., edit with many lines)
+mcp__telegram__send_message(chat_id=-1003356094635, message="Edit /tmp/testfile.txt and add 20 lines of text")
+# Wait 15s for permission prompt
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=5)
+```
+
+**Expected:**
+- UI: Permission body shows max 5 lines + `[truncated]` indicator
+- State: Full body visible in tmux, truncated only in Telegram
+
+---
+
+## TC-PERMISSIONS-012: Permission body full in verbose mode (verbose=on)
+
+**Tags:** full, permissions, verbose
+**Preconditions:** verbose=on enabled
+
+**Setup:**
+```python
+# Enable verbose
+mcp__telegram__send_message(chat_id=-1003356094635, message="/verbose")
+# Wait 2s - verify "Verbose output: ● on"
+```
+
+**Steps:**
+```python
+# Trigger permission that produces long body
+mcp__telegram__send_message(chat_id=-1003356094635, message="Edit /tmp/testfile.txt and add 20 lines of text")
+# Wait 15s for permission prompt
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=5)
+```
+
+**Expected:**
+- UI: Permission body shows ALL lines (no truncation, no `[truncated]`)
+- State: verbose=true in config
+
+**Cleanup:**
+```python
+# Disable verbose
+mcp__telegram__send_message(chat_id=-1003356094635, message="/verbose")
+```
+
+---
+
+## TC-PERMISSIONS-013: Auto-accept message truncated in short mode (verbose=off)
+
+**Tags:** full, permissions, verbose, auto_accept
+**Preconditions:** auto_accept=on, verbose=off (default)
+
+**Setup:**
+```python
+# Enable auto_accept, ensure verbose is off
+mcp__telegram__send_message(chat_id=-1003356094635, message="/auto_accept")
+# Wait 2s - verify "Auto-accept: ● on"
+mcp__telegram__send_message(chat_id=-1003356094635, message="/settings")
+# Wait 2s - verify "verbose: ○ off"
+```
+
+**Steps:**
+```python
+# Trigger permission that will be auto-accepted with long body
+mcp__telegram__send_message(chat_id=-1003356094635, message="Edit /tmp/testfile.txt and add 20 lines")
+# Wait 15s for auto-accept message
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=5)
+```
+
+**Expected:**
+- UI: Auto-accept confirmation shows body with max 5 lines + `[truncated]`
+- State: Permission auto-accepted, tool executed
+
+**Cleanup:**
+```python
+# Disable auto_accept
+mcp__telegram__send_message(chat_id=-1003356094635, message="/auto_accept")
+```
+
+---
+
+## TC-PERMISSIONS-014: Auto-accept message full in verbose mode (verbose=on)
+
+**Tags:** full, permissions, verbose, auto_accept
+**Preconditions:** auto_accept=on, verbose=on
+
+**Setup:**
+```python
+# Enable both auto_accept and verbose
+mcp__telegram__send_message(chat_id=-1003356094635, message="/auto_accept")
+# Wait 2s
+mcp__telegram__send_message(chat_id=-1003356094635, message="/verbose")
+# Wait 2s - verify both are on
+```
+
+**Steps:**
+```python
+# Trigger permission that will be auto-accepted with long body
+mcp__telegram__send_message(chat_id=-1003356094635, message="Edit /tmp/testfile.txt and add 20 lines")
+# Wait 15s for auto-accept message
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=5)
+```
+
+**Expected:**
+- UI: Auto-accept confirmation shows full body (no truncation, no `[truncated]`)
+- State: Permission auto-accepted, tool executed
+
+**Cleanup:**
+```python
+# Disable both
+mcp__telegram__send_message(chat_id=-1003356094635, message="/auto_accept")
+mcp__telegram__send_message(chat_id=-1003356094635, message="/verbose")
