@@ -125,6 +125,14 @@ TOPIC_CREATE_ERROR = "Error creating topic: {error}"
 TOPIC_DELETE_ERROR = "Error deleting topic: {error}"
 
 
+# --- File input ---
+
+FILE_AUDIO_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video and audio not supported yet. Coming soon with Whisper!"
+FILE_TYPE_NOT_SUPPORTED = "This file type is not supported"
+FILE_TOO_LARGE = "File too large. Max 20MB"
+FILE_DOWNLOAD_FAILED = "Download failed. Try again"
+
+
 # --- Resume (deprecated) ---
 
 RESUME_NOT_SUPPORTED_MULTI = f"{STATUS_WARN} /resume not supported in multi-session mode.\nUse /thread_create for a new thread."

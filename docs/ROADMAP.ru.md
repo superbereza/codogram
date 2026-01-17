@@ -234,6 +234,15 @@
 `gh repo create --push` падал на пустом репо с ошибкой "no commits found".
 - Добавлен `git commit --allow-empty -m "Initial commit"` перед `gh repo create --push`
 
+### Отправка картинок и файлов
+Отправка картинок и файлов из Telegram в Claude:
+- Фото сохраняются в `tmp/input-files/{thread}/` с таймстемпом в имени
+- Документы (PDF, txt, md и др.) с whitelist расширений
+- Формат: `See file: ./path/to/file` для чтения Claude
+- Видео/аудио/голосовые отклоняются с "Coming soon with Whisper"
+- Защита от path traversal и лимит 20MB
+- См. [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
+
 ## In Progress
 
 ### Robust /start flow
@@ -247,12 +256,6 @@
 - **sanitize_project_name с unidecode** — "Мой Проект 🚀" → `moj-proekt`
 - **Анонс команд по типу чата** — после успешного запуска показываем доступные команды
 - См. docs/designs/2026-01-17-robust-start-flow.md (planned)
-
-### Отправка картинок и файлов
-Поддержка отправки картинок и файлов от админа в Claude:
-- Сохранять в temp/project folder
-- Отправлять путь к файлу в tmux
-- Возможно: inline images через base64
 
 ### Inline suggests к сообщениям Claude
 Кнопки-саджесты прикреплённые к ответам Claude:
