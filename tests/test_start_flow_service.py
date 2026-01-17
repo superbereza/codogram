@@ -842,3 +842,42 @@ class TestHandleRestartConfirm:
         result = service.handle_cancel()
 
         assert result.action == FlowAction.CANCELLED
+
+
+class TestIsSetupPhase:
+    """Tests for is_setup_phase() function."""
+
+    def test_is_setup_phase_no_threads(self):
+        """No threads at all -> True."""
+        from codogram.services.start_flow import is_setup_phase
+        from codogram.session_manager import ProjectState
+
+        project = ProjectState(project_name="test")
+        assert is_setup_phase(project) is True
+
+    def test_is_setup_phase_main_thread_no_session(self):
+        """Main thread exists but no session_id -> True."""
+        from codogram.services.start_flow import is_setup_phase
+        from codogram.session_manager import ProjectState, ThreadInfo
+
+        project = ProjectState(project_name="test")
+        project.threads[None] = ThreadInfo(thread_id=None, name="main")
+        assert is_setup_phase(project) is True
+
+    def test_is_setup_phase_main_thread_with_session(self):
+        """Main thread has session_id -> False."""
+        from codogram.services.start_flow import is_setup_phase
+        from codogram.session_manager import ProjectState, ThreadInfo
+
+        project = ProjectState(project_name="test")
+        project.threads[None] = ThreadInfo(thread_id=None, name="main", session_id="abc123")
+        assert is_setup_phase(project) is False
+
+    def test_is_setup_phase_legacy_session_id(self):
+        """Legacy projects have session_id on project, not thread."""
+        from codogram.services.start_flow import is_setup_phase
+        from codogram.session_manager import ProjectState
+
+        project = ProjectState(project_name="test")
+        project.session_id = "legacy-session"
+        assert is_setup_phase(project) is False

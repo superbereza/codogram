@@ -16,7 +16,25 @@ from ..session_manager import ThreadInfo
 from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention, TmuxSession, kill_tmux_session
 
 if TYPE_CHECKING:
-    from ..session_manager import ProjectManager
+    from ..session_manager import ProjectManager, ProjectState
+
+
+def is_setup_phase(project: "ProjectState") -> bool:
+    """Check if project is in setup phase (Claude never ran).
+
+    Returns True if no session ever started in main thread.
+    Handles legacy projects that have session_id on project instead of thread.
+    """
+    # Check new threads structure
+    main_thread = project.threads.get(None)
+    if main_thread and main_thread.session_id:
+        return False
+
+    # Fallback: legacy session_id field
+    if project.session_id:
+        return False
+
+    return True
 
 
 class FlowAction(Enum):
