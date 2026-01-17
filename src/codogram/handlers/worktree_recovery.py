@@ -6,6 +6,7 @@ from pathlib import Path
 from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery
 
+from codogram import strings
 from codogram.services.branch import archive_thread, create_worktree, create_branch_with_worktree
 from codogram.session_manager import ProjectManager
 from codogram.telegram_queue import TelegramQueue
@@ -35,17 +36,17 @@ class WorktreeRecoveryHandler:
         thread_id = _parse_thread_id(callback.data)
         if thread_id is None:
             logger.warning("Malformed callback data: %s", callback.data)
-            await callback.message.edit_text("`[x]` Invalid callback data")
+            await self.queue.edit(callback.message, strings.ERR_INVALID_CALLBACK)
             return
 
         project = self.project_manager.get_by_chat(callback.message.chat.id)
         if not project:
-            await callback.message.edit_text("`[x]` Project not found")
+            await self.queue.edit(callback.message, strings.ERR_PROJECT_NOT_FOUND)
             return
 
         thread = project.get_thread(thread_id)
         if not thread:
-            await callback.message.edit_text("`[x]` Thread not found")
+            await self.queue.edit(callback.message, strings.ERR_THREAD_NOT_FOUND)
             return
         success, path = create_worktree(Path(project.cwd), thread.name)
 
@@ -55,12 +56,8 @@ class WorktreeRecoveryHandler:
             await callback.message.delete()
             await self._start_claude_session(callback.message, thread)
         else:
-            await callback.message.edit_text(
-                f"`[x]` Failed to recreate worktree: {path}\n\n"
-                "What to do:\n"
-                "* /finish \u2014 archive this topic\n"
-                "* /thread \u2014 create new topic in main\n"
-                "* /branch \u2014 create new worktree branch"
+            await self.queue.edit(
+                callback.message, strings.WORKTREE_RECREATE_FAILED.format(path=path)
             )
 
     async def handle_wr_create(self, callback: CallbackQuery) -> None:
@@ -69,17 +66,17 @@ class WorktreeRecoveryHandler:
         thread_id = _parse_thread_id(callback.data)
         if thread_id is None:
             logger.warning("Malformed callback data: %s", callback.data)
-            await callback.message.edit_text("`[x]` Invalid callback data")
+            await self.queue.edit(callback.message, strings.ERR_INVALID_CALLBACK)
             return
 
         project = self.project_manager.get_by_chat(callback.message.chat.id)
         if not project:
-            await callback.message.edit_text("`[x]` Project not found")
+            await self.queue.edit(callback.message, strings.ERR_PROJECT_NOT_FOUND)
             return
 
         thread = project.get_thread(thread_id)
         if not thread:
-            await callback.message.edit_text("`[x]` Thread not found")
+            await self.queue.edit(callback.message, strings.ERR_THREAD_NOT_FOUND)
             return
         success, path = create_branch_with_worktree(Path(project.cwd), thread.name)
 
@@ -89,12 +86,8 @@ class WorktreeRecoveryHandler:
             await callback.message.delete()
             await self._start_claude_session(callback.message, thread)
         else:
-            await callback.message.edit_text(
-                f"`[x]` Failed to create branch: {path}\n\n"
-                "What to do:\n"
-                "* /finish \u2014 archive this topic\n"
-                "* /thread \u2014 create new topic in main\n"
-                "* /branch \u2014 create new worktree branch"
+            await self.queue.edit(
+                callback.message, strings.WORKTREE_BRANCH_CREATE_FAILED.format(path=path)
             )
 
     async def handle_wr_main(self, callback: CallbackQuery) -> None:
@@ -103,23 +96,20 @@ class WorktreeRecoveryHandler:
         thread_id = _parse_thread_id(callback.data)
         if thread_id is None:
             logger.warning("Malformed callback data: %s", callback.data)
-            await callback.message.edit_text("`[x]` Invalid callback data")
+            await self.queue.edit(callback.message, strings.ERR_INVALID_CALLBACK)
             return
 
         project = self.project_manager.get_by_chat(callback.message.chat.id)
         if not project:
-            await callback.message.edit_text("`[x]` Project not found")
+            await self.queue.edit(callback.message, strings.ERR_PROJECT_NOT_FOUND)
             return
 
         thread = project.get_thread(thread_id)
         if not thread:
-            await callback.message.edit_text("`[x]` Thread not found")
+            await self.queue.edit(callback.message, strings.ERR_THREAD_NOT_FOUND)
             return
         await archive_thread(self.bot, callback.message.chat.id, project, thread)
-        await callback.message.edit_text(
-            "`[v]` Topic archived\n\n"
-            "Use General or /thread for new session."
-        )
+        await self.queue.edit(callback.message, strings.WORKTREE_TOPIC_ARCHIVED)
 
     async def handle_wr_cancel(self, callback: CallbackQuery) -> None:
         """Cancel recovery - just delete message."""

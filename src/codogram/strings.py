@@ -151,3 +151,28 @@ BTN_CANCEL_X = "[x] Cancel"
 BTN_CREATE = "Create"
 BTN_DIFFERENT_PATH = "Different path"
 BTN_NO_GIT = "No git"
+
+
+# --- Worktree Recovery ---
+
+ERR_INVALID_CALLBACK = f"{STATUS_ERR} Invalid callback data"
+ERR_PROJECT_NOT_FOUND = f"{STATUS_ERR} Project not found"
+ERR_THREAD_NOT_FOUND = f"{STATUS_ERR} Thread not found"
+
+WORKTREE_RECREATE_FAILED = f"""{STATUS_ERR} Failed to recreate worktree: {{path}}
+
+What to do:
+* /finish — archive this topic
+* /thread — create new topic in main
+* /branch — create new worktree branch"""
+
+WORKTREE_BRANCH_CREATE_FAILED = f"""{STATUS_ERR} Failed to create branch: {{path}}
+
+What to do:
+* /finish — archive this topic
+* /thread — create new topic in main
+* /branch — create new worktree branch"""
+
+WORKTREE_TOPIC_ARCHIVED = f"""{STATUS_OK} Topic archived
+
+Use General or /thread for new session."""
