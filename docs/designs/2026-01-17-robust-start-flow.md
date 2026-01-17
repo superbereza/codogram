@@ -288,19 +288,294 @@ To see Claude's UI, run in terminal:
 
 ## Чеклист
 
+**Validators & Sanitization:**
 - [ ] Добавить unidecode в `sanitize_project_name`
-- [ ] Добавить `validate_git_url()` с проверкой wiki/blob/gist/format (использует константы)
-- [ ] Retry flow при невалидном URL (остаёмся в FSM state)
+- [ ] Добавить `validate_git_url()` с точными GitHub паттернами (см. Note 4)
+
+**Clone & Cleanup:**
+- [ ] `git_clone()` cleanup при ошибке (см. Note 1)
 - [ ] Атомарность: project entry после успешного clone/init
-- [ ] Cleanup при ошибке: удаление директории
-- [ ] `require_project_ready()` helper
-- [ ] Применить helper в /clear, /new, /esc, /thread, /branch, /finish
-- [ ] `is_setup_phase()` helper для определения broken state
-- [ ] /reset_all команда с multi-step flow:
-  - [ ] Setup phase → сразу чистим
-  - [ ] Рабочий проект → подтверждение + выбор директории
-  - [ ] Проверка uncommitted changes
-  - [ ] Go back на каждом шаге
+
+**FSM & Retry:**
+- [ ] `FlowAction.ASK_CLONE_URL_RETRY` для retry без очистки state (см. Note 2)
+
+**Concurrency:**
+- [ ] File locking в `ProjectManager._save()` (см. Note 3)
+
+**Project Ready Checks:**
+- [ ] `require_tmux_exists()` для /clear, /esc
+- [ ] `require_claude_ready()` для /new, /thread, /branch, /finish
+- [ ] (см. Note 8 для mapping)
+
+**Setup Phase & Legacy:**
+- [ ] `is_setup_phase()` с fallback на legacy fields (см. Note 5)
+
+**/reset_all Command:**
+- [ ] Multi-step flow с go back
+- [ ] Project-level scope (не topic-level) (см. Note 6)
+- [ ] Uncommitted changes detection (см. Note 7)
+- [ ] Worktree cleanup (см. Note 9)
+- [ ] Отдельное сообщение если вызвано из topic
+
+**Announcement:**
 - [ ] Анонс команд после успешного запуска (по типу чата)
+
+**Strings & Keyboards:**
 - [ ] Константы в strings.py (URL validation, reset flow, buttons)
+- [ ] `keyboards/reset.py` для reset flow
+
+**Testing:**
 - [ ] E2E тесты для error cases
+- [ ] E2E тесты для concurrent /start
+- [ ] E2E тесты для legacy project migration
+
+## Implementation Notes
+
+### 1. git_clone() cleanup при ошибке
+
+**Проблема:** `project_launcher.git_clone()` не чистит директорию при ошибке.
+
+**Решение:** Обновить `git_clone()` для cleanup:
+
+```python
+def git_clone(path: str, repo_url: str) -> LaunchResult:
+    """Clone repository into path. Cleans up on failure."""
+    target = Path(path)
+    try:
+        parent = str(target.parent)
+        name = target.name
+        result = subprocess.run(
+            ["git", "clone", repo_url, name],
+            cwd=parent,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            # Cleanup partial clone
+            if target.exists():
+                shutil.rmtree(target, ignore_errors=True)
+            return LaunchResult(success=False, error=f"git clone error: {result.stderr}")
+        return LaunchResult(success=True)
+    except Exception as e:
+        # Cleanup on exception
+        if target.exists():
+            shutil.rmtree(target, ignore_errors=True)
+        return LaunchResult(success=False, error=str(e))
+```
+
+### 2. FSM retry для невалидного URL
+
+**Проблема:** `FlowAction.ERROR` очищает FSM state, retry невозможен.
+
+**Решение:** Новый action `ASK_CLONE_URL_RETRY` который показывает ошибку + prompt:
+
+```python
+class FlowAction(Enum):
+    # ... existing
+    ASK_CLONE_URL = "ask_clone_url"
+    ASK_CLONE_URL_RETRY = "ask_clone_url_retry"  # NEW: shows error + re-prompt
+```
+
+В `handle_clone_url()`:
+```python
+is_valid, error_msg = validate_git_url(url)
+if not is_valid:
+    return FlowResult(
+        action=FlowAction.ASK_CLONE_URL_RETRY,
+        error=error_msg,
+        project=project,
+        path=path,
+    )
+```
+
+В handler:
+```python
+case FlowAction.ASK_CLONE_URL_RETRY:
+    # НЕ очищаем state - остаёмся в awaiting_clone_url
+    await telegram_queue.reply(
+        message,
+        f"{result.error}\n\n{strings.START_CLONE_URL_PROMPT}",
+    )
+```
+
+### 3. Concurrency: ProjectManager._save()
+
+**Проблема:** `_save()` не thread-safe при параллельных /start.
+
+**Решение:** File locking через `fcntl` (Linux) или `portalocker`:
+
+```python
+import fcntl
+
+def _save(self) -> None:
+    """Persist to disk with file locking."""
+    config_path = get_config_path()
+
+    with open(config_path, "r+") as f:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            # Read current state
+            current = json.load(f)
+            # Update projects
+            current["projects"] = self._serialize_projects()
+            # Write back
+            f.seek(0)
+            f.truncate()
+            json.dump(current, f, indent=2)
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+```
+
+**Альтернатива:** Использовать `filelock` library для кросс-платформенности.
+
+### 4. URL validation: /blob/ edge case
+
+**Проблема:** `/blob/` может быть легитимным именем папки в репозитории.
+
+**Решение:** Проверяем паттерн GitHub URL более точно:
+
+```python
+def validate_git_url(url: str) -> tuple[bool, str | None]:
+    # GitHub-specific patterns
+    github_blob_pattern = re.compile(r'github\.com/[^/]+/[^/]+/blob/')
+    github_tree_pattern = re.compile(r'github\.com/[^/]+/[^/]+/tree/')
+
+    if "/wiki/" in url and "github.com" in url:
+        return False, strings.GIT_URL_INVALID_WIKI
+    if github_blob_pattern.search(url):
+        return False, strings.GIT_URL_INVALID_BLOB
+    if github_tree_pattern.search(url):
+        return False, strings.GIT_URL_INVALID_BLOB
+    if "gist.github.com" in url:
+        return False, strings.GIT_URL_INVALID_GIST
+    if not url.startswith(("https://", "git@", "ssh://")):
+        return False, strings.GIT_URL_INVALID_FORMAT
+    return True, None
+```
+
+### 5. is_setup_phase(): legacy projects
+
+**Проблема:** Legacy проекты могут не иметь `threads[None]`, но иметь `project.session_id`.
+
+**Решение:** Fallback на legacy fields:
+
+```python
+def is_setup_phase(project: Project) -> bool:
+    """True if Claude never ran. Handles legacy projects."""
+    # Check new threads structure
+    main_thread = project.threads.get(None)
+    if main_thread and main_thread.session_id:
+        return False
+
+    # Fallback: legacy session_id field
+    if project.session_id:
+        return False
+
+    return True
+```
+
+### 6. /reset_all scope: project vs topic
+
+**Уточнение:** `/reset_all` ресетит ВЕСЬ проект, не отдельный topic.
+
+- В main chat: ресетит проект + все topics
+- В topic: ресетит весь проект (не только этот topic)
+- Для удаления отдельного topic: используй `/finish`
+
+**Сообщение если вызвано из topic:**
+```
+`[?]` Reset entire project `{name}`?
+
+This will disconnect Claude in all topics and clear settings.
+
+[Continue] [Cancel]
+```
+
+### 7. Uncommitted changes detection
+
+**Реализация:**
+
+```python
+def has_uncommitted_changes(path: str) -> bool:
+    """Check for uncommitted changes (staged, unstaged, untracked)."""
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+        )
+        return bool(result.stdout.strip())
+    except Exception:
+        return False  # Can't check = assume clean
+```
+
+**Edge cases:**
+- Corrupted .git → return False (не блокируем delete)
+- Stashed changes → не детектим (stash это backup, не uncommitted)
+- Untracked files → детектим (могут быть важны)
+
+### 8. require_project_ready() vs /clear semantics
+
+**Текущее поведение /clear:** работает если tmux exists (даже если Claude starting).
+
+**Новое поведение с require_project_ready():** блокирует если Claude starting.
+
+**Решение:** Разные уровни проверки:
+
+```python
+async def require_project_exists(message, telegram_queue) -> bool:
+    """Basic check: project + cwd."""
+    # ... minimal check
+
+async def require_tmux_exists(message, telegram_queue) -> bool:
+    """Check: project + cwd + tmux session exists."""
+    # ... for /clear, /esc
+
+async def require_claude_ready(message, telegram_queue) -> bool:
+    """Strict check: project + cwd + tmux + Claude ready."""
+    # ... for /new, /thread, /branch, /finish
+```
+
+**Mapping:**
+- `/clear`, `/esc` → `require_tmux_exists()` (работают во время startup)
+- `/new`, `/thread`, `/branch`, `/finish` → `require_claude_ready()`
+
+### 9. Worktree cleanup в /reset_all
+
+**/reset_all должен чистить worktrees:**
+
+```python
+def cleanup_project(project: Project, delete_directory: bool) -> None:
+    """Full project cleanup."""
+    # 1. Kill all tmux sessions (main + topics)
+    for thread in project.threads.values():
+        tmux_name = thread.get_tmux_session(project.project_name)
+        if is_tmux_session_exists(tmux_name):
+            kill_tmux_session(tmux_name)
+
+    # 2. Remove worktrees (if any)
+    if project.cwd:
+        worktrees_dir = Path(project.cwd) / ".worktrees"
+        for thread in project.threads.values():
+            if thread.worktree_path:
+                try:
+                    subprocess.run(
+                        ["git", "worktree", "remove", "--force", thread.worktree_path],
+                        cwd=project.cwd,
+                        capture_output=True,
+                    )
+                except Exception:
+                    pass  # Best effort
+
+    # 3. Delete main directory (if requested)
+    if delete_directory and project.cwd:
+        shutil.rmtree(project.cwd, ignore_errors=True)
+
+    # 4. Remove from config
+    project_manager.remove(project.project_name)
+```
+
+### 10. unidecode: уже в зависимостях ✓
+
+Проверено: `pyproject.toml` содержит `"unidecode>=1.3"`
