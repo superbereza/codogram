@@ -8,6 +8,8 @@ STATUS_OK = "`[v]`"
 STATUS_ERR = "`[x]`"
 STATUS_WARN = "`[!]`"
 STATUS_PENDING = "`[~]`"
+STATUS_QUESTION = "`[?]`"
+STATUS_INFO = "`[i]`"
 
 
 # --- Launch animation ---
