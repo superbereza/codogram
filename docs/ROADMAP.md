@@ -273,13 +273,6 @@ Suggestion buttons attached to Claude's responses:
 - Context-aware based on message content
 - Quick follow-up actions
 
-### Simplified output & hidden tools
-Cleaner output by default:
-- Don't dump full permission text on auto-accept
-- Hide tool calls by default (TodoWrite, Read, etc.)
-- `/silent` command to toggle tools visibility
-- Filter TOOL_USE, TOOL_RESULT, show only TEXT
-
 ### Activity indicators
 Show that Claude is thinking/working:
 - Generation indicator appears ABOVE input box in tmux
@@ -287,6 +280,12 @@ Show that Claude is thinking/working:
 - Show typing indicator or status in Telegram
 
 ## Backlog
+
+### Hidden tool calls
+Hide internal tool calls by default:
+- Hide tool calls (TodoWrite, Read, etc.) from output
+- `/silent` command to toggle tools visibility
+- Filter TOOL_USE, TOOL_RESULT, show only TEXT
 
 ### Bot onboarding
 Interactive onboarding for new users:

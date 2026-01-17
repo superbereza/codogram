@@ -273,13 +273,6 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Context-aware на основе содержимого сообщения
 - Быстрые follow-up действия
 
-### Упрощённый вывод и скрытые тулы
-Чистый вывод по умолчанию:
-- Не вываливать полный текст permission при auto-accept
-- Скрывать tool calls по умолчанию (TodoWrite, Read и т.д.)
-- Команда `/silent` для переключения видимости тулов
-- Фильтровать TOOL_USE, TOOL_RESULT, показывать только TEXT
-
 ### Activity indicators
 Отображение что Claude думает/работает:
 - Индикатор генерации над input box в tmux
@@ -287,6 +280,12 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Показывать typing indicator или статус в Telegram
 
 ## Backlog
+
+### Скрытые tool calls
+Скрывать internal tool calls по умолчанию:
+- Скрывать tool calls (TodoWrite, Read и т.д.) из вывода
+- Команда `/silent` для переключения видимости тулов
+- Фильтровать TOOL_USE, TOOL_RESULT, показывать только TEXT
 
 ### Онбординг в боте
 Интерактивный онбординг для новых пользователей:
