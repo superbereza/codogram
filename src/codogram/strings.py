@@ -347,4 +347,7 @@ BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logic
 
 Run `/branch_create {{branch_name}}` again after commit."""
 
+BRANCH_CREATING = f"{STATUS_PENDING} Creating branch `{{name}}`..."
+BRANCH_CREATED = f"{STATUS_OK} Branch `{{name}}` created"
+
 BRANCH_FINISH_USE_FINISH = f"{STATUS_INFO} Use /finish to complete branches"

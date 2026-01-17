@@ -132,7 +132,10 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
 async def on_branch_base_selected(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle base branch selection for branch_create."""
     _, branch_name, base_branch = callback.data.split(":")
-    project = project_manager.get_by_chat(callback.message.chat.id)
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
     if not project:
         await callback.answer(strings.BRANCH_PROJECT_NOT_FOUND_TOAST)
         return
@@ -159,23 +162,38 @@ async def on_branch_base_selected(callback: CallbackQuery, telegram_queue: Teleg
         )
         return
 
-    await callback.message.delete()
-    await do_branch_create(callback.bot, callback.message.chat.id, project, branch_name, base_branch)
+    # 1. Remove buttons (edit)
+    await telegram_queue.edit(callback.message, strings.BRANCH_CREATING.format(name=branch_name))
     await callback.answer()
+
+    # 2. Create branch
+    await do_branch_create(callback.bot, chat_id, project, branch_name, base_branch)
+
+    # 3. Final status (send)
+    await telegram_queue.send(chat_id, strings.BRANCH_CREATED.format(name=branch_name), thread_id=thread_id)
 
 
 @router.callback_query(F.data.startswith("bc_create:"))
 async def on_branch_create_confirm(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Create branch from last commit."""
     _, branch_name, base_branch = callback.data.split(":")
-    project = project_manager.get_by_chat(callback.message.chat.id)
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
     if not project:
         await callback.answer(strings.BRANCH_PROJECT_NOT_FOUND_TOAST)
         return
 
-    await callback.message.delete()
-    await do_branch_create(callback.bot, callback.message.chat.id, project, branch_name, base_branch)
+    # 1. Remove buttons (edit)
+    await telegram_queue.edit(callback.message, strings.BRANCH_CREATING.format(name=branch_name))
     await callback.answer()
+
+    # 2. Create branch
+    await do_branch_create(callback.bot, chat_id, project, branch_name, base_branch)
+
+    # 3. Final status (send)
+    await telegram_queue.send(chat_id, strings.BRANCH_CREATED.format(name=branch_name), thread_id=thread_id)
 
 
 @router.callback_query(F.data.startswith("bc_commit:"))
