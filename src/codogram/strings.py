@@ -125,6 +125,41 @@ GIT_URL_INVALID_FORMAT = f"{STATUS_ERR} Invalid URL. Use https:// or git@ format
 GIT_URL_RETRY_PROMPT = "Send valid repository URL:"
 
 
+# --- Project State ---
+
+PROJECT_NOT_READY = f"{STATUS_WARN} Project not ready. Use /start first"
+CLAUDE_STARTING = f"{STATUS_WARN} Claude is starting... wait a moment"
+
+
+# --- Clone Progress ---
+
+CLONE_IN_PROGRESS = f"{STATUS_PENDING} Cloning repository... may take several minutes for large repos"
+
+
+# --- Reset Flow ---
+
+RESET_FLOW_IN_PROGRESS = f"{STATUS_WARN} Start flow in progress. Wait for completion or use /cancel"
+RESET_CLEANUP_FAILED = f"{STATUS_WARN} Could not delete directory `{{path}}`\\n\\nDelete manually: `rm -rf {{path}}`"
+
+RESET_NO_PROJECT = f"{STATUS_INFO} Nothing to reset. Use /start to begin."
+RESET_COMPLETE = f"{STATUS_OK} Reset complete. Use /start to begin."
+RESET_CONFIRM = f"""{STATUS_QUESTION} Reset project `{{name}}`?
+
+This will disconnect Claude and clear settings."""
+RESET_CONFIRM_TOPIC = f"""{STATUS_QUESTION} Reset entire project `{{name}}`?
+
+This will disconnect Claude in all topics and clear settings."""
+RESET_UNCOMMITTED = f"{STATUS_WARN} Uncommitted changes in `{{path}}`"
+RESET_DIR_CHOICE = f"{STATUS_QUESTION} Delete directory `{{path}}`?"
+RESET_DONE = f"""{STATUS_OK} Project reset
+
+• Config cleared
+• Claude stopped
+• Directory {{dir_status}}
+
+/start to begin new project"""
+
+
 # --- Misc ---
 
 TOPICS_REQUIRED_GROUP = f"{STATUS_WARN} This command requires a group with topics"
@@ -202,6 +237,11 @@ BTN_CANCEL_X = "[x] Cancel"
 BTN_CREATE = "Create"
 BTN_DIFFERENT_PATH = "Different path"
 BTN_NO_GIT = "No git"
+BTN_CONTINUE = "Continue"
+BTN_KEEP_DIR = "Keep directory"
+BTN_DELETE_DIR = "Delete"
+BTN_DELETE_ANYWAY = "Delete anyway"
+BTN_GO_BACK = "[<<] Go back"
 
 
 # --- Worktree Recovery ---
