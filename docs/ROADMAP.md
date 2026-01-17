@@ -281,12 +281,6 @@ Show that Claude is thinking/working:
 
 ## Backlog
 
-### Hidden tool calls
-Hide internal tool calls by default:
-- Hide tool calls (TodoWrite, Read, etc.) from output
-- `/silent` command to toggle tools visibility
-- Filter TOOL_USE, TOOL_RESULT, show only TEXT
-
 ### Bot onboarding
 Interactive onboarding for new users:
 - Welcome flow explaining bot features
@@ -298,6 +292,11 @@ Make command names more intuitive:
 - Clarify thread/branch/topic terminology
 - User-friendly labels in menu
 - Consistent naming across all commands
+
+### Reply support
+When replying to message, send context to tmux:
+- Quote piece of message being replied to
+- Format: `> quote\n\nresponse text`
 
 ### Role model & chat registration
 Minimal permission system for multi-user access:
@@ -327,14 +326,11 @@ Allow product managers to use Claude without breaking environment:
 - Easy recovery if something breaks
 - Need R&D on best approach
 
-### Message queue until session ready
-Cache user messages while session is binding, send when ready:
-- After `/start` or `/branch`, session binding takes ~1-2 minutes
-- During this window messages go to tmux but responses don't appear
-- Solution: queue messages while `awaiting_new_session=True`
-- Send all queued messages when session binds
-- Show "⏳ Connecting..." feedback to user
-- See bug: [2026-01-07-session-not-immediately-active.md](bugs/active/2026-01-07-session-not-immediately-active.md)
+### Hidden tool calls
+Hide internal tool calls by default:
+- Hide tool calls (TodoWrite, Read, etc.) from output
+- `/silent` command to toggle tools visibility
+- Filter TOOL_USE, TOOL_RESULT, show only TEXT
 
 ### Tool visibility R&D
 Research and implement tool display improvements:
@@ -357,10 +353,14 @@ Detect when Claude Code exits with error (API errors, network issues, etc.):
 - Send error text to user: "⚠️ Claude error: <error text>. Figure it out and /start"
 - Detect shell prompt appearing after Claude was active
 
-### Reply support
-When replying to message, send context to tmux:
-- Quote piece of message being replied to
-- Format: `> quote\n\nresponse text`
+### Message queue until session ready
+Cache user messages while session is binding, send when ready:
+- After `/start` or `/branch`, session binding takes ~1-2 minutes
+- During this window messages go to tmux but responses don't appear
+- Solution: queue messages while `awaiting_new_session=True`
+- Send all queued messages when session binds
+- Show "⏳ Connecting..." feedback to user
+- See bug: [2026-01-07-session-not-immediately-active.md](bugs/active/2026-01-07-session-not-immediately-active.md)
 
 ---
 
