@@ -202,7 +202,7 @@ async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "Telegram
     try:
         async for entry in watcher.watch():
             try:
-                messages = _entry_to_messages(entry)
+                messages = _entry_to_messages(entry, verbose=thread.verbose)
                 if messages:
                     batch = OutgoingBatch(
                         chat_id=project.chat_id,
