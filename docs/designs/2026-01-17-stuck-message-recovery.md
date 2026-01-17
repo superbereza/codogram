@@ -167,10 +167,10 @@ time.sleep(0.5)  # Instead of 0.3
 
 ## Checklist
 
-- [ ] Add `extract_input_text()` to screen.py
-- [ ] Add `PASTED_PATTERN` to screen.py
-- [ ] Add stuck detection logic to permission_poller.py
-- [ ] Clear `last_sent_message` after recovery
-- [ ] Add logging for debugging
-- [ ] Test with multi-line messages
-- [ ] Test with large messages
+- [x] Add `extract_input_text()` to screen.py
+- [x] Add `PASTED_PATTERN` to screen.py
+- [x] Add stuck detection logic to permission_poller.py
+- [x] Clear `last_sent_message` after recovery
+- [x] Add logging for debugging
+- [ ] Test with multi-line messages (manual when occurs)
+- [ ] Test with large messages (manual when occurs)
