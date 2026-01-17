@@ -21,6 +21,11 @@ LAUNCH_TIMEOUT = f"{STATUS_ERR} Timeout: Claude didn't start in 2 minutes"
 LAUNCH_ERROR = f"{STATUS_ERR} Launch error: {{error}}"
 LAUNCH_READY = f"{STATUS_OK} Claude ready"
 
+# Launch service (worktree creation)
+LAUNCH_CREATING_BRANCH = f"{STATUS_PENDING} Creating branch `{{branch}}` from `{{base}}`..."
+LAUNCH_BRANCH_ERROR = f"{STATUS_ERR} {{error}}"
+LAUNCH_WORKTREE_CREATED = f"{STATUS_OK} Worktree: `{{path}}`"
+
 
 # --- Session management ---
 
