@@ -683,42 +683,26 @@ git commit -m "feat: add settings keyboard builder"
 - Modify: `src/codogram/handlers/settings.py:54-123`
 - Test: E2E via Telegram MCP
 
-**Step 1: Update /settings handler**
+**Step 1: Add _build_settings_text helper**
 
-Replace the `cmd_settings` function in `src/codogram/handlers/settings.py`:
+Add helper function to `src/codogram/handlers/settings.py` (before cmd_settings):
 
 ```python
-@router.message(Command("settings"))
-async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
-    """Show current settings including Claude session state."""
+def _build_settings_text(project, thread, tmux_name: str) -> str:
+    """Build settings message text. Used by cmd_settings and callback handler."""
     from ..tmux import TmuxSession
     from ..services.session_state import SessionStateService
-    from ..keyboards import settings_keyboard
-
-    chat_id = message.chat.id
-    thread_id = message.message_thread_id
-
-    project = project_manager.get_by_chat(chat_id)
-    if not project:
-        await telegram_queue.reply(message, "No project. Use /start first.")
-        return
-
-    thread = None
-    if project.threads:
-        thread = project.threads.get(thread_id)
 
     # Get settings from context
     if thread:
         auto_accept = thread.auto_accept
         verbose = thread.verbose
         context_name = thread.name
-        tmux_name = thread.get_tmux_session(project.project_name)
         cwd = thread.worktree_path or project.cwd
     else:
         auto_accept = project.auto_accept
         verbose = project.verbose
         context_name = project.project_name
-        tmux_name = project.tmux_session
         cwd = project.cwd
 
     # Format toggle indicators
@@ -753,11 +737,8 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
             else:
                 mode_text = "default"
             lines.append(f"• mode: {mode_text}")
-
-            # Background tasks
             lines.append(f"• background tasks: {sb.background_tasks}")
 
-            # Context
             if sb.context_percent is not None:
                 lines.append(f"• context: {sb.context_percent}%")
             else:
@@ -766,17 +747,46 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
         lines.append("• mode: not connected")
         lines.append("• background tasks: ?")
         lines.append("• context: ?")
-        tmux_name = f"claude-{project.project_name}"  # For keyboard
 
-    kb = settings_keyboard(tmux_name)
-    await telegram_queue.reply(message, "\n".join(lines), reply_markup=kb)
+    return "\n".join(lines)
 ```
 
-**Step 2: Test via Telegram MCP**
+**Step 2: Update cmd_settings to use helper**
+
+```python
+@router.message(Command("settings"))
+async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
+    """Show current settings including Claude session state."""
+    from ..keyboards import settings_keyboard
+
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    thread = None
+    if project.threads:
+        thread = project.threads.get(thread_id)
+
+    # Get tmux name for keyboard
+    if thread:
+        tmux_name = thread.get_tmux_session(project.project_name)
+    else:
+        tmux_name = project.tmux_session or f"claude-{project.project_name}"
+
+    text = _build_settings_text(project, thread, tmux_name)
+    kb = settings_keyboard(tmux_name)
+    await telegram_queue.reply(message, text, reply_markup=kb)
+```
+
+**Step 3: Test via Telegram MCP**
 
 Send `/settings` command and verify output format matches design.
 
-**Step 3: Commit**
+**Step 4: Commit**
 
 ```bash
 git add src/codogram/handlers/settings.py
@@ -904,16 +914,20 @@ git commit -m "feat: update /auto_accept response format with circle indicators"
 - Modify: `src/codogram/handlers/settings.py`
 - Test: E2E via Telegram MCP
 
-**Step 1: Add callback handler**
+**Step 1: Add imports for callback handler**
 
-Add callback router to `src/codogram/handlers/settings.py`:
+Add to imports at top of `src/codogram/handlers/settings.py`:
 
 ```python
 from aiogram.types import Message, CallbackQuery
 from aiogram import F
+```
 
-# ... existing code ...
+**Step 2: Add callback handler**
 
+Add callback handler to `src/codogram/handlers/settings.py` (uses `_build_settings_text` from Task 8):
+
+```python
 @router.callback_query(F.data.startswith("settings:"))
 async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle settings keyboard button presses."""
@@ -973,74 +987,21 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
         else:
             await callback.answer(result.error)
 
-    # Update the settings message
-    await _update_settings_message(callback.message, project, thread, tmux_name, telegram_queue)
-
-
-async def _update_settings_message(message, project, thread, tmux_name, telegram_queue):
-    """Update settings message after toggle."""
-    from ..tmux import TmuxSession
-    from ..services.session_state import SessionStateService
-    from ..keyboards import settings_keyboard
-
-    # Get settings from context
-    if thread:
-        auto_accept = thread.auto_accept
-        verbose = thread.verbose
-        context_name = thread.name
-        cwd = thread.worktree_path or project.cwd
-    else:
-        auto_accept = project.auto_accept
-        verbose = project.verbose
-        context_name = project.project_name
-        cwd = project.cwd
-
-    auto_status = "● on" if auto_accept else "○ off"
-    verbose_status = "● on" if verbose else "○ off"
-
-    lines = [f"**{context_name}**", ""]
-    lines.append("chat")
-    lines.append(f"• auto-accept: {auto_status}")
-    lines.append(f"• verbose: {verbose_status}")
-    lines.append("")
-    lines.append("claude")
-
-    tmux = TmuxSession(tmux_name, cwd)
-    service = SessionStateService()
-    result = service.get_status(tmux)
-
-    if not result.success:
-        lines.append(f"• mode: {result.error}")
-        lines.append("• background tasks: ?")
-        lines.append("• context: ?")
-    else:
-        sb = result.status_bar
-        if sb.approval_mode == "accept edits":
-            mode_text = "accept edits"
-        elif sb.approval_mode == "plan mode":
-            mode_text = "plan mode"
-        else:
-            mode_text = "default"
-        lines.append(f"• mode: {mode_text}")
-        lines.append(f"• background tasks: {sb.background_tasks}")
-        if sb.context_percent is not None:
-            lines.append(f"• context: {sb.context_percent}%")
-        else:
-            lines.append("• context: not displayed")
-
+    # Update the settings message using shared helper
+    text = _build_settings_text(project, thread, tmux_name)
     kb = settings_keyboard(tmux_name)
-    await telegram_queue.edit(message, "\n".join(lines), reply_markup=kb)
+    await telegram_queue.edit(callback.message, text, reply_markup=kb)
 ```
 
-**Step 2: Add edit method to telegram_queue if needed**
+**Step 3: Add edit method to telegram_queue if needed**
 
 Check if `telegram_queue.edit` exists. If not, add it.
 
-**Step 3: Test via Telegram MCP**
+**Step 4: Test via Telegram MCP**
 
 Click settings buttons and verify message updates.
 
-**Step 4: Commit**
+**Step 5: Commit**
 
 ```bash
 git add src/codogram/handlers/settings.py
@@ -1135,16 +1096,6 @@ git commit -m "feat: wire verbose setting to history watcher"
 ```bash
 git commit --allow-empty -m "test: complete E2E testing for verbose toggle"
 ```
-
----
-
-## Notes
-
-**Design document deviation:** The design says to put callbacks in `handlers/callbacks.py`, but this plan puts them in `handlers/settings.py` to keep settings-related code together. This is intentional.
-
-**Future improvements:**
-- `MAX_LINES` constant could be made configurable via settings
-- Consider extracting `_build_settings_text()` helper to deduplicate `cmd_settings` and `_update_settings_message`
 
 ---
 
