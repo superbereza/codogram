@@ -51,6 +51,13 @@ class KeyboardBatch:
 
 
 @dataclass
+class DeleteBatch:
+    """Delete message operation."""
+    chat_id: int
+    message_id: int
+
+
+@dataclass
 class _QueueItem:
     """Internal queue item with result future."""
     batch: OutgoingBatch
@@ -71,6 +78,13 @@ class _KeyboardQueueItem:
     result: asyncio.Future[list[int]] | None
 
 
+@dataclass
+class _DeleteQueueItem:
+    """Internal queue item for delete operations."""
+    batch: DeleteBatch
+    result: asyncio.Future[None] | None
+
+
 class TelegramQueue:
     """FIFO queue for outgoing messages per chat_id.
 
@@ -79,16 +93,17 @@ class TelegramQueue:
 
     def __init__(self, bot: Bot):
         self.bot = bot
-        self._queues: dict[int, asyncio.Queue[_QueueItem | _EditQueueItem | _KeyboardQueueItem]] = defaultdict(asyncio.Queue)
+        self._queues: dict[int, asyncio.Queue[_QueueItem | _EditQueueItem | _KeyboardQueueItem | _DeleteQueueItem]] = defaultdict(asyncio.Queue)
         self._workers: dict[int, asyncio.Task] = {}
         self._locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
-    async def enqueue(self, batch: OutgoingBatch | EditBatch | KeyboardBatch, timeout: float = 120.0) -> list[int] | None:
+    async def enqueue(self, batch: OutgoingBatch | EditBatch | KeyboardBatch | DeleteBatch, timeout: float = 120.0) -> list[int] | None:
         """Add batch to queue, wait for send.
 
         For OutgoingBatch: returns list of sent message IDs.
         For EditBatch: returns None (edit doesn't create new messages).
         For KeyboardBatch: returns list with single message ID.
+        For DeleteBatch: returns None (delete doesn't create new messages).
 
         Args:
             batch: The batch to send.
@@ -99,9 +114,12 @@ class TelegramQueue:
         """
         chat_id = batch.chat_id
 
-        if isinstance(batch, EditBatch):
+        if isinstance(batch, DeleteBatch):
+            result_future_del: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+            item: _QueueItem | _EditQueueItem | _KeyboardQueueItem | _DeleteQueueItem = _DeleteQueueItem(batch=batch, result=result_future_del)
+        elif isinstance(batch, EditBatch):
             result_future: asyncio.Future[None] = asyncio.get_running_loop().create_future()
-            item: _QueueItem | _EditQueueItem | _KeyboardQueueItem = _EditQueueItem(batch=batch, result=result_future)
+            item = _EditQueueItem(batch=batch, result=result_future)
         elif isinstance(batch, KeyboardBatch):
             result_future_kb: asyncio.Future[list[int]] = asyncio.get_running_loop().create_future()
             item = _KeyboardQueueItem(batch=batch, result=result_future_kb)
@@ -116,7 +134,10 @@ class TelegramQueue:
         await self._queues[chat_id].put(item)
 
         try:
-            if isinstance(batch, EditBatch):
+            if isinstance(batch, DeleteBatch):
+                await asyncio.wait_for(result_future_del, timeout=timeout)
+                return None
+            elif isinstance(batch, EditBatch):
                 await asyncio.wait_for(result_future, timeout=timeout)
                 return None
             elif isinstance(batch, KeyboardBatch):
@@ -126,15 +147,17 @@ class TelegramQueue:
         except asyncio.TimeoutError as e:
             raise TelegramQueueTimeout(f"Enqueue operation timed out after {timeout}s") from e
 
-    async def enqueue_nowait(self, batch: OutgoingBatch | EditBatch | KeyboardBatch) -> None:
+    async def enqueue_nowait(self, batch: OutgoingBatch | EditBatch | KeyboardBatch | DeleteBatch) -> None:
         """Add batch to queue without waiting. Fire-and-forget.
 
         Use this when you don't need message IDs (e.g., watcher notifications).
         """
         chat_id = batch.chat_id
 
-        if isinstance(batch, EditBatch):
-            item: _QueueItem | _EditQueueItem | _KeyboardQueueItem = _EditQueueItem(batch=batch, result=None)
+        if isinstance(batch, DeleteBatch):
+            item: _QueueItem | _EditQueueItem | _KeyboardQueueItem | _DeleteQueueItem = _DeleteQueueItem(batch=batch, result=None)
+        elif isinstance(batch, EditBatch):
+            item = _EditQueueItem(batch=batch, result=None)
         elif isinstance(batch, KeyboardBatch):
             item = _KeyboardQueueItem(batch=batch, result=None)
         else:
@@ -158,7 +181,11 @@ class TelegramQueue:
                 return
 
             try:
-                if isinstance(item, _EditQueueItem):
+                if isinstance(item, _DeleteQueueItem):
+                    await self._delete_message(item.batch)
+                    if item.result is not None and not item.result.done():
+                        item.result.set_result(None)
+                elif isinstance(item, _EditQueueItem):
                     await self._edit_message(item.batch)
                     if item.result is not None and not item.result.done():
                         item.result.set_result(None)
@@ -335,6 +362,13 @@ class TelegramQueue:
         except Exception as e:
             logger.error(f"keyboard_send_error: {e}")
             return []
+
+    async def _delete_message(self, batch: DeleteBatch) -> None:
+        """Delete a message. Silently ignores errors (message already deleted)."""
+        try:
+            await self.bot.delete_message(batch.chat_id, batch.message_id)
+        except Exception as e:
+            logger.debug(f"Delete failed (message likely already deleted): {e}")
 
     async def _cleanup_orphans(self, chat_id: int, msg_ids: list[int]) -> None:
         """Delete partially sent messages."""

@@ -366,3 +366,21 @@ async def test_edit_helper():
         assert batch.chat_id == 123
         assert batch.message_id == 456
         assert batch.text == "Updated"
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_deletes_message():
+    """DeleteBatch should call bot.delete_message."""
+    from unittest.mock import MagicMock
+    from codogram.telegram_queue import DeleteBatch
+
+    bot = MagicMock()
+    bot.delete_message = AsyncMock()
+
+    queue = TelegramQueue(bot)
+    batch = DeleteBatch(chat_id=123, message_id=456)
+
+    await queue.enqueue(batch)
+
+    bot.delete_message.assert_called_once_with(123, 456)
+    await queue.shutdown()
