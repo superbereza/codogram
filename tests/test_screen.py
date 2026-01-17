@@ -342,16 +342,43 @@ def test_parse_thinking_status_with_details():
 
 def test_parse_thinking_status_esc():
     """Parse with esc instead of ctrl+c."""
-    output = "· Thinking… (esc to interrupt · 5s)"
+    output = """
+· Thinking… (esc to interrupt · 5s)
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
     result = parse_thinking_status(output)
     assert result == "· Thinking… (/esc to interrupt · 5s)"
 
 
 def test_parse_thinking_status_cooked():
     """Parse completion status."""
-    output = "✻ Cooked for 35s\n────────"
+    output = """
+✻ Cooked for 35s
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
     result = parse_thinking_status(output)
     assert result == "✻ Cooked for 35s"
+
+
+def test_parse_thinking_status_ignores_scrollback():
+    """Ignore thinking status in scrollback (far from input box)."""
+    output = """
+· Old thinking status from scrollback
+lots of other output
+more output
+even more output
+another line
+yet another line
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
+    result = parse_thinking_status(output)
+    assert result is None
 
 
 def test_parse_thinking_status_none():

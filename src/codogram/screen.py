@@ -312,18 +312,37 @@ def parse_status_bar(output: str) -> StatusBar:
 
 
 def parse_thinking_status(output: str) -> str | None:
-    """Parse thinking status line as-is.
+    """Parse thinking status line from area just above input box.
 
     Formats vary:
     - · Wibbling… (ctrl+c to interrupt)
     - ✶ Wibbling… (ctrl+c to interrupt · 30s · ↓ 914 tokens · thinking)
     - ✻ Cooked for 35s
 
+    Only looks at last 5 lines before first ──── separator to avoid
+    picking up old thinking statuses from scrollback.
+
     Returns raw line with command injection:
     - 'ctrl+c to interrupt' → '/esc to interrupt'
     - 'esc to interrupt' → '/esc to interrupt'
     """
-    for line in output.split("\n"):
+    lines = output.split("\n")
+
+    # Find first ──── separator (top of input box)
+    first_sep_idx = -1
+    for i, line in enumerate(lines):
+        if "─" * 10 in line:
+            first_sep_idx = i
+            break
+
+    if first_sep_idx == -1:
+        return None
+
+    # Look at last 5 lines before separator (where thinking status appears)
+    start_idx = max(0, first_sep_idx - 5)
+    recent_lines = lines[start_idx:first_sep_idx]
+
+    for line in recent_lines:
         stripped = line.strip()
         if stripped and stripped[0] in THINKING_SPINNERS:
             # Replace ctrl+c first, then esc (but only standalone, not /esc)
