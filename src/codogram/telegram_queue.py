@@ -174,24 +174,25 @@ class TelegramQueue:
             item = _QueueItem(batch=batch, result=None)
 
         async with self._queue_locks[chat_id]:
-            # Replace existing item with same replace_key
-            if isinstance(batch, OutgoingBatch) and batch.replace_key:
-                queue = self._queues[chat_id]
+            queue = self._queues[chat_id]
+            replaced = False
+
+            # Dedup by replace_key for OutgoingBatch, EditBatch, DeleteBatch
+            if hasattr(batch, 'replace_key') and batch.replace_key:
                 for i, existing in enumerate(queue):
-                    if (isinstance(existing, _QueueItem) and
-                        isinstance(existing.batch, OutgoingBatch) and
-                        existing.batch.replace_key == batch.replace_key):
+                    existing_batch = existing.batch
+                    # Match same type and same replace_key
+                    if (type(existing_batch) == type(batch) and
+                        hasattr(existing_batch, 'replace_key') and
+                        existing_batch.replace_key == batch.replace_key):
                         queue[i] = item
-                        self._queue_events[chat_id].set()
-                        # Start worker if needed (outside lock)
+                        replaced = True
                         break
-                else:
-                    # No existing item found, append new
-                    self._queues[chat_id].append(item)
-                    self._queue_events[chat_id].set()
-            else:
-                self._queues[chat_id].append(item)
-                self._queue_events[chat_id].set()
+
+            if not replaced:
+                queue.append(item)
+
+            self._queue_events[chat_id].set()
 
         async with self._locks[chat_id]:
             if chat_id not in self._workers or self._workers[chat_id].done():

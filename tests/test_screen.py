@@ -392,6 +392,19 @@ def test_parse_thinking_status_none():
     assert result is None
 
 
+def test_parse_thinking_status_false_positive():
+    """Spinner character without thinking pattern should be ignored."""
+    output = """
+· Just a bullet point, not thinking
+Some other text
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
+    result = parse_thinking_status(output)
+    assert result is None
+
+
 # Input Suggestion Tests
 
 from codogram.screen import parse_input_suggestion

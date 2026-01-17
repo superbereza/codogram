@@ -130,6 +130,9 @@ async def permission_poller(
     last_thinking_update: float = 0.0
     last_thinking_text: str | None = None
 
+    # Suggestion state
+    suggestion_msg_key: str | None = None
+
     # Stuck message detection state
     stuck_input_text: str | None = None
     stuck_seen_count: int = 0
@@ -158,6 +161,7 @@ async def permission_poller(
 
                 if thinking_msg_key is None:
                     # First time — send new message
+                    logger.debug(f"{log_prefix}: thinking status NEW: {thinking_text[:50]}...")
                     batch = OutgoingBatch(
                         chat_id=project.chat_id,
                         thread_id=thread_id,
@@ -167,6 +171,7 @@ async def permission_poller(
                     thinking_msg_key = key
                 else:
                     # Update existing message — edit
+                    logger.debug(f"{log_prefix}: thinking status EDIT: {thinking_text[:50]}...")
                     batch = EditBatch(
                         chat_id=project.chat_id,
                         message_id=0,  # Lookup from sent_statuses
@@ -180,6 +185,7 @@ async def permission_poller(
 
         elif thinking_msg_key:
             # Claude finished thinking — delete status message
+            logger.debug(f"{log_prefix}: thinking status DELETE")
             batch = DeleteBatch(
                 chat_id=project.chat_id,
                 message_id=0,
@@ -188,6 +194,7 @@ async def permission_poller(
             await telegram_queue.enqueue_nowait(batch)
             thinking_msg_key = None
             last_thinking_text = None
+            last_thinking_update = 0.0  # Reset for next thinking cycle
 
         # Parse input suggestion (only when not thinking)
         if not thinking_text:
@@ -196,6 +203,8 @@ async def permission_poller(
 
             if suggestion and suggestion != _last_suggestions.get(key):
                 # New suggestion — send 💡 with ReplyKeyboard
+                logger.debug(f"{log_prefix}: suggestion NEW: {suggestion[:50]}...")
+                suggestion_msg_key = f"suggestion:{project.chat_id}:{thread_id}"
                 batch = OutgoingBatch(
                     chat_id=project.chat_id,
                     thread_id=thread_id,
@@ -205,12 +214,23 @@ async def permission_poller(
                         resize_keyboard=True,
                         one_time_keyboard=True,
                     ),
+                    replace_key=suggestion_msg_key,
                 )
                 await telegram_queue.enqueue_nowait(batch)
                 _last_suggestions[key] = suggestion
 
-            elif not suggestion:
-                # Suggestion gone — reset tracking
+            elif not suggestion and _last_suggestions.get(key):
+                # Suggestion gone — delete 💡 message
+                # Note: ReplyKeyboard persists until user interacts (one_time_keyboard=True helps)
+                logger.debug(f"{log_prefix}: suggestion DELETE")
+                if suggestion_msg_key:
+                    batch = DeleteBatch(
+                        chat_id=project.chat_id,
+                        message_id=0,  # Lookup from sent_statuses
+                        replace_key=suggestion_msg_key,
+                    )
+                    await telegram_queue.enqueue_nowait(batch)
+                    suggestion_msg_key = None
                 _last_suggestions[key] = None
 
         # Crash detection
