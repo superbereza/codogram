@@ -253,6 +253,21 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Кнопка close удаляет сообщение с настройками
 - См. [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
+## Beta Test
+
+### Activity indicators
+Отображение что Claude думает/работает:
+- Индикатор генерации над input box в tmux
+- Парсинг из tmux capture-pane
+- Показ thinking status в Telegram
+- Toggle: `/exp_thinking_status`
+
+### Input suggestions
+Показ саджестов Claude в Telegram:
+- Парсинг саджеста из input box (текст с маркером `↵ send`)
+- Отображение как ReplyKeyboard для отправки в один тап
+- Toggle: `/exp_suggestions`
+
 ## In Progress
 
 ### Robust /start flow
@@ -266,18 +281,6 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - **sanitize_project_name с unidecode** — "Мой Проект 🚀" → `moj-proekt`
 - **Анонс команд по типу чата** — после успешного запуска показываем доступные команды
 - См. docs/designs/2026-01-17-robust-start-flow.md (planned)
-
-### Inline suggests к сообщениям Claude
-Кнопки-саджесты прикреплённые к ответам Claude:
-- Клик отправляет предложенное действие/ответ
-- Context-aware на основе содержимого сообщения
-- Быстрые follow-up действия
-
-### Activity indicators
-Отображение что Claude думает/работает:
-- Индикатор генерации над input box в tmux
-- Парсить из tmux capture-pane
-- Показывать typing indicator или статус в Telegram
 
 ## Backlog
 

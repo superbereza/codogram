@@ -253,6 +253,21 @@ Per-thread/per-project verbose output toggle and /settings UX:
 - Close button deletes settings message
 - See [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
+## Beta Test
+
+### Activity indicators
+Show that Claude is thinking/working:
+- Generation indicator appears ABOVE input box in tmux
+- Parse from tmux capture-pane
+- Show thinking status in Telegram
+- Toggle: `/exp_thinking_status`
+
+### Input suggestions
+Show Claude's suggested input in Telegram:
+- Parse suggestion from input box (text with `↵ send` marker)
+- Display as ReplyKeyboard for one-tap send
+- Toggle: `/exp_suggestions`
+
 ## In Progress
 
 ### Robust /start flow
@@ -266,18 +281,6 @@ Atomicity and error recovery for project creation flow:
 - **sanitize_project_name with unidecode** — "Мой Проект 🚀" → `moj-proekt`
 - **Announce commands by chat type** — show available commands after successful launch
 - See docs/designs/2026-01-17-robust-start-flow.md (planned)
-
-### Inline suggests on Claude messages
-Suggestion buttons attached to Claude's responses:
-- Click to send suggested action/response
-- Context-aware based on message content
-- Quick follow-up actions
-
-### Activity indicators
-Show that Claude is thinking/working:
-- Generation indicator appears ABOVE input box in tmux
-- Parse from tmux capture-pane
-- Show typing indicator or status in Telegram
 
 ## Backlog
 
