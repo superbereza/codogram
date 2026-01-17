@@ -34,23 +34,23 @@ LAUNCH_WORKTREE_CREATED = f"{STATUS_OK} Worktree: `{{path}}`"
 
 SESSION_BOUND = f"{STATUS_OK} New session bound"
 SESSION_CLOSED = f"{STATUS_WARN} Claude session closed: {{name}}"
-SESSION_NOT_FOUND = f"{STATUS_WARN} Session not found. Make sure Claude is running."
+SESSION_NOT_FOUND = f"{STATUS_WARN} Session not found. Make sure Claude is running"
 SESSION_EXPIRED = "Session expired"
 SESSION_EXPIRED_START = "Session expired, start again with /start"
-SESSION_STOPPED = "Session stopped. Use /start to launch."
+SESSION_STOPPED = "Session stopped. Use /start to launch"
 SESSION_RESTART_CONFIRM = "Restart session `{tmux_name}`?"
 
 NEW_SESSION = f"{STATUS_PENDING} Creating new session..."
 CLEAR_SESSION = f"{STATUS_PENDING} Clearing session..."
 
-CLAUDE_CRASHED = f"{STATUS_WARN} Claude crashed: {{reason}}\nUse /restart to restart."
+CLAUDE_CRASHED = f"{STATUS_WARN} Claude crashed: {{reason}}\nUse /restart to restart"
 
 
 # --- Project/Thread ---
 
 PROJECT_NOT_FOUND = "Project not found"
 PROJECT_NOT_REGISTERED = "Project not registered. Use /start"
-PROJECT_NAME_INVALID = "Project name can only contain letters, digits, `-` and `_`."
+PROJECT_NAME_INVALID = "Project name can only contain letters, digits, `-` and `_`"
 PROJECT_NAME_PROMPT = "Send project name (e.g. `my-project`):"
 
 THREAD_NOT_FOUND = "Thread not found"
@@ -58,7 +58,7 @@ THREAD_NOT_FOUND_START = "Thread not found. Use /start"
 THREAD_CLOSED = "Thread closed"
 THREAD_EXISTS = "Thread with name '{name}' already exists"
 THREAD_NAME_INVALID = "Name can only contain letters, digits, - and _"
-THREAD_CLOSE_CONFIRM = "Close thread '{name}'?\nTopic and tmux session will be deleted."
+THREAD_CLOSE_CONFIRM = "Close thread '{name}'?\nTopic and tmux session will be deleted"
 THREAD_NOT_LINKED = "This topic is not linked to a Claude session"
 THREAD_TOPIC_ONLY = "This command can only be used in a topic"
 THREAD_CONNECT_HINT = "Use /start or /session_new to connect Claude to this topic"
@@ -70,8 +70,8 @@ THREAD_CREATED = f"{STATUS_OK} Thread `{{name}}` created"
 # --- Directory/Git ---
 
 DIR_NOT_FOUND = "Directory `{path}` not found.\n\nWhat to do?"
-DIR_NOT_EXISTS = "Directory `{path}` does not exist."
-DIR_CREATED = "Directory `{path}` created."
+DIR_NOT_EXISTS = "Directory `{path}` does not exist"
+DIR_CREATED = "Directory `{path}` created"
 DIR_ERROR = "Error creating directory: {error}"
 
 GIT_SETUP_PROMPT = """{dir_created}
@@ -104,14 +104,14 @@ CLAUDE_ACTIVE = "Claude active in `{tmux_name}`"
 CLAUDE_ATTACH = "Attach: `tmux attach -t {tmux_name}`"
 CLAUDE_NOT_RUNNING = "Claude not running in `{cwd}`.\n\nLaunch?"
 CLAUDE_CONNECTED = "Connected to tmux: `{tmux_session}`"
-CLAUDE_NO_SESSION = "No active Claude session. Use /start to launch."
-CLAUDE_TMUX_NOT_FOUND = "tmux session not found. Start Claude in terminal."
-CLAUDE_NO_RESTART = "No active session to restart."
+CLAUDE_NO_SESSION = "No active Claude session. Use /start to launch"
+CLAUDE_TMUX_NOT_FOUND = "tmux session not found. Start Claude in terminal"
+CLAUDE_NO_RESTART = "No active session to restart"
 
 
 # --- Misc ---
 
-TOPICS_REQUIRED_GROUP = f"{STATUS_WARN} This command requires a group with topics."
+TOPICS_REQUIRED_GROUP = f"{STATUS_WARN} This command requires a group with topics"
 TOPICS_REQUIRED_ENABLE = f"{STATUS_WARN} Topics required. Enable in group settings -> Topics"
 
 CREATE_PROJECT_NOT_FOUND = f"{STATUS_WARN} Project not found"
@@ -120,7 +120,7 @@ CREATE_TOPIC_ERROR = f"{STATUS_ERR} Error creating topic"
 LAUNCH_IN_PROGRESS = "Launch already in progress..."
 CANCELLED = "Cancelled"
 INVALID_CALLBACK = "Invalid callback"
-TOPICS_REQUIRED = "This chat doesn't support topics. Enable Topics in group settings."
+TOPICS_REQUIRED = "This chat doesn't support topics. Enable Topics in group settings"
 TOPIC_CREATE_ERROR = "Error creating topic: {error}"
 TOPIC_DELETE_ERROR = "Error deleting topic: {error}"
 
@@ -135,8 +135,8 @@ FILE_DOWNLOAD_FAILED = "Download failed. Try again"
 
 # --- Resume (deprecated) ---
 
-RESUME_NOT_SUPPORTED_MULTI = f"{STATUS_WARN} /resume not supported in multi-session mode.\nUse /thread_create for a new thread."
-RESUME_NOT_SUPPORTED = f"{STATUS_WARN} /resume not supported.\nUse /start to connect to existing session."
+RESUME_NOT_SUPPORTED_MULTI = f"{STATUS_WARN} /resume not supported in multi-session mode\nUse /thread_create for a new thread"
+RESUME_NOT_SUPPORTED = f"{STATUS_WARN} /resume not supported\nUse /start to connect to existing session"
 
 
 # --- Flavor Text (shown ~30% of time after success) ---
@@ -208,22 +208,22 @@ Use General or /thread for new session."""
 
 # --- Finish/Archive ---
 
-FINISH_NOTHING_IN_GENERAL = f"{STATUS_INFO} Nothing to finish in General. Use /clear to reset session."
-FINISH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first."
-FINISH_THREAD_NOT_FOUND = f"{STATUS_WARN} Thread not found."
+FINISH_NOTHING_IN_GENERAL = f"{STATUS_INFO} Nothing to finish in General. Use /clear to reset session"
+FINISH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first"
+FINISH_THREAD_NOT_FOUND = f"{STATUS_WARN} Thread not found"
 
 FINISH_ARCHIVE_CONFIRM = f"""{STATUS_QUESTION} Archive topic `{{name}}`?
 
-This will close the topic and stop Claude session."""
+This will close the topic and stop Claude session"""
 
 FINISH_WORKTREE_NOT_FOUND = f"""{STATUS_WARN} Worktree not found: `{{path}}`
 
-Archiving topic without git cleanup."""
+Archiving topic without git cleanup"""
 
 FINISH_UNCOMMITTED_CHANGES = f"{STATUS_WARN} Branch `{{branch}}` has uncommitted changes"
 
 FINISH_ARCHIVING = f"{STATUS_PENDING} Archiving `{{name}}`..."
-FINISH_ARCHIVED = f"{STATUS_OK} Topic `{{name}}` archived."
+FINISH_ARCHIVED = f"{STATUS_OK} Topic `{{name}}` archived"
 
 FINISH_BRANCH_OPTIONS = """Finish branch `{name}`:
 
@@ -250,14 +250,13 @@ FINISH_MERGED_PUSHED = f"{STATUS_OK} Merged and pushed `{{branch}}` -> `{{target
 FINISH_MERGED_LOCAL = f"{STATUS_OK} Merged `{{branch}}` -> `{{target}}` (local only)"
 FINISH_WORKTREE_CLEANUP_FAILED = f"\n{STATUS_WARN} Worktree cleanup failed: {{error}}"
 
-FINISH_DISCARDED_ARCHIVED = f"{STATUS_OK} Branch `{{branch}}` discarded and archived."
-FINISH_ARCHIVED_KEPT = f"""{STATUS_OK} Branch `{{branch}}` archived.
-Worktree kept for potential resume.
-Use /start to resume."""
+FINISH_DISCARDED_ARCHIVED = f"{STATUS_OK} Branch `{{branch}}` discarded and archived"
+FINISH_ARCHIVED_KEPT = f"""{STATUS_OK} Branch `{{branch}}` archived
+Worktree kept for potential resume"""
 
-FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages."
+FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
 
-Run /finish again after commit."""
+Run /finish again after commit"""
 
 
 # --- Start Flow ---
@@ -272,7 +271,7 @@ START_TMUX_SELECT = "Multiple tmux sessions found. Select one:"
 START_ERROR = "Error: {error}"
 START_LAUNCHING = "Launching Claude..."
 START_CONNECTED = "Connected to `{tmux_session}`"
-START_SESSION_KILLED = "Session killed. Use /start to restart."
+START_SESSION_KILLED = "Session killed. Use /start to restart"
 
 START_THREAD_RUNNING = f"""{STATUS_OK} Thread `{{thread_name}}` running
 
@@ -307,7 +306,7 @@ Branch `{{branch}}` not found (merged?).
 
 START_NEW_SESSION = f"{STATUS_PENDING} Starting new session..."
 START_RECREATING_WORKTREE = f"{STATUS_PENDING} Recreating worktree..."
-START_WORKTREE_RECREATED = f"{STATUS_OK} Worktree recreated. Use /start to launch."
+START_WORKTREE_RECREATED = f"{STATUS_OK} Worktree recreated. Use /start to launch"
 START_WORKTREE_RECREATE_FAILED = f"{STATUS_ERR} Failed to recreate: {{error}}"
 
 START_PATH_PROMPT = "Send project directory path:"
@@ -339,7 +338,7 @@ ERR_NOT_ADMIN_POPUP = "[x] Not admin. Your ID: {user_id}"
 
 # --- Branch Operations ---
 
-BRANCH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first."
+BRANCH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first"
 BRANCH_GIT_REQUIRED = f"{STATUS_ERR} Git repository required for /branch_create"
 BRANCH_CREATE_FROM_PROMPT = "Create branch from:"
 BRANCH_PROJECT_NOT_FOUND_TOAST = "Project not found"
@@ -355,9 +354,9 @@ BRANCH_DIR_EXISTS = f"{STATUS_ERR} Directory already exists: `{{path}}`"
 BRANCH_UNCOMMITTED_CHANGES = f"{STATUS_WARN} Uncommitted changes detected"
 BRANCH_UNCOMMITTED_IN_BASE = f"{STATUS_WARN} Uncommitted changes in {{base_branch}}"
 
-BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages."
+BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
 
-Run `/branch_create {{branch_name}}` again after commit."""
+Run `/branch_create {{branch_name}}` again after commit"""
 
 BRANCH_CREATING = f"{STATUS_PENDING} Creating branch `{{name}}`..."
 BRANCH_CREATED = f"{STATUS_OK} Branch `{{name}}` created"
