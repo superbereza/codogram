@@ -236,6 +236,18 @@ Handle deleted worktrees gracefully instead of crashing:
 
 ## In Progress
 
+### Robust /start flow
+Atomicity and error recovery for project creation flow:
+- **Atomicity** — project entry created only after successful clone/init
+- **URL validation** — check wiki/blob/gist URLs BEFORE cloning
+- **Retry on invalid URL** — stay in FSM state, ask for valid URL
+- **require_project_ready()** — helper to check cwd + tmux + Claude ready
+- **Hide commands** — /clear, /esc etc unavailable until project ready
+- **/reset_all** — command to reset project during setup (before Claude launches)
+- **sanitize_project_name with unidecode** — "Мой Проект 🚀" → `moj-proekt`
+- **Announce commands by chat type** — show available commands after successful launch
+- See docs/designs/2026-01-17-robust-start-flow.md (planned)
+
 ### Images and files input
 Support sending images and files from admin to Claude:
 - Save to temp/project folder

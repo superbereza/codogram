@@ -236,6 +236,18 @@
 
 ## In Progress
 
+### Robust /start flow
+Атомарность и error recovery для flow создания проекта:
+- **Атомарность** — project entry создаётся только после успешного clone/init
+- **Валидация URL** — проверка wiki/blob/gist ссылок ДО клонирования
+- **retry при невалидном URL** — остаёмся в FSM state, просим валидный URL
+- **require_project_ready()** — helper для проверки cwd + tmux + Claude ready
+- **Скрытие команд** — /clear, /esc etc недоступны пока проект не готов
+- **/reset_all** — команда для сброса проекта на этапе сетапа (до запуска Claude)
+- **sanitize_project_name с unidecode** — "Мой Проект 🚀" → `moj-proekt`
+- **Анонс команд по типу чата** — после успешного запуска показываем доступные команды
+- См. docs/designs/2026-01-17-robust-start-flow.md (planned)
+
 ### Отправка картинок и файлов
 Поддержка отправки картинок и файлов от админа в Claude:
 - Сохранять в temp/project folder
