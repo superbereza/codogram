@@ -3,9 +3,12 @@ import re
 import subprocess
 from pathlib import Path
 
+from unidecode import unidecode
+
 
 def sanitize_branch_name(name: str) -> str:
-    """Sanitize branch name: lowercase, replace invalid chars."""
+    """Sanitize branch name: lowercase, transliterate, replace invalid chars."""
+    name = unidecode(name)  # transliterate any language to ASCII
     name = name.lower()
     name = re.sub(r'[/\s]+', '-', name)  # slashes and spaces to dashes
     name = re.sub(r'[^a-z0-9_-]', '', name)  # remove invalid chars
