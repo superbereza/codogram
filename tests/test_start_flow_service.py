@@ -932,3 +932,30 @@ class TestCleanupProject:
 
             assert result.success is False
             assert "could not delete" in result.error.lower()
+
+
+class TestBuildAnnouncement:
+    """Tests for build_announcement() helper."""
+
+    def test_build_announcement_non_forum(self):
+        from codogram.services.start_flow import build_announcement
+
+        result = build_announcement("test-project", "claude-test", is_forum=False)
+
+        assert "test-project" in result
+        assert "claude-test" in result
+        assert "/esc" in result
+        assert "/clear" in result
+        assert "/auto_accept" in result
+        assert "/thread" not in result  # Forum-only
+        assert "/branch" not in result
+        assert "/finish" not in result
+
+    def test_build_announcement_forum(self):
+        from codogram.services.start_flow import build_announcement
+
+        result = build_announcement("test-project", "claude-test", is_forum=True)
+
+        assert "/thread" in result
+        assert "/branch" in result
+        assert "/finish" in result

@@ -22,6 +22,38 @@ if TYPE_CHECKING:
     from ..session_manager import ProjectManager, ProjectState
 
 
+def build_announcement(project_name: str, tmux_name: str, is_forum: bool) -> str:
+    """Build project ready announcement message.
+
+    Args:
+        project_name: Name of the project
+        tmux_name: Name of the tmux session
+        is_forum: Whether chat is a forum (has topics)
+
+    Returns:
+        Formatted announcement message
+    """
+    commands = [
+        "• /esc — cancel operation",
+        "• /clear — clear context",
+        "• /auto_accept — toggle auto-accept",
+    ]
+    if is_forum:
+        commands.extend([
+            "• /thread — new topic",
+            "• /branch — new branch + topic",
+            "• /finish — merge and archive",
+        ])
+
+    return f"""`[v]` Project `{project_name}` ready
+
+Commands available in this chat:
+{chr(10).join(commands)}
+
+To see Claude's UI, run in terminal:
+`tmux attach -t {tmux_name}`"""
+
+
 def is_setup_phase(project: "ProjectState") -> bool:
     """Check if project is in setup phase (Claude never ran).
 
