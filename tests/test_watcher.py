@@ -52,3 +52,25 @@ def test_parse_jsonl_entry_handles_string_in_assistant_content():
     result = parse_jsonl_entry(entry)
     assert result is not None
     assert result.content_type == ContentType.TEXT
+
+
+from codogram.watcher import format_tool_use
+
+
+def test_format_tool_use_bash_truncates_in_short_mode():
+    """Bash command should be truncated when verbose=False."""
+    long_cmd = "\n".join([f"echo line{i}" for i in range(10)])
+    result = format_tool_use("Bash", {"command": long_cmd}, verbose=False)
+    # Should truncate the command to 5 lines + [truncated]
+    assert "[truncated]" in result
+    # Original 10 lines should NOT be fully present
+    assert "echo line9" not in result
+
+
+def test_format_tool_use_bash_full_in_verbose_mode():
+    """Bash command should be full when verbose=True."""
+    long_cmd = "\n".join([f"echo line{i}" for i in range(10)])
+    result = format_tool_use("Bash", {"command": long_cmd}, verbose=True)
+    # All 10 lines should be present
+    assert "echo line9" in result
+    assert "[truncated]" not in result

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 from aiogram import Bot
 from .config import settings
 from .logging_config import logger
+from .utils.truncate import truncate_body
 
 class ContentType(Enum):
     TEXT = "text"
@@ -74,17 +75,21 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
 
     return None
 
-def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
+def format_tool_use(tool_name: str, tool_input: dict | None, verbose: bool = False) -> str:
     """Format tool use for Telegram display."""
     if not tool_input:
         return f"● **{tool_name}**"
 
     if tool_name == "Bash":
-        cmd = tool_input.get("command", "")[:500]
+        cmd = tool_input.get("command", "")
+        # Safety limits to prevent Telegram API errors
+        char_limit = 3500 if verbose else 500
+        cmd = cmd[:char_limit]
         desc = tool_input.get("description", "")
+        cmd_display = truncate_body(cmd, verbose=verbose) or cmd
         if desc:
-            return f"● **Bash**: {desc}\n`{cmd}`"
-        return f"● **Bash**\n`{cmd}`"
+            return f"● **Bash**: {desc}\n`{cmd_display}`"
+        return f"● **Bash**\n`{cmd_display}`"
     elif tool_name == "Read":
         path = tool_input.get("file_path", "")
         return f"● **Read** `{path}`"
@@ -107,6 +112,7 @@ def format_tool_use(tool_name: str, tool_input: dict | None) -> str:
         return f"● **TodoWrite**"
     else:
         preview = str(tool_input)[:200]
+        preview = truncate_body(preview, verbose=verbose) or preview
         return f"● **{tool_name}**\n`{preview}`"
 
 class JsonlWatcher:
@@ -210,7 +216,7 @@ async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "Telegram
         raise
 
 
-def _entry_to_messages(entry: ParsedEntry) -> list[dict]:
+def _entry_to_messages(entry: ParsedEntry, verbose: bool = False) -> list[dict]:
     """Convert ParsedEntry to list of message dicts for queue."""
     messages = []
 
@@ -218,7 +224,7 @@ def _entry_to_messages(entry: ParsedEntry) -> list[dict]:
         messages.append({"text": f"● {entry.text}", "parse_mode": "MarkdownV2"})
 
     elif entry.content_type == ContentType.TOOL_USE:
-        text = format_tool_use(entry.tool_name, entry.tool_input)
+        text = format_tool_use(entry.tool_name, entry.tool_input, verbose=verbose)
         messages.append({"text": text, "parse_mode": "MarkdownV2"})
 
     return messages
