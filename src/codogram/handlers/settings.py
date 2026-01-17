@@ -84,10 +84,6 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     lines.append(f"• auto-accept: {auto_status}")
     lines.append(f"• verbose: {verbose_status}")
     lines.append("")
-    lines.append("experimental")
-    lines.append(f"• /feat\\_toggle\\_thinking\\_status: {thinking_status}")
-    lines.append(f"• /feat\\_toggle\\_suggestions: {suggestions_status}")
-    lines.append("")
     lines.append("claude")
 
     # Get Claude session state from tmux
@@ -122,6 +118,11 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
         lines.append("• mode: not connected")
         lines.append("• background tasks: ?")
         lines.append("• context: ?")
+
+    lines.append("")
+    lines.append("experimental features")
+    lines.append(f"• /exp\\_thinking\\_status: {thinking_status}")
+    lines.append(f"• /exp\\_suggestions: {suggestions_status}")
 
     return "\n".join(lines)
 
@@ -222,8 +223,8 @@ async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, f"Verbose output: {status}")
 
 
-@router.message(Command("feat_toggle_thinking_status"))
-async def cmd_feat_toggle_thinking_status(message: Message, telegram_queue: TelegramQueue):
+@router.message(Command("exp_thinking_status"))
+async def cmd_exp_thinking_status(message: Message, telegram_queue: TelegramQueue):
     """Toggle thinking status feature."""
     chat_id = message.chat.id
     thread_id = message.message_thread_id
@@ -248,8 +249,8 @@ async def cmd_feat_toggle_thinking_status(message: Message, telegram_queue: Tele
     await telegram_queue.reply(message, f"Thinking status: {status}")
 
 
-@router.message(Command("feat_toggle_suggestions"))
-async def cmd_feat_toggle_suggestions(message: Message, telegram_queue: TelegramQueue):
+@router.message(Command("exp_suggestions"))
+async def cmd_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
     """Toggle suggestions feature."""
     chat_id = message.chat.id
     thread_id = message.message_thread_id
