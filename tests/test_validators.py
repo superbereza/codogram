@@ -5,6 +5,7 @@ from codogram.domain.validators import (
     is_valid_project_name,
     sanitize_project_name,
     MAX_PROJECT_NAME_LENGTH,
+    validate_git_url,
 )
 
 
@@ -82,3 +83,55 @@ class TestSanitizeProjectName:
 
     def test_preserves_valid_chars(self):
         assert sanitize_project_name("my-project_123") == "my-project_123"
+
+
+class TestValidateGitUrl:
+    def test_valid_https_url(self):
+        is_valid, error = validate_git_url("https://github.com/user/repo.git")
+        assert is_valid is True
+        assert error is None
+
+    def test_valid_ssh_url(self):
+        is_valid, error = validate_git_url("git@github.com:user/repo.git")
+        assert is_valid is True
+        assert error is None
+
+    def test_valid_ssh_protocol_url(self):
+        is_valid, error = validate_git_url("ssh://git@github.com/user/repo.git")
+        assert is_valid is True
+        assert error is None
+
+    def test_wiki_url_invalid(self):
+        is_valid, error = validate_git_url("https://github.com/user/repo/wiki/Page")
+        assert is_valid is False
+        assert "wiki" in error.lower()
+
+    def test_blob_url_invalid(self):
+        is_valid, error = validate_git_url("https://github.com/user/repo/blob/main/file.py")
+        assert is_valid is False
+        assert "file" in error.lower()
+
+    def test_tree_url_invalid(self):
+        is_valid, error = validate_git_url("https://github.com/user/repo/tree/main/folder")
+        assert is_valid is False
+        assert "file" in error.lower()
+
+    def test_gist_url_invalid(self):
+        is_valid, error = validate_git_url("https://gist.github.com/user/abc123")
+        assert is_valid is False
+        assert "gist" in error.lower()
+
+    def test_invalid_format(self):
+        is_valid, error = validate_git_url("ftp://example.com/repo")
+        assert is_valid is False
+        assert "format" in error.lower()
+
+    def test_repo_named_wiki_valid(self):
+        """Repo with 'wiki' in name should be valid."""
+        is_valid, error = validate_git_url("https://github.com/user/wiki-parser.git")
+        assert is_valid is True
+
+    def test_repo_named_blob_valid(self):
+        """Repo with 'blob' in name should be valid."""
+        is_valid, error = validate_git_url("https://github.com/user/blob-storage.git")
+        assert is_valid is True

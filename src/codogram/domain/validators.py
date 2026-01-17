@@ -1,7 +1,30 @@
 """Domain validators for project names and other inputs."""
 import re
 
+from .. import strings
+
 MAX_PROJECT_NAME_LENGTH = 35
+
+
+def validate_git_url(url: str) -> tuple[bool, str | None]:
+    """Validate git clone URL.
+
+    Returns (is_valid, error_string). Uses precise GitHub patterns
+    to avoid false positives on repos with names like 'wiki-parser'.
+    """
+    # GitHub-specific patterns (match only actual file/tree URLs)
+    github_blob = re.compile(r'github\.com/[^/]+/[^/]+/blob/')
+    github_tree = re.compile(r'github\.com/[^/]+/[^/]+/tree/')
+
+    if "/wiki/" in url and "github.com" in url:
+        return False, strings.GIT_URL_INVALID_WIKI
+    if github_blob.search(url) or github_tree.search(url):
+        return False, strings.GIT_URL_INVALID_BLOB
+    if "gist.github.com" in url:
+        return False, strings.GIT_URL_INVALID_GIST
+    if not url.startswith(("https://", "git@", "ssh://")):
+        return False, strings.GIT_URL_INVALID_FORMAT
+    return True, None
 
 
 def is_valid_project_name(name: str) -> bool:
