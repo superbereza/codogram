@@ -2,6 +2,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
 from freezegun import freeze_time
 
 
@@ -205,3 +206,79 @@ class TestBuildPath:
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "outside" in str(e).lower()
+
+
+class TestSaveFile:
+    @pytest.mark.asyncio
+    @freeze_time("2026-01-17 04:35:12")
+    async def test_save_file_success(self, tmp_path):
+        from codogram.services.file_input import FileInputService, FileInfo
+
+        service = FileInputService()
+        file_info = FileInfo(file_id="abc123", extension="png", size=1000)
+
+        async def mock_download(file_id, destination):
+            Path(destination).write_bytes(b"fake image data")
+
+        result = await service.save_file(
+            file_info=file_info,
+            cwd=str(tmp_path),
+            thread_name="celestial",
+            thread_id=1328,
+            user_id=456,
+            download_fn=mock_download
+        )
+
+        assert result.success is True
+        assert result.path is not None
+        assert result.path.exists()
+        assert result.path.read_bytes() == b"fake image data"
+        assert "celestial" in str(result.path)
+
+    @pytest.mark.asyncio
+    async def test_save_file_too_large(self, tmp_path):
+        from codogram.services.file_input import FileInputService, FileInfo
+
+        service = FileInputService()
+        file_info = FileInfo(
+            file_id="abc123",
+            extension="png",
+            size=25 * 1024 * 1024  # 25MB > 20MB limit
+        )
+
+        async def mock_download(file_id, destination):
+            pass
+
+        result = await service.save_file(
+            file_info=file_info,
+            cwd=str(tmp_path),
+            thread_name="main",
+            thread_id=None,
+            user_id=123,
+            download_fn=mock_download
+        )
+
+        assert result.success is False
+        assert result.error == "too_large"
+
+    @pytest.mark.asyncio
+    async def test_save_file_download_fails(self, tmp_path):
+        from codogram.services.file_input import FileInputService, FileInfo
+
+        service = FileInputService()
+        file_info = FileInfo(file_id="abc123", extension="png", size=1000)
+
+        async def failing_download(file_id, destination):
+            raise Exception("Network error")
+
+        result = await service.save_file(
+            file_info=file_info,
+            cwd=str(tmp_path),
+            thread_name="main",
+            thread_id=None,
+            user_id=123,
+            download_fn=failing_download
+        )
+
+        assert result.success is False
+        assert result.error == "download_failed"

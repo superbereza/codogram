@@ -106,3 +106,45 @@ class FileInputService:
             raise ValueError(f"Path {resolved} is outside allowed directory {base_resolved}")
 
         return path
+
+    async def save_file(
+        self,
+        file_info: FileInfo,
+        cwd: str,
+        thread_name: str,
+        thread_id: int | None,
+        user_id: int,
+        download_fn: DownloadFn
+    ) -> FileInputResult:
+        """Validate, build path, download via callback, return result.
+
+        Args:
+            file_info: File metadata from extract_info()
+            cwd: Project working directory
+            thread_name: Thread name for folder
+            thread_id: Thread ID for filename (None for main)
+            user_id: User ID for filename
+            download_fn: Callback to download file (handler provides this)
+
+        Returns:
+            FileInputResult with success/error/path
+        """
+        # Validate size
+        if file_info.size > self.MAX_SIZE_BYTES:
+            return FileInputResult(success=False, error="too_large")
+
+        # Build path
+        try:
+            path = self._build_path(cwd, thread_name, thread_id, user_id, file_info.extension)
+        except ValueError:
+            return FileInputResult(success=False, error="path_error")
+
+        # Download via callback
+        try:
+            await download_fn(file_info.file_id, str(path))
+        except Exception:
+            # Cleanup partial file
+            path.unlink(missing_ok=True)
+            return FileInputResult(success=False, error="download_failed")
+
+        return FileInputResult(success=True, path=path)
