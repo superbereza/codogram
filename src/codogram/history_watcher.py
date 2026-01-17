@@ -256,7 +256,7 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
     try:
         async for entry in watcher.watch():
             try:
-                messages = _entry_to_messages(entry)
+                messages = _entry_to_messages(entry, verbose=thread.verbose)
                 if messages:
                     text_preview = messages[0].get("text", "")[:40].replace("\n", " ")
                     # Use hash of preview as tracking ID
