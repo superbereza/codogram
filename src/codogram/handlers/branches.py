@@ -5,6 +5,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
+from .. import strings
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
 from .common import require_forum_group, clear_flow_state, set_flow_state
@@ -40,12 +41,12 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await telegram_queue.reply(message, "`[!]` Project not registered. Use /start first.")
+        await telegram_queue.reply(message, strings.BRANCH_PROJECT_NOT_REGISTERED)
         return
 
     # Check git repo
     if not is_git_repo(Path(project.cwd)):
-        await telegram_queue.reply(message, "`[x]` Git repository required for /branch_create")
+        await telegram_queue.reply(message, strings.BRANCH_GIT_REQUIRED)
         return
 
     # Check for stale worktree early (before name prompt)
@@ -73,9 +74,7 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
             # Show warning with name prompt
             await telegram_queue.reply(
                 message,
-                f"`[!]` Worktree not found, using {default_branch} as base\n\n"
-                "Branch name?\n\n"
-                "Send name or pick random",
+                strings.BRANCH_WORKTREE_NOT_FOUND_BASE.format(default_branch=default_branch),
                 reply_markup=build_name_prompt_keyboard(CreateType.BRANCH),
             )
         else:
@@ -94,14 +93,14 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
 
     # Check if branch already exists
     if branch_exists(Path(project.cwd), branch_name):
-        await telegram_queue.reply(message, f"`[x]` Branch `{branch_name}` already exists")
+        await telegram_queue.reply(message, strings.BRANCH_ALREADY_EXISTS.format(name=branch_name))
         return
 
     # Check if worktree directory already exists
     main_repo = Path(project.cwd)
     worktree_dir = main_repo.parent / f"{main_repo.name}-{branch_name}"
     if worktree_dir.exists():
-        await telegram_queue.reply(message, f"`[x]` Directory already exists: `{worktree_dir}`")
+        await telegram_queue.reply(message, strings.BRANCH_DIR_EXISTS.format(path=worktree_dir))
         return
 
     # Check if creating from worktree topic or main
@@ -112,7 +111,7 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
             [InlineKeyboardButton(text=f"From {current_thread.name}", callback_data=f"bc_base:{branch_name}:{current_thread.name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await telegram_queue.reply(message, "Create branch from:", reply_markup=keyboard)
+        await telegram_queue.reply(message, strings.BRANCH_CREATE_FROM_PROMPT, reply_markup=keyboard)
         return
 
     # From main - check uncommitted changes
@@ -122,7 +121,7 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
             [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await telegram_queue.reply(message, "`[!]` Uncommitted changes detected", reply_markup=keyboard)
+        await telegram_queue.reply(message, strings.BRANCH_UNCOMMITTED_CHANGES, reply_markup=keyboard)
         return
 
     # No uncommitted changes - create directly
@@ -133,9 +132,12 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
 async def on_branch_base_selected(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle base branch selection for branch_create."""
     _, branch_name, base_branch = callback.data.split(":")
-    project = project_manager.get_by_chat(callback.message.chat.id)
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
     if not project:
-        await callback.answer("Project not found")
+        await callback.answer(strings.BRANCH_PROJECT_NOT_FOUND_TOAST)
         return
 
     # Check uncommitted in selected base
@@ -153,26 +155,45 @@ async def on_branch_base_selected(callback: CallbackQuery, telegram_queue: Teleg
             [InlineKeyboardButton(text="Commit first", callback_data=f"bc_commit:{branch_name}")],
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")]
         ])
-        await telegram_queue.edit(callback.message, f"`[!]` Uncommitted changes in {base_branch}", reply_markup=keyboard)
+        await telegram_queue.edit(
+            callback.message,
+            strings.BRANCH_UNCOMMITTED_IN_BASE.format(base_branch=base_branch),
+            reply_markup=keyboard,
+        )
         return
 
-    await callback.message.delete()
-    await do_branch_create(callback.bot, callback.message.chat.id, project, branch_name, base_branch)
+    # 1. Remove buttons (edit)
+    await telegram_queue.edit(callback.message, strings.BRANCH_CREATING.format(name=branch_name))
     await callback.answer()
+
+    # 2. Create branch
+    await do_branch_create(callback.bot, chat_id, project, branch_name, base_branch)
+
+    # 3. Final status (send)
+    await telegram_queue.send(chat_id, strings.BRANCH_CREATED.format(name=branch_name), thread_id=thread_id)
 
 
 @router.callback_query(F.data.startswith("bc_create:"))
 async def on_branch_create_confirm(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Create branch from last commit."""
     _, branch_name, base_branch = callback.data.split(":")
-    project = project_manager.get_by_chat(callback.message.chat.id)
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
     if not project:
-        await callback.answer("Project not found")
+        await callback.answer(strings.BRANCH_PROJECT_NOT_FOUND_TOAST)
         return
 
-    await callback.message.delete()
-    await do_branch_create(callback.bot, callback.message.chat.id, project, branch_name, base_branch)
+    # 1. Remove buttons (edit)
+    await telegram_queue.edit(callback.message, strings.BRANCH_CREATING.format(name=branch_name))
     await callback.answer()
+
+    # 2. Create branch
+    await do_branch_create(callback.bot, chat_id, project, branch_name, base_branch)
+
+    # 3. Final status (send)
+    await telegram_queue.send(chat_id, strings.BRANCH_CREATED.format(name=branch_name), thread_id=thread_id)
 
 
 @router.callback_query(F.data.startswith("bc_commit:"))
@@ -181,7 +202,7 @@ async def on_branch_commit_request(callback: CallbackQuery, telegram_queue: Tele
     _, branch_name = callback.data.split(":")
     project = project_manager.get_by_chat(callback.message.chat.id)
     if not project:
-        await callback.answer("Project not found")
+        await callback.answer(strings.BRANCH_PROJECT_NOT_FOUND_TOAST)
         return
 
     thread = project.threads.get(callback.message.message_thread_id)
@@ -194,8 +215,7 @@ async def on_branch_commit_request(callback: CallbackQuery, telegram_queue: Tele
 
     await telegram_queue.edit(
         callback.message,
-        "`[~]` Sent: \"Commit current changes in logical chunks with descriptive messages.\"\n\n"
-        f"Run `/branch_create {branch_name}` again after commit.",
+        strings.BRANCH_COMMIT_SENT.format(branch_name=branch_name),
     )
     await callback.answer()
 
@@ -217,4 +237,4 @@ async def on_branch_redirect(callback: CallbackQuery, telegram_queue: TelegramQu
 @router.message(Command("branch_finish"))
 async def cmd_branch_finish(message: Message, telegram_queue: TelegramQueue):
     """Deprecated: redirect to /finish."""
-    await telegram_queue.reply(message, "`[i]` Use /finish to complete branches")
+    await telegram_queue.reply(message, strings.BRANCH_FINISH_USE_FINISH)

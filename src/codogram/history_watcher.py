@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from aiogram import Bot
 
+from . import strings
 from .session_manager import project_manager, ProjectState, ThreadInfo
 
 if TYPE_CHECKING:
@@ -107,7 +108,7 @@ class HistoryWatcher:
                             batch = OutgoingBatch(
                                 chat_id=project.chat_id,
                                 thread_id=thread.thread_id,
-                                messages=[{"text": f"`[!]` Claude session closed: {thread.name}", "parse_mode": "MarkdownV2"}],
+                                messages=[{"text": strings.SESSION_CLOSED.format(name=thread.name), "parse_mode": "MarkdownV2"}],
                             )
                             await self.telegram_queue.enqueue_nowait(batch)
                         except Exception:
@@ -228,7 +229,7 @@ class HistoryWatcher:
             batch = OutgoingBatch(
                 chat_id=project.chat_id,
                 thread_id=thread.thread_id,
-                messages=[{"text": "`[v]` New session bound", "parse_mode": "MarkdownV2"}],
+                messages=[{"text": strings.SESSION_BOUND, "parse_mode": "MarkdownV2"}],
             )
             # Fire-and-forget notification
             await self.telegram_queue.enqueue_nowait(batch)
@@ -364,7 +365,7 @@ async def poll_for_session_thread(
         batch = OutgoingBatch(
             chat_id=project.chat_id,
             thread_id=thread.thread_id,
-            messages=[{"text": "`[!]` Session not found. Make sure Claude is running.", "parse_mode": "MarkdownV2"}],
+            messages=[{"text": strings.SESSION_NOT_FOUND, "parse_mode": "MarkdownV2"}],
         )
         await telegram_queue.enqueue_nowait(batch)
     except Exception:

@@ -17,6 +17,7 @@ from .tmux import TmuxSession
 from .logging_config import logger
 from .auto_accept import try_auto_accept
 from .config import settings
+from . import strings
 
 
 class PollerState(Enum):
@@ -141,7 +142,7 @@ async def permission_poller(
                 batch = OutgoingBatch(
                     chat_id=project.chat_id,
                     thread_id=thread_id,
-                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
+                    messages=[{"text": strings.CLAUDE_CRASHED.format(reason=crash_reason), "parse_mode": "MarkdownV2"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
@@ -182,8 +183,10 @@ async def permission_poller(
                             telegram_queue, project.chat_id, thread_id, context_name,
                             prompt_type=parsed.prompt_type,
                         ):
-                            state = PollerState.IDLE
-                            last_options = None
+                            # Go to SHOWING to reuse existing dedup logic
+                            # (wait for prompt to disappear before accepting new ones)
+                            state = PollerState.SHOWING
+                            last_body = parsed.body
                             continue
 
                     logger.debug(f"{log_prefix} DEBOUNCING->SHOWING: sending to Telegram")
