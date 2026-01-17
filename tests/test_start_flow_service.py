@@ -72,10 +72,10 @@ class TestHandleStartWithProjectName:
         assert "letters, digits" in result.error.lower() or "only contain" in result.error.lower()
 
     def test_project_name_too_long(self):
-        """Project name > 35 chars -> ERROR."""
+        """Project name > 50 chars -> ERROR."""
         service = StartFlowService(Mock(), Mock())
 
-        result = service.handle_start(chat_id=123, args=["a" * 40])
+        result = service.handle_start(chat_id=123, args=["a" * 55])
 
         assert result.action == FlowAction.ERROR
         assert "too long" in result.error.lower()
@@ -105,13 +105,14 @@ class TestHandleStartNoArgs:
         with patch(
             "codogram.services.start_flow.resolve_project_path"
         ) as mock_resolve:
-            mock_resolve.return_value = Mock(path="/tmp/My-Project", exists=False)
+            mock_resolve.return_value = Mock(path="/tmp/my-project", exists=False)
             result = service.handle_start(
                 chat_id=123, args=[], chat_title="My Project!"
             )
 
         assert result.action == FlowAction.ASK_DIR_CHOICE
-        assert result.project == "My-Project"
+        # sanitize_project_name now lowercases the result
+        assert result.project == "my-project"
 
     def test_ignores_invalid_chat_title(self):
         """Chat title that sanitizes to empty -> ASK_PROJECT_NAME."""

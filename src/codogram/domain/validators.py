@@ -1,9 +1,11 @@
 """Domain validators for project names and other inputs."""
 import re
 
+from unidecode import unidecode
+
 from .. import strings
 
-MAX_PROJECT_NAME_LENGTH = 35
+MAX_PROJECT_NAME_LENGTH = 50
 
 
 def validate_git_url(url: str) -> tuple[bool, str | None]:
@@ -32,7 +34,7 @@ def is_valid_project_name(name: str) -> bool:
 
     Valid names:
     - Only letters, digits, dash, underscore
-    - Max 35 characters
+    - Max 50 characters
     - Not empty
     """
     if not name:
@@ -43,26 +45,25 @@ def is_valid_project_name(name: str) -> bool:
 
 
 def sanitize_project_name(title: str) -> str | None:
-    """Convert chat title to valid project name.
+    """Sanitize chat title to valid project name.
 
-    - Replaces invalid chars with dashes
-    - Collapses multiple dashes
-    - Strips leading/trailing dashes
-    - Returns None if result is empty or too long
+    Uses unidecode to transliterate non-ASCII characters.
+    Returns None if result is empty or too long.
     """
     if not title:
         return None
 
-    # Replace invalid chars with dash
-    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '-', title)
+    # Transliterate to ASCII
+    sanitized = unidecode(title)
+    sanitized = sanitized.lower()
+    # Replace non-alphanumeric with dashes
+    sanitized = re.sub(r'[^a-z0-9_-]', '-', sanitized)
     # Collapse multiple dashes
     sanitized = re.sub(r'-+', '-', sanitized)
     # Strip leading/trailing dashes
     sanitized = sanitized.strip('-')
 
-    if not sanitized:
-        return None
-    if len(sanitized) > MAX_PROJECT_NAME_LENGTH:
+    if not sanitized or len(sanitized) > MAX_PROJECT_NAME_LENGTH:
         return None
 
     return sanitized

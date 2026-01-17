@@ -44,45 +44,64 @@ class TestIsValidProjectName:
 
 
 class TestMaxProjectNameLength:
-    def test_constant_is_35(self):
-        assert MAX_PROJECT_NAME_LENGTH == 35
+    def test_constant_is_50(self):
+        assert MAX_PROJECT_NAME_LENGTH == 50
 
     def test_valid_name_at_max_length(self):
-        name = "a" * 35
+        name = "a" * 50
         assert is_valid_project_name(name) is True
 
     def test_invalid_name_over_max_length(self):
-        name = "a" * 36
+        name = "a" * 51
         assert is_valid_project_name(name) is False
 
 
 class TestSanitizeProjectName:
-    def test_simple_title(self):
-        assert sanitize_project_name("MyProject") == "MyProject"
+    def test_cyrillic(self):
+        result = sanitize_project_name("Мой Проект")
+        # unidecode transliterates й as i, not j
+        assert result == "moi-proekt"
 
-    def test_title_with_spaces(self):
-        assert sanitize_project_name("My Project") == "My-Project"
+    def test_emoji(self):
+        result = sanitize_project_name("Test Project ")
+        assert result == "test-project"
 
-    def test_title_with_special_chars(self):
-        assert sanitize_project_name("My Project!@#") == "My-Project"
+    def test_japanese(self):
+        result = sanitize_project_name("日本語")
+        # unidecode converts to romaji
+        assert result is not None
+        assert all(c.isalnum() or c == '-' for c in result)
 
-    def test_title_with_multiple_spaces(self):
-        assert sanitize_project_name("My   Project") == "My-Project"
+    def test_already_valid(self):
+        result = sanitize_project_name("my-project")
+        assert result == "my-project"
 
-    def test_cyrillic_title(self):
-        # Cyrillic gets replaced with dashes, then stripped
-        result = sanitize_project_name("Мой проект")
-        assert result is None or result == ""
+    def test_spaces_to_dashes(self):
+        result = sanitize_project_name("My Cool Project")
+        assert result == "my-cool-project"
+
+    def test_multiple_dashes_collapsed(self):
+        result = sanitize_project_name("test---project")
+        assert result == "test-project"
+
+    def test_strips_leading_trailing_dashes(self):
+        result = sanitize_project_name("-test-project-")
+        assert result == "test-project"
+
+    def test_empty_returns_none(self):
+        result = sanitize_project_name("")
+        assert result is None
+
+    def test_too_long_returns_none(self):
+        result = sanitize_project_name("a" * 100)
+        assert result is None
+
+    def test_preserves_underscores(self):
+        result = sanitize_project_name("my_project_123")
+        assert result == "my_project_123"
 
     def test_empty_after_sanitize(self):
         assert sanitize_project_name("!!!") is None
-
-    def test_too_long_gets_none(self):
-        long_title = "a" * 50
-        assert sanitize_project_name(long_title) is None
-
-    def test_preserves_valid_chars(self):
-        assert sanitize_project_name("my-project_123") == "my-project_123"
 
 
 class TestValidateGitUrl:
