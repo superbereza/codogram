@@ -363,3 +363,42 @@ def test_parse_thinking_status_none():
 """
     result = parse_thinking_status(output)
     assert result is None
+
+
+# Input Suggestion Tests
+
+from codogram.screen import parse_input_suggestion
+
+
+def test_parse_input_suggestion_basic():
+    """Parse suggestion from input box."""
+    output = """
+● Response text
+────────────────────────────────────────
+❯ посмотри что залогировалось                                            ↵ send
+────────────────────────────────────────
+"""
+    result = parse_input_suggestion(output)
+    assert result == "посмотри что залогировалось"
+
+
+def test_parse_input_suggestion_empty():
+    """Return None for empty input."""
+    output = """
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
+    result = parse_input_suggestion(output)
+    assert result is None
+
+
+def test_parse_input_suggestion_user_typing():
+    """Return None when user is typing (no ↵ send)."""
+    output = """
+────────────────────────────────────────
+❯ my custom text
+────────────────────────────────────────
+"""
+    result = parse_input_suggestion(output)
+    assert result is None

@@ -307,3 +307,39 @@ def parse_thinking_status(output: str) -> str | None:
             result = re.sub(r'(?<!/)(esc to interrupt)', r'/\1', result)
             return result
     return None
+
+
+def parse_input_suggestion(output: str) -> str | None:
+    """Parse suggestion from input box.
+
+    Format: ❯ suggestion text                    ↵ send
+    Located between last two ──── lines (input box).
+
+    Returns suggestion text or None if no suggestion.
+    """
+    lines = output.split("\n")
+
+    # Find last two ──── separators
+    sep_indices = []
+    for i, line in enumerate(lines):
+        if "─" * 10 in line:
+            sep_indices.append(i)
+
+    if len(sep_indices) < 2:
+        return None
+
+    # Get content between last two separators
+    start = sep_indices[-2]
+    end = sep_indices[-1]
+
+    content = "\n".join(lines[start + 1:end]).strip()
+
+    # Match pattern: ❯ text ↵ send
+    # \xa0 is non-breaking space that Claude uses
+    match = re.match(r'❯[\s\xa0]*(.+?)[\s\xa0]*↵\s*send', content)
+    if match:
+        suggestion = match.group(1).strip()
+        if suggestion:
+            return suggestion
+
+    return None
