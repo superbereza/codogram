@@ -168,18 +168,18 @@ async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
             for t in project.threads.values():
                 t.auto_accept = False
         project_manager._save()
-        await telegram_queue.reply(message, "Auto-accept reset to **OFF** for project and all threads.")
+        await telegram_queue.reply(message, "Auto-accept reset to ○ off for project and all threads.")
         return
 
     # /auto_accept - toggle current context
     if thread:
         thread.auto_accept = not thread.auto_accept
-        status = "⚡ ON" if thread.auto_accept else "OFF"
-        await telegram_queue.reply(message, f"Auto-accept for `{thread.name}`: **{status}**")
+        status = "● on" if thread.auto_accept else "○ off"
+        await telegram_queue.reply(message, f"Auto-accept: {status}")
     else:
         project.auto_accept = not project.auto_accept
-        status = "⚡ ON" if project.auto_accept else "OFF"
-        await telegram_queue.reply(message, f"Auto-accept: **{status}**")
+        status = "● on" if project.auto_accept else "○ off"
+        await telegram_queue.reply(message, f"Auto-accept: {status}")
     project_manager._save()
 
 
