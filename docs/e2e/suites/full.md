@@ -27,6 +27,10 @@
 | TC-SETTINGS-002 | /settings shows info | commands/settings.md |
 | TC-SETTINGS-003 | /auto_accept toggle | commands/settings.md |
 | TC-SETTINGS-004 | /get_debug_ids | commands/settings.md |
+| TC-SETTINGS-010 | /auto_accept circle indicators | commands/settings.md |
+| TC-SETTINGS-011 | Settings button toggles auto_accept | commands/settings.md |
+| TC-SETTINGS-012 | Settings button toggles verbose | commands/settings.md |
+| TC-SETTINGS-013 | Settings button cycles mode | commands/settings.md |
 
 ### Error Handling
 | ID | Название | Файл |
@@ -47,17 +51,21 @@
 | TC-WATCHER-003 | Long output chunking | commands/watcher.md |
 | TC-WATCHER-004 | Watcher starts for resumed session | commands/watcher.md |
 | TC-WATCHER-005 | Watcher output after bot restart | commands/watcher.md |
+| TC-WATCHER-006 | Tool call truncated (verbose=off) | commands/watcher.md |
+| TC-WATCHER-007 | Tool call full (verbose=on) | commands/watcher.md |
 
 ### Permissions Extended
 | ID | Название | Файл |
 |----|----------|------|
 | TC-PERMISSIONS-005 | Poller detects new folder prompt | commands/permissions.md |
 | TC-PERMISSIONS-006 | Poller starts for resumed session | commands/permissions.md |
+| TC-PERMISSIONS-011 | Permission truncated (verbose=off) | commands/permissions.md |
+| TC-PERMISSIONS-012 | Permission full (verbose=on) | commands/permissions.md |
 
 ## Включённые тесты из Critical
 
-Все 21 тест из critical.md
+Все 26 тестов из critical.md
 
 ## Критерий успеха
 
-Все ~40 тестов PASS = готов к релизу.
+Все ~50 тестов PASS = готов к релизу.
