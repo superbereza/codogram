@@ -37,10 +37,11 @@ class OutgoingBatch:
 class EditBatch:
     """Single message edit operation."""
     chat_id: int
-    message_id: int
+    message_id: int  # 0 = lookup from sent_statuses using replace_key
     text: str
     parse_mode: str | None = None
     reply_markup: InlineKeyboardMarkup | None = None
+    replace_key: str | None = None  # If message_id=0, use this to lookup
 
 
 @dataclass
@@ -56,7 +57,8 @@ class KeyboardBatch:
 class DeleteBatch:
     """Delete message operation."""
     chat_id: int
-    message_id: int
+    message_id: int  # 0 = lookup from sent_statuses using replace_key
+    replace_key: str | None = None
 
 
 @dataclass
@@ -335,10 +337,18 @@ class TelegramQueue:
         """Edit a message. Handles rate limits and parse errors."""
         MAX_ATTEMPTS = 3
 
+        # Lookup message_id from sent_statuses if needed
+        message_id = batch.message_id
+        if message_id == 0 and batch.replace_key:
+            message_id = self.sent_statuses.get(batch.replace_key)
+            if not message_id:
+                logger.debug(f"No stored msg_id for replace_key={batch.replace_key}, skipping edit")
+                return
+
         if attempt >= MAX_ATTEMPTS:
             logger.error(
                 f"Edit failed after {MAX_ATTEMPTS} attempts, "
-                f"chat_id={batch.chat_id}, message_id={batch.message_id}"
+                f"chat_id={batch.chat_id}, message_id={message_id}"
             )
             return
 
@@ -357,7 +367,7 @@ class TelegramQueue:
         try:
             await self.bot.edit_message_text(
                 chat_id=batch.chat_id,
-                message_id=batch.message_id,
+                message_id=message_id,
                 text=text,
                 parse_mode=batch.parse_mode,
                 reply_markup=batch.reply_markup,
@@ -404,10 +414,22 @@ class TelegramQueue:
 
     async def _delete_message(self, batch: DeleteBatch) -> None:
         """Delete a message. Silently ignores errors (message already deleted)."""
+        # Lookup message_id from sent_statuses if needed
+        message_id = batch.message_id
+        if message_id == 0 and batch.replace_key:
+            message_id = self.sent_statuses.get(batch.replace_key)
+            if not message_id:
+                logger.debug(f"No stored msg_id for replace_key={batch.replace_key}, skipping delete")
+                return
+
         try:
-            await self.bot.delete_message(batch.chat_id, batch.message_id)
+            await self.bot.delete_message(batch.chat_id, message_id)
         except Exception as e:
             logger.debug(f"Delete failed (message likely already deleted): {e}")
+
+        # Clean up sent_statuses
+        if batch.replace_key and batch.replace_key in self.sent_statuses:
+            del self.sent_statuses[batch.replace_key]
 
     async def _cleanup_orphans(self, chat_id: int, msg_ids: list[int]) -> None:
         """Delete partially sent messages."""

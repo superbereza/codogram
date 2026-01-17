@@ -442,3 +442,68 @@ async def test_sent_statuses_tracks_message_ids():
 
     assert queue.sent_statuses.get("thinking:123:456") == 999
     await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_edit_by_replace_key():
+    """EditBatch with replace_key should use stored msg_id."""
+    from unittest.mock import MagicMock
+    from codogram.telegram_queue import EditBatch
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))
+    bot.edit_message_text = AsyncMock()
+
+    queue = TelegramQueue(bot)
+
+    # First send
+    send_batch = OutgoingBatch(
+        chat_id=123, thread_id=None,
+        messages=[{"text": "original"}],
+        replace_key="status:1"
+    )
+    await queue.enqueue(send_batch)
+
+    # Then edit by key
+    edit_batch = EditBatch(
+        chat_id=123, message_id=0,  # 0 = use sent_statuses
+        text="updated",
+        replace_key="status:1"
+    )
+    await queue.enqueue(edit_batch)
+
+    bot.edit_message_text.assert_called_with(
+        chat_id=123, message_id=999, text="updated",
+        parse_mode=None, reply_markup=None
+    )
+    await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_delete_by_replace_key():
+    """DeleteBatch with replace_key should use stored msg_id and clean up."""
+    from unittest.mock import MagicMock
+    from codogram.telegram_queue import DeleteBatch
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))
+    bot.delete_message = AsyncMock()
+
+    queue = TelegramQueue(bot)
+
+    # First send
+    send_batch = OutgoingBatch(
+        chat_id=123, thread_id=None,
+        messages=[{"text": "temp"}],
+        replace_key="status:1"
+    )
+    await queue.enqueue(send_batch)
+    assert queue.sent_statuses.get("status:1") == 999
+
+    # Then delete by key
+    delete_batch = DeleteBatch(chat_id=123, message_id=0, replace_key="status:1")
+    await queue.enqueue(delete_batch)
+
+    bot.delete_message.assert_called_with(123, 999)
+    assert "status:1" not in queue.sent_statuses
+    await queue.shutdown()
