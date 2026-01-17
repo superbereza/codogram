@@ -39,29 +39,38 @@ class OutgoingBatch:
 
 ## Parsing in screen.py
 
-**New dataclass:**
-```python
-@dataclass
-class ThinkingStatus:
-    verb: str      # "Hatching", "Conjuring", "Enchanting"
-    seconds: int   # 42
-    tokens: int    # 0
-```
+**Simplified approach:** parse line as-is, only inject Telegram commands.
+
+**Spinner symbols:** `·✶✻✽*✢` (6 animation frames)
 
 **New function:**
 ```python
-def parse_thinking_status(output: str) -> ThinkingStatus | None:
-    """Parse thinking indicator from tmux output.
+THINKING_SPINNERS = "·✶✻✽*✢"
 
-    Format: · Hatching… (esc to interrupt · 42s · ↓ 0 tokens)
-    Located ABOVE the input box (before first ────).
+def parse_thinking_status(output: str) -> str | None:
+    """Parse thinking status line as-is.
+
+    Formats vary:
+    - · Wibbling… (ctrl+c to interrupt)
+    - ✶ Wibbling… (ctrl+c to interrupt · 30s · ↓ 914 tokens · thinking)
+    - ✻ Cooked for 35s
+
+    Returns raw line with command injection:
+    - 'esc to interrupt' → '/esc'
+    - 'ctrl+c to interrupt' → '/ctrl_c'
     """
+    for line in output.split("\n"):
+        stripped = line.strip()
+        if stripped and stripped[0] in THINKING_SPINNERS:
+            result = stripped.replace("esc to interrupt", "/esc")
+            result = result.replace("ctrl+c to interrupt", "/ctrl_c")
+            return result
+    return None
 ```
 
-**Parsing logic:**
-- Regex: `· (\w+)… \(esc to interrupt · (\d+)s · ↓ (\d+) tokens?\)`
-- Search in lines BEFORE first `────` (above input box)
-- Return `ThinkingStatus` or `None` if not found
+**Output examples:**
+- `✶ Wibbling… (/ctrl_c · 30s · ↓ 914 tokens · thinking)`
+- `✻ Cooked for 35s`
 
 **Not part of ScreenState** — separate function like `parse_status_bar()`.
 
@@ -77,33 +86,61 @@ last_thinking_update: float = 0
 **Logic in main loop:**
 ```python
 # After parse_screen()
-thinking = parse_thinking_status(screen)
+thinking_text = parse_thinking_status(screen)
 
-if thinking:
+if thinking_text:
     now = time.time()
     if now - last_thinking_update >= 3.0:  # throttle 3 sec
-        text = f"· {thinking.verb}… (/esc · {thinking.seconds}s · ↓ {thinking.tokens} tokens)"
         key = f"thinking:{chat_id}:{thread_id}"
 
         if thinking_msg_key is None:
             # First time — send
-            batch = OutgoingBatch(..., replace_key=key, operation="send")
+            batch = OutgoingBatch(
+                chat_id=chat_id,
+                thread_id=thread_id,
+                messages=[{"text": thinking_text}],
+                replace_key=key,
+                operation="send",
+            )
             thinking_msg_key = key
         else:
             # Update — edit
-            batch = OutgoingBatch(..., replace_key=key, operation="edit")
+            batch = OutgoingBatch(
+                chat_id=chat_id,
+                thread_id=thread_id,
+                messages=[{"text": thinking_text}],
+                replace_key=key,
+                operation="edit",
+            )
 
         await telegram_queue.enqueue(batch)
         last_thinking_update = now
 
 elif thinking_msg_key:
     # Claude finished — delete
-    batch = OutgoingBatch(..., replace_key=thinking_msg_key, operation="delete")
+    batch = OutgoingBatch(
+        chat_id=chat_id,
+        thread_id=thread_id,
+        messages=[],
+        replace_key=thinking_msg_key,
+        operation="delete",
+    )
     await telegram_queue.enqueue(batch)
     thinking_msg_key = None
 ```
 
 **Priority:** thinking status doesn't block permission prompt — processed independently.
+
+## New Command: /ctrl_c
+
+Add `/ctrl_c` command to send Ctrl+C to tmux (interrupt Claude):
+```python
+@router.message(Command("ctrl_c"))
+async def cmd_ctrl_c(message: Message, telegram_queue: TelegramQueue):
+    """Send Ctrl+C to interrupt Claude."""
+    # Similar to /esc but sends C-c instead of Escape
+    tmux.send_key("C-c")
+```
 
 ## Edge Cases
 
