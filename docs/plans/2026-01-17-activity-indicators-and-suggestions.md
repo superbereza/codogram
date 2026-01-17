@@ -511,7 +511,7 @@ Some previous output
 ────────────────────────────────────────
 """
     result = parse_thinking_status(output)
-    assert result == "· Wibbling… (/ctrl_c)"
+    assert result == "· Wibbling… (/esc)"
 
 
 def test_parse_thinking_status_with_details():
@@ -521,7 +521,7 @@ def test_parse_thinking_status_with_details():
 ────────────────────────────────────────
 """
     result = parse_thinking_status(output)
-    assert result == "✶ Hatching… (/ctrl_c · 30s · ↓ 914 tokens · thinking)"
+    assert result == "✶ Hatching… (/esc · 30s · ↓ 914 tokens · thinking)"
 
 
 def test_parse_thinking_status_esc():
@@ -572,13 +572,13 @@ def parse_thinking_status(output: str) -> str | None:
 
     Returns raw line with command injection:
     - 'esc to interrupt' → '/esc'
-    - 'ctrl+c to interrupt' → '/ctrl_c'
+    - 'ctrl+c to interrupt' → '/esc'
     """
     for line in output.split("\n"):
         stripped = line.strip()
         if stripped and stripped[0] in THINKING_SPINNERS:
             result = stripped.replace("esc to interrupt", "/esc")
-            result = result.replace("ctrl+c to interrupt", "/ctrl_c")
+            result = result.replace("ctrl+c to interrupt", "/esc")
             return result
     return None
 ```
@@ -782,86 +782,7 @@ git commit -m "feat(poller): add thinking status display"
 
 ---
 
-## Task 8: Add /ctrl_c command
-
-**Files:**
-- Create: `src/codogram/handlers/ctrl_c.py`
-- Modify: `src/codogram/handlers/__init__.py`
-
-**Step 1: Create handler file**
-
-```python
-# src/codogram/handlers/ctrl_c.py
-"""Ctrl+C command handler - interrupt Claude."""
-from aiogram import Router
-from aiogram.types import Message
-from aiogram.filters import Command
-
-from ..session_manager import project_manager
-from ..telegram_queue import TelegramQueue
-from ..tmux import TmuxSession
-
-router = Router(name="ctrl_c")
-
-
-def _get_tmux_for_context(chat_id: int, thread_id: int | None) -> TmuxSession | None:
-    """Get TmuxSession for current chat/thread context."""
-    project = project_manager.get_by_chat(chat_id)
-    if not project:
-        return None
-
-    if project.threads:
-        thread = project.threads.get(thread_id)
-        if thread:
-            tmux_name = thread.get_tmux_session(project.project_name)
-            return TmuxSession(tmux_name, thread.worktree_path or project.cwd)
-
-    if project.tmux_session:
-        return TmuxSession(project.tmux_session, project.cwd)
-
-    return None
-
-
-@router.message(Command("ctrl_c"))
-async def cmd_ctrl_c(message: Message, telegram_queue: TelegramQueue):
-    """Send Ctrl+C to interrupt Claude."""
-    chat_id = message.chat.id
-    thread_id = message.message_thread_id
-
-    tmux = _get_tmux_for_context(chat_id, thread_id)
-    if not tmux:
-        await telegram_queue.reply(message, "No project. Use /start first.")
-        return
-
-    try:
-        tmux.send_key("C-c")
-        await telegram_queue.reply(message, "`Ctrl+C` sent", parse_mode="MarkdownV2")
-    except Exception as e:
-        await telegram_queue.reply(message, f"Error: {e}")
-```
-
-**Step 2: Register router**
-
-In `src/codogram/handlers/__init__.py`, add:
-
-```python
-from .ctrl_c import router as ctrl_c_router
-# ...
-def register_handlers(dp: Dispatcher) -> None:
-    # ... existing routers ...
-    dp.include_router(ctrl_c_router)
-```
-
-**Step 3: Commit**
-
-```bash
-git add src/codogram/handlers/ctrl_c.py src/codogram/handlers/__init__.py
-git commit -m "feat: add /ctrl_c command to interrupt Claude"
-```
-
----
-
-## Task 9: Add input suggestion handling to permission_poller
+## Task 8: Add input suggestion handling to permission_poller
 
 **Files:**
 - Modify: `src/codogram/permission_poller.py`
@@ -917,20 +838,20 @@ git commit -m "feat(poller): send suggestion as 💡 message with ReplyKeyboard"
 
 ---
 
-## Task 10: E2E Testing
+## Task 9: E2E Testing
 
 **Step 1: Test thinking status**
 
 1. Start bot: `cd /home/superbereza/dev/codogram/.worktrees/show-thinking-status && ./dev-run.sh`
 2. Send message to Claude in Telegram
-3. Verify: thinking status message appears with spinner (e.g., "· Thinking… (/ctrl_c)")
+3. Verify: thinking status message appears with spinner (e.g., "· Thinking… (/esc)")
 4. Verify: message updates every ~3 sec with new time/tokens
 5. Verify: message deleted when Claude responds
 
-**Step 2: Test /ctrl_c**
+**Step 2: Test /esc interrupt**
 
 1. Send long task to Claude
-2. While Claude is thinking, send `/ctrl_c`
+2. While Claude is thinking, send `/esc`
 3. Verify: Claude is interrupted
 
 **Step 3: Test input suggestions**
@@ -962,6 +883,5 @@ git commit -m "feat: activity indicators and input suggestions complete"
 | 5 | parse_thinking_status | screen.py |
 | 6 | parse_input_suggestion | screen.py |
 | 7 | Thinking status in poller | permission_poller.py |
-| 8 | /ctrl_c command | handlers/ctrl_c.py |
-| 9 | Suggestion in poller | permission_poller.py |
-| 10 | E2E testing | manual |
+| 8 | Suggestion in poller | permission_poller.py |
+| 9 | E2E testing | manual |

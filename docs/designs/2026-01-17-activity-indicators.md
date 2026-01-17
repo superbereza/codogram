@@ -57,19 +57,19 @@ def parse_thinking_status(output: str) -> str | None:
 
     Returns raw line with command injection:
     - 'esc to interrupt' → '/esc'
-    - 'ctrl+c to interrupt' → '/ctrl_c'
+    - 'ctrl+c to interrupt' → '/esc'
     """
     for line in output.split("\n"):
         stripped = line.strip()
         if stripped and stripped[0] in THINKING_SPINNERS:
             result = stripped.replace("esc to interrupt", "/esc")
-            result = result.replace("ctrl+c to interrupt", "/ctrl_c")
+            result = result.replace("ctrl+c to interrupt", "/esc")
             return result
     return None
 ```
 
 **Output examples:**
-- `✶ Wibbling… (/ctrl_c · 30s · ↓ 914 tokens · thinking)`
+- `✶ Wibbling… (/esc · 30s · ↓ 914 tokens · thinking)`
 - `✻ Cooked for 35s`
 
 **Not part of ScreenState** — separate function like `parse_status_bar()`.
@@ -130,17 +130,6 @@ elif thinking_msg_key:
 ```
 
 **Priority:** thinking status doesn't block permission prompt — processed independently.
-
-## New Command: /ctrl_c
-
-Add `/ctrl_c` command to send Ctrl+C to tmux (interrupt Claude):
-```python
-@router.message(Command("ctrl_c"))
-async def cmd_ctrl_c(message: Message, telegram_queue: TelegramQueue):
-    """Send Ctrl+C to interrupt Claude."""
-    # Similar to /esc but sends C-c instead of Escape
-    tmux.send_key("C-c")
-```
 
 ## Edge Cases
 
