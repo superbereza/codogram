@@ -840,30 +840,27 @@ git commit -m "feat(poller): send suggestion as 💡 message with ReplyKeyboard"
 
 ## Task 9: E2E Testing
 
-**Step 1: Test thinking status**
+**Reference:** `docs/e2e/commands/activity.md`
 
-1. Start bot: `cd /home/superbereza/dev/codogram/.worktrees/show-thinking-status && ./dev-run.sh`
-2. Send message to Claude in Telegram
-3. Verify: thinking status message appears with spinner (e.g., "· Thinking… (/esc to interrupt)")
-4. Verify: message updates every ~3 sec with new time/tokens
-5. Verify: message deleted when Claude responds
+**Step 1: Start bot**
 
-**Step 2: Test /esc interrupt**
+```bash
+cd /home/superbereza/dev/codogram/.worktrees/show-thinking-status && ./dev-run.sh
+```
 
-1. Send long task to Claude
-2. While Claude is thinking, send `/esc`
-3. Verify: Claude is interrupted
+**Step 2: Run E2E tests**
 
-**Step 3: Test input suggestions**
+Execute test cases from `docs/e2e/commands/activity.md`:
+- TC-ACT-001: Thinking status appears
+- TC-ACT-002: Thinking status updates
+- TC-ACT-003: Thinking status deleted on response
+- TC-ACT-004: /esc interrupts thinking
+- TC-ACT-005: Input suggestion appears
+- TC-ACT-006: Clicking suggestion sends text
 
-1. Send message that will trigger a suggestion (e.g., ask Claude to run tests)
-2. Wait for Claude response
-3. Verify: "💡" message appears with ReplyKeyboard button
-4. Click suggestion button
-5. Verify: text sent to Claude
-6. Verify: keyboard disappears (one_time_keyboard behavior)
+Use hybrid approach: MCP commands + ASK USER for manual verification.
 
-**Step 4: Final commit**
+**Step 3: Final commit**
 
 ```bash
 git add -A
