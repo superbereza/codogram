@@ -6,6 +6,7 @@ import time
 
 from aiogram import Bot
 
+from . import strings
 from .config import settings
 from .logging_config import logger
 from .session_manager import ProjectState, ThreadInfo, project_manager
@@ -82,7 +83,7 @@ async def launch_with_animation(
     if not actual_cwd:
         await queue.send(
             chat_id,
-            "`[x]` Project cwd not set. Re-register with /start",
+            strings.LAUNCH_PROJECT_CWD_NOT_SET,
             thread_id=thread_id,
             parse_mode="MarkdownV2",
         )
@@ -97,24 +98,24 @@ async def launch_with_animation(
         thread.notified_closed = False  # Reset so we can notify again if this session dies
 
         # 1. Create tmux
-        await queue.send(chat_id, "`[~]` Creating tmux session...", thread_id=thread_id, parse_mode="MarkdownV2")
+        await queue.send(chat_id, strings.LAUNCH_CREATING_TMUX, thread_id=thread_id, parse_mode="MarkdownV2")
 
         if not tmux.exists():
             tmux.create()
 
         # 2. Launch Claude
         if session_id:
-            await queue.send(chat_id, "`[~]` Resuming session...", thread_id=thread_id, parse_mode="MarkdownV2")
+            await queue.send(chat_id, strings.LAUNCH_RESUMING, thread_id=thread_id, parse_mode="MarkdownV2")
             tmux.send(f"claude --resume {session_id}")
         else:
-            await queue.send(chat_id, "`[~]` Starting Claude...", thread_id=thread_id, parse_mode="MarkdownV2")
+            await queue.send(chat_id, strings.LAUNCH_STARTING, thread_id=thread_id, parse_mode="MarkdownV2")
             tmux.send("claude")
 
         # 2.5. Start poller early to catch trust prompts during startup
         await _start_monitoring(bot, project, thread, queue)
 
         # 3. Wait for ready with animation
-        await queue.send(chat_id, "`[~]` Waiting for Claude...", thread_id=thread_id, parse_mode="MarkdownV2")
+        await queue.send(chat_id, strings.LAUNCH_WAITING, thread_id=thread_id, parse_mode="MarkdownV2")
 
         start_time = time.time()
         face_msg_id: int | None = None
@@ -136,7 +137,7 @@ async def launch_with_animation(
                     except Exception:
                         pass
                 await queue.send(
-                    chat_id, "`[x]` Timeout: Claude didn't start in 2 minutes",
+                    chat_id, strings.LAUNCH_TIMEOUT,
                     thread_id=thread_id,
                     parse_mode="MarkdownV2"
                 )
@@ -178,7 +179,7 @@ async def launch_with_animation(
 
         await queue.send(
             chat_id,
-            f"`[v]` Claude ready\n\nAttach: `tmux attach -t {tmux_name}`",
+            strings.LAUNCH_READY_WITH_ATTACH.format(tmux_name=tmux_name),
             thread_id=thread_id,
             parse_mode="MarkdownV2",
         )
@@ -194,7 +195,7 @@ async def launch_with_animation(
     except Exception as e:
         logger.error(f"launch_error: {e}")
         try:
-            await queue.send(chat_id, f"`[x]` Launch error: {e}", thread_id=thread_id, parse_mode="MarkdownV2")
+            await queue.send(chat_id, strings.LAUNCH_ERROR.format(error=e), thread_id=thread_id, parse_mode="MarkdownV2")
         except Exception:
             pass
         return False

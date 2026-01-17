@@ -3,6 +3,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
+from .. import strings
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
 from .common import require_forum_group, set_flow_state, get_flow_state, clear_flow_state
@@ -107,7 +108,7 @@ async def on_thread_create_confirm(callback: CallbackQuery, telegram_queue: Tele
     state = get_flow_state(chat_id, thread_id)
 
     if not state or state.get("type") != "thread_create_pending":
-        await callback.answer("Session expired")
+        await callback.answer(strings.SESSION_EXPIRED)
         return
 
     name = state.get("name")
@@ -115,11 +116,14 @@ async def on_thread_create_confirm(callback: CallbackQuery, telegram_queue: Tele
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await callback.answer("Project not found")
+        await callback.answer(strings.BRANCH_PROJECT_NOT_FOUND_TOAST)
         return
 
-    await callback.message.delete()
+    # 1. Remove buttons (edit)
+    await telegram_queue.edit(callback.message, strings.THREAD_CREATING.format(name=name))
+    await callback.answer()
 
+    # 2. Create thread
     thread = await create_thread_with_session(
         bot=callback.bot,
         chat_id=chat_id,
@@ -127,7 +131,8 @@ async def on_thread_create_confirm(callback: CallbackQuery, telegram_queue: Tele
         name=name,
     )
 
-    if not thread:
-        await telegram_queue.send(chat_id, "Error creating topic")
-
-    await callback.answer()
+    # 3. Final status (send)
+    if thread:
+        await telegram_queue.send(chat_id, strings.THREAD_CREATED.format(name=name), thread_id=thread_id)
+    else:
+        await telegram_queue.send(chat_id, strings.CREATE_TOPIC_ERROR, thread_id=thread_id)
