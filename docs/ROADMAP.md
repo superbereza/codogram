@@ -214,6 +214,14 @@ Display and control Claude session state:
 - **Permission cancel on send** — cancel active permission before sending message
 - See [docs/designs/done/2026-01-07-session-state-display.md](designs/done/2026-01-07-session-state-display.md)
 
+### Status messages unification
+All user-facing messages centralized in `strings.py`:
+- 170 constants for all status messages, prompts, errors, button texts
+- `STATUS_*` prefixes (`[v]`, `[x]`, `[!]`, `[~]`, `[?]`, `[i]`)
+- Send vs edit pattern: first edit removes buttons, subsequent statuses via send
+- Consistent tone-of-voice across all handlers
+- See [docs/designs/done/2026-01-17-status-messages-unification.md](designs/done/2026-01-17-status-messages-unification.md)
+
 ### Stale worktree recovery
 Handle deleted worktrees gracefully instead of crashing:
 - `/resume`, `/start` — detect stale worktree_path, offer: recreate / resume in main / cancel
@@ -235,7 +243,52 @@ Send images and files from Telegram to Claude:
 - Path traversal protection and 20MB size limit
 - See [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
 
+## In Progress
+
+### Robust /start flow
+Atomicity and error recovery for project creation flow:
+- **Atomicity** — project entry created only after successful clone/init
+- **URL validation** — check wiki/blob/gist URLs BEFORE cloning
+- **Retry on invalid URL** — stay in FSM state, ask for valid URL
+- **require_project_ready()** — helper to check cwd + tmux + Claude ready
+- **Hide commands** — /clear, /esc etc unavailable until project ready
+- **/reset_all** — command to reset project during setup (before Claude launches)
+- **sanitize_project_name with unidecode** — "Мой Проект 🚀" → `moj-proekt`
+- **Announce commands by chat type** — show available commands after successful launch
+- See docs/designs/2026-01-17-robust-start-flow.md (planned)
+
+### Inline suggests on Claude messages
+Suggestion buttons attached to Claude's responses:
+- Click to send suggested action/response
+- Context-aware based on message content
+- Quick follow-up actions
+
+### Simplified output & hidden tools
+Cleaner output by default:
+- Don't dump full permission text on auto-accept
+- Hide tool calls by default (TodoWrite, Read, etc.)
+- `/silent` command to toggle tools visibility
+- Filter TOOL_USE, TOOL_RESULT, show only TEXT
+
+### Activity indicators
+Show that Claude is thinking/working:
+- Generation indicator appears ABOVE input box in tmux
+- Parse from tmux capture-pane
+- Show typing indicator or status in Telegram
+
 ## Backlog
+
+### Bot onboarding
+Interactive onboarding for new users:
+- Welcome flow explaining bot features
+- Step-by-step setup guidance
+- Tips and hints during first use
+
+### Menu naming simplification
+Make command names more intuitive:
+- Clarify thread/branch/topic terminology
+- User-friendly labels in menu
+- Consistent naming across all commands
 
 ### Role model & chat registration
 Minimal permission system for multi-user access:
@@ -264,28 +317,6 @@ Allow product managers to use Claude without breaking environment:
 - Or sandboxed/isolated execution
 - Easy recovery if something breaks
 - Need R&D on best approach
-
-### Inline suggests on Claude messages
-Suggestion buttons attached to Claude's responses:
-- Click to send suggested action/response
-- Context-aware based on message content
-- Quick follow-up actions
-
-### Simplified output & hidden tools
-Cleaner output by default:
-- Don't dump full permission text on auto-accept
-- Hide tool calls by default (TodoWrite, Read, etc.)
-- `/silent` command to toggle tools visibility
-- Filter TOOL_USE, TOOL_RESULT, show only TEXT
-- High priority — improves daily UX significantly
-
-### Activity indicators
-Show that Claude is thinking/working:
-- Generation indicator appears ABOVE input box in tmux
-- Format: `· Hatching… (esc to interrupt · 42s · ↓ 0 tokens)`
-- Random verbs: "Hatching", "Enchanting", "Conjuring", etc.
-- Parse from tmux capture-pane
-- Show typing indicator or status in Telegram
 
 ### Message queue until session ready
 Cache user messages while session is binding, send when ready:
@@ -321,15 +352,6 @@ Detect when Claude Code exits with error (API errors, network issues, etc.):
 When replying to message, send context to tmux:
 - Quote piece of message being replied to
 - Format: `> quote\n\nresponse text`
-
-### Migrate strings to strings.py
-Move all hardcoded strings to `src/codogram/strings.py`:
-- handlers/*.py — command responses
-- launch_animation.py — startup statuses
-- history_watcher.py — notifications
-- keyboards.py — buttons
-- services/start_flow.py — wizard buttons
-- See `docs/specs/tone-of-voice.md` for guidelines
 
 ---
 

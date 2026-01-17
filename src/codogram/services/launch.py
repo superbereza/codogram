@@ -9,6 +9,7 @@ from aiogram import Bot
 if TYPE_CHECKING:
     from ..telegram_queue import TelegramQueue
 
+from .. import strings
 from ..session_manager import ProjectState, ThreadInfo, project_manager
 from ..launch_animation import launch_with_animation
 from ..logging_config import logger
@@ -117,7 +118,7 @@ async def _create_worktree_with_status(
     # Status: creating branch
     await telegram_queue.send(
         chat_id,
-        f"`[~]` Creating branch `{branch_name}` from `{base_branch}`...",
+        strings.LAUNCH_CREATING_BRANCH.format(branch=branch_name, base=base_branch),
         thread_id=thread_id,
         parse_mode="MarkdownV2"
     )
@@ -128,7 +129,7 @@ async def _create_worktree_with_status(
     if not result.success:
         await telegram_queue.send(
             chat_id,
-            f"`[x]` {result.error}",
+            strings.LAUNCH_BRANCH_ERROR.format(error=result.error),
             thread_id=thread_id,
             parse_mode="MarkdownV2"
         )
@@ -137,7 +138,7 @@ async def _create_worktree_with_status(
     # Status: worktree created
     await telegram_queue.send(
         chat_id,
-        f"`[v]` Worktree: `{worktree_path}`",
+        strings.LAUNCH_WORKTREE_CREATED.format(path=worktree_path),
         thread_id=thread_id,
         parse_mode="MarkdownV2"
     )

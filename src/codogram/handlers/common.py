@@ -2,6 +2,7 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 
+from .. import strings
 from ..telegram_queue import TelegramQueue
 
 router = Router(name="common")
@@ -42,10 +43,10 @@ def has_flow_state(chat_id: int, thread_id: int | None) -> bool:
 async def require_forum_group(message: Message, telegram_queue: TelegramQueue) -> bool:
     """Check if message is from a forum group. Returns False and sends error if not."""
     if message.chat.type == "private":
-        await telegram_queue.reply(message, "`[!]` This command requires a group with topics.")
+        await telegram_queue.reply(message, strings.TOPICS_REQUIRED_GROUP)
         return False
     if not message.chat.is_forum:
-        await telegram_queue.reply(message, "`[!]` Topics required. Enable in group settings -> Topics")
+        await telegram_queue.reply(message, strings.TOPICS_REQUIRED_ENABLE)
         return False
     return True
 
@@ -56,5 +57,5 @@ async def cb_cancel(callback: CallbackQuery, telegram_queue: TelegramQueue):
     chat_id = callback.message.chat.id
     thread_id = callback.message.message_thread_id
     clear_flow_state(chat_id, thread_id)
-    await telegram_queue.edit(callback.message, "Cancelled.")
+    await telegram_queue.edit(callback.message, strings.CANCELLED)
     await callback.answer()
