@@ -229,3 +229,28 @@ Worktree kept for potential resume."""
 FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages."
 
 Run /finish again after commit."""
+
+
+# --- Branch Operations ---
+
+BRANCH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first."
+BRANCH_GIT_REQUIRED = f"{STATUS_ERR} Git repository required for /branch_create"
+BRANCH_CREATE_FROM_PROMPT = "Create branch from:"
+BRANCH_PROJECT_NOT_FOUND_TOAST = "Project not found"
+
+BRANCH_WORKTREE_NOT_FOUND_BASE = f"""{STATUS_WARN} Worktree not found, using {{default_branch}} as base
+
+Branch name?
+
+Send name or pick random"""
+
+BRANCH_ALREADY_EXISTS = f"{STATUS_ERR} Branch `{{name}}` already exists"
+BRANCH_DIR_EXISTS = f"{STATUS_ERR} Directory already exists: `{{path}}`"
+BRANCH_UNCOMMITTED_CHANGES = f"{STATUS_WARN} Uncommitted changes detected"
+BRANCH_UNCOMMITTED_IN_BASE = f"{STATUS_WARN} Uncommitted changes in {{base_branch}}"
+
+BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages."
+
+Run `/branch_create {{branch_name}}` again after commit."""
+
+BRANCH_FINISH_USE_FINISH = f"{STATUS_INFO} Use /finish to complete branches"
