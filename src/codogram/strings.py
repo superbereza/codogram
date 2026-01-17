@@ -40,6 +40,8 @@ SESSION_RESTART_CONFIRM = "Restart session `{tmux_name}`?"
 NEW_SESSION = f"{STATUS_PENDING} Creating new session..."
 CLEAR_SESSION = f"{STATUS_PENDING} Clearing session..."
 
+CLAUDE_CRASHED = f"{STATUS_WARN} Claude crashed: {{reason}}\nUse /restart to restart."
+
 
 # --- Project/Thread ---
 

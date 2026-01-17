@@ -17,6 +17,7 @@ from .tmux import TmuxSession
 from .logging_config import logger
 from .auto_accept import try_auto_accept
 from .config import settings
+from . import strings
 
 
 class PollerState(Enum):
@@ -141,7 +142,7 @@ async def permission_poller(
                 batch = OutgoingBatch(
                     chat_id=project.chat_id,
                     thread_id=thread_id,
-                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
+                    messages=[{"text": strings.CLAUDE_CRASHED.format(reason=crash_reason), "parse_mode": "MarkdownV2"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
