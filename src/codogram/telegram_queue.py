@@ -1,6 +1,7 @@
 # src/codogram/telegram_queue.py
 """Rate-limited Telegram message queue with FIFO ordering per chat_id."""
 import asyncio
+import collections
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -29,6 +30,7 @@ class OutgoingBatch:
     thread_id: int | None
     messages: list[dict]  # [{text, parse_mode}, ...]
     reply_markup: InlineKeyboardMarkup | None = None  # Applied to LAST message
+    replace_key: str | None = None  # If set, replaces previous batch with same key
 
 
 @dataclass
@@ -93,9 +95,12 @@ class TelegramQueue:
 
     def __init__(self, bot: Bot):
         self.bot = bot
-        self._queues: dict[int, asyncio.Queue[_QueueItem | _EditQueueItem | _KeyboardQueueItem | _DeleteQueueItem]] = defaultdict(asyncio.Queue)
+        self._queues: dict[int, collections.deque] = defaultdict(collections.deque)
+        self._queue_locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._queue_events: dict[int, asyncio.Event] = defaultdict(asyncio.Event)
         self._workers: dict[int, asyncio.Task] = {}
         self._locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self.sent_statuses: dict[str, int] = {}  # replace_key -> msg_id
 
     async def enqueue(self, batch: OutgoingBatch | EditBatch | KeyboardBatch | DeleteBatch, timeout: float = 120.0) -> list[int] | None:
         """Add batch to queue, wait for send.
@@ -127,11 +132,13 @@ class TelegramQueue:
             result_future_send: asyncio.Future[list[int]] = asyncio.get_running_loop().create_future()
             item = _QueueItem(batch=batch, result=result_future_send)
 
+        async with self._queue_locks[chat_id]:
+            self._queues[chat_id].append(item)
+            self._queue_events[chat_id].set()
+
         async with self._locks[chat_id]:
             if chat_id not in self._workers or self._workers[chat_id].done():
                 self._workers[chat_id] = asyncio.create_task(self._worker(chat_id))
-
-        await self._queues[chat_id].put(item)
 
         try:
             if isinstance(batch, DeleteBatch):
@@ -154,6 +161,7 @@ class TelegramQueue:
         """
         chat_id = batch.chat_id
 
+        # Create queue item
         if isinstance(batch, DeleteBatch):
             item: _QueueItem | _EditQueueItem | _KeyboardQueueItem | _DeleteQueueItem = _DeleteQueueItem(batch=batch, result=None)
         elif isinstance(batch, EditBatch):
@@ -163,46 +171,72 @@ class TelegramQueue:
         else:
             item = _QueueItem(batch=batch, result=None)
 
+        async with self._queue_locks[chat_id]:
+            # Replace existing item with same replace_key
+            if isinstance(batch, OutgoingBatch) and batch.replace_key:
+                queue = self._queues[chat_id]
+                for i, existing in enumerate(queue):
+                    if (isinstance(existing, _QueueItem) and
+                        isinstance(existing.batch, OutgoingBatch) and
+                        existing.batch.replace_key == batch.replace_key):
+                        queue[i] = item
+                        self._queue_events[chat_id].set()
+                        # Start worker if needed (outside lock)
+                        break
+                else:
+                    # No existing item found, append new
+                    self._queues[chat_id].append(item)
+                    self._queue_events[chat_id].set()
+            else:
+                self._queues[chat_id].append(item)
+                self._queue_events[chat_id].set()
+
         async with self._locks[chat_id]:
             if chat_id not in self._workers or self._workers[chat_id].done():
                 self._workers[chat_id] = asyncio.create_task(self._worker(chat_id))
 
-        await self._queues[chat_id].put(item)
-
     async def _worker(self, chat_id: int) -> None:
         """Process queue FIFO. Exits after 5 min idle."""
         queue = self._queues[chat_id]
+        event = self._queue_events[chat_id]
 
         while True:
+            # Wait for items or timeout
             try:
-                item = await asyncio.wait_for(queue.get(), timeout=300)
+                await asyncio.wait_for(event.wait(), timeout=300)
             except asyncio.TimeoutError:
                 logger.debug(f"Queue worker {chat_id} exiting (idle timeout)")
                 return
 
-            try:
-                if isinstance(item, _DeleteQueueItem):
-                    await self._delete_message(item.batch)
+            # Process all available items
+            while True:
+                async with self._queue_locks[chat_id]:
+                    if not queue:
+                        event.clear()
+                        break
+                    item = queue.popleft()
+
+                try:
+                    if isinstance(item, _DeleteQueueItem):
+                        await self._delete_message(item.batch)
+                        if item.result is not None and not item.result.done():
+                            item.result.set_result(None)
+                    elif isinstance(item, _EditQueueItem):
+                        await self._edit_message(item.batch)
+                        if item.result is not None and not item.result.done():
+                            item.result.set_result(None)
+                    elif isinstance(item, _KeyboardQueueItem):
+                        sent_ids = await self._send_keyboard(item.batch)
+                        if item.result is not None and not item.result.done():
+                            item.result.set_result(sent_ids)
+                    else:
+                        sent_ids = await self._send_batch(item.batch)
+                        if item.result is not None and not item.result.done():
+                            item.result.set_result(sent_ids)
+                except Exception as e:
+                    logger.error(f"Queue operation failed chat_id={item.batch.chat_id}: {e}")
                     if item.result is not None and not item.result.done():
-                        item.result.set_result(None)
-                elif isinstance(item, _EditQueueItem):
-                    await self._edit_message(item.batch)
-                    if item.result is not None and not item.result.done():
-                        item.result.set_result(None)
-                elif isinstance(item, _KeyboardQueueItem):
-                    sent_ids = await self._send_keyboard(item.batch)
-                    if item.result is not None and not item.result.done():
-                        item.result.set_result(sent_ids)
-                else:
-                    sent_ids = await self._send_batch(item.batch)
-                    if item.result is not None and not item.result.done():
-                        item.result.set_result(sent_ids)
-            except Exception as e:
-                logger.error(f"Queue operation failed chat_id={item.batch.chat_id}: {e}")
-                if item.result is not None and not item.result.done():
-                    item.result.set_exception(e)
-            finally:
-                queue.task_done()
+                        item.result.set_exception(e)
 
     async def _send_batch(self, batch: OutgoingBatch, attempt: int = 0) -> list[int]:
         """Send all messages in batch. Returns message IDs. Cleanup on failure."""

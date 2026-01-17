@@ -384,3 +384,39 @@ async def test_delete_batch_deletes_message():
 
     bot.delete_message.assert_called_once_with(123, 456)
     await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_replace_key_deduplicates_in_queue():
+    """Messages with same replace_key should replace each other in queue."""
+    from unittest.mock import MagicMock
+
+    bot = MagicMock()
+    sent_texts = []
+
+    async def mock_send(*args, **kwargs):
+        sent_texts.append(kwargs.get("text"))
+        msg = MagicMock()
+        msg.message_id = len(sent_texts)
+        return msg
+
+    bot.send_message = mock_send
+
+    queue = TelegramQueue(bot)
+
+    # Enqueue 3 messages with same replace_key, only last should be sent
+    batch1 = OutgoingBatch(chat_id=123, thread_id=None, messages=[{"text": "first"}], replace_key="status:123")
+    batch2 = OutgoingBatch(chat_id=123, thread_id=None, messages=[{"text": "second"}], replace_key="status:123")
+    batch3 = OutgoingBatch(chat_id=123, thread_id=None, messages=[{"text": "third"}], replace_key="status:123")
+
+    # Add all without waiting
+    await queue.enqueue_nowait(batch1)
+    await queue.enqueue_nowait(batch2)
+    await queue.enqueue_nowait(batch3)
+
+    # Wait for processing
+    await asyncio.sleep(0.5)
+
+    # Only "third" should be sent
+    assert sent_texts == ["third"]
+    await queue.shutdown()
