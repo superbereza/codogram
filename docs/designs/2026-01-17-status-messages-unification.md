@@ -34,11 +34,15 @@ STATUS_INFO = "`[i]`"
 
 # === Status messages ===
 # Branch operations
+BRANCH_CREATING = f"{STATUS_PENDING} Creating branch `{{name}}`..."
+BRANCH_CREATED = f"{STATUS_OK} Branch `{{name}}` created"
 BRANCH_MERGED = f"{STATUS_OK} Branch `{{name}}` merged"
 BRANCH_MERGE_FAILED = f"{STATUS_ERR} Failed to merge: {{error}}"
 BRANCH_PUSHING = f"{STATUS_PENDING} Pushing `{{branch}}`..."
 
-# Topic operations
+# Thread/Topic operations
+THREAD_CREATING = f"{STATUS_PENDING} Creating thread `{{name}}`..."
+THREAD_CREATED = f"{STATUS_OK} Thread `{{name}}` created"
 TOPIC_ARCHIVING = f"{STATUS_PENDING} Archiving `{{name}}`..."
 TOPIC_ARCHIVED = f"{STATUS_OK} Topic `{{name}}` archived"
 TOPIC_ARCHIVE_CONFIRM = f"{STATUS_QUESTION} Archive topic `{{name}}`?"
@@ -87,7 +91,7 @@ await telegram_queue.edit(callback.message, strings.PROMPT_PROJECT_NAME, parse_m
 | Ответ на сообщение пользователя | `reply` |
 | Launch animation (рожица) | `edit` (не трогаем) |
 
-**Пример длинной операции:**
+**Пример длинной операции (merge):**
 
 ```python
 async def on_merge_confirm(callback, telegram_queue):
@@ -109,6 +113,26 @@ async def on_merge_confirm(callback, telegram_queue):
     # 3. Финальный статус (send)
     await telegram_queue.send(chat_id, strings.BRANCH_MERGED.format(name=branch_name), thread_id=thread_id)
 ```
+
+**Пример создания (branch/thread):**
+
+```python
+async def on_branch_create_confirm(callback, telegram_queue):
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+
+    # 1. Убираем кнопки (edit)
+    await telegram_queue.edit(callback.message, strings.BRANCH_CREATING.format(name=branch_name))
+    await callback.answer()
+
+    # 2. Создаём бранч
+    result = create_branch(...)
+
+    # 3. Финальный статус (send)
+    await telegram_queue.send(chat_id, strings.BRANCH_CREATED.format(name=branch_name), thread_id=thread_id)
+```
+
+**Правило:** Любая операция с кнопками заканчивается финальным статусом через `send`.
 
 ### 3. MarkdownV2 и parse_mode
 
