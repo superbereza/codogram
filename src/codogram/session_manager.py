@@ -123,6 +123,7 @@ class ThreadInfo:
 
     # Runtime-only (not persisted):
     notified_closed: bool = False      # True = already sent "session closed" notification
+    thinking_needs_resend: bool = False  # True = watcher sent message, thinking needs delete+send
 
     def get_tmux_session(self, project_name: str) -> str:
         """Get tmux session name for this thread."""

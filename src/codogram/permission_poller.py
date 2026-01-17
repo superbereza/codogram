@@ -157,13 +157,26 @@ async def permission_poller(
 
         if thinking_text:
             now = asyncio.get_event_loop().time()
-            # Throttle: update every 3 seconds (ignore text changes for throttle)
+            # Throttle: update every 3 seconds
             if now - last_thinking_update >= 3.0:
                 key = f"thinking:{project.chat_id}:{thread_id}"
+                needs_resend = thread.thinking_needs_resend if thread else False
 
-                # Always delete old + send new to keep message at bottom
-                if thinking_msg_key:
-                    logger.debug(f"{log_prefix}: thinking status DELETE (before resend)")
+                if thinking_msg_key is None:
+                    # First time — send new message
+                    logger.debug(f"{log_prefix}: thinking status SEND: {thinking_text[:50]}...")
+                    batch = OutgoingBatch(
+                        chat_id=project.chat_id,
+                        thread_id=thread_id,
+                        messages=[{"text": thinking_text}],
+                        replace_key=key,
+                    )
+                    thinking_msg_key = key
+                    await telegram_queue.enqueue_nowait(batch)
+
+                elif needs_resend:
+                    # Watcher sent message — delete + send to keep at bottom
+                    logger.debug(f"{log_prefix}: thinking status RESEND: {thinking_text[:50]}...")
                     delete_batch = DeleteBatch(
                         chat_id=project.chat_id,
                         message_id=0,
@@ -171,16 +184,27 @@ async def permission_poller(
                     )
                     await telegram_queue.enqueue_nowait(delete_batch)
 
-                logger.debug(f"{log_prefix}: thinking status SEND: {thinking_text[:50]}...")
-                batch = OutgoingBatch(
-                    chat_id=project.chat_id,
-                    thread_id=thread_id,
-                    messages=[{"text": thinking_text}],
-                    replace_key=key,
-                )
-                thinking_msg_key = key
+                    batch = OutgoingBatch(
+                        chat_id=project.chat_id,
+                        thread_id=thread_id,
+                        messages=[{"text": thinking_text}],
+                        replace_key=key,
+                    )
+                    await telegram_queue.enqueue_nowait(batch)
+                    if thread:
+                        thread.thinking_needs_resend = False
 
-                await telegram_queue.enqueue_nowait(batch)
+                else:
+                    # No new messages — just edit in place
+                    logger.debug(f"{log_prefix}: thinking status EDIT: {thinking_text[:50]}...")
+                    batch = EditBatch(
+                        chat_id=project.chat_id,
+                        message_id=0,
+                        text=thinking_text,
+                        replace_key=key,
+                    )
+                    await telegram_queue.enqueue_nowait(batch)
+
                 last_thinking_update = now
                 last_thinking_text = thinking_text
 
