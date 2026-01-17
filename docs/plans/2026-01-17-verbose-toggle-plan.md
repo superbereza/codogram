@@ -85,12 +85,13 @@ Add to `tests/test_session_manager.py`:
 def test_verbose_persisted_in_config(tmp_path, monkeypatch):
     """verbose field should be saved and loaded from config."""
     import json
-    from codogram.session_manager import ProjectManager, CONFIG_PATH
+    from codogram.session_manager import ProjectManager
     from codogram import config
 
     # Use temp config
     test_config = tmp_path / "config.json"
     monkeypatch.setattr(config, "CONFIG_PATH", test_config)
+    monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
 
     # Create manager and set verbose
     manager = ProjectManager()
@@ -178,7 +179,7 @@ def test_truncate_body_short_text():
     text = "line1\nline2\nline3"
     result = truncate_body(text, verbose=False)
     assert result == text
-    assert "..." not in result
+    assert "[truncated]" not in result
 
 
 def test_truncate_body_exact_limit():
@@ -186,16 +187,16 @@ def test_truncate_body_exact_limit():
     text = "\n".join([f"line{i}" for i in range(5)])
     result = truncate_body(text, verbose=False)
     assert result == text
-    assert "..." not in result
+    assert "[truncated]" not in result
 
 
 def test_truncate_body_over_limit():
-    """Text over 5 lines is truncated with ellipsis."""
+    """Text over 5 lines is truncated with indicator."""
     text = "\n".join([f"line{i}" for i in range(10)])
     result = truncate_body(text, verbose=False)
     lines = result.split("\n")
-    assert len(lines) == 6  # 5 lines + "..."
-    assert lines[-1] == "..."
+    assert len(lines) == 6  # 5 lines + "[truncated]"
+    assert lines[-1] == "[truncated]"
 
 
 def test_truncate_body_verbose_mode():
@@ -203,7 +204,7 @@ def test_truncate_body_verbose_mode():
     text = "\n".join([f"line{i}" for i in range(20)])
     result = truncate_body(text, verbose=True)
     assert result == text
-    assert "..." not in result
+    assert "[truncated]" not in result
 
 
 def test_truncate_body_none():
@@ -222,6 +223,12 @@ Run: `pytest tests/test_truncate.py -v`
 Expected: FAIL with ModuleNotFoundError
 
 **Step 3: Create utils directory and truncate module**
+
+First, create the utils directory:
+
+```bash
+mkdir -p src/codogram/utils
+```
 
 Create `src/codogram/utils/__init__.py`:
 
@@ -260,7 +267,7 @@ def truncate_body(text: str | None, verbose: bool) -> str | None:
     if len(lines) <= MAX_LINES:
         return text
 
-    return "\n".join(lines[:MAX_LINES]) + "\n..."
+    return "\n".join(lines[:MAX_LINES]) + "\n[truncated]"
 ```
 
 **Step 4: Run test to verify it passes**
@@ -295,8 +302,8 @@ def test_permission_body_truncated_in_short_mode():
     """Permission body should be truncated when verbose=False."""
     long_body = "\n".join([f"line{i}" for i in range(10)])
     result = truncate_body(long_body, verbose=False)
-    assert result.count("\n") == 5  # 5 lines + "..."
-    assert result.endswith("...")
+    assert result.count("\n") == 5  # 5 lines + "[truncated]"
+    assert result.endswith("[truncated]")
 
 
 def test_permission_body_full_in_verbose_mode():
@@ -468,24 +475,28 @@ Add to `tests/test_watcher.py`:
 from codogram.watcher import format_tool_use
 
 
-def test_format_tool_use_truncates_in_short_mode():
-    """Tool use body should be truncated when verbose=False."""
-    long_preview = "\n".join([f"line{i}" for i in range(10)])
-    result = format_tool_use("SomeTool", {"data": long_preview}, verbose=False)
-    # Should truncate the preview
-    assert result.count("\n") <= 6
+def test_format_tool_use_bash_truncates_in_short_mode():
+    """Bash command should be truncated when verbose=False."""
+    long_cmd = "\n".join([f"echo line{i}" for i in range(10)])
+    result = format_tool_use("Bash", {"command": long_cmd}, verbose=False)
+    # Should truncate the command to 5 lines + [truncated]
+    assert "[truncated]" in result
+    # Original 10 lines should NOT be fully present
+    assert "echo line9" not in result
 
 
-def test_format_tool_use_full_in_verbose_mode():
-    """Tool use body should be full when verbose=True."""
-    long_preview = "\n".join([f"line{i}" for i in range(10)])
-    result = format_tool_use("SomeTool", {"data": long_preview}, verbose=True)
-    assert long_preview in result
+def test_format_tool_use_bash_full_in_verbose_mode():
+    """Bash command should be full when verbose=True."""
+    long_cmd = "\n".join([f"echo line{i}" for i in range(10)])
+    result = format_tool_use("Bash", {"command": long_cmd}, verbose=True)
+    # All 10 lines should be present
+    assert "echo line9" in result
+    assert "[truncated]" not in result
 ```
 
 **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/test_watcher.py::test_format_tool_use_truncates_in_short_mode -v`
+Run: `pytest tests/test_watcher.py::test_format_tool_use_bash_truncates_in_short_mode -v`
 Expected: FAIL (unexpected keyword argument)
 
 **Step 3: Add verbose parameter to format_tool_use**
@@ -1041,21 +1052,63 @@ git commit -m "feat: add settings callback handler for inline buttons"
 ## Task 12: Wire up verbose in history_watcher
 
 **Files:**
-- Modify: `src/codogram/history_watcher.py`
+- Modify: `src/codogram/history_watcher.py:242-276` (watch_thread_jsonl function)
 
-**Step 1: Find where tool calls are sent**
+**Step 1: Update watch_thread_jsonl to pass verbose**
 
-Check `history_watcher.py` for where it calls watcher functions.
+In `src/codogram/history_watcher.py`, update the `watch_thread_jsonl` function (around line 256-258):
 
-**Step 2: Pass verbose setting**
+```python
+async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo, telegram_queue: "TelegramQueue"):
+    """Watch jsonl for a specific thread and send messages through queue."""
+    from .watcher import JsonlWatcher, _entry_to_messages
+    from .telegram_queue import OutgoingBatch
+    from pathlib import Path
 
-Update to read verbose from thread/project and pass to message formatting.
+    if not thread.jsonl_path:
+        logger.warning(f"watch_thread_jsonl: no jsonl_path for thread={thread.name}")
+        return
 
-**Step 3: Test E2E**
+    logger.info(f"thread_watcher_started: thread={thread.name}, session={thread.session_id[:8] if thread.session_id else 'None'}")
+    watcher = JsonlWatcher(Path(thread.jsonl_path))
 
-Toggle verbose, trigger tool calls, verify truncation.
+    try:
+        async for entry in watcher.watch():
+            try:
+                # Get verbose setting from thread (with fallback to project)
+                verbose = thread.verbose if hasattr(thread, 'verbose') else project.verbose
+                messages = _entry_to_messages(entry, verbose=verbose)
+                if messages:
+                    text_preview = messages[0].get("text", "")[:40].replace("\n", " ")
+                    msg_id = hash(text_preview) & 0xFFFFFF
+                    logger.info(f"message_read: msg_id={msg_id:06x} thread={thread.name} preview='{text_preview}'")
 
-**Step 4: Commit**
+                    batch = OutgoingBatch(
+                        chat_id=project.chat_id,
+                        thread_id=thread.thread_id,
+                        messages=messages,
+                    )
+                    telegram_ids = await telegram_queue.enqueue(batch)
+                    logger.info(f"message_sent: msg_id={msg_id:06x} thread={thread.name} telegram_ids={telegram_ids}")
+            except Exception as e:
+                logger.error(f"watch_thread_error: {e}")
+    except asyncio.CancelledError:
+        logger.info(f"watch_thread_cancelled: thread={thread.name}")
+        raise
+```
+
+The key change is line: `messages = _entry_to_messages(entry, verbose=verbose)`
+
+**Step 2: Test E2E**
+
+1. Run `/verbose` to enable verbose mode
+2. Trigger a tool call (send a message to Claude)
+3. Verify full body is shown
+4. Run `/verbose` again to disable
+5. Trigger another tool call
+6. Verify body is truncated with `[truncated]`
+
+**Step 3: Commit**
 
 ```bash
 git add src/codogram/history_watcher.py
@@ -1082,6 +1135,16 @@ git commit -m "feat: wire verbose setting to history watcher"
 ```bash
 git commit --allow-empty -m "test: complete E2E testing for verbose toggle"
 ```
+
+---
+
+## Notes
+
+**Design document deviation:** The design says to put callbacks in `handlers/callbacks.py`, but this plan puts them in `handlers/settings.py` to keep settings-related code together. This is intentional.
+
+**Future improvements:**
+- `MAX_LINES` constant could be made configurable via settings
+- Consider extracting `_build_settings_text()` helper to deduplicate `cmd_settings` and `_update_settings_message`
 
 ---
 
