@@ -297,6 +297,15 @@ START_GIT_VISIBILITY_PROMPT = "Repository visibility?"
 START_RESTART_CONFIRM = "Restart session `{tmux_session}`?"
 
 
+# --- Validation ---
+
+VALIDATE_INVALID_NAME = f"{STATUS_ERR} Invalid name"
+VALIDATE_NAME_TOO_LONG = f"{STATUS_ERR} Name too long (max {{max_len}} chars)"
+VALIDATE_NAME_EXISTS = f"{STATUS_ERR} Name `{{name}}` already used"
+VALIDATE_GIT_REQUIRED = f"{STATUS_ERR} Git repository required"
+VALIDATE_UNCOMMITTED = f"{STATUS_WARN} Uncommitted changes"
+
+
 # --- Branch Operations ---
 
 BRANCH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first."
