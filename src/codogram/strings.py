@@ -116,6 +116,15 @@ CLAUDE_TMUX_NOT_FOUND = "tmux session not found. Start Claude in terminal"
 CLAUDE_NO_RESTART = "No active session to restart"
 
 
+# --- URL Validation ---
+
+GIT_URL_INVALID_WIKI = f"{STATUS_ERR} This is a wiki page, not a repository"
+GIT_URL_INVALID_BLOB = f"{STATUS_ERR} This is a file link. Use repository URL"
+GIT_URL_INVALID_GIST = f"{STATUS_ERR} Gists cannot be cloned as projects"
+GIT_URL_INVALID_FORMAT = f"{STATUS_ERR} Invalid URL. Use https:// or git@ format"
+GIT_URL_RETRY_PROMPT = "Send valid repository URL:"
+
+
 # --- Misc ---
 
 TOPICS_REQUIRED_GROUP = f"{STATUS_WARN} This command requires a group with topics"
