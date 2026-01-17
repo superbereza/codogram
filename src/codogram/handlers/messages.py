@@ -86,8 +86,8 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
         case RouteAction.START_BINDING:
             # Need to bind session - start binding task
             await _start_binding(message, result)
-            # Still try to send to tmux
-            _try_send_to_tmux(result, text)
+            # Still try to send to tmux (supports files too)
+            await _send_content(message, result, telegram_queue)
             return
 
         case RouteAction.SEND_TO_TMUX:

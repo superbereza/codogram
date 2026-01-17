@@ -119,11 +119,12 @@ class TestFileMessageHandler:
         telegram_queue = MagicMock()
         telegram_queue.reply = AsyncMock()
 
-        await on_message(message, telegram_queue)
+        with patch("codogram.handlers.messages.handle_name_input", new_callable=AsyncMock, return_value=False):
+            await on_message(message, telegram_queue)
 
-        telegram_queue.reply.assert_called_once()
-        reply_text = telegram_queue.reply.call_args[0][1]
-        assert "whisper" in reply_text.lower()
+            telegram_queue.reply.assert_called_once()
+            reply_text = telegram_queue.reply.call_args[0][1]
+            assert "whisper" in reply_text.lower()
 
     @pytest.mark.asyncio
     async def test_voice_rejected(self):
@@ -144,11 +145,12 @@ class TestFileMessageHandler:
         telegram_queue = MagicMock()
         telegram_queue.reply = AsyncMock()
 
-        await on_message(message, telegram_queue)
+        with patch("codogram.handlers.messages.handle_name_input", new_callable=AsyncMock, return_value=False):
+            await on_message(message, telegram_queue)
 
-        telegram_queue.reply.assert_called_once()
-        reply_text = telegram_queue.reply.call_args[0][1]
-        assert "whisper" in reply_text.lower()
+            telegram_queue.reply.assert_called_once()
+            reply_text = telegram_queue.reply.call_args[0][1]
+            assert "whisper" in reply_text.lower()
 
     @pytest.mark.asyncio
     async def test_file_download_error_shows_message(self, tmp_path):
