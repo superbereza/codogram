@@ -21,3 +21,10 @@ class RestartFlow(StatesGroup):
     """States for /restart confirmation flow."""
 
     awaiting_confirm = State()
+
+
+class ResetFlow(StatesGroup):
+    """FSM states for /reset_all flow."""
+
+    awaiting_confirm = State()
+    awaiting_dir_choice = State()
