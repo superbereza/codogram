@@ -49,7 +49,9 @@ async def on_create_magic(callback: CallbackQuery, telegram_queue: TelegramQueue
     await callback.answer()
 
     if create_type == CreateType.BRANCH:
-        await _do_create_branch(callback.bot, chat_id, thread_id, project, name, telegram_queue)
+        result = await _do_create_branch(callback.bot, chat_id, thread_id, project, name, telegram_queue)
+        if result:
+            await telegram_queue.send(chat_id, strings.BRANCH_CREATED.format(name=name), thread_id=thread_id)
     else:
         result = await _do_create_thread(callback.bot, chat_id, thread_id, project, name, telegram_queue)
         if result:
@@ -97,12 +99,15 @@ async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> 
 async def _do_create_branch(
     bot, chat_id: int, thread_id: int | None, project, name: str, telegram_queue: TelegramQueue
 ):
-    """Create branch with given name, handling preconditions."""
+    """Create branch with given name, handling preconditions.
+
+    Returns ThreadInfo if created, None otherwise.
+    """
     can_create, error, warning = create_flow_service.check_branch_preconditions(project, name)
 
     if error:
         await telegram_queue.send(chat_id, error, thread_id=thread_id)
-        return
+        return None
 
     if warning:
         # Uncommitted changes - show options
@@ -119,10 +124,10 @@ async def _do_create_branch(
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")],
         ])
         await telegram_queue.send(chat_id, warning, thread_id=thread_id, reply_markup=keyboard)
-        return
+        return None
 
     default_branch = get_default_branch(project.cwd)
-    await do_branch_create(bot, chat_id, project, name, default_branch)
+    return await do_branch_create(bot, chat_id, project, name, default_branch)
 
 
 async def _do_create_thread(bot, chat_id: int, thread_id: int | None, project, name: str, telegram_queue: TelegramQueue):
