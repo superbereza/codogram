@@ -276,8 +276,6 @@ Cleaner output by default:
 - Filter TOOL_USE, TOOL_RESULT, show only TEXT
 - High priority — improves daily UX significantly
 
----
-
 ### Activity indicators
 Show that Claude is thinking/working:
 - Generation indicator appears ABOVE input box in tmux
