@@ -43,11 +43,17 @@
 - Неверный формат: не начинается с `https://`, `git@`, `ssh://`
 
 ```python
+import re
+
 def validate_git_url(url: str) -> tuple[bool, str | None]:
-    """Returns (is_valid, error_string). Uses constants from strings.py."""
-    if "/wiki/" in url:
+    """Returns (is_valid, error_string). Uses precise GitHub patterns."""
+    # GitHub-specific patterns (avoid false positives on repo names like "wiki-parser")
+    github_blob = re.compile(r'github\.com/[^/]+/[^/]+/blob/')
+    github_tree = re.compile(r'github\.com/[^/]+/[^/]+/tree/')
+
+    if "/wiki/" in url and "github.com" in url:
         return False, strings.GIT_URL_INVALID_WIKI
-    if "/blob/" in url or "/tree/" in url:
+    if github_blob.search(url) or github_tree.search(url):
         return False, strings.GIT_URL_INVALID_BLOB
     if "gist.github.com" in url:
         return False, strings.GIT_URL_INVALID_GIST
@@ -226,6 +232,30 @@ tmux attach -t {tmux_name}
 • /finish — merge and archive
 ```
 
+**Пример построения сообщения в коде:**
+```python
+def build_announcement(project_name: str, tmux_name: str, is_forum: bool) -> str:
+    commands = [
+        "• /esc — cancel operation",
+        "• /clear — clear context",
+        "• /auto_accept — toggle auto-accept",
+    ]
+    if is_forum:
+        commands.extend([
+            "• /thread — new topic",
+            "• /branch — new branch + topic",
+            "• /finish — merge and archive",
+        ])
+
+    return f"""`[v]` Project `{project_name}` ready
+
+Commands available in this chat:
+{chr(10).join(commands)}
+
+To see Claude's UI, run in terminal:
+`tmux attach -t {tmux_name}`"""
+```
+
 ## Файлы для изменения
 
 | Файл | Изменения |
@@ -303,9 +333,8 @@ To see Claude's UI, run in terminal:
 - [ ] File locking в `ProjectManager._save()` (см. Note 3)
 
 **Project Ready Checks:**
-- [ ] `require_tmux_exists()` для /clear, /esc
-- [ ] `require_claude_ready()` для /new, /thread, /branch, /finish
-- [ ] (см. Note 8 для mapping)
+- [ ] `require_tmux_exists()` для /clear, /esc (см. Note 8)
+- [ ] `require_claude_ready()` для /new, /thread, /branch, /finish (см. Note 8)
 
 **Setup Phase & Legacy:**
 - [ ] `is_setup_phase()` с fallback на legacy fields (см. Note 5)
@@ -430,28 +459,14 @@ def _save(self) -> None:
 
 ### 4. URL validation: /blob/ edge case
 
-**Проблема:** `/blob/` может быть легитимным именем папки в репозитории.
+**Проблема:** Простая проверка `/blob/` может дать false positive на репозитории с папкой "blob" в имени.
 
-**Решение:** Проверяем паттерн GitHub URL более точно:
+**Решение:** Используем точные regex паттерны для GitHub URL — см. Section 2 для полной реализации.
 
-```python
-def validate_git_url(url: str) -> tuple[bool, str | None]:
-    # GitHub-specific patterns
-    github_blob_pattern = re.compile(r'github\.com/[^/]+/[^/]+/blob/')
-    github_tree_pattern = re.compile(r'github\.com/[^/]+/[^/]+/tree/')
-
-    if "/wiki/" in url and "github.com" in url:
-        return False, strings.GIT_URL_INVALID_WIKI
-    if github_blob_pattern.search(url):
-        return False, strings.GIT_URL_INVALID_BLOB
-    if github_tree_pattern.search(url):
-        return False, strings.GIT_URL_INVALID_BLOB
-    if "gist.github.com" in url:
-        return False, strings.GIT_URL_INVALID_GIST
-    if not url.startswith(("https://", "git@", "ssh://")):
-        return False, strings.GIT_URL_INVALID_FORMAT
-    return True, None
-```
+**Паттерны:**
+- `github\.com/[^/]+/[^/]+/blob/` — матчит только GitHub file URLs
+- `github\.com/[^/]+/[^/]+/tree/` — матчит только GitHub directory URLs
+- Wiki проверяем только для github.com URLs
 
 ### 5. is_setup_phase(): legacy projects
 
@@ -482,7 +497,7 @@ def is_setup_phase(project: Project) -> bool:
 - В topic: ресетит весь проект (не только этот topic)
 - Для удаления отдельного topic: используй `/finish`
 
-**Сообщение если вызвано из topic:**
+**Сообщение если вызвано из topic (working project):**
 ```
 `[?]` Reset entire project `{name}`?
 
@@ -490,6 +505,11 @@ This will disconnect Claude in all topics and clear settings.
 
 [Continue] [Cancel]
 ```
+
+**Setup phase в topic:**
+Если `/reset_all` вызван из topic, но проект в setup phase — поведение такое же как в main:
+- Сразу чистим (нечего терять)
+- Показываем: `[v]` Reset complete. Use /start to begin.
 
 ### 7. Uncommitted changes detection
 
@@ -521,20 +541,38 @@ def has_uncommitted_changes(path: str) -> bool:
 
 **Новое поведение с require_project_ready():** блокирует если Claude starting.
 
-**Решение:** Разные уровни проверки:
+**Решение:** Два уровня проверки:
 
 ```python
-async def require_project_exists(message, telegram_queue) -> bool:
-    """Basic check: project + cwd."""
-    # ... minimal check
-
 async def require_tmux_exists(message, telegram_queue) -> bool:
     """Check: project + cwd + tmux session exists."""
-    # ... for /clear, /esc
+    project = project_manager.get_by_chat(message.chat.id)
+    if not project or not project.cwd:
+        await telegram_queue.reply(message, strings.PROJECT_NOT_READY)
+        return False
+    thread = project.threads.get(message.message_thread_id)
+    if not thread:
+        await telegram_queue.reply(message, strings.PROJECT_NOT_READY)
+        return False
+    tmux_name = thread.get_tmux_session(project.project_name)
+    if not is_tmux_session_exists(tmux_name):
+        await telegram_queue.reply(message, strings.CLAUDE_NOT_RUNNING)
+        return False
+    return True
 
 async def require_claude_ready(message, telegram_queue) -> bool:
     """Strict check: project + cwd + tmux + Claude ready."""
-    # ... for /new, /thread, /branch, /finish
+    if not await require_tmux_exists(message, telegram_queue):
+        return False
+    # Additional check: Claude is ready (not starting)
+    project = project_manager.get_by_chat(message.chat.id)
+    thread = project.threads.get(message.message_thread_id)
+    tmux_name = thread.get_tmux_session(project.project_name)
+    tmux = TmuxSession(tmux_name, project.cwd)
+    if not tmux.is_claude_ready():
+        await telegram_queue.reply(message, strings.CLAUDE_STARTING)
+        return False
+    return True
 ```
 
 **Mapping:**
