@@ -131,16 +131,30 @@ And in thread_data dict (around line 268), add after auto_accept:
 
 **Step 4: Update _load_projects to load verbose**
 
-In `src/codogram/session_manager.py` `_load_projects` method, after line 204:
+In `src/codogram/session_manager.py` `_load_projects` method, after loading `project.auto_accept`:
 
 ```python
                 project.verbose = data.get("verbose", False)
 ```
 
-And in thread loading (around line 224), add:
+And in thread loading, add `verbose` parameter to ThreadInfo constructor (after `auto_accept`):
 
 ```python
-                        verbose=thread_data.get("verbose", False),
+                    project.threads[tid] = ThreadInfo(
+                        thread_id=tid,
+                        name=thread_name,
+                        topic_name=thread_data.get("topic_name"),
+                        session_id=thread_data.get("session_id"),
+                        jsonl_path=thread_data.get("jsonl_path"),
+                        awaiting_new_session=thread_data.get("awaiting_new_session", False),
+                        start_requested_at=thread_data.get("start_requested_at"),
+                        worktree_path=thread_data.get("worktree_path"),
+                        base_branch=thread_data.get("base_branch"),
+                        archived=thread_data.get("archived", False),
+                        auto_accept=thread_data.get("auto_accept", False),
+                        verbose=thread_data.get("verbose", False),  # <-- ADD THIS
+                        notified_closed=bool(thread_data.get("session_id")),
+                    )
 ```
 
 **Step 5: Run test to verify it passes**
@@ -391,7 +405,7 @@ async def test_try_auto_accept_truncates_in_short_mode():
     call_args = queue.enqueue_nowait.call_args[0][0]
     sent_text = call_args.messages[0]["text"]
     # Should be truncated
-    assert sent_text.count("\n") <= 6  # "🤖 Auto: " + 5 lines + "..."
+    assert "[truncated]" in sent_text  # Should be truncated
 ```
 
 **Step 2: Run test to verify it fails**
@@ -513,11 +527,15 @@ Update function signature (line 77):
 def format_tool_use(tool_name: str, tool_input: dict | None, verbose: bool = False) -> str:
 ```
 
-For Bash command, apply truncation (around line 83):
+For Bash command, apply truncation (around line 83).
+
+Note: The `[:500]` character limit is a safety measure. In verbose mode, we skip it to show full command. In short mode, we apply both `[:500]` and line truncation:
 
 ```python
     if tool_name == "Bash":
-        cmd = tool_input.get("command", "")[:500]
+        cmd = tool_input.get("command", "")
+        if not verbose:
+            cmd = cmd[:500]  # Safety limit only in short mode
         desc = tool_input.get("description", "")
         cmd_display = truncate_body(cmd, verbose=verbose) or cmd
         if desc:
@@ -771,11 +789,12 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     if project.threads:
         thread = project.threads.get(thread_id)
 
-    # Get tmux name for keyboard
+    # Get tmux name for keyboard (avoid deprecated project.tmux_session)
     if thread:
         tmux_name = thread.get_tmux_session(project.project_name)
     else:
-        tmux_name = project.tmux_session or f"claude-{project.project_name}"
+        # No thread found - use default naming convention
+        tmux_name = f"claude-{project.project_name}"
 
     text = _build_settings_text(project, thread, tmux_name)
     kb = settings_keyboard(tmux_name)
@@ -978,7 +997,10 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
         await callback.answer(f"Verbose: {status}")
 
     elif action == "mode":
-        cwd = thread.worktree_path if thread else project.cwd
+        cwd = (thread.worktree_path if thread else None) or project.cwd
+        if not cwd:
+            await callback.answer("No cwd configured")
+            return
         tmux = TmuxSession(tmux_name, cwd)
         service = SessionStateService()
         result = service.cycle_approval_mode(tmux)
@@ -1036,9 +1058,8 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
     try:
         async for entry in watcher.watch():
             try:
-                # Get verbose setting from thread (with fallback to project)
-                verbose = thread.verbose if hasattr(thread, 'verbose') else project.verbose
-                messages = _entry_to_messages(entry, verbose=verbose)
+                # Get verbose setting from thread
+                messages = _entry_to_messages(entry, verbose=thread.verbose)
                 if messages:
                     text_preview = messages[0].get("text", "")[:40].replace("\n", " ")
                     msg_id = hash(text_preview) & 0xFFFFFF

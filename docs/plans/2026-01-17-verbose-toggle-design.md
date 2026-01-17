@@ -75,7 +75,7 @@ Auto-accept: ○ off
 
 ### Short mode (default):
 - Show first 5 lines of body
-- Add `...` if truncated
+- Add `[truncated]` if truncated
 
 ### Long mode (verbose: on):
 - Show full body (current behavior)
@@ -87,7 +87,7 @@ Auto-accept: ○ off
   auto_accept: bool = False
   verbose: bool = False
 + display_mode: str = "short"
-...
+[truncated]
 ```
 
 ## Inline Buttons
@@ -107,9 +107,8 @@ Callback data format:
 ## Files to Modify
 
 1. `src/codogram/session_manager.py` - add `verbose` field to ThreadInfo and ProjectState
-2. `src/codogram/handlers/settings.py` - update `/settings` output, add `/verbose` command
+2. `src/codogram/handlers/settings.py` - update `/settings` output, add `/verbose` command, handle settings callbacks
 3. `src/codogram/keyboards/` - add settings keyboard builder
-4. `src/codogram/handlers/callbacks.py` - handle settings button callbacks
-5. `src/codogram/watcher.py` - apply short/long logic to tool calls
-6. `src/codogram/permission_poller.py` - apply short/long logic to permissions
-7. `src/codogram/auto_accept.py` - apply short/long logic to auto-accept messages
+4. `src/codogram/watcher.py` - apply short/long logic to tool calls
+5. `src/codogram/permission_poller.py` - apply short/long logic to permissions
+6. `src/codogram/auto_accept.py` - apply short/long logic to auto-accept messages
