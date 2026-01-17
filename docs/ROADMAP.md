@@ -214,6 +214,14 @@ Display and control Claude session state:
 - **Permission cancel on send** — cancel active permission before sending message
 - See [docs/designs/done/2026-01-07-session-state-display.md](designs/done/2026-01-07-session-state-display.md)
 
+### Status messages unification
+All user-facing messages centralized in `strings.py`:
+- 170 constants for all status messages, prompts, errors, button texts
+- `STATUS_*` prefixes (`[v]`, `[x]`, `[!]`, `[~]`, `[?]`, `[i]`)
+- Send vs edit pattern: first edit removes buttons, subsequent statuses via send
+- Consistent tone-of-voice across all handlers
+- See [docs/designs/done/2026-01-17-status-messages-unification.md](designs/done/2026-01-17-status-messages-unification.md)
+
 ### Stale worktree recovery
 Handle deleted worktrees gracefully instead of crashing:
 - `/resume`, `/start` — detect stale worktree_path, offer: recreate / resume in main / cancel
@@ -252,15 +260,6 @@ Show that Claude is thinking/working:
 - Generation indicator appears ABOVE input box in tmux
 - Parse from tmux capture-pane
 - Show typing indicator or status in Telegram
-
-### Migrate strings to strings.py
-Move all hardcoded strings to `src/codogram/strings.py`:
-- handlers/*.py — command responses
-- launch_animation.py — startup statuses
-- history_watcher.py — notifications
-- keyboards.py — buttons
-- services/start_flow.py — wizard buttons
-- See `docs/specs/tone-of-voice.md` for guidelines
 
 ## Backlog
 
