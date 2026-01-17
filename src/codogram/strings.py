@@ -176,3 +176,56 @@ What to do:
 WORKTREE_TOPIC_ARCHIVED = f"""{STATUS_OK} Topic archived
 
 Use General or /thread for new session."""
+
+
+# --- Finish/Archive ---
+
+FINISH_NOTHING_IN_GENERAL = f"{STATUS_INFO} Nothing to finish in General. Use /clear to reset session."
+FINISH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first."
+FINISH_THREAD_NOT_FOUND = f"{STATUS_WARN} Thread not found."
+
+FINISH_ARCHIVE_CONFIRM = f"""{STATUS_QUESTION} Archive topic `{{name}}`?
+
+This will close the topic and stop Claude session."""
+
+FINISH_WORKTREE_NOT_FOUND = f"""{STATUS_WARN} Worktree not found: `{{path}}`
+
+Archiving topic without git cleanup."""
+
+FINISH_UNCOMMITTED_CHANGES = f"{STATUS_WARN} Branch `{{branch}}` has uncommitted changes"
+
+FINISH_ARCHIVING = f"{STATUS_PENDING} Archiving `{{name}}`..."
+FINISH_ARCHIVED = f"{STATUS_OK} Topic `{{name}}` archived."
+
+FINISH_BRANCH_OPTIONS = """Finish branch `{name}`:
+
+Base: `{base}`"""
+
+FINISH_MERGE_CONFIRM = f"""{STATUS_QUESTION} Merge `{{branch}}` -> `{{target}}`?
+
+Choose push option:"""
+
+FINISH_MERGING = f"{STATUS_PENDING} Merging `{{branch}}` -> `{{target}}`..."
+FINISH_MERGE_FAILED = f"""{STATUS_ERR} Merge failed: {{error}}
+
+Resolve conflicts manually and try again."""
+
+FINISH_PUSHING = f"{STATUS_PENDING} Pushing `{{target}}`..."
+FINISH_PUSH_FAILED = f"""{STATUS_WARN} Merged but push failed: {{error}}
+
+Push manually: `git push origin {{target}}`"""
+
+FINISH_ARCHIVING_TOPIC = f"{STATUS_PENDING} Archiving topic..."
+FINISH_CLEANING_WORKTREE = f"{STATUS_PENDING} Cleaning up worktree..."
+
+FINISH_MERGED_PUSHED = f"{STATUS_OK} Merged and pushed `{{branch}}` -> `{{target}}`"
+FINISH_MERGED_LOCAL = f"{STATUS_OK} Merged `{{branch}}` -> `{{target}}` (local only)"
+FINISH_WORKTREE_CLEANUP_FAILED = f"\n{STATUS_WARN} Worktree cleanup failed: {{error}}"
+
+FINISH_DISCARDED_ARCHIVED = f"{STATUS_OK} Branch `{{branch}}` discarded and archived."
+FINISH_ARCHIVED_KEPT = f"""{STATUS_OK} Branch `{{branch}}` archived.
+Worktree kept for potential resume."""
+
+FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages."
+
+Run /finish again after commit."""

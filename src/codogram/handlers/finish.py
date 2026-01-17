@@ -5,6 +5,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
+from .. import strings
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
 from ..services.branch import archive_thread
@@ -24,20 +25,17 @@ async def cmd_finish(message: Message, telegram_queue: TelegramQueue):
 
     # In General topic - nothing to finish
     if thread_id is None:
-        await telegram_queue.reply(
-            message,
-            "`[i]` Nothing to finish in General. Use /clear to reset session."
-        )
+        await telegram_queue.reply(message, strings.FINISH_NOTHING_IN_GENERAL)
         return
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await telegram_queue.reply(message, "`[!]` Project not registered. Use /start first.")
+        await telegram_queue.reply(message, strings.FINISH_PROJECT_NOT_REGISTERED)
         return
 
     thread = project.get_thread(thread_id)
     if not thread:
-        await telegram_queue.reply(message, "`[!]` Thread not found.")
+        await telegram_queue.reply(message, strings.FINISH_THREAD_NOT_FOUND)
         return
 
     # Branch topic (has worktree) - show merge options
@@ -52,8 +50,7 @@ async def cmd_finish(message: Message, telegram_queue: TelegramQueue):
     ])
     await telegram_queue.reply(
         message,
-        f"`[?]` Archive topic `{thread.name}`?\n\n"
-        "This will close the topic and stop Claude session.",
+        strings.FINISH_ARCHIVE_CONFIRM.format(name=thread.name),
         reply_markup=keyboard
     )
 
@@ -78,8 +75,7 @@ async def _show_branch_finish_options(
 
         await telegram_queue.reply(
             message,
-            f"`[!]` Worktree not found: `{display_path}`\n\n"
-            "Archiving topic without git cleanup.",
+            strings.FINISH_WORKTREE_NOT_FOUND.format(path=display_path),
         )
         await archive_thread(message.bot, message.chat.id, project, thread)
         return
@@ -93,7 +89,7 @@ async def _show_branch_finish_options(
         ])
         await telegram_queue.reply(
             message,
-            f"`[!]` Branch `{thread.name}` has uncommitted changes",
+            strings.FINISH_UNCOMMITTED_CHANGES.format(branch=thread.name),
             reply_markup=keyboard
         )
         return
@@ -134,8 +130,10 @@ async def _show_branch_finish_options(
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     await telegram_queue.reply(
         message,
-        f"Finish branch `{thread.name}`:\n\n"
-        f"Base: `{thread.base_branch or default_branch}`",
+        strings.FINISH_BRANCH_OPTIONS.format(
+            name=thread.name,
+            base=thread.base_branch or default_branch
+        ),
         reply_markup=keyboard
     )
 
@@ -158,11 +156,11 @@ async def on_finish_archive(callback: CallbackQuery, telegram_queue: TelegramQue
         await callback.answer("Thread not found")
         return
 
-    await telegram_queue.edit(callback.message, f"`[~]` Archiving `{thread.name}`...")
+    await telegram_queue.edit(callback.message, strings.FINISH_ARCHIVING.format(name=thread.name))
 
     await archive_thread(callback.bot, callback.message.chat.id, project, thread)
 
-    await telegram_queue.edit(callback.message, f"`[v]` Topic `{thread.name}` archived.")
+    await telegram_queue.edit(callback.message, strings.FINISH_ARCHIVED.format(name=thread.name))
     await callback.answer()
 
 
@@ -196,8 +194,7 @@ async def on_finish_merge(callback: CallbackQuery, telegram_queue: TelegramQueue
 
     await telegram_queue.edit(
         callback.message,
-        f"`[?]` Merge `{thread.name}` -> `{target_branch}`?\n\n"
-        "Choose push option:",
+        strings.FINISH_MERGE_CONFIRM.format(branch=thread.name, target=target_branch),
         reply_markup=keyboard
     )
     await callback.answer()
@@ -225,47 +222,50 @@ async def on_finish_do_merge(callback: CallbackQuery, telegram_queue: TelegramQu
     worktree_path = Path(thread.worktree_path)
     branch_name = thread.name
 
-    await telegram_queue.edit(callback.message, f"`[~]` Merging `{branch_name}` -> `{target_branch}`...")
+    await telegram_queue.edit(
+        callback.message,
+        strings.FINISH_MERGING.format(branch=branch_name, target=target_branch)
+    )
 
     # Perform merge
     result = merge_branch(main_repo, branch_name, target_branch)
     if not result.success:
         await telegram_queue.edit(
             callback.message,
-            f"`[x]` Merge failed: {result.error}\n\n"
-            "Resolve conflicts manually and try again."
+            strings.FINISH_MERGE_FAILED.format(error=result.error)
         )
         await callback.answer()
         return
 
     # Push if requested
     if push_mode == "push":
-        await telegram_queue.edit(callback.message, f"`[~]` Pushing `{target_branch}`...")
+        await telegram_queue.edit(
+            callback.message, strings.FINISH_PUSHING.format(target=target_branch)
+        )
         push_result = push_branch(main_repo, target_branch)
         if not push_result.success:
             await telegram_queue.edit(
                 callback.message,
-                f"`[!]` Merged but push failed: {push_result.error}\n\n"
-                "Push manually: `git push origin {target_branch}`"
+                strings.FINISH_PUSH_FAILED.format(error=push_result.error, target=target_branch)
             )
             await callback.answer()
             return
 
     # Archive thread
-    await telegram_queue.edit(callback.message, f"`[~]` Archiving topic...")
+    await telegram_queue.edit(callback.message, strings.FINISH_ARCHIVING_TOPIC)
     await archive_thread(callback.bot, callback.message.chat.id, project, thread)
 
     # Remove worktree and branch
-    await telegram_queue.edit(callback.message, f"`[~]` Cleaning up worktree...")
+    await telegram_queue.edit(callback.message, strings.FINISH_CLEANING_WORKTREE)
     remove_result = remove_worktree(main_repo, worktree_path, branch_name, delete_branch=True)
 
     if push_mode == "push":
-        status = f"`[v]` Merged and pushed `{branch_name}` -> `{target_branch}`"
+        status = strings.FINISH_MERGED_PUSHED.format(branch=branch_name, target=target_branch)
     else:
-        status = f"`[v]` Merged `{branch_name}` -> `{target_branch}` (local only)"
+        status = strings.FINISH_MERGED_LOCAL.format(branch=branch_name, target=target_branch)
 
     if not remove_result.success:
-        status += f"\n`[!]` Worktree cleanup failed: {remove_result.error}"
+        status += strings.FINISH_WORKTREE_CLEANUP_FAILED.format(error=remove_result.error)
 
     await telegram_queue.edit(callback.message, status)
     await callback.answer()
@@ -288,7 +288,7 @@ async def on_finish_archive_branch(callback: CallbackQuery, telegram_queue: Tele
         await callback.answer("Thread not found")
         return
 
-    await telegram_queue.edit(callback.message, f"`[~]` Archiving `{thread.name}`...")
+    await telegram_queue.edit(callback.message, strings.FINISH_ARCHIVING.format(name=thread.name))
 
     # Archive topic (closes topic, kills tmux)
     await archive_thread(callback.bot, callback.message.chat.id, project, thread)
@@ -300,14 +300,13 @@ async def on_finish_archive_branch(callback: CallbackQuery, telegram_queue: Tele
         remove_worktree(main_repo, worktree_path, thread.name, delete_branch=True, force=True)
         await telegram_queue.edit(
             callback.message,
-            f"`[v]` Branch `{thread.name}` discarded and archived."
+            strings.FINISH_DISCARDED_ARCHIVED.format(branch=thread.name)
         )
     else:
         # Keep mode - worktree stays for potential resume
         await telegram_queue.edit(
             callback.message,
-            f"`[v]` Branch `{thread.name}` archived.\n"
-            "Worktree kept for potential resume."
+            strings.FINISH_ARCHIVED_KEPT.format(branch=thread.name)
         )
 
     await callback.answer()
@@ -336,9 +335,5 @@ async def on_finish_commit(callback: CallbackQuery, telegram_queue: TelegramQueu
     if tmux.exists():
         tmux.send("Commit current changes in logical chunks with descriptive messages.")
 
-    await telegram_queue.edit(
-        callback.message,
-        '`[~]` Sent: "Commit current changes in logical chunks with descriptive messages."\n\n'
-        "Run /finish again after commit."
-    )
+    await telegram_queue.edit(callback.message, strings.FINISH_COMMIT_SENT)
     await callback.answer()
