@@ -529,13 +529,14 @@ def format_tool_use(tool_name: str, tool_input: dict | None, verbose: bool = Fal
 
 For Bash command, apply truncation (around line 83).
 
-Note: The `[:500]` character limit is a safety measure. In verbose mode, we skip it to show full command. In short mode, we apply both `[:500]` and line truncation:
+Note: Character limits prevent Telegram API errors (4096 char limit). In short mode: 500 chars + 5 lines. In verbose mode: 3500 chars (no line limit):
 
 ```python
     if tool_name == "Bash":
         cmd = tool_input.get("command", "")
-        if not verbose:
-            cmd = cmd[:500]  # Safety limit only in short mode
+        # Safety limits to prevent Telegram API errors
+        char_limit = 3500 if verbose else 500
+        cmd = cmd[:char_limit]
         desc = tool_input.get("description", "")
         cmd_display = truncate_body(cmd, verbose=verbose) or cmd
         if desc:
@@ -559,7 +560,7 @@ Expected: PASS
 
 **Step 5: Update _entry_to_messages to get verbose setting**
 
-The watcher needs access to verbose setting. This requires passing it through. Update `_watch_with_queue` to receive verbose getter.
+The watcher needs access to verbose setting. This requires passing it through.
 
 In `src/codogram/watcher.py`, update `_entry_to_messages` signature:
 
@@ -574,7 +575,23 @@ And pass verbose to format_tool_use:
         text = format_tool_use(entry.tool_name, entry.tool_input, verbose=verbose)
 ```
 
-**Step 6: Commit**
+**Step 6: Update _watch_with_queue to pass verbose**
+
+In `src/codogram/watcher.py`, update the call to `_entry_to_messages` (around line 199):
+
+```python
+async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "TelegramQueue"):
+    """Watch jsonl and send entries through queue."""
+    # ... existing code ...
+
+    async for entry in watcher.watch():
+        try:
+            messages = _entry_to_messages(entry, verbose=thread.verbose)  # <-- ADD verbose
+            if messages:
+                # ... rest unchanged
+```
+
+**Step 7: Commit**
 
 ```bash
 git add src/codogram/watcher.py tests/test_watcher.py
@@ -1015,9 +1032,14 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
     await telegram_queue.edit(callback.message, text, reply_markup=kb)
 ```
 
-**Step 3: Add edit method to telegram_queue if needed**
+**Step 3: Verify telegram_queue.edit exists**
 
-Check if `telegram_queue.edit` exists. If not, add it.
+The `telegram_queue.edit` method already exists (line 398 in telegram_queue.py) with signature:
+```python
+async def edit(self, message: Message, text: str, parse_mode: str | None = "MarkdownV2", reply_markup: InlineKeyboardMarkup | None = None)
+```
+
+No changes needed.
 
 **Step 4: Test via Telegram MCP**
 
