@@ -191,6 +191,12 @@ def _parse_options_without_separator(lines: list[str]) -> PermissionPrompt | Non
         return None
 
     body = "\n".join(body_lines).strip()
+
+    # Detect trust-related prompts (should not be auto-accepted)
+    body_lower = body.lower()
+    if "trust" in body_lower or "folder" in body_lower:
+        return PermissionPrompt(options=options, body=body, prompt_type=PromptType.MCP_TRUST)
+
     return PermissionPrompt(options=options, body=body)
 
 
