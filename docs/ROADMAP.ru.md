@@ -169,7 +169,7 @@
 Конфиг перенесён в `~/.codogram/` для избежания проблем с worktrees:
 - `pip install -e` из worktree больше не ломает main бота
 - Новый `dev-run.sh` для тестирования из worktrees (использует PYTHONPATH)
-- Защита в `restart.sh` от запуска из worktree
+- Защита в `stop-and-restart.sh` от запуска из worktree
 - См. [docs/designs/done/2026-01-07-worktree-safe-config.md](designs/done/2026-01-07-worktree-safe-config.md)
 
 ### Миграция группа → супергруппа

@@ -169,7 +169,7 @@ Manual E2E tests executed by Claude via Telegram MCP:
 Config moved to `~/.codogram/` to avoid worktree issues:
 - `pip install -e` from worktree no longer breaks main bot
 - New `dev-run.sh` for testing from worktrees (uses PYTHONPATH)
-- `restart.sh` protection against running from worktree
+- `stop-and-restart.sh` protection against running from worktree
 - See [docs/designs/done/2026-01-07-worktree-safe-config.md](designs/done/2026-01-07-worktree-safe-config.md)
 
 ### Group → Supergroup migration

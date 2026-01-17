@@ -60,7 +60,7 @@ cp .env.example .env
 ### Run
 
 ```bash
-./restart.sh
+./stop-and-restart.sh
 ```
 
 ### Use
@@ -73,7 +73,7 @@ cp .env.example .env
 
 ```bash
 git pull
-./restart.sh
+./stop-and-restart.sh
 ```
 
 ## Commands
