@@ -4,12 +4,13 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from aiogram import Bot
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
 from .telegram_queue import OutgoingBatch, EditBatch, DeleteBatch
-from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status
+from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status, parse_input_suggestion
 from .keyboards import permission_keyboard
 from .state import permission_messages
 from .session_manager import ProjectState, ThreadInfo
@@ -39,6 +40,9 @@ CRASH_SIGNATURES = [
 
 # Shell prompts indicating Claude exited
 SHELL_PROMPTS = ["➜", "$ ", "# ", "❯ "]
+
+# Track last suggestion per thread to avoid duplicates
+_last_suggestions: dict[str, str | None] = {}
 
 
 def _detect_crash(screen: str) -> str | None:
@@ -179,6 +183,30 @@ async def permission_poller(
             await telegram_queue.enqueue_nowait(batch)
             thinking_msg_key = None
             last_thinking_text = None
+
+        # Parse input suggestion (only when not thinking)
+        if not thinking_text:
+            suggestion = parse_input_suggestion(screen)
+            key = f"{project.chat_id}:{thread_id}"
+
+            if suggestion and suggestion != _last_suggestions.get(key):
+                # New suggestion — send 💡 with ReplyKeyboard
+                batch = OutgoingBatch(
+                    chat_id=project.chat_id,
+                    thread_id=thread_id,
+                    messages=[{"text": "💡"}],
+                    reply_markup=ReplyKeyboardMarkup(
+                        keyboard=[[KeyboardButton(text=suggestion)]],
+                        resize_keyboard=True,
+                        one_time_keyboard=True,
+                    ),
+                )
+                await telegram_queue.enqueue_nowait(batch)
+                _last_suggestions[key] = suggestion
+
+            elif not suggestion:
+                # Suggestion gone — reset tracking
+                _last_suggestions[key] = None
 
         # Crash detection
         crash_reason = _detect_crash(screen)
