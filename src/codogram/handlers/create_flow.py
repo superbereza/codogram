@@ -2,6 +2,7 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 
+from .. import strings
 from ..domain.create_flow import CreateType
 from .common import get_flow_state, clear_flow_state
 from ..keyboards.create_flow import CALLBACK_MAGIC_PREFIX, CALLBACK_CANCEL
@@ -35,7 +36,7 @@ async def on_create_magic(callback: CallbackQuery, telegram_queue: TelegramQueue
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await callback.answer("Project not found")
+        await callback.answer(strings.PROJECT_NOT_FOUND)
         return
 
     name = create_flow_service.get_magic_name(project)
@@ -67,7 +68,7 @@ async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> 
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await telegram_queue.reply(message, "`[!]` Project not found")
+        await telegram_queue.reply(message, strings.CREATE_PROJECT_NOT_FOUND)
         return True
 
     name, error = create_flow_service.validate_name(message.text.strip(), project)
@@ -124,4 +125,4 @@ async def _do_create_thread(bot, chat_id: int, thread_id: int | None, project, n
         name=name,
     )
     if not thread:
-        await telegram_queue.send(chat_id, "`[x]` Error creating topic", thread_id=thread_id)
+        await telegram_queue.send(chat_id, strings.CREATE_TOPIC_ERROR, thread_id=thread_id)

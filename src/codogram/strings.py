@@ -98,6 +98,12 @@ CLAUDE_NO_RESTART = "No active session to restart."
 
 # --- Misc ---
 
+TOPICS_REQUIRED_GROUP = f"{STATUS_WARN} This command requires a group with topics."
+TOPICS_REQUIRED_ENABLE = f"{STATUS_WARN} Topics required. Enable in group settings -> Topics"
+
+CREATE_PROJECT_NOT_FOUND = f"{STATUS_WARN} Project not found"
+CREATE_TOPIC_ERROR = f"{STATUS_ERR} Error creating topic"
+
 LAUNCH_IN_PROGRESS = "Launch already in progress..."
 CANCELLED = "Cancelled"
 INVALID_CALLBACK = "Invalid callback"
