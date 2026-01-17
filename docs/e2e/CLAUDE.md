@@ -24,6 +24,30 @@
 4. **Cleanup** — выполни если указано
 5. **Результат** — PASS / FAIL с деталями
 
+### Гибридные тесты (ASK USER)
+
+Некоторые тесты требуют наблюдения пользователя (динамические UI элементы, которые MCP не видит).
+
+**Паттерн ASK USER:**
+```
+Steps:
+1. mcp__telegram__send_message(...)
+2. **ASK USER:** "Видишь X в Telegram?"
+3. User отвечает да/нет
+4. Продолжаем или фейлим тест
+```
+
+**Как выполнять:**
+1. Выполни MCP команды до ASK USER
+2. Задай вопрос пользователю и жди ответа
+3. На основе ответа определи PASS/FAIL
+4. Продолжи со следующим шагом
+
+**Результаты:**
+- **PASS** — user подтвердил ожидаемое поведение
+- **FAIL** — user не подтвердил
+- **SKIP** — тест невозможно выполнить (например, Claude не выдал саджест)
+
 ### Пример выполнения
 
 ```
@@ -121,5 +145,6 @@ docs/e2e/
     ├── settings.md     # /help, /settings, /auto_accept
     ├── permissions.md  # Permission buttons
     ├── watcher.md      # Tool call output
-    └── messages.md     # Message forwarding
+    ├── messages.md     # Message forwarding
+    └── activity.md     # Thinking status, suggestions (ASK USER)
 ```
