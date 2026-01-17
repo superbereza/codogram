@@ -1,5 +1,6 @@
 # src/codogram/project_launcher.py
 """Project launcher - resolve paths and start Claude in tmux."""
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass
@@ -105,21 +106,33 @@ def git_init_with_github(path: str, private: bool = True) -> LaunchResult:
 
 
 def git_clone(path: str, repo_url: str) -> LaunchResult:
-    """Clone repository into path."""
+    """Clone repository into path. Cleans up on failure."""
+    target = Path(path)
     try:
-        # Clone into current directory (path should be empty or not exist)
-        parent = str(Path(path).parent)
-        name = Path(path).name
+        parent = str(target.parent)
+        name = target.name
+
+        # Ensure parent exists
+        target.parent.mkdir(parents=True, exist_ok=True)
+
         result = subprocess.run(
             ["git", "clone", repo_url, name],
             cwd=parent,
             capture_output=True,
             text=True,
         )
+
         if result.returncode != 0:
-            return LaunchResult(success=False, error=f"git clone error: {result.stderr}")
+            # Cleanup partial clone
+            if target.exists():
+                shutil.rmtree(target, ignore_errors=True)
+            return LaunchResult(success=False, error=result.stderr.strip())
+
         return LaunchResult(success=True)
     except Exception as e:
+        # Cleanup on exception
+        if target.exists():
+            shutil.rmtree(target, ignore_errors=True)
         return LaunchResult(success=False, error=str(e))
 
 
