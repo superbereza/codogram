@@ -107,7 +107,7 @@ TOPIC_DELETE_ERROR = "Error deleting topic: {error}"
 
 # --- Resume (deprecated) ---
 
-RESUME_NOT_SUPPORTED_MULTI = f"{STATUS_WARN} /resume not supported in multi-session mode.\nUse /session_new for a new session."
+RESUME_NOT_SUPPORTED_MULTI = f"{STATUS_WARN} /resume not supported in multi-session mode.\nUse /thread_create for a new thread."
 RESUME_NOT_SUPPORTED = f"{STATUS_WARN} /resume not supported.\nUse /start to connect to existing session."
 
 
