@@ -22,7 +22,9 @@ mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
 
 ## TC-SETTINGS-002: /settings shows project info and Claude session state
 
-**Tags:** critical, settings
+> **Note:** This test describes the OLD format. See TC-SETTINGS-008 for NEW format with circle indicators and inline buttons.
+
+**Tags:** critical, settings, deprecated
 **Preconditions:** Project registered, Claude session running
 
 **Steps:**
@@ -32,7 +34,7 @@ mcp__telegram__send_message(chat_id=-1003356094635, message="/settings")
 mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
 ```
 
-**Expected:**
+**Expected (OLD format - superseded by TC-SETTINGS-008):**
 - UI: Response contains:
   - Settings header with project/thread name
   - Auto-accept status (⚡ ON or OFF)

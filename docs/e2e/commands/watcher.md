@@ -126,7 +126,7 @@ tmux has-session -t claude-codogram-testing-area-main
 **Steps:**
 ```bash
 # 1. Restart bot
-./restart.sh
+./stop-and-restart.sh
 
 # Wait 5s for bot to start
 ```

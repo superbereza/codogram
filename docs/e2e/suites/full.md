@@ -61,6 +61,8 @@
 | TC-PERMISSIONS-006 | Poller starts for resumed session | commands/permissions.md |
 | TC-PERMISSIONS-011 | Permission truncated (verbose=off) | commands/permissions.md |
 | TC-PERMISSIONS-012 | Permission full (verbose=on) | commands/permissions.md |
+| TC-PERMISSIONS-013 | Auto-accept truncated (verbose=off) | commands/permissions.md |
+| TC-PERMISSIONS-014 | Auto-accept full (verbose=on) | commands/permissions.md |
 
 ## Включённые тесты из Critical
 

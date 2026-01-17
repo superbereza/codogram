@@ -17,7 +17,7 @@
 
 ```bash
 # Убедись что бот запущен
-./restart.sh
+./stop-and-restart.sh
 
 # Убедись что есть tmux сессия
 tmux new-session -d -s claude-codogram-testing-area -c /tmp/test-branch-repo

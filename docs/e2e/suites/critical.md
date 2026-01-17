@@ -38,7 +38,7 @@
 
 ```bash
 # Бот запущен
-./restart.sh
+./stop-and-restart.sh
 
 # Тестовый репозиторий существует
 cd /tmp/test-branch-repo && git status
