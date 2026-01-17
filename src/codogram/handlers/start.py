@@ -36,6 +36,53 @@ async def _register_chat_menu(bot: Bot, chat) -> None:
     await register_menu_for_chat(bot, chat.id, is_forum=chat.is_forum or False)
 
 
+async def _get_required_state_data(
+    state: FSMContext,
+    callback: CallbackQuery,
+    telegram_queue: TelegramQueue,
+    *keys: str,
+) -> dict | None:
+    """Get required data from FSM state, or show error if missing.
+
+    Returns data dict if all keys present, None otherwise.
+    Handles clearing state and showing error message.
+    """
+    data = await state.get_data()
+    missing = [k for k in keys if k not in data]
+    if missing:
+        await state.clear()
+        await telegram_queue.edit(
+            callback.message,
+            "Сессия истекла. Начни заново с /start",
+            parse_mode=None,
+        )
+        await callback.answer()
+        return None
+    return data
+
+
+async def _get_required_state_data_msg(
+    state: FSMContext,
+    message: Message,
+    telegram_queue: TelegramQueue,
+    *keys: str,
+) -> dict | None:
+    """Get required data from FSM state for message handlers.
+
+    Returns data dict if all keys present, None otherwise.
+    """
+    data = await state.get_data()
+    missing = [k for k in keys if k not in data]
+    if missing:
+        await state.clear()
+        await telegram_queue.reply(
+            message,
+            "Сессия истекла. Начни заново с /start",
+        )
+        return None
+    return data
+
+
 # ===== Result Handlers =====
 
 async def _handle_result(
@@ -468,9 +515,11 @@ async def on_project_name(message: Message, state: FSMContext, telegram_queue: T
 @router.message(StartFlow.awaiting_custom_path)
 async def on_custom_path(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle custom path input."""
-    start_flow = StartFlowService(project_manager, None)
+    data = await _get_required_state_data_msg(state, message, telegram_queue, "project")
+    if not data:
+        return
 
-    data = await state.get_data()
+    start_flow = StartFlowService(project_manager, None)
     result = start_flow.handle_custom_path(
         message.chat.id,
         data["project"],
@@ -483,9 +532,11 @@ async def on_custom_path(message: Message, state: FSMContext, telegram_queue: Te
 @router.message(StartFlow.awaiting_clone_url)
 async def on_clone_url(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle git clone URL input."""
-    start_flow = StartFlowService(project_manager, None)
+    data = await _get_required_state_data_msg(state, message, telegram_queue, "project", "path")
+    if not data:
+        return
 
-    data = await state.get_data()
+    start_flow = StartFlowService(project_manager, None)
     result = start_flow.handle_clone_url(
         message.chat.id,
         data["project"],
@@ -501,9 +552,11 @@ async def on_clone_url(message: Message, state: FSMContext, telegram_queue: Tele
 @router.callback_query(F.data == "start:create_dir")
 async def on_create_dir(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle create directory button."""
-    start_flow = StartFlowService(project_manager, None)
+    data = await _get_required_state_data(state, callback, telegram_queue, "project", "path")
+    if not data:
+        return
 
-    data = await state.get_data()
+    start_flow = StartFlowService(project_manager, None)
     result = start_flow.handle_create_dir(data["project"], data["path"])
 
     await _handle_callback_result(callback, state, result, telegram_queue)
@@ -520,9 +573,11 @@ async def on_custom_path_btn(callback: CallbackQuery, state: FSMContext, telegra
 @router.callback_query(F.data == "start:git_init")
 async def on_git_init(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle git init button."""
-    start_flow = StartFlowService(project_manager, None)
+    data = await _get_required_state_data(state, callback, telegram_queue, "project", "path")
+    if not data:
+        return
 
-    data = await state.get_data()
+    start_flow = StartFlowService(project_manager, None)
     result = start_flow.handle_git_init(
         callback.message.chat.id,
         data["project"],
@@ -548,9 +603,11 @@ async def on_git_gh(callback: CallbackQuery, state: FSMContext, telegram_queue: 
 @router.callback_query(F.data.in_({"start:gh_private", "start:gh_public"}))
 async def on_gh_visibility(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle GitHub visibility choice."""
-    start_flow = StartFlowService(project_manager, None)
+    data = await _get_required_state_data(state, callback, telegram_queue, "project", "path")
+    if not data:
+        return
 
-    data = await state.get_data()
+    start_flow = StartFlowService(project_manager, None)
     private = callback.data == "start:gh_private"
     result = start_flow.handle_gh_create(
         callback.message.chat.id,
@@ -573,9 +630,11 @@ async def on_git_clone(callback: CallbackQuery, state: FSMContext, telegram_queu
 @router.callback_query(F.data == "start:no_git")
 async def on_no_git(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle no git button."""
-    start_flow = StartFlowService(project_manager, None)
+    data = await _get_required_state_data(state, callback, telegram_queue, "project", "path")
+    if not data:
+        return
 
-    data = await state.get_data()
+    start_flow = StartFlowService(project_manager, None)
     result = start_flow.handle_no_git(
         callback.message.chat.id,
         data["project"],

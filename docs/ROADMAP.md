@@ -228,6 +228,54 @@ Handle deleted worktrees gracefully instead of crashing:
 
 ## Backlog
 
+### Role model & chat registration
+Minimal permission system for multi-user access:
+- `/register_chat` — allow everyone in chat to message the bot (not just admins)
+- Admin-only settings commands
+- Roles: admin (full control) vs user (can send messages)
+- Per-chat configuration
+
+### Interface simplification settings
+Admin commands to enable/disable features:
+- Toggle `/thread` command visibility
+- Toggle `/branch` command visibility
+- Simplify menu for non-power-users
+- Store in per-project settings
+
+### Images and files input
+Support sending images and files from admin to Claude:
+- Save to temp/project folder
+- Send file path to tmux
+- Possibly: inline images via base64
+
+### Telegram safety context
+Inject safety guidelines when starting thread/branch/project:
+- Tell Claude what's safe to do in Telegram environment
+- Warn about dangerous operations (don't kill tmux, etc.)
+- Project-specific constraints
+- Need to design the exact guidelines
+
+### Protected environment for non-devs
+Allow product managers to use Claude without breaking environment:
+- Rollback mechanism after session
+- Or sandboxed/isolated execution
+- Easy recovery if something breaks
+- Need R&D on best approach
+
+### Inline suggests on Claude messages
+Suggestion buttons attached to Claude's responses:
+- Click to send suggested action/response
+- Context-aware based on message content
+- Quick follow-up actions
+
+### Simplified output & hidden tools
+Cleaner output by default:
+- Don't dump full permission text on auto-accept
+- Hide tool calls by default (TodoWrite, Read, etc.)
+- `/silent` command to toggle tools visibility
+- Filter TOOL_USE, TOOL_RESULT, show only TEXT
+- High priority — improves daily UX significantly
+
 ### Activity indicators
 Show that Claude is thinking/working:
 - Generation indicator appears ABOVE input box in tmux
@@ -340,12 +388,6 @@ Beautiful tool results formatting:
 - Collapsible for long outputs
 - File previews
 
-### Images and files support
-Support sending images and files from admin:
-- Save to temp/project folder
-- Send file path to tmux
-- Possibly: inline images via base64
-
 ### Self-hosting: default chat = bot project
 Default private chat with bot linked to codogram folder:
 - Allows managing bot through itself
@@ -371,11 +413,6 @@ Silent pushes for regular messages, loud for permissions and stops:
 - Regular messages: `disable_notification=True`
 - Permissions, generation stopped: loud push
 - May need webhooks for fast reaction
-
-### Silent mode
-Mode without showing tool calls, only final generations:
-- `/silent` command to toggle
-- Filter TOOL_USE, TOOL_RESULT, show only TEXT
 
 ### Thread summarization
 Summarize long threads (questionable):
