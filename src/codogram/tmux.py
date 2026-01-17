@@ -50,14 +50,15 @@ class TmuxSession:
         after_cc = self._capture_last_lines(20)
         _log_tmux_debug(f"AFTER C-c:\n{after_cc}")
 
-        # Step 1.5: Send Escape to cancel exit confirmation mode
-        # (C-c when idle triggers "Press Ctrl-C again to exit" which eats input)
-        _log_tmux_debug("[1.5] Sending Escape to cancel exit mode...")
+        # Step 1.5: Send Escape twice to cancel exit confirmation mode
+        # First Escape: cancel Claude's "Press Ctrl-C again to exit" prompt
+        # Second Escape: ensure zsh isn't stuck in vi command mode
+        _log_tmux_debug("[1.5] Sending Escape twice to cancel exit mode...")
         subprocess.run(
-            ["tmux", "send-keys", "-t", self.name, "Escape"],
+            ["tmux", "send-keys", "-t", self.name, "Escape", "Escape"],
             check=True
         )
-        time.sleep(0.05)
+        time.sleep(0.1)
 
         after_esc = self._capture_last_lines(20)
         _log_tmux_debug(f"AFTER Escape:\n{after_esc}")

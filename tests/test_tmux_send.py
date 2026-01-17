@@ -14,6 +14,8 @@ def test_tmux_session():
     subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True)
     # Create new
     subprocess.run(["tmux", "new-session", "-d", "-s", session_name], check=True)
+    # Wait for shell to initialize (zsh/oh-my-zsh/keychain takes time)
+    time.sleep(1.5)
 
     yield TmuxSession(session_name, "/tmp")
 

@@ -76,7 +76,7 @@ async def test_magic_branch_creates_branch(mock_callback):
         await on_create_magic(mock_callback, mock_queue)
 
         assert get_flow_state(-100123, 456) is None
-        mock_callback.message.delete.assert_called_once()
+        mock_queue.edit.assert_called_once()  # Shows "Creating..." status
         mock_create.assert_called_once()
 
 

@@ -68,4 +68,4 @@ class TestCmdStart:
         mock_telegram_queue.reply.assert_called_once()
         # Should ask for project name
         call_args = mock_telegram_queue.reply.call_args[0][1].lower()
-        assert "проект" in call_args or "имя" in call_args
+        assert "project" in call_args or "name" in call_args
