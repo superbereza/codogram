@@ -270,6 +270,9 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
                     )
                     telegram_ids = await telegram_queue.enqueue(batch)
                     logger.info(f"message_sent: msg_id={msg_id:06x} thread={thread.name} telegram_ids={telegram_ids}")
+
+                    # Signal poller to resend thinking status (so it appears at bottom)
+                    thread.thinking_needs_resend = True
             except Exception as e:
                 logger.error(f"watch_thread_error: {e}")
     except asyncio.CancelledError:
