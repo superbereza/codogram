@@ -148,3 +148,30 @@ class FileInputService:
             return FileInputResult(success=False, error="download_failed")
 
         return FileInputResult(success=True, path=path)
+
+    def format_message(self, caption: str | None, paths: list[Path], cwd: str) -> str:
+        """Format message with caption and file paths for tmux.
+
+        Args:
+            caption: Optional user caption
+            paths: List of absolute file paths
+            cwd: Project working directory (for relative paths)
+
+        Returns:
+            Formatted message string for tmux
+        """
+        cwd_path = Path(cwd)
+
+        path_lines = []
+        for p in paths:
+            try:
+                rel = p.relative_to(cwd_path)
+                path_lines.append(f"📎 ./{rel}")
+            except ValueError:
+                path_lines.append(f"📎 {p}")
+
+        paths_str = "\n".join(path_lines)
+
+        if caption:
+            return f"{caption}\n\n{paths_str}"
+        return paths_str

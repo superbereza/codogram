@@ -282,3 +282,45 @@ class TestSaveFile:
 
         assert result.success is False
         assert result.error == "download_failed"
+
+
+class TestFormatMessage:
+    def test_format_single_file_no_caption(self):
+        from codogram.services.file_input import FileInputService
+
+        service = FileInputService()
+        msg = service.format_message(
+            caption=None,
+            paths=[Path("/project/tmp/input-files/main/test.png")],
+            cwd="/project"
+        )
+
+        assert msg == "📎 ./tmp/input-files/main/test.png"
+
+    def test_format_single_file_with_caption(self):
+        from codogram.services.file_input import FileInputService
+
+        service = FileInputService()
+        msg = service.format_message(
+            caption="Check this mockup",
+            paths=[Path("/project/tmp/input-files/celestial/design.png")],
+            cwd="/project"
+        )
+
+        assert msg == "Check this mockup\n\n📎 ./tmp/input-files/celestial/design.png"
+
+    def test_format_multiple_files(self):
+        from codogram.services.file_input import FileInputService
+
+        service = FileInputService()
+        msg = service.format_message(
+            caption="Review these",
+            paths=[
+                Path("/project/tmp/input-files/main/a.png"),
+                Path("/project/tmp/input-files/main/b.png"),
+            ],
+            cwd="/project"
+        )
+
+        expected = "Review these\n\n📎 ./tmp/input-files/main/a.png\n📎 ./tmp/input-files/main/b.png"
+        assert msg == expected
