@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject, User
 
+from .. import strings
 from ..config import settings
 
 if TYPE_CHECKING:
@@ -67,13 +68,12 @@ class AdminMiddleware(BaseMiddleware):
             telegram_queue: "TelegramQueue" = data["telegram_queue"]
             await telegram_queue.reply(
                 event,
-                f"`[x]` Not admin. Your ID: `{user_id}`\n"
-                f"Add to ADMIN_IDS in .env",
+                strings.ERR_NOT_ADMIN.format(user_id=user_id),
             )
         elif hasattr(event, 'answer'):
             # CallbackQuery - popup (no markdown, shorter)
             # Note: callback.answer() is not message sending, keep as-is
             await event.answer(
-                f"[x] Not admin. Your ID: {user_id}",
+                strings.ERR_NOT_ADMIN_POPUP.format(user_id=user_id),
                 show_alert=True
             )

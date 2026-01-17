@@ -313,6 +313,15 @@ VALIDATE_GIT_REQUIRED = f"{STATUS_ERR} Git repository required"
 VALIDATE_UNCOMMITTED = f"{STATUS_WARN} Uncommitted changes"
 
 
+# --- Errors ---
+
+ERR_NOT_ADMIN = f"""{STATUS_ERR} Not admin. Your ID: `{{user_id}}`
+Add your ID to ADMIN_IDS in .env"""
+
+# Plain text version for callback popups (no markdown support)
+ERR_NOT_ADMIN_POPUP = "[x] Not admin. Your ID: {user_id}"
+
+
 # --- Branch Operations ---
 
 BRANCH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first."
