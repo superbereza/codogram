@@ -16,10 +16,13 @@ STATUS_INFO = "`[i]`"
 
 LAUNCH_CREATING_TMUX = f"{STATUS_PENDING} Creating tmux session..."
 LAUNCH_STARTING = f"{STATUS_PENDING} Starting Claude..."
+LAUNCH_RESUMING = f"{STATUS_PENDING} Resuming session..."
 LAUNCH_WAITING = f"{STATUS_PENDING} Waiting for Claude..."
 LAUNCH_TIMEOUT = f"{STATUS_ERR} Timeout: Claude didn't start in 2 minutes"
 LAUNCH_ERROR = f"{STATUS_ERR} Launch error: {{error}}"
 LAUNCH_READY = f"{STATUS_OK} Claude ready"
+LAUNCH_READY_WITH_ATTACH = f"{STATUS_OK} Claude ready\n\nAttach: `tmux attach -t {{tmux_name}}`"
+LAUNCH_PROJECT_CWD_NOT_SET = f"{STATUS_ERR} Project cwd not set. Re-register with /start"
 
 # Launch service (worktree creation)
 LAUNCH_CREATING_BRANCH = f"{STATUS_PENDING} Creating branch `{{branch}}` from `{{base}}`..."
