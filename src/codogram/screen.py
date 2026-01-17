@@ -5,6 +5,25 @@ from enum import Enum
 THINKING_SPINNERS = "·✶✻✽*✢"
 
 
+# Pattern for pasted content placeholder: [Pasted text #1 +51 lines]
+PASTED_PATTERN = re.compile(r'\[Pasted text #\d+ \+\d+ lines?\]')
+
+
+def extract_input_text(screen: str) -> str | None:
+    """Extract text from Claude's input line (after ❯).
+
+    Returns None if input is empty or not found.
+    Used for stuck message detection.
+    """
+    for line in screen.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("❯"):
+            # Text after ❯
+            text = stripped[1:].strip()
+            return text if text else None
+    return None
+
+
 class PromptType(Enum):
     REGULAR = "regular"
     MCP_TRUST = "mcp_trust"
@@ -193,6 +212,12 @@ def _parse_options_without_separator(lines: list[str]) -> PermissionPrompt | Non
         return None
 
     body = "\n".join(body_lines).strip()
+
+    # Detect trust-related prompts (should not be auto-accepted)
+    body_lower = body.lower()
+    if "trust" in body_lower or "folder" in body_lower:
+        return PermissionPrompt(options=options, body=body, prompt_type=PromptType.MCP_TRUST)
+
     return PermissionPrompt(options=options, body=body)
 
 

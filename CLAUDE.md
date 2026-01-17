@@ -57,7 +57,7 @@ src/codogram/
 ### Start bot
 
 ```bash
-./restart.sh
+./stop-and-restart.sh
 ```
 
 ### Register project
@@ -114,7 +114,7 @@ Never use the production codogram chat. Always confirm: "Which chat should I use
 # 1. Make code changes
 
 # 2. Restart bot
-./restart.sh
+./stop-and-restart.sh
 
 # 3. Ask user for test chat ID, then send command via MCP
 mcp__telegram__send_message(chat_id=TEST_CHAT_ID, message="/help")
@@ -172,7 +172,7 @@ src/codogram/
 
 **Важно:** Config хранится в `~/.codogram/config.json`, не в репозитории.
 
-**НИКОГДА не убивай процессы вручную!** Скрипты `restart.sh` и `dev-run.sh` сами убивают старый процесс бота перед запуском. Команда `pkill -f codogram` убьёт ВСЕ tmux сессии `claude-codogram-*` — это потеря всех Claude сессий пользователя!
+**НИКОГДА не убивай процессы вручную!** Скрипты `stop-and-restart.sh` и `dev-run.sh` сами убивают старый процесс бота перед запуском. Команда `pkill -f codogram` убьёт ВСЕ tmux сессии `claude-codogram-*` — это потеря всех Claude сессий пользователя!
 
 **НИКОГДА не запускай `pip install -e .` из worktree!** Это сломает main бота — он начнёт импортировать код из worktree. Для тестирования в worktree используй `dev-run.sh` (он использует PYTHONPATH, не pip). Если нужны новые зависимости — добавь их в pyproject.toml и установи из main.
 
@@ -180,7 +180,7 @@ src/codogram/
 
 ```bash
 # Из main (production):
-./restart.sh              # pip install + nohup
+./stop-and-restart.sh              # pip install + nohup
 
 # Из worktree (testing):
 ./dev-run.sh              # PYTHONPATH + foreground
@@ -195,7 +195,7 @@ cd .worktrees/my-feature/
 # Ctrl+C
 
 cd /path/to/main
-./restart.sh              # Восстанавливаем main бота
+./stop-and-restart.sh              # Восстанавливаем main бота
 ```
 
 ### Почему так

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
 from .telegram_queue import OutgoingBatch, EditBatch, DeleteBatch
-from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status, parse_input_suggestion
+from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status, parse_input_suggestion, extract_input_text, PASTED_PATTERN
 from .keyboards import permission_keyboard
 from .state import permission_messages
 from .session_manager import ProjectState, ThreadInfo
@@ -18,6 +18,7 @@ from .tmux import TmuxSession
 from .logging_config import logger
 from .auto_accept import try_auto_accept
 from .config import settings
+from . import strings
 
 
 class PollerState(Enum):
@@ -129,6 +130,10 @@ async def permission_poller(
     last_thinking_update: float = 0.0
     last_thinking_text: str | None = None
 
+    # Stuck message detection state
+    stuck_input_text: str | None = None
+    stuck_seen_count: int = 0
+
     debounce_time = settings.permission_poller_debounce
     poll_interval = settings.permission_poller_interval
 
@@ -216,12 +221,48 @@ async def permission_poller(
                 batch = OutgoingBatch(
                     chat_id=project.chat_id,
                     thread_id=thread_id,
-                    messages=[{"text": f"`[!]` Claude crashed: {crash_reason}\nUse /restart to restart.", "parse_mode": "MarkdownV2"}],
+                    messages=[{"text": strings.CLAUDE_CRASHED.format(reason=crash_reason), "parse_mode": "MarkdownV2"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
             except Exception:
                 pass
             return  # Exit poller
+
+        # Stuck message detection (before permission state machine)
+        input_text = extract_input_text(screen)
+        if input_text:
+            last_msg = thread.last_sent_message if thread else None
+
+            is_potentially_stuck = (
+                PASTED_PATTERN.match(input_text) is not None or
+                (last_msg is not None and input_text == last_msg)
+            )
+
+            if is_potentially_stuck:
+                if input_text == stuck_input_text:
+                    stuck_seen_count += 1
+                else:
+                    stuck_input_text = input_text
+                    stuck_seen_count = 1
+
+                # Debounce: seen twice in a row = stuck, send Enter
+                if stuck_seen_count >= 2:
+                    logger.info(f"{log_prefix}: stuck message detected ({stuck_seen_count}x), sending Enter")
+                    tmux.send_key("Enter")
+                    # Clear state
+                    stuck_input_text = None
+                    stuck_seen_count = 0
+                    # Clear last_sent_message to prevent re-triggering
+                    if thread:
+                        thread.last_sent_message = None
+            else:
+                # Not a stuck message, reset
+                stuck_input_text = None
+                stuck_seen_count = 0
+        else:
+            # No input text, reset
+            stuck_input_text = None
+            stuck_seen_count = 0
 
         is_permission = isinstance(parsed, PermissionPrompt)
 
@@ -257,8 +298,10 @@ async def permission_poller(
                             telegram_queue, project.chat_id, thread_id, context_name,
                             prompt_type=parsed.prompt_type,
                         ):
-                            state = PollerState.IDLE
-                            last_options = None
+                            # Go to SHOWING to reuse existing dedup logic
+                            # (wait for prompt to disappear before accepting new ones)
+                            state = PollerState.SHOWING
+                            last_body = parsed.body
                             continue
 
                     logger.debug(f"{log_prefix} DEBOUNCING->SHOWING: sending to Telegram")

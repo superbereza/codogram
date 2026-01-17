@@ -1,6 +1,7 @@
 # src/codogram/project_launcher.py
 """Project launcher - resolve paths and start Claude in tmux."""
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -133,6 +134,9 @@ def create_tmux_with_claude(session_name: str, project_path: str) -> LaunchResul
         )
         if result.returncode != 0:
             return LaunchResult(success=False, error=f"tmux error: {result.stderr}")
+
+        # Wait for shell to initialize (zsh config, oh-my-zsh, etc.)
+        time.sleep(0.5)
 
         # Send claude command
         subprocess.run(

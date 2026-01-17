@@ -39,7 +39,7 @@ class TmuxSession:
         # Step 0: Cancel permission prompt if active
         self._cancel_permission_if_active()
 
-        # Step 1: Send C-c
+        # Step 1: Send C-c to interrupt any running operation
         _log_tmux_debug("[1] Sending C-c...")
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, "C-c"],
@@ -50,13 +50,25 @@ class TmuxSession:
         after_cc = self._capture_last_lines(20)
         _log_tmux_debug(f"AFTER C-c:\n{after_cc}")
 
+        # Step 1.5: Send Escape to cancel exit confirmation mode
+        # (C-c when idle triggers "Press Ctrl-C again to exit" which eats input)
+        _log_tmux_debug("[1.5] Sending Escape to cancel exit mode...")
+        subprocess.run(
+            ["tmux", "send-keys", "-t", self.name, "Escape"],
+            check=True
+        )
+        time.sleep(0.05)
+
+        after_esc = self._capture_last_lines(20)
+        _log_tmux_debug(f"AFTER Escape:\n{after_esc}")
+
         # Step 2: Send text with -l (literal)
         _log_tmux_debug(f"[2] Sending text with -l...")
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, "-l", "--", text],
             check=True
         )
-        time.sleep(0.1)
+        time.sleep(0.3)
 
         after_text = self._capture_last_lines(20)
         _log_tmux_debug(f"AFTER text:\n{after_text}")

@@ -6,6 +6,7 @@ from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
 
+from .. import strings
 from ..session_manager import project_manager
 from ..project_launcher import is_tmux_session_exists
 from ..tmux import TmuxSession
@@ -27,19 +28,19 @@ async def _send_session_command(
     """
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await telegram_queue.reply(message, "Project not registered. Use /start")
+        await telegram_queue.reply(message, strings.PROJECT_NOT_REGISTERED)
         return None
 
     thread_id = message.message_thread_id
     thread = project.threads.get(thread_id)
     if not thread:
-        await telegram_queue.reply(message, "Thread not found. Use /start")
+        await telegram_queue.reply(message, strings.THREAD_NOT_FOUND_START)
         return None
 
     tmux_name = thread.get_tmux_session(project.project_name)
 
     if not is_tmux_session_exists(tmux_name):
-        await telegram_queue.reply(message, "tmux session not found. Start Claude in terminal.")
+        await telegram_queue.reply(message, strings.CLAUDE_TMUX_NOT_FOUND)
         return None
 
     # Cancel old watcher task so new one can be created after rebinding
@@ -73,7 +74,7 @@ async def _wait_for_claude_ready(
         if tmux.is_claude_ready():
             await telegram_queue.send(
                 chat_id,
-                f"`[v]` Claude ready",
+                strings.LAUNCH_READY,
                 thread_id=thread_id,
             )
             return
@@ -85,7 +86,7 @@ async def _wait_for_claude_ready(
 @router.message(Command("new"))
 async def cmd_new(message: Message, telegram_queue: TelegramQueue):
     """Start new Claude session in current thread."""
-    tmux = await _send_session_command(message, telegram_queue, "/new", "`[~]` Creating new session...")
+    tmux = await _send_session_command(message, telegram_queue, "/new", strings.NEW_SESSION)
     if tmux:
         await _wait_for_claude_ready(tmux, telegram_queue, message.chat.id, message.message_thread_id)
 
@@ -93,7 +94,7 @@ async def cmd_new(message: Message, telegram_queue: TelegramQueue):
 @router.message(Command("clear"))
 async def cmd_clear(message: Message, telegram_queue: TelegramQueue):
     """Clear Claude session and start fresh."""
-    tmux = await _send_session_command(message, telegram_queue, "/clear", "`[~]` Clearing session...")
+    tmux = await _send_session_command(message, telegram_queue, "/clear", strings.CLEAR_SESSION)
     if tmux:
         await _wait_for_claude_ready(tmux, telegram_queue, message.chat.id, message.message_thread_id)
 
@@ -128,15 +129,7 @@ async def cmd_resume(message: Message, telegram_queue: TelegramQueue):
     thread_id = message.message_thread_id
     if thread_id is not None:
         # In a topic - resume not supported
-        await telegram_queue.reply(
-            message,
-            "`[!]` /resume not supported in multi-session mode.\n"
-            "Use /thread_create for a new thread.",
-        )
+        await telegram_queue.reply(message, strings.RESUME_NOT_SUPPORTED_MULTI)
     else:
         # In private/general - just inform
-        await telegram_queue.reply(
-            message,
-            "`[!]` /resume not supported.\n"
-            "Use /start to connect to existing session.",
-        )
+        await telegram_queue.reply(message, strings.RESUME_NOT_SUPPORTED)

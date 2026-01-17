@@ -2,6 +2,7 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 
+from .. import strings
 from ..domain.create_flow import CreateType
 from .common import get_flow_state, clear_flow_state
 from ..keyboards.create_flow import CALLBACK_MAGIC_PREFIX, CALLBACK_CANCEL
@@ -13,6 +14,16 @@ from ..telegram_queue import TelegramQueue
 from ..git_utils import get_default_branch
 
 router = Router(name="create_flow")
+
+# Status strings by create type
+CREATING_STATUS = {
+    CreateType.BRANCH: strings.BRANCH_CREATING,
+    CreateType.THREAD: strings.THREAD_CREATING,
+}
+CREATED_STATUS = {
+    CreateType.BRANCH: strings.BRANCH_CREATED,
+    CreateType.THREAD: strings.THREAD_CREATED,
+}
 
 
 @router.callback_query(F.data == CALLBACK_CANCEL)
@@ -35,19 +46,16 @@ async def on_create_magic(callback: CallbackQuery, telegram_queue: TelegramQueue
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await callback.answer("Project not found")
+        await callback.answer(strings.PROJECT_NOT_FOUND)
         return
 
     name = create_flow_service.get_magic_name(project)
 
-    await callback.message.delete()
-
-    if create_type == CreateType.BRANCH:
-        await _do_create_branch(callback.bot, chat_id, thread_id, project, name, telegram_queue)
-    else:
-        await _do_create_thread(callback.bot, chat_id, thread_id, project, name, telegram_queue)
-
+    # Show "Creating..." status (edit removes buttons)
+    await telegram_queue.edit(callback.message, CREATING_STATUS[create_type].format(name=name))
     await callback.answer()
+
+    await _create_and_notify(create_type, callback.bot, chat_id, thread_id, project, name, telegram_queue)
 
 
 async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> bool:
@@ -67,7 +75,7 @@ async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> 
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
-        await telegram_queue.reply(message, "`[!]` Project not found")
+        await telegram_queue.reply(message, strings.CREATE_PROJECT_NOT_FOUND)
         return True
 
     name, error = create_flow_service.validate_name(message.text.strip(), project)
@@ -76,23 +84,39 @@ async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> 
         return True
 
     create_type = CreateType(create_type_str)
-    if create_type == CreateType.BRANCH:
-        await _do_create_branch(message.bot, chat_id, thread_id, project, name, telegram_queue)
-    else:
-        await _do_create_thread(message.bot, chat_id, thread_id, project, name, telegram_queue)
 
+    # Show "Creating..." status
+    await telegram_queue.reply(message, CREATING_STATUS[create_type].format(name=name))
+
+    await _create_and_notify(create_type, message.bot, chat_id, thread_id, project, name, telegram_queue)
     return True
+
+
+async def _create_and_notify(
+    create_type: CreateType, bot, chat_id: int, thread_id: int | None, project, name: str, telegram_queue: TelegramQueue
+):
+    """Create branch/thread and send 'Created' status on success."""
+    if create_type == CreateType.BRANCH:
+        result = await _do_create_branch(bot, chat_id, thread_id, project, name, telegram_queue)
+    else:
+        result = await _do_create_thread(bot, chat_id, thread_id, project, name, telegram_queue)
+
+    if result:
+        await telegram_queue.send(chat_id, CREATED_STATUS[create_type].format(name=name), thread_id=thread_id)
 
 
 async def _do_create_branch(
     bot, chat_id: int, thread_id: int | None, project, name: str, telegram_queue: TelegramQueue
 ):
-    """Create branch with given name, handling preconditions."""
+    """Create branch with given name, handling preconditions.
+
+    Returns ThreadInfo if created, None otherwise.
+    """
     can_create, error, warning = create_flow_service.check_branch_preconditions(project, name)
 
     if error:
         await telegram_queue.send(chat_id, error, thread_id=thread_id)
-        return
+        return None
 
     if warning:
         # Uncommitted changes - show options
@@ -109,14 +133,14 @@ async def _do_create_branch(
             [InlineKeyboardButton(text="[<<] Go back", callback_data="cancel")],
         ])
         await telegram_queue.send(chat_id, warning, thread_id=thread_id, reply_markup=keyboard)
-        return
+        return None
 
     default_branch = get_default_branch(project.cwd)
-    await do_branch_create(bot, chat_id, project, name, default_branch)
+    return await do_branch_create(bot, chat_id, project, name, default_branch)
 
 
 async def _do_create_thread(bot, chat_id: int, thread_id: int | None, project, name: str, telegram_queue: TelegramQueue):
-    """Create thread with given name."""
+    """Create thread with given name. Returns thread if successful, None otherwise."""
     thread = await create_thread_with_session(
         bot=bot,
         chat_id=chat_id,
@@ -124,4 +148,6 @@ async def _do_create_thread(bot, chat_id: int, thread_id: int | None, project, n
         name=name,
     )
     if not thread:
-        await telegram_queue.send(chat_id, "`[x]` Error creating topic", thread_id=thread_id)
+        await telegram_queue.send(chat_id, strings.CREATE_TOPIC_ERROR, thread_id=thread_id)
+        return None
+    return thread

@@ -1,6 +1,7 @@
 """CreateFlowService - business logic for branch/thread creation."""
 from pathlib import Path
 
+from .. import strings
 from ..magic_names import get_random_magic_name
 from ..git_utils import sanitize_branch_name, max_branch_name_length, is_git_repo, has_uncommitted_changes
 
@@ -28,15 +29,15 @@ class CreateFlowService:
         """
         sanitized = sanitize_branch_name(name)
         if not sanitized:
-            return None, "`[x]` Invalid name"
+            return None, strings.VALIDATE_INVALID_NAME
 
         max_len = max_branch_name_length(project.project_name)
         if len(sanitized) > max_len:
-            return None, f"`[x]` Name too long (max {max_len} chars)"
+            return None, strings.VALIDATE_NAME_TOO_LONG.format(max_len=max_len)
 
         existing = {t.name for t in project.threads.values()}
         if sanitized in existing:
-            return None, f"`[x]` Name `{sanitized}` already used"
+            return None, strings.VALIDATE_NAME_EXISTS.format(name=sanitized)
 
         return sanitized, None
 
@@ -51,10 +52,10 @@ class CreateFlowService:
             - warning: can proceed with user confirmation (e.g. uncommitted changes)
         """
         if not is_git_repo(Path(project.cwd)):
-            return False, "`[x]` Git repository required", None
+            return False, strings.VALIDATE_GIT_REQUIRED, None
 
         if has_uncommitted_changes(Path(project.cwd)):
-            return False, None, "`[!]` Uncommitted changes"
+            return False, None, strings.VALIDATE_UNCOMMITTED
 
         return True, None, None
 

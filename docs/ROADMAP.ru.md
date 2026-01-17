@@ -214,6 +214,14 @@
 - **Отмена permission при отправке** — отменяет активный permission prompt перед отправкой сообщения
 - См. [docs/designs/done/2026-01-07-session-state-display.md](designs/done/2026-01-07-session-state-display.md)
 
+### Унификация статусных сообщений
+Все user-facing сообщения централизованы в `strings.py`:
+- 170 констант для всех статусов, промптов, ошибок, текстов кнопок
+- `STATUS_*` префиксы (`[v]`, `[x]`, `[!]`, `[~]`, `[?]`, `[i]`)
+- Паттерн send vs edit: первый edit убирает кнопки, последующие статусы через send
+- Единый tone-of-voice во всех handlers
+- См. [docs/designs/done/2026-01-17-status-messages-unification.md](designs/done/2026-01-17-status-messages-unification.md)
+
 ### Восстановление stale worktree
 Обработка удалённых worktrees вместо краша:
 - `/resume`, `/start` — детект stale worktree_path, предложить: пересоздать / resume in main / отмена
@@ -226,7 +234,61 @@
 `gh repo create --push` падал на пустом репо с ошибкой "no commits found".
 - Добавлен `git commit --allow-empty -m "Initial commit"` перед `gh repo create --push`
 
+### Отправка картинок и файлов
+Отправка картинок и файлов из Telegram в Claude:
+- Фото сохраняются в `tmp/input-files/{thread}/` с таймстемпом в имени
+- Документы (PDF, txt, md и др.) с whitelist расширений
+- Формат: `See file: ./path/to/file` для чтения Claude
+- Видео/аудио/голосовые отклоняются с "Coming soon with Whisper"
+- Защита от path traversal и лимит 20MB
+- См. [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
+
+## In Progress
+
+### Robust /start flow
+Атомарность и error recovery для flow создания проекта:
+- **Атомарность** — project entry создаётся только после успешного clone/init
+- **Валидация URL** — проверка wiki/blob/gist ссылок ДО клонирования
+- **retry при невалидном URL** — остаёмся в FSM state, просим валидный URL
+- **require_project_ready()** — helper для проверки cwd + tmux + Claude ready
+- **Скрытие команд** — /clear, /esc etc недоступны пока проект не готов
+- **/reset_all** — команда для сброса проекта на этапе сетапа (до запуска Claude)
+- **sanitize_project_name с unidecode** — "Мой Проект 🚀" → `moj-proekt`
+- **Анонс команд по типу чата** — после успешного запуска показываем доступные команды
+- См. docs/designs/2026-01-17-robust-start-flow.md (planned)
+
+### Inline suggests к сообщениям Claude
+Кнопки-саджесты прикреплённые к ответам Claude:
+- Клик отправляет предложенное действие/ответ
+- Context-aware на основе содержимого сообщения
+- Быстрые follow-up действия
+
+### Упрощённый вывод и скрытые тулы
+Чистый вывод по умолчанию:
+- Не вываливать полный текст permission при auto-accept
+- Скрывать tool calls по умолчанию (TodoWrite, Read и т.д.)
+- Команда `/silent` для переключения видимости тулов
+- Фильтровать TOOL_USE, TOOL_RESULT, показывать только TEXT
+
+### Activity indicators
+Отображение что Claude думает/работает:
+- Индикатор генерации над input box в tmux
+- Парсить из tmux capture-pane
+- Показывать typing indicator или статус в Telegram
+
 ## Backlog
+
+### Онбординг в боте
+Интерактивный онбординг для новых пользователей:
+- Welcome flow с объяснением возможностей бота
+- Пошаговое руководство по настройке
+- Подсказки при первом использовании
+
+### Упрощение названий в меню
+Сделать названия команд более понятными:
+- Прояснить терминологию thread/branch/topic
+- Понятные названия в меню
+- Консистентное именование во всех командах
 
 ### Ролевая модель и регистрация чата
 Минимальная система прав для многопользовательского доступа:
@@ -242,12 +304,6 @@
 - Упрощённое меню для не-power-users
 - Хранить в per-project settings
 
-### Отправка картинок и файлов
-Поддержка отправки картинок и файлов от админа в Claude:
-- Сохранять в temp/project folder
-- Отправлять путь к файлу в tmux
-- Возможно: inline images через base64
-
 ### Контекст безопасности Telegram
 Подкидывать гайдлайны безопасности при старте треда/бранча/проекта:
 - Объяснить Claude что безопасно делать в Telegram окружении
@@ -261,26 +317,6 @@
 - Или sandbox/изолированное выполнение
 - Простое восстановление если что-то сломалось
 - Нужен R&D по лучшему подходу
-
-### Inline suggests к сообщениям Claude
-Кнопки-саджесты прикреплённые к ответам Claude:
-- Клик отправляет предложенное действие/ответ
-- Context-aware на основе содержимого сообщения
-- Быстрые follow-up действия
-
-### Упрощённый вывод и скрытые тулы
-Чистый вывод по умолчанию:
-- Не вываливать полный текст permission при auto-accept
-- Скрывать tool calls по умолчанию (TodoWrite, Read и т.д.)
-- Команда `/silent` для переключения видимости тулов
-- Фильтровать TOOL_USE, TOOL_RESULT, показывать только TEXT
-- Высокий приоритет — значительно улучшает ежедневный UX
-
-### Activity indicators
-Отображение что Claude думает/работает:
-- "thinking..." когда Claude обрабатывает
-- Throbber/typing indicator
-- Слова типа "Hmm", "Let me think"
 
 ### Очередь сообщений до готовности сессии
 Кэширование сообщений пользователя пока сессия привязывается:
@@ -316,15 +352,6 @@
 При реплае на сообщение отправлять контекст в tmux:
 - Цитировать кусочек сообщения на которое ответили
 - Формат: `> цитата\n\nтекст ответа`
-
-### Migrate strings to strings.py
-Перенести все захардкоженные строки в `src/codogram/strings.py`:
-- handlers/*.py — ответы на команды
-- launch_animation.py — статусы запуска
-- history_watcher.py — уведомления
-- keyboards.py — кнопки
-- services/start_flow.py — кнопки wizard'а
-- См. `docs/specs/tone-of-voice.md` для гайдлайнов
 
 ---
 

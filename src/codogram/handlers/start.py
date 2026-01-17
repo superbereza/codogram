@@ -8,6 +8,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
+from .. import strings
 from ..domain.states import StartFlow, RestartFlow
 from ..domain.worktree_state import WorktreeState, get_worktree_state
 from ..keyboards.keyboards import worktree_recovery_keyboard
@@ -53,7 +54,7 @@ async def _get_required_state_data(
         await state.clear()
         await telegram_queue.edit(
             callback.message,
-            "Сессия истекла. Начни заново с /start",
+            strings.START_SESSION_EXPIRED,
             parse_mode=None,
         )
         await callback.answer()
@@ -77,7 +78,7 @@ async def _get_required_state_data_msg(
         await state.clear()
         await telegram_queue.reply(
             message,
-            "Сессия истекла. Начни заново с /start",
+            strings.START_SESSION_EXPIRED,
         )
         return None
     return data
@@ -97,14 +98,14 @@ async def _handle_result(
             await state.set_state(StartFlow.awaiting_project_name)
             if result.thread_id:
                 await state.update_data(thread_id=result.thread_id)
-            await telegram_queue.reply(message, "Отправь имя проекта:", parse_mode=None)
+            await telegram_queue.reply(message, strings.START_PROJECT_NAME_PROMPT, parse_mode=None)
 
         case FlowAction.ASK_DIR_CHOICE:
             await state.set_state(StartFlow.awaiting_dir_choice)
             await state.update_data(project=result.project, path=result.path)
             await telegram_queue.reply(
                 message,
-                f"Директория `{result.path}` не найдена.\n\nЧто делать?",
+                strings.START_DIR_CHOICE_PROMPT.format(path=result.path),
                 reply_markup=dir_not_found_keyboard(),
             )
 
@@ -113,7 +114,7 @@ async def _handle_result(
             await state.update_data(project=result.project, path=result.path)
             await telegram_queue.reply(
                 message,
-                "Git setup?",
+                strings.START_GIT_SETUP_PROMPT,
                 reply_markup=git_setup_keyboard(),
                 parse_mode=None,
             )
@@ -124,7 +125,7 @@ async def _handle_result(
             from ..start_flow import launch_confirm_keyboard
             await telegram_queue.reply(
                 message,
-                f"Запустить Claude в `{result.path}`?",
+                strings.START_LAUNCH_CONFIRM.format(path=result.path),
                 reply_markup=launch_confirm_keyboard(),
             )
 
@@ -133,7 +134,7 @@ async def _handle_result(
             await _register_chat_menu(message.bot, message.chat)
             await telegram_queue.reply(
                 message,
-                f"Claude running: `{result.project}` in `{result.tmux_session}`",
+                strings.START_CLAUDE_RUNNING.format(project=result.project, tmux_session=result.tmux_session),
             )
 
         case FlowAction.CONNECT:
@@ -147,7 +148,7 @@ async def _handle_result(
         case FlowAction.SELECT_TMUX:
             await telegram_queue.reply(
                 message,
-                "Multiple tmux sessions found. Select one:",
+                strings.START_TMUX_SELECT,
                 reply_markup=create_tmux_selection_keyboard(
                     result.tmux_list, result.project
                 ),
@@ -156,11 +157,11 @@ async def _handle_result(
 
         case FlowAction.ERROR:
             await state.clear()
-            await telegram_queue.reply(message, f"Error: {result.error}", parse_mode=None)
+            await telegram_queue.reply(message, strings.START_ERROR.format(error=result.error), parse_mode=None)
 
         case FlowAction.CANCELLED:
             await state.clear()
-            await telegram_queue.reply(message, "Cancelled.", parse_mode=None)
+            await telegram_queue.reply(message, strings.CANCELLED, parse_mode=None)
 
         # Thread-specific actions
         case FlowAction.THREAD_SHOW_STATUS:
@@ -168,7 +169,7 @@ async def _handle_result(
             await _register_chat_menu(message.bot, message.chat)
             await telegram_queue.reply(
                 message,
-                f"`[v]` Thread `{result.thread_name}` running\n\nAttach: `tmux attach -t {result.tmux_session}`",
+                strings.START_THREAD_RUNNING.format(thread_name=result.thread_name, tmux_session=result.tmux_session),
             )
 
         case FlowAction.THREAD_LAUNCH:
@@ -179,7 +180,7 @@ async def _handle_result(
             await state.clear()
             await telegram_queue.reply(
                 message,
-                f"Thread upgraded to `{result.thread_name}`",
+                strings.START_THREAD_UPGRADED.format(thread_name=result.thread_name),
             )
             await _launch_claude_in_thread(message, result, telegram_queue)
 
@@ -187,7 +188,7 @@ async def _handle_result(
             await state.clear()
             await telegram_queue.reply(
                 message,
-                f"Topic registered as `{result.thread_name}`",
+                strings.START_TOPIC_REGISTERED.format(thread_name=result.thread_name),
             )
             await _launch_claude_in_thread(message, result, telegram_queue)
 
@@ -207,35 +208,35 @@ async def _handle_callback_result(
             await state.update_data(project=result.project, path=result.path)
             await telegram_queue.edit(
                 callback.message,
-                "Git setup?",
+                strings.START_GIT_SETUP_PROMPT,
                 reply_markup=git_setup_keyboard(),
                 parse_mode=None,
             )
 
         case FlowAction.LAUNCH:
             await state.clear()
-            await telegram_queue.edit(callback.message, "Launching Claude...", parse_mode=None)
+            await telegram_queue.edit(callback.message, strings.START_LAUNCHING, parse_mode=None)
             await _launch_claude_from_callback(callback, result, telegram_queue)
 
         case FlowAction.CONNECT:
             await state.clear()
             await telegram_queue.edit(
                 callback.message,
-                f"Connected to `{result.tmux_session}`",
+                strings.START_CONNECTED.format(tmux_session=result.tmux_session),
             )
             await _connect_to_session_from_callback(callback, result)
 
         case FlowAction.ERROR:
             await state.clear()
-            await telegram_queue.edit(callback.message, f"Error: {result.error}", parse_mode=None)
+            await telegram_queue.edit(callback.message, strings.START_ERROR.format(error=result.error), parse_mode=None)
 
         case FlowAction.RESTART_DONE:
             await state.clear()
-            await telegram_queue.edit(callback.message, "Session killed. Use /start to restart.", parse_mode=None)
+            await telegram_queue.edit(callback.message, strings.START_SESSION_KILLED, parse_mode=None)
 
         case FlowAction.CANCELLED:
             await state.clear()
-            await telegram_queue.edit(callback.message, "Cancelled.", parse_mode=None)
+            await telegram_queue.edit(callback.message, strings.CANCELLED, parse_mode=None)
 
 
 # ===== Launch Helpers =====
@@ -246,14 +247,14 @@ async def _launch_claude(message: Message, result: FlowResult, telegram_queue: T
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
-        await telegram_queue.reply(message, "Project not found", parse_mode=None)
+        await telegram_queue.reply(message, strings.PROJECT_NOT_FOUND, parse_mode=None)
         return
 
     await _register_chat_menu(message.bot, message.chat)
     thread = project.get_or_create_thread(None, "main")
 
     if thread.launch_task and not thread.launch_task.done():
-        await telegram_queue.reply(message, "Launch already in progress", parse_mode=None)
+        await telegram_queue.reply(message, strings.LAUNCH_IN_PROGRESS, parse_mode=None)
         return
 
     thread.launch_task = asyncio.create_task(
@@ -316,7 +317,7 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
         if tmux.is_claude_ready():
             await telegram_queue.reply(
                 message,
-                f"`[v]` Already running\n\nAttach: `tmux attach -t {tmux_name}`"
+                strings.START_ALREADY_RUNNING.format(tmux_name=tmux_name)
             )
             return
         else:
@@ -371,11 +372,11 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
                 text="Start new session",
                 callback_data=f"resume:start_new:{result.thread_id}"
             )],
-            [InlineKeyboardButton(text="Cancel", callback_data=f"resume:cancel:{result.thread_id}")]
+            [InlineKeyboardButton(text=strings.BTN_CANCEL, callback_data=f"resume:cancel:{result.thread_id}")]
         ])
         await telegram_queue.reply(
             message,
-            "`[!]` Previous session not found",
+            strings.START_SESSION_NOT_FOUND,
             reply_markup=keyboard,
         )
         return
@@ -387,11 +388,11 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
                 text="Recreate worktree",
                 callback_data=f"resume:recreate:{result.thread_id}"
             )],
-            [InlineKeyboardButton(text="Cancel", callback_data=f"resume:cancel:{result.thread_id}")]
+            [InlineKeyboardButton(text=strings.BTN_CANCEL, callback_data=f"resume:cancel:{result.thread_id}")]
         ])
         await telegram_queue.reply(
             message,
-            f"`[!]` Worktree not found: `{thread.worktree_path}`",
+            strings.START_WORKTREE_NOT_FOUND.format(path=thread.worktree_path),
             reply_markup=keyboard,
         )
         return
@@ -419,7 +420,7 @@ async def _connect_to_session(message: Message, result: FlowResult, telegram_que
         await _register_chat_menu(message.bot, message.chat)
         await telegram_queue.reply(
             message,
-            f"Connected to `{result.tmux_session}`",
+            strings.START_CONNECTED.format(tmux_session=result.tmux_session),
         )
 
 
@@ -454,20 +455,12 @@ async def cmd_start(message: Message, state: FSMContext, telegram_queue: Telegra
                         relative_path = thread.worktree_path
 
                     if wt_state == WorktreeState.MISSING_WITH_BRANCH:
-                        text = (
-                            f"`[!]` Worktree not found: `{relative_path}`\n\n"
-                            f"Branch `{thread.name}` exists.\n\n"
-                            "• Recreate worktree — recreate folder and resume session\n"
-                            "• Resume in main — archive topic, continue in main\n"
-                            "• Cancel"
+                        text = strings.START_WORKTREE_NOT_FOUND_BRANCH_EXISTS.format(
+                            path=relative_path, branch=thread.name
                         )
                     else:
-                        text = (
-                            f"`[!]` Worktree not found: `{relative_path}`\n\n"
-                            f"Branch `{thread.name}` not found (merged?).\n\n"
-                            "• Create new — create branch + worktree, resume session\n"
-                            "• Resume in main — archive topic, continue in main\n"
-                            "• Cancel"
+                        text = strings.START_WORKTREE_NOT_FOUND_BRANCH_MISSING.format(
+                            path=relative_path, branch=thread.name
                         )
 
                     batch = OutgoingBatch(
@@ -566,7 +559,7 @@ async def on_create_dir(callback: CallbackQuery, state: FSMContext, telegram_que
 async def on_custom_path_btn(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle custom path button."""
     await state.set_state(StartFlow.awaiting_custom_path)
-    await telegram_queue.edit(callback.message, "Отправь путь к директории:", parse_mode=None)
+    await telegram_queue.edit(callback.message, strings.START_PATH_PROMPT, parse_mode=None)
     await callback.answer()
 
 
@@ -593,7 +586,7 @@ async def on_git_gh(callback: CallbackQuery, state: FSMContext, telegram_queue: 
     await state.set_state(StartFlow.awaiting_gh_visibility)
     await telegram_queue.edit(
         callback.message,
-        "Видимость репозитория?",
+        strings.START_GIT_VISIBILITY_PROMPT,
         reply_markup=git_visibility_keyboard(),
         parse_mode=None,
     )
@@ -623,7 +616,7 @@ async def on_gh_visibility(callback: CallbackQuery, state: FSMContext, telegram_
 async def on_git_clone(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle git clone button."""
     await state.set_state(StartFlow.awaiting_clone_url)
-    await telegram_queue.edit(callback.message, "Отправь ссылку на репозиторий:", parse_mode=None)
+    await telegram_queue.edit(callback.message, strings.START_CLONE_URL_PROMPT)
     await callback.answer()
 
 
@@ -651,11 +644,11 @@ async def on_launch_claude(callback: CallbackQuery, state: FSMContext, telegram_
 
     project = project_manager.get_by_chat(callback.message.chat.id)
     if not project:
-        await callback.answer("Project not found")
+        await callback.answer(strings.PROJECT_NOT_FOUND)
         return
 
     await state.clear()
-    await telegram_queue.edit(callback.message, "Launching Claude...", parse_mode=None)
+    await telegram_queue.edit(callback.message, strings.START_LAUNCHING, parse_mode=None)
     await callback.answer()
 
     result = FlowResult(
@@ -670,7 +663,7 @@ async def on_launch_claude(callback: CallbackQuery, state: FSMContext, telegram_
 async def on_cancel(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle cancel button."""
     await state.clear()
-    await telegram_queue.edit(callback.message, "Cancelled.", parse_mode=None)
+    await telegram_queue.edit(callback.message, strings.CANCELLED, parse_mode=None)
     await callback.answer()
 
 
@@ -681,7 +674,7 @@ async def on_tmux_selected(callback: CallbackQuery, state: FSMContext, telegram_
 
     parts = callback.data.split(":", 2)
     if len(parts) < 3:
-        await callback.answer("Invalid callback")
+        await callback.answer(strings.INVALID_CALLBACK)
         return
 
     project_name, tmux_session = parts[1], parts[2]
@@ -711,7 +704,7 @@ async def cmd_restart(message: Message, state: FSMContext, telegram_queue: Teleg
         await state.update_data(tmux_session=result.tmux_session)
         await telegram_queue.reply(
             message,
-            f"Restart session `{result.tmux_session}`?",
+            strings.START_RESTART_CONFIRM.format(tmux_session=result.tmux_session),
             reply_markup=restart_confirm_keyboard(),
         )
     else:
@@ -727,7 +720,7 @@ async def on_restart_confirm(callback: CallbackQuery, state: FSMContext, telegra
     tmux_session = data.get("tmux_session")
 
     if not tmux_session:
-        await callback.answer("Session expired")
+        await callback.answer(strings.SESSION_EXPIRED)
         return
 
     # Cancel background tasks before killing tmux
@@ -765,7 +758,7 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
 
     project = project_manager.get_by_chat(callback.message.chat.id)
     if not project:
-        await callback.answer("Project not found")
+        await callback.answer(strings.PROJECT_NOT_FOUND)
         return
 
     thread = project.threads.get(thread_id)
@@ -777,7 +770,7 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
             thread.jsonl_path = None
             project_manager._save()
 
-        await telegram_queue.edit(callback.message, "`[~]` Starting new session...")
+        await telegram_queue.edit(callback.message, strings.START_NEW_SESSION)
         await callback.answer()
 
         # Trigger launch
@@ -800,10 +793,10 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
     elif action == "recreate":
         # Recreate worktree from existing branch
         if not thread:
-            await callback.answer("Thread not found")
+            await callback.answer(strings.THREAD_NOT_FOUND)
             return
 
-        await telegram_queue.edit(callback.message, "`[~]` Recreating worktree...")
+        await telegram_queue.edit(callback.message, strings.START_RECREATING_WORKTREE)
         await callback.answer()
 
         # Attach worktree to existing branch
@@ -833,10 +826,10 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
             thread.worktree_path = str(worktree_path)
             project_manager._save()
 
-            await telegram_queue.edit(callback.message, "`[v]` Worktree recreated. Use /start to launch.")
+            await telegram_queue.edit(callback.message, strings.START_WORKTREE_RECREATED)
         except Exception as e:
-            await telegram_queue.edit(callback.message, f"`[x]` Failed to recreate: {e}")
+            await telegram_queue.edit(callback.message, strings.START_WORKTREE_RECREATE_FAILED.format(error=e))
 
     elif action == "cancel":
-        await telegram_queue.edit(callback.message, "Cancelled.")
+        await telegram_queue.edit(callback.message, strings.CANCELLED)
         await callback.answer()
