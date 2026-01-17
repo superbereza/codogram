@@ -88,14 +88,28 @@ async def require_project_ready(message: Message, telegram_queue: TelegramQueue)
     return True
 ```
 
-**Использование:**
+**Использование во всех командах требующих готовый проект:**
 
 ```python
+# sessions.py
 @router.message(Command("clear"))
-async def cmd_clear(message: Message, telegram_queue: TelegramQueue):
-    if not await require_project_ready(message, telegram_queue):
-        return
-    # ... остальная логика
+@router.message(Command("new"))
+@router.message(Command("esc"))
+
+# threads.py
+@router.message(Command("thread"))
+
+# branches.py
+@router.message(Command("branch"))
+
+# finish.py
+@router.message(Command("finish"))
+```
+
+Все эти команды начинаются с:
+```python
+if not await require_project_ready(message, telegram_queue):
+    return
 ```
 
 ### 4. /reset_all команда
@@ -164,6 +178,9 @@ tmux attach -t {tmux_name}
 | `domain/validators.py` | `sanitize_project_name` с unidecode |
 | `services/start_flow.py` | Атомарность, валидация URL, retry flow |
 | `handlers/sessions.py` | `require_project_ready()` в /clear, /new, /esc |
+| `handlers/threads.py` | `require_project_ready()` в /thread |
+| `handlers/branches.py` | `require_project_ready()` в /branch |
+| `handlers/finish.py` | `require_project_ready()` в /finish |
 | `handlers/common.py` | `require_project_ready()` helper |
 | `handlers/start.py` | /reset_all команда, анонс команд |
 | `strings.py` | Новые константы для ошибок и анонса |
@@ -197,7 +214,7 @@ To see Claude's UI, run in terminal:
 - [ ] Атомарность: project entry после успешного clone/init
 - [ ] Cleanup при ошибке: удаление директории
 - [ ] `require_project_ready()` helper
-- [ ] Применить helper в /clear, /new, /esc
+- [ ] Применить helper в /clear, /new, /esc, /thread, /branch, /finish
 - [ ] /reset_all команда (только до запуска Claude)
 - [ ] Анонс команд после успешного запуска (по типу чата)
 - [ ] Константы в strings.py
