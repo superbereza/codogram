@@ -181,3 +181,30 @@ async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
         status = "⚡ ON" if project.auto_accept else "OFF"
         await telegram_queue.reply(message, f"Auto-accept: **{status}**")
     project_manager._save()
+
+
+@router.message(Command("verbose"))
+async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
+    """Toggle verbose output mode."""
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    thread = None
+    if project.threads:
+        thread = project.threads.get(thread_id)
+
+    # Toggle verbose
+    if thread:
+        thread.verbose = not thread.verbose
+        status = "● on" if thread.verbose else "○ off"
+    else:
+        project.verbose = not project.verbose
+        status = "● on" if project.verbose else "○ off"
+
+    project_manager._save()
+    await telegram_queue.reply(message, f"Verbose output: {status}")
