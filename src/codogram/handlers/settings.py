@@ -5,6 +5,7 @@ from aiogram.filters import Command
 
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
+from .. import strings
 
 router = Router(name="settings")
 
@@ -71,12 +72,12 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
 
     # Get auto-accept status
     if thread:
-        auto_status = "⚡ ON" if thread.auto_accept else "OFF"
+        auto_status = strings.STATUS_ON if thread.auto_accept else strings.STATUS_OFF
         context_name = thread.name
         tmux_name = thread.get_tmux_session(project.project_name)
         cwd = thread.worktree_path or project.cwd
     else:
-        auto_status = "⚡ ON" if project.auto_accept else "OFF"
+        auto_status = strings.STATUS_ON if project.auto_accept else strings.STATUS_OFF
         context_name = project.project_name
         tmux_name = project.tmux_session
         cwd = project.cwd
@@ -120,6 +121,19 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     else:
         lines.append("• claude: not connected")
 
+    # Experimental features
+    if thread:
+        thinking_status = strings.STATUS_ON if thread.feat_thinking_status else strings.STATUS_OFF
+        suggestions_status = strings.STATUS_ON if thread.feat_suggestions else strings.STATUS_OFF
+    else:
+        thinking_status = strings.STATUS_ON if project.feat_thinking_status else strings.STATUS_OFF
+        suggestions_status = strings.STATUS_ON if project.feat_suggestions else strings.STATUS_OFF
+
+    lines.append("")
+    lines.append("experimental:")
+    lines.append(f"• thinking-status: {thinking_status}")
+    lines.append(f"• suggestions: {suggestions_status}")
+
     await telegram_queue.reply(message, "\n".join(lines))
 
 
@@ -149,16 +163,64 @@ async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
             for t in project.threads.values():
                 t.auto_accept = False
         project_manager._save()
-        await telegram_queue.reply(message, "Auto-accept reset to **OFF** for project and all threads.")
+        await telegram_queue.reply(message, f"Auto-accept reset to **{strings.STATUS_OFF}** for project and all threads.")
         return
 
     # /auto_accept - toggle current context
     if thread:
         thread.auto_accept = not thread.auto_accept
-        status = "⚡ ON" if thread.auto_accept else "OFF"
+        status = strings.STATUS_ON if thread.auto_accept else strings.STATUS_OFF
         await telegram_queue.reply(message, f"Auto-accept for `{thread.name}`: **{status}**")
     else:
         project.auto_accept = not project.auto_accept
-        status = "⚡ ON" if project.auto_accept else "OFF"
+        status = strings.STATUS_ON if project.auto_accept else strings.STATUS_OFF
         await telegram_queue.reply(message, f"Auto-accept: **{status}**")
+    project_manager._save()
+
+
+@router.message(Command("feat_toggle_thinking_status"))
+async def cmd_feat_toggle_thinking_status(message: Message, telegram_queue: TelegramQueue):
+    """Toggle thinking status display (experimental)."""
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    thread = project.threads.get(thread_id) if project.threads else None
+
+    if thread:
+        thread.feat_thinking_status = not thread.feat_thinking_status
+        status = strings.STATUS_ON if thread.feat_thinking_status else strings.STATUS_OFF
+        await telegram_queue.reply(message, f"thinking-status: **{status}**")
+    else:
+        project.feat_thinking_status = not project.feat_thinking_status
+        status = strings.STATUS_ON if project.feat_thinking_status else strings.STATUS_OFF
+        await telegram_queue.reply(message, f"thinking-status: **{status}**")
+    project_manager._save()
+
+
+@router.message(Command("feat_toggle_suggestions"))
+async def cmd_feat_toggle_suggestions(message: Message, telegram_queue: TelegramQueue):
+    """Toggle input suggestions display (experimental)."""
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    thread = project.threads.get(thread_id) if project.threads else None
+
+    if thread:
+        thread.feat_suggestions = not thread.feat_suggestions
+        status = strings.STATUS_ON if thread.feat_suggestions else strings.STATUS_OFF
+        await telegram_queue.reply(message, f"suggestions: **{status}**")
+    else:
+        project.feat_suggestions = not project.feat_suggestions
+        status = strings.STATUS_ON if project.feat_suggestions else strings.STATUS_OFF
+        await telegram_queue.reply(message, f"suggestions: **{status}**")
     project_manager._save()

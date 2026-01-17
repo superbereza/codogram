@@ -11,6 +11,10 @@ STATUS_PENDING = "`[~]`"
 STATUS_QUESTION = "`[?]`"
 STATUS_INFO = "`[i]`"
 
+# Toggle states
+STATUS_ON = "`● on`"
+STATUS_OFF = "`○ off`"
+
 
 # --- Launch animation ---
 

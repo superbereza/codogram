@@ -114,6 +114,10 @@ class ThreadInfo:
     # Auto-accept permissions:
     auto_accept: bool = False          # True = auto-accept permission prompts
 
+    # Experimental features:
+    feat_thinking_status: bool = False  # Show Claude's thinking status
+    feat_suggestions: bool = False      # Show input suggestions as ReplyKeyboard
+
     # Runtime-only (not persisted):
     notified_closed: bool = False      # True = already sent "session closed" notification
 
@@ -157,6 +161,10 @@ class ProjectState:
 
     # Auto-accept permissions (project-wide default):
     auto_accept: bool = False
+
+    # Experimental features (project-wide default for simple mode):
+    feat_thinking_status: bool = False
+    feat_suggestions: bool = False
 
     # DEPRECATED: Legacy fields kept for backward compatibility with old configs.
     # All new code should use threads[None] for main thread.

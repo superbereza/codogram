@@ -150,8 +150,9 @@ async def permission_poller(
             logger.warning(f"{log_prefix}: capture error: {e}")
             continue
 
-        # Parse and display thinking status
-        thinking_text = parse_thinking_status(screen)
+        # Parse and display thinking status (if feature enabled)
+        feat_thinking_enabled = thread.feat_thinking_status if thread else project.feat_thinking_status
+        thinking_text = parse_thinking_status(screen) if feat_thinking_enabled else None
 
         if thinking_text:
             now = asyncio.get_event_loop().time()
@@ -196,12 +197,14 @@ async def permission_poller(
             last_thinking_text = None
             last_thinking_update = 0.0  # Reset for next thinking cycle
 
-        # Parse input suggestion (only when not thinking)
-        if not thinking_text:
-            suggestion = parse_input_suggestion(screen)
-            key = f"{project.chat_id}:{thread_id}"
+        # Parse input suggestion (if feature enabled and not thinking)
+        feat_suggestions_enabled = thread.feat_suggestions if thread else project.feat_suggestions
+        suggestion_key = f"{project.chat_id}:{thread_id}"
 
-            if suggestion and suggestion != _last_suggestions.get(key):
+        if feat_suggestions_enabled and not thinking_text:
+            suggestion = parse_input_suggestion(screen)
+
+            if suggestion and suggestion != _last_suggestions.get(suggestion_key):
                 # New suggestion — send 💡 with ReplyKeyboard
                 logger.debug(f"{log_prefix}: suggestion NEW: {suggestion[:50]}...")
                 suggestion_msg_key = f"suggestion:{project.chat_id}:{thread_id}"
@@ -217,9 +220,9 @@ async def permission_poller(
                     replace_key=suggestion_msg_key,
                 )
                 await telegram_queue.enqueue_nowait(batch)
-                _last_suggestions[key] = suggestion
+                _last_suggestions[suggestion_key] = suggestion
 
-            elif not suggestion and _last_suggestions.get(key):
+            elif not suggestion and _last_suggestions.get(suggestion_key):
                 # Suggestion gone — delete 💡 message
                 # Note: ReplyKeyboard persists until user interacts (one_time_keyboard=True helps)
                 logger.debug(f"{log_prefix}: suggestion DELETE")
@@ -231,7 +234,19 @@ async def permission_poller(
                     )
                     await telegram_queue.enqueue_nowait(batch)
                     suggestion_msg_key = None
-                _last_suggestions[key] = None
+                _last_suggestions[suggestion_key] = None
+
+        elif suggestion_msg_key:
+            # Feature disabled but message exists — cleanup
+            logger.debug(f"{log_prefix}: suggestion DELETE (feature disabled)")
+            batch = DeleteBatch(
+                chat_id=project.chat_id,
+                message_id=0,
+                replace_key=suggestion_msg_key,
+            )
+            await telegram_queue.enqueue_nowait(batch)
+            suggestion_msg_key = None
+            _last_suggestions[suggestion_key] = None
 
         # Crash detection
         crash_reason = _detect_crash(screen)
