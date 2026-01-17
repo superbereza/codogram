@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from .. import strings
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
-from .common import require_forum_group, set_flow_state, get_flow_state, clear_flow_state
+from .common import require_forum_group, require_claude_ready, set_flow_state, get_flow_state, clear_flow_state
 from ..domain.create_flow import CreateType
 from ..keyboards.create_flow import build_name_prompt_keyboard
 from ..services.create_flow import create_flow_service
@@ -33,6 +33,8 @@ async def cmd_thread_delete(message: Message, telegram_queue: TelegramQueue):
 async def cmd_thread_create(message: Message, telegram_queue: TelegramQueue):
     """Create a new thread (topic) with its own Claude session."""
     if not await require_forum_group(message, telegram_queue):
+        return
+    if not await require_claude_ready(message, telegram_queue):
         return
 
     chat_id = message.chat.id

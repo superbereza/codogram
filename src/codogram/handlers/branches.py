@@ -8,7 +8,7 @@ from aiogram.filters import Command
 from .. import strings
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
-from .common import require_forum_group, clear_flow_state, set_flow_state
+from .common import require_forum_group, require_claude_ready, clear_flow_state, set_flow_state
 from ..services.branch import do_branch_create
 from ..services.create_flow import create_flow_service
 from ..domain.create_flow import CreateType
@@ -37,6 +37,8 @@ async def cmd_branch(message: Message, telegram_queue: TelegramQueue):
 async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
     """Create a new worktree branch with isolated Claude session."""
     if not await require_forum_group(message, telegram_queue):
+        return
+    if not await require_claude_ready(message, telegram_queue):
         return
 
     project = project_manager.get_by_chat(message.chat.id)
