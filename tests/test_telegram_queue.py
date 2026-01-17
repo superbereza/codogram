@@ -420,3 +420,25 @@ async def test_replace_key_deduplicates_in_queue():
     # Only "third" should be sent
     assert sent_texts == ["third"]
     await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_sent_statuses_tracks_message_ids():
+    """After sending with replace_key, msg_id should be stored in sent_statuses."""
+    from unittest.mock import MagicMock
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))
+
+    queue = TelegramQueue(bot)
+    batch = OutgoingBatch(
+        chat_id=123,
+        thread_id=None,
+        messages=[{"text": "test"}],
+        replace_key="thinking:123:456"
+    )
+
+    await queue.enqueue(batch)
+
+    assert queue.sent_statuses.get("thinking:123:456") == 999
+    await queue.shutdown()

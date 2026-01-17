@@ -293,6 +293,11 @@ class TelegramQueue:
                     **send_kwargs,
                 )
                 sent_ids.append(result.message_id)
+
+            # Track sent message ID by replace_key for later edit/delete
+            if sent_ids and batch.replace_key:
+                self.sent_statuses[batch.replace_key] = sent_ids[-1]
+
             return sent_ids
 
         except TelegramRetryAfter as e:
