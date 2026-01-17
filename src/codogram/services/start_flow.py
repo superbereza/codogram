@@ -27,6 +27,7 @@ class FlowAction(Enum):
     ASK_GIT_CHOICE = "ask_git_choice"
     ASK_GH_VISIBILITY = "ask_gh_visibility"
     ASK_CLONE_URL = "ask_clone_url"
+    ASK_CLONE_URL_RETRY = "ask_clone_url_retry"  # Shows error + re-prompt
     ASK_CUSTOM_PATH = "ask_custom_path"
     ASK_LAUNCH_CONFIRM = "ask_launch_confirm"
 

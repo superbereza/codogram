@@ -22,6 +22,10 @@ class TestFlowAction:
     def test_has_launch(self):
         assert FlowAction.LAUNCH.value == "launch"
 
+    def test_ask_clone_url_retry_action_exists(self):
+        assert hasattr(FlowAction, 'ASK_CLONE_URL_RETRY')
+        assert FlowAction.ASK_CLONE_URL_RETRY.value == "ask_clone_url_retry"
+
 
 class TestFlowResult:
     def test_default_values(self):
