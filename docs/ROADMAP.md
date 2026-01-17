@@ -226,7 +226,55 @@ Handle deleted worktrees gracefully instead of crashing:
 `gh repo create --push` was failing on empty repo with "no commits found".
 - Added `git commit --allow-empty -m "Initial commit"` before `gh repo create --push`
 
+## In Progress
+
+### Images and files input
+Support sending images and files from admin to Claude:
+- Save to temp/project folder
+- Send file path to tmux
+- Possibly: inline images via base64
+
+### Inline suggests on Claude messages
+Suggestion buttons attached to Claude's responses:
+- Click to send suggested action/response
+- Context-aware based on message content
+- Quick follow-up actions
+
+### Simplified output & hidden tools
+Cleaner output by default:
+- Don't dump full permission text on auto-accept
+- Hide tool calls by default (TodoWrite, Read, etc.)
+- `/silent` command to toggle tools visibility
+- Filter TOOL_USE, TOOL_RESULT, show only TEXT
+
+### Activity indicators
+Show that Claude is thinking/working:
+- Generation indicator appears ABOVE input box in tmux
+- Parse from tmux capture-pane
+- Show typing indicator or status in Telegram
+
+### Migrate strings to strings.py
+Move all hardcoded strings to `src/codogram/strings.py`:
+- handlers/*.py — command responses
+- launch_animation.py — startup statuses
+- history_watcher.py — notifications
+- keyboards.py — buttons
+- services/start_flow.py — wizard buttons
+- See `docs/specs/tone-of-voice.md` for guidelines
+
 ## Backlog
+
+### Bot onboarding
+Interactive onboarding for new users:
+- Welcome flow explaining bot features
+- Step-by-step setup guidance
+- Tips and hints during first use
+
+### Menu naming simplification
+Make command names more intuitive:
+- Clarify thread/branch/topic terminology
+- User-friendly labels in menu
+- Consistent naming across all commands
 
 ### Role model & chat registration
 Minimal permission system for multi-user access:
@@ -242,12 +290,6 @@ Admin commands to enable/disable features:
 - Simplify menu for non-power-users
 - Store in per-project settings
 
-### Images and files input
-Support sending images and files from admin to Claude:
-- Save to temp/project folder
-- Send file path to tmux
-- Possibly: inline images via base64
-
 ### Telegram safety context
 Inject safety guidelines when starting thread/branch/project:
 - Tell Claude what's safe to do in Telegram environment
@@ -261,28 +303,6 @@ Allow product managers to use Claude without breaking environment:
 - Or sandboxed/isolated execution
 - Easy recovery if something breaks
 - Need R&D on best approach
-
-### Inline suggests on Claude messages
-Suggestion buttons attached to Claude's responses:
-- Click to send suggested action/response
-- Context-aware based on message content
-- Quick follow-up actions
-
-### Simplified output & hidden tools
-Cleaner output by default:
-- Don't dump full permission text on auto-accept
-- Hide tool calls by default (TodoWrite, Read, etc.)
-- `/silent` command to toggle tools visibility
-- Filter TOOL_USE, TOOL_RESULT, show only TEXT
-- High priority — improves daily UX significantly
-
-### Activity indicators
-Show that Claude is thinking/working:
-- Generation indicator appears ABOVE input box in tmux
-- Format: `· Hatching… (esc to interrupt · 42s · ↓ 0 tokens)`
-- Random verbs: "Hatching", "Enchanting", "Conjuring", etc.
-- Parse from tmux capture-pane
-- Show typing indicator or status in Telegram
 
 ### Message queue until session ready
 Cache user messages while session is binding, send when ready:
@@ -318,15 +338,6 @@ Detect when Claude Code exits with error (API errors, network issues, etc.):
 When replying to message, send context to tmux:
 - Quote piece of message being replied to
 - Format: `> quote\n\nresponse text`
-
-### Migrate strings to strings.py
-Move all hardcoded strings to `src/codogram/strings.py`:
-- handlers/*.py — command responses
-- launch_animation.py — startup statuses
-- history_watcher.py — notifications
-- keyboards.py — buttons
-- services/start_flow.py — wizard buttons
-- See `docs/specs/tone-of-voice.md` for guidelines
 
 ---
 
