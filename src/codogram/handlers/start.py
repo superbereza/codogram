@@ -9,10 +9,12 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 from .. import strings
-from ..domain.states import StartFlow, RestartFlow
+from ..domain.states import StartFlow, RestartFlow, ResetFlow
 from ..domain.worktree_state import WorktreeState, get_worktree_state
 from ..keyboards.keyboards import worktree_recovery_keyboard
-from ..services.start_flow import StartFlowService, FlowAction, FlowResult
+from ..git_utils import has_uncommitted_changes
+from ..keyboards.reset import reset_confirm_keyboard, reset_dir_choice_keyboard, reset_uncommitted_keyboard
+from ..services.start_flow import StartFlowService, FlowAction, FlowResult, is_setup_phase, cleanup_project
 from ..session_manager import project_manager
 from ..start_flow import (
     dir_not_found_keyboard,
@@ -850,3 +852,182 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
     elif action == "cancel":
         await telegram_queue.edit(callback.message, strings.CANCELLED)
         await callback.answer()
+
+
+# ===== Reset Flow =====
+
+@router.message(Command("reset_all"))
+async def cmd_reset_all(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
+    """Handle /reset_all command."""
+    # Check if start flow is in progress (e.g., clone running)
+    current_state = await state.get_state()
+    if current_state and str(current_state).startswith("StartFlow:"):
+        await telegram_queue.reply(message, strings.RESET_FLOW_IN_PROGRESS)
+        return
+
+    project = project_manager.get_by_chat(message.chat.id)
+
+    # No project registered
+    if not project:
+        await telegram_queue.reply(message, strings.RESET_NO_PROJECT)
+        return
+
+    # Setup phase - reset immediately
+    if is_setup_phase(project):
+        result = cleanup_project(project, delete_directory=True)
+        if result.success:
+            await telegram_queue.reply(message, strings.RESET_COMPLETE)
+        else:
+            await telegram_queue.reply(message, result.error)
+        return
+
+    # Working project - ask for confirmation
+    await state.set_state(ResetFlow.awaiting_confirm)
+    await state.update_data(project_name=project.project_name)
+
+    # Different message if called from topic
+    if message.message_thread_id:
+        text = strings.RESET_CONFIRM_TOPIC.format(name=project.project_name)
+    else:
+        text = strings.RESET_CONFIRM.format(name=project.project_name)
+
+    await telegram_queue.reply(message, text, reply_markup=reset_confirm_keyboard())
+
+
+@router.callback_query(F.data == "reset:continue")
+async def on_reset_continue(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
+    """Handle reset confirm → continue."""
+    current_state = await state.get_state()
+    if current_state != ResetFlow.awaiting_confirm:
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    data = await state.get_data()
+    project_name = data.get("project_name")
+    if not project_name:
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    project = project_manager.projects.get(project_name)
+    if not project or not project.cwd:
+        cleanup_project(project, delete_directory=False)
+        await state.clear()
+        await telegram_queue.edit(
+            callback.message,
+            strings.RESET_DONE.format(dir_status="not found"),
+        )
+        await callback.answer()
+        return
+
+    # Directory exists - check for uncommitted changes
+    await state.set_state(ResetFlow.awaiting_dir_choice)
+
+    if has_uncommitted_changes(Path(project.cwd)):
+        await telegram_queue.edit(
+            callback.message,
+            strings.RESET_UNCOMMITTED.format(path=project.cwd),
+            reply_markup=reset_uncommitted_keyboard(),
+        )
+    else:
+        await telegram_queue.edit(
+            callback.message,
+            strings.RESET_DIR_CHOICE.format(path=project.cwd),
+            reply_markup=reset_dir_choice_keyboard(),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "reset:keep")
+async def on_reset_keep(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
+    """Handle reset → keep directory."""
+    current_state = await state.get_state()
+    if current_state != ResetFlow.awaiting_dir_choice:
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    data = await state.get_data()
+    project_name = data.get("project_name")
+    if not project_name:
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    project = project_manager.projects.get(project_name)
+    if not project:
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    cleanup_project(project, delete_directory=False)
+
+    await state.clear()
+    await telegram_queue.edit(
+        callback.message,
+        strings.RESET_DONE.format(dir_status=f"kept at `{project.cwd}`"),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "reset:delete")
+async def on_reset_delete(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
+    """Handle reset → delete directory."""
+    current_state = await state.get_state()
+    if current_state != ResetFlow.awaiting_dir_choice:
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    data = await state.get_data()
+    project_name = data.get("project_name")
+    if not project_name:
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    project = project_manager.projects.get(project_name)
+    if not project:
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    result = cleanup_project(project, delete_directory=True)
+
+    await state.clear()
+
+    if result.success:
+        await telegram_queue.edit(
+            callback.message,
+            strings.RESET_DONE.format(dir_status="deleted"),
+        )
+    else:
+        await telegram_queue.edit(callback.message, result.error)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "reset:back")
+async def on_reset_back(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
+    """Handle reset → go back."""
+    current_state = await state.get_state()
+    if current_state != ResetFlow.awaiting_dir_choice:
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    data = await state.get_data()
+    project_name = data.get("project_name")
+    if not project_name:
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    # Go back to confirm step
+    await state.set_state(ResetFlow.awaiting_confirm)
+
+    text = strings.RESET_CONFIRM.format(name=project_name)
+    await telegram_queue.edit(
+        callback.message,
+        text,
+        reply_markup=reset_confirm_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "reset:cancel")
+async def on_reset_cancel(callback: CallbackQuery, state: FSMContext, telegram_queue: TelegramQueue):
+    """Handle reset → cancel."""
+    await state.clear()
+    await telegram_queue.edit(callback.message, strings.CANCELLED, parse_mode=None)
+    await callback.answer()
