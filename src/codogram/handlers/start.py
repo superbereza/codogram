@@ -163,6 +163,13 @@ async def _handle_result(
             await state.clear()
             await telegram_queue.reply(message, strings.CANCELLED, parse_mode=None)
 
+        case FlowAction.ASK_CLONE_URL_RETRY:
+            # Stay in awaiting_clone_url state - don't clear, let user retry
+            await telegram_queue.reply(
+                message,
+                f"{result.error}\n\n{strings.GIT_URL_RETRY_PROMPT}",
+            )
+
         # Thread-specific actions
         case FlowAction.THREAD_SHOW_STATUS:
             await state.clear()
@@ -237,6 +244,13 @@ async def _handle_callback_result(
         case FlowAction.CANCELLED:
             await state.clear()
             await telegram_queue.edit(callback.message, strings.CANCELLED, parse_mode=None)
+
+        case FlowAction.ASK_CLONE_URL_RETRY:
+            # Stay in awaiting_clone_url state - don't clear, let user retry
+            await telegram_queue.edit(
+                callback.message,
+                f"{result.error}\n\n{strings.GIT_URL_RETRY_PROMPT}",
+            )
 
 
 # ===== Launch Helpers =====
@@ -528,6 +542,9 @@ async def on_clone_url(message: Message, state: FSMContext, telegram_queue: Tele
     data = await _get_required_state_data_msg(state, message, telegram_queue, "project", "path")
     if not data:
         return
+
+    # Show progress before clone attempt (can take a while for large repos)
+    await telegram_queue.reply(message, strings.CLONE_IN_PROGRESS)
 
     start_flow = StartFlowService(project_manager, None)
     result = start_flow.handle_clone_url(
