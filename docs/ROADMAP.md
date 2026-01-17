@@ -226,6 +226,15 @@ Handle deleted worktrees gracefully instead of crashing:
 `gh repo create --push` was failing on empty repo with "no commits found".
 - Added `git commit --allow-empty -m "Initial commit"` before `gh repo create --push`
 
+### Images and files input
+Send images and files from Telegram to Claude:
+- Photos saved to `tmp/input-files/{thread}/` with timestamped names
+- Documents (PDF, txt, md, etc.) supported with extension whitelist
+- Format: `See file: ./path/to/file` for Claude to read
+- Video/audio/voice rejected with "Coming soon with Whisper" message
+- Path traversal protection and 20MB size limit
+- See [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
+
 ## Backlog
 
 ### Role model & chat registration
@@ -241,12 +250,6 @@ Admin commands to enable/disable features:
 - Toggle `/branch` command visibility
 - Simplify menu for non-power-users
 - Store in per-project settings
-
-### Images and files input
-Support sending images and files from admin to Claude:
-- Save to temp/project folder
-- Send file path to tmux
-- Possibly: inline images via base64
 
 ### Telegram safety context
 Inject safety guidelines when starting thread/branch/project:

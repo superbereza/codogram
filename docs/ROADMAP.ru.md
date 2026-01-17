@@ -226,6 +226,15 @@
 `gh repo create --push` падал на пустом репо с ошибкой "no commits found".
 - Добавлен `git commit --allow-empty -m "Initial commit"` перед `gh repo create --push`
 
+### Отправка картинок и файлов
+Отправка картинок и файлов из Telegram в Claude:
+- Фото сохраняются в `tmp/input-files/{thread}/` с таймстемпом в имени
+- Документы (PDF, txt, md и др.) с whitelist расширений
+- Формат: `See file: ./path/to/file` для чтения Claude
+- Видео/аудио/голосовые отклоняются с "Coming soon with Whisper"
+- Защита от path traversal и лимит 20MB
+- См. [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
+
 ## Backlog
 
 ### Ролевая модель и регистрация чата
@@ -241,12 +250,6 @@
 - Toggle видимости команды `/branch`
 - Упрощённое меню для не-power-users
 - Хранить в per-project settings
-
-### Отправка картинок и файлов
-Поддержка отправки картинок и файлов от админа в Claude:
-- Сохранять в temp/project folder
-- Отправлять путь к файлу в tmux
-- Возможно: inline images через base64
 
 ### Контекст безопасности Telegram
 Подкидывать гайдлайны безопасности при старте треда/бранча/проекта:
