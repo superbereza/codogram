@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from ..domain.validators import (
     is_valid_project_name,
     sanitize_project_name,
+    validate_git_url,
     MAX_PROJECT_NAME_LENGTH,
 )
 from ..magic_names import get_random_magic_name
@@ -411,18 +412,23 @@ class StartFlowService:
     ) -> FlowResult:
         """Handle user input for git clone URL."""
         # Validate URL format
-        if not url.startswith(("https://", "git@", "ssh://")):
+        is_valid, error_msg = validate_git_url(url)
+        if not is_valid:
             return FlowResult(
-                action=FlowAction.ERROR,
-                error="Invalid URL. Use https:// or git@ format",
+                action=FlowAction.ASK_CLONE_URL_RETRY,
+                error=error_msg,
+                project=project,
+                path=path,
             )
 
         result = git_clone(path, url)
 
         if not result.success:
             return FlowResult(
-                action=FlowAction.ERROR,
+                action=FlowAction.ASK_CLONE_URL_RETRY,
                 error=f"Clone failed: {result.error}",
+                project=project,
+                path=path,
             )
 
         proj = self.pm.get_or_create(project)

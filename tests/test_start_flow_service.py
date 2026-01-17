@@ -426,6 +426,36 @@ class TestGitMethods:
 class TestHandleCloneUrl:
     """Tests for handle_clone_url."""
 
+    def test_validates_wiki_url(self):
+        """Wiki URL -> ASK_CLONE_URL_RETRY with wiki error."""
+        pm = Mock()
+        service = StartFlowService(pm, None)
+
+        result = service.handle_clone_url(
+            chat_id=123,
+            project="test",
+            path="/tmp/test",
+            url="https://github.com/user/repo/wiki/Page",
+        )
+
+        assert result.action == FlowAction.ASK_CLONE_URL_RETRY
+        assert "wiki" in result.error.lower()
+
+    def test_validates_blob_url(self):
+        """Blob URL -> ASK_CLONE_URL_RETRY with file error."""
+        pm = Mock()
+        service = StartFlowService(pm, None)
+
+        result = service.handle_clone_url(
+            chat_id=123,
+            project="test",
+            path="/tmp/test",
+            url="https://github.com/user/repo/blob/main/file.py",
+        )
+
+        assert result.action == FlowAction.ASK_CLONE_URL_RETRY
+        assert "file" in result.error.lower()
+
     def test_valid_https_url(self):
         mock_pm = Mock()
         mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
@@ -462,6 +492,7 @@ class TestHandleCloneUrl:
         assert result.action == FlowAction.LAUNCH
 
     def test_invalid_url_format(self):
+        """Invalid URL format -> ASK_CLONE_URL_RETRY to allow correction."""
         service = StartFlowService(Mock(), Mock())
         result = service.handle_clone_url(
             chat_id=123,
@@ -470,10 +501,11 @@ class TestHandleCloneUrl:
             url="not-a-valid-url",
         )
 
-        assert result.action == FlowAction.ERROR
+        assert result.action == FlowAction.ASK_CLONE_URL_RETRY
         assert "invalid" in result.error.lower() or "url" in result.error.lower()
 
     def test_clone_failure(self):
+        """Clone failure -> ASK_CLONE_URL_RETRY to allow URL correction."""
         service = StartFlowService(Mock(), Mock())
 
         with patch("codogram.services.start_flow.git_clone") as mock_clone:
@@ -485,7 +517,8 @@ class TestHandleCloneUrl:
                 url="https://github.com/user/repo.git",
             )
 
-        assert result.action == FlowAction.ERROR
+        assert result.action == FlowAction.ASK_CLONE_URL_RETRY
+        assert "clone failed" in result.error.lower()
 
 
 class TestHandleTmuxSelected:
