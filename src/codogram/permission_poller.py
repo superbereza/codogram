@@ -8,8 +8,8 @@ from aiogram import Bot
 if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
-from .telegram_queue import OutgoingBatch
-from .screen import parse_screen, PermissionPrompt, is_claude_ready
+from .telegram_queue import OutgoingBatch, EditBatch, DeleteBatch
+from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status
 from .keyboards import permission_keyboard
 from .state import permission_messages
 from .session_manager import ProjectState, ThreadInfo
@@ -120,6 +120,11 @@ async def permission_poller(
     content_msg_ids: list[int] = []
     kb_msg_id: int | None = None
 
+    # Thinking status state
+    thinking_msg_key: str | None = None
+    last_thinking_update: float = 0.0
+    last_thinking_text: str | None = None
+
     debounce_time = settings.permission_poller_debounce
     poll_interval = settings.permission_poller_interval
 
@@ -132,6 +137,48 @@ async def permission_poller(
         except Exception as e:
             logger.warning(f"{log_prefix}: capture error: {e}")
             continue
+
+        # Parse and display thinking status
+        thinking_text = parse_thinking_status(screen)
+
+        if thinking_text:
+            now = asyncio.get_event_loop().time()
+            # Throttle updates to every 3 seconds, but always send if text changed
+            if thinking_text != last_thinking_text or now - last_thinking_update >= 3.0:
+                key = f"thinking:{project.chat_id}:{thread_id}"
+
+                if thinking_msg_key is None:
+                    # First time — send new message
+                    batch = OutgoingBatch(
+                        chat_id=project.chat_id,
+                        thread_id=thread_id,
+                        messages=[{"text": thinking_text}],
+                        replace_key=key,
+                    )
+                    thinking_msg_key = key
+                else:
+                    # Update existing message — edit
+                    batch = EditBatch(
+                        chat_id=project.chat_id,
+                        message_id=0,  # Lookup from sent_statuses
+                        text=thinking_text,
+                        replace_key=key,
+                    )
+
+                await telegram_queue.enqueue_nowait(batch)
+                last_thinking_update = now
+                last_thinking_text = thinking_text
+
+        elif thinking_msg_key:
+            # Claude finished thinking — delete status message
+            batch = DeleteBatch(
+                chat_id=project.chat_id,
+                message_id=0,
+                replace_key=thinking_msg_key,
+            )
+            await telegram_queue.enqueue_nowait(batch)
+            thinking_msg_key = None
+            last_thinking_text = None
 
         # Crash detection
         crash_reason = _detect_crash(screen)
