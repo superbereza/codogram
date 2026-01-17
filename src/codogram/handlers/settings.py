@@ -51,11 +51,73 @@ async def cmd_help(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, text)
 
 
+def _build_settings_text(project, thread, tmux_name: str) -> str:
+    """Build settings message text. Used by cmd_settings and callback handler."""
+    from ..tmux import TmuxSession
+    from ..services.session_state import SessionStateService
+
+    # Get settings from context
+    if thread:
+        auto_accept = thread.auto_accept
+        verbose = thread.verbose
+        context_name = thread.name
+        cwd = thread.worktree_path or project.cwd
+    else:
+        auto_accept = project.auto_accept
+        verbose = project.verbose
+        context_name = project.project_name
+        cwd = project.cwd
+
+    # Format toggle indicators
+    auto_status = "● on" if auto_accept else "○ off"
+    verbose_status = "● on" if verbose else "○ off"
+
+    lines = [f"**{context_name}**", ""]
+    lines.append("chat")
+    lines.append(f"• auto-accept: {auto_status}")
+    lines.append(f"• verbose: {verbose_status}")
+    lines.append("")
+    lines.append("claude")
+
+    # Get Claude session state from tmux
+    if tmux_name:
+        tmux = TmuxSession(tmux_name, cwd)
+        service = SessionStateService()
+        result = service.get_status(tmux)
+
+        if not result.success:
+            lines.append(f"• mode: {result.error}")
+            lines.append("• background tasks: ?")
+            lines.append("• context: ?")
+        else:
+            sb = result.status_bar
+
+            # Approval mode
+            if sb.approval_mode == "accept edits":
+                mode_text = "accept edits"
+            elif sb.approval_mode == "plan mode":
+                mode_text = "plan mode"
+            else:
+                mode_text = "default"
+            lines.append(f"• mode: {mode_text}")
+            lines.append(f"• background tasks: {sb.background_tasks}")
+
+            if sb.context_percent is not None:
+                lines.append(f"• context: {sb.context_percent}%")
+            else:
+                lines.append("• context: not displayed")
+    else:
+        lines.append("• mode: not connected")
+        lines.append("• background tasks: ?")
+        lines.append("• context: ?")
+
+    return "\n".join(lines)
+
+
 @router.message(Command("settings"))
 async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     """Show current settings including Claude session state."""
-    from ..tmux import TmuxSession
-    from ..services.session_state import SessionStateService
+    from ..keyboards import settings_keyboard
 
     chat_id = message.chat.id
     thread_id = message.message_thread_id
@@ -69,58 +131,15 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     if project.threads:
         thread = project.threads.get(thread_id)
 
-    # Get auto-accept status
+    # Get tmux name for keyboard
     if thread:
-        auto_status = "⚡ ON" if thread.auto_accept else "OFF"
-        context_name = thread.name
         tmux_name = thread.get_tmux_session(project.project_name)
-        cwd = thread.worktree_path or project.cwd
     else:
-        auto_status = "⚡ ON" if project.auto_accept else "OFF"
-        context_name = project.project_name
-        tmux_name = project.tmux_session
-        cwd = project.cwd
+        tmux_name = f"claude-{project.project_name}"
 
-    lines = [f"session state (`{context_name}`)"]
-    lines.append(f"• auto-accept: {auto_status}")
-
-    # Get Claude session state from tmux
-    if tmux_name:
-        tmux = TmuxSession(tmux_name, cwd)
-        service = SessionStateService()
-        result = service.get_status(tmux)
-
-        if not result.success:
-            lines.append(f"• claude: {result.error}")
-        else:
-            sb = result.status_bar
-
-            # Approval mode (None = default mode)
-            if sb.approval_mode == "accept edits":
-                mode_text = "⏵⏵ accept edits on"
-            elif sb.approval_mode == "plan mode":
-                mode_text = "⏸ plan mode on"
-            else:
-                mode_text = "default mode on"
-            lines.append(f"• mode: {mode_text}, (/shift\\_tab to cycle)")
-
-            # Background tasks
-            if sb.background_tasks == 0:
-                lines.append("• no background tasks")
-            elif sb.background_tasks == 1:
-                lines.append("• 1 background task")
-            else:
-                lines.append(f"• {sb.background_tasks} background tasks")
-
-            # Context
-            if sb.context_percent is not None:
-                lines.append(f"• context left until autocompact: {sb.context_percent}%")
-            else:
-                lines.append("• context left until autocompact: not displayed")
-    else:
-        lines.append("• claude: not connected")
-
-    await telegram_queue.reply(message, "\n".join(lines))
+    text = _build_settings_text(project, thread, tmux_name)
+    kb = settings_keyboard(tmux_name)
+    await telegram_queue.reply(message, text, reply_markup=kb)
 
 
 @router.message(Command("auto_accept"))
