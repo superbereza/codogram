@@ -1,6 +1,6 @@
 """Settings and info commands."""
-from aiogram import Router
-from aiogram.types import Message
+from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
 from ..session_manager import project_manager
@@ -208,3 +208,71 @@ async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
 
     project_manager._save()
     await telegram_queue.reply(message, f"Verbose output: {status}")
+
+
+@router.callback_query(F.data.startswith("settings:"))
+async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Handle settings keyboard button presses."""
+    from ..tmux import TmuxSession
+    from ..services.session_state import SessionStateService
+    from ..keyboards import settings_keyboard
+
+    data = callback.data
+    parts = data.split(":", 2)
+    if len(parts) < 3:
+        await callback.answer("Invalid callback")
+        return
+
+    action = parts[1]  # auto_accept, verbose, or mode
+    tmux_name = parts[2]
+
+    # Find project by tmux name
+    project = project_manager.get_by_tmux(tmux_name)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    # Find thread
+    thread = None
+    for t in project.threads.values():
+        if t.get_tmux_session(project.project_name) == tmux_name:
+            thread = t
+            break
+
+    if action == "auto_accept":
+        if thread:
+            thread.auto_accept = not thread.auto_accept
+            status = "on" if thread.auto_accept else "off"
+        else:
+            project.auto_accept = not project.auto_accept
+            status = "on" if project.auto_accept else "off"
+        project_manager._save()
+        await callback.answer(f"Auto-accept: {status}")
+
+    elif action == "verbose":
+        if thread:
+            thread.verbose = not thread.verbose
+            status = "on" if thread.verbose else "off"
+        else:
+            project.verbose = not project.verbose
+            status = "on" if project.verbose else "off"
+        project_manager._save()
+        await callback.answer(f"Verbose: {status}")
+
+    elif action == "mode":
+        cwd = (thread.worktree_path if thread else None) or project.cwd
+        if not cwd:
+            await callback.answer("No cwd configured")
+            return
+        tmux = TmuxSession(tmux_name, cwd)
+        service = SessionStateService()
+        result = service.cycle_approval_mode(tmux)
+        if result.success:
+            await callback.answer(f"Mode: {result.new_mode or 'default'}")
+        else:
+            await callback.answer(result.error)
+
+    # Update the settings message using shared helper
+    text = _build_settings_text(project, thread, tmux_name)
+    kb = settings_keyboard(tmux_name)
+    await telegram_queue.edit(callback.message, text, reply_markup=kb)
