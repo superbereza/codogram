@@ -40,10 +40,10 @@ def test_extract_input_text_with_text():
 
 def test_extract_input_text_pasted():
     screen = """────────────────────
-❯ [Pasted 3 lines]
+❯ [Pasted text #1 +51 lines]
 ────────────────────"""
     result = extract_input_text(screen)
-    assert result == "[Pasted 3 lines]"
+    assert result == "[Pasted text #1 +51 lines]"
     assert PASTED_PATTERN.match(result)
 
 
@@ -54,11 +54,11 @@ More output"""
 
 
 def test_pasted_pattern_variants():
-    assert PASTED_PATTERN.match("[Pasted 1 line]")
-    assert PASTED_PATTERN.match("[Pasted 3 lines]")
-    assert PASTED_PATTERN.match("[Pasted 100 lines]")
+    assert PASTED_PATTERN.match("[Pasted text #1 +1 line]")
+    assert PASTED_PATTERN.match("[Pasted text #1 +51 lines]")
+    assert PASTED_PATTERN.match("[Pasted text #2 +100 lines]")
     assert not PASTED_PATTERN.match("hello world")
-    assert not PASTED_PATTERN.match("[Pasted lines]")
+    assert not PASTED_PATTERN.match("[Pasted 3 lines]")  # old assumed format
 ```
 
 **Step 2: Run test to verify it fails**
@@ -72,7 +72,7 @@ Add to `src/codogram/screen.py` after line 4 (after `from enum import Enum`):
 
 ```python
 # Pattern for pasted content placeholder
-PASTED_PATTERN = re.compile(r'\[Pasted \d+ lines?\]')
+PASTED_PATTERN = re.compile(r'\[Pasted text #\d+ \+\d+ lines?\]')
 
 
 def extract_input_text(screen: str) -> str | None:

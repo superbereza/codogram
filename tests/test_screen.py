@@ -1,5 +1,5 @@
 import pytest
-from codogram.screen import parse_screen, PermissionPrompt, ToolProgress, Idle, PromptType, _extract_options, StatusBar, parse_status_bar
+from codogram.screen import parse_screen, PermissionPrompt, ToolProgress, Idle, PromptType, _extract_options, StatusBar, parse_status_bar, extract_input_text, PASTED_PATTERN
 
 PERMISSION_SCREEN = """
 ● Write(test.txt)
@@ -310,4 +310,59 @@ class TestParseStatusBar:
         assert result.approval_mode is None  # default mode
         assert result.background_tasks == 2
         assert result.context_percent is None
+
+
+# extract_input_text Tests
+
+class TestExtractInputText:
+    def test_empty_input(self):
+        screen = """────────────────────
+❯
+────────────────────"""
+        assert extract_input_text(screen) is None
+
+    def test_with_text(self):
+        screen = """────────────────────
+❯ hello world
+────────────────────"""
+        assert extract_input_text(screen) == "hello world"
+
+    def test_pasted_placeholder(self):
+        screen = """────────────────────
+❯ [Pasted text #1 +51 lines]
+────────────────────"""
+        result = extract_input_text(screen)
+        assert result == "[Pasted text #1 +51 lines]"
+        assert PASTED_PATTERN.match(result)
+
+    def test_no_prompt(self):
+        screen = """Some output
+More output"""
+        assert extract_input_text(screen) is None
+
+    def test_multiline_text(self):
+        """Only extracts from the ❯ line, not subsequent lines."""
+        screen = """────────────────────
+❯ first line
+second line
+────────────────────"""
+        assert extract_input_text(screen) == "first line"
+
+
+class TestPastedPattern:
+    def test_single_line(self):
+        assert PASTED_PATTERN.match("[Pasted text #1 +1 line]")
+
+    def test_multiple_lines(self):
+        assert PASTED_PATTERN.match("[Pasted text #1 +51 lines]")
+
+    def test_large_number(self):
+        assert PASTED_PATTERN.match("[Pasted text #2 +100 lines]")
+
+    def test_not_matching_text(self):
+        assert not PASTED_PATTERN.match("hello world")
+
+    def test_not_matching_old_format(self):
+        # Old assumed format - should not match
+        assert not PASTED_PATTERN.match("[Pasted 3 lines]")
 

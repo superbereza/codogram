@@ -39,7 +39,7 @@ NOT suggestions because:
 
 import re
 
-PASTED_PATTERN = re.compile(r'\[Pasted \d+ lines?\]')
+PASTED_PATTERN = re.compile(r'\[Pasted text #\d+ \+\d+ lines?\]')
 
 def extract_input_text(screen: str) -> str | None:
     """Extract text from Claude's input line (after ❯).

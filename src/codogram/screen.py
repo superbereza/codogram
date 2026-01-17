@@ -3,6 +3,25 @@ from dataclasses import dataclass
 from enum import Enum
 
 
+# Pattern for pasted content placeholder: [Pasted text #1 +51 lines]
+PASTED_PATTERN = re.compile(r'\[Pasted text #\d+ \+\d+ lines?\]')
+
+
+def extract_input_text(screen: str) -> str | None:
+    """Extract text from Claude's input line (after ❯).
+
+    Returns None if input is empty or not found.
+    Used for stuck message detection.
+    """
+    for line in screen.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("❯"):
+            # Text after ❯
+            text = stripped[1:].strip()
+            return text if text else None
+    return None
+
+
 class PromptType(Enum):
     REGULAR = "regular"
     MCP_TRUST = "mcp_trust"
