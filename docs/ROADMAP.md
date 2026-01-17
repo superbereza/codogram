@@ -234,6 +234,15 @@ Handle deleted worktrees gracefully instead of crashing:
 `gh repo create --push` was failing on empty repo with "no commits found".
 - Added `git commit --allow-empty -m "Initial commit"` before `gh repo create --push`
 
+### Images and files input
+Send images and files from Telegram to Claude:
+- Photos saved to `tmp/input-files/{thread}/` with timestamped names
+- Documents (PDF, txt, md, etc.) supported with extension whitelist
+- Format: `See file: ./path/to/file` for Claude to read
+- Video/audio/voice rejected with "Coming soon with Whisper" message
+- Path traversal protection and 20MB size limit
+- See [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
+
 ## In Progress
 
 ### Robust /start flow
@@ -247,12 +256,6 @@ Atomicity and error recovery for project creation flow:
 - **sanitize_project_name with unidecode** — "Мой Проект 🚀" → `moj-proekt`
 - **Announce commands by chat type** — show available commands after successful launch
 - See docs/designs/2026-01-17-robust-start-flow.md (planned)
-
-### Images and files input
-Support sending images and files from admin to Claude:
-- Save to temp/project folder
-- Send file path to tmux
-- Possibly: inline images via base64
 
 ### Inline suggests on Claude messages
 Suggestion buttons attached to Claude's responses:
