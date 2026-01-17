@@ -4,6 +4,9 @@ from aiogram.types import Message, CallbackQuery
 
 from .. import strings
 from ..telegram_queue import TelegramQueue
+from ..session_manager import project_manager
+from ..project_launcher import is_tmux_session_exists
+from ..tmux import TmuxSession
 
 router = Router(name="common")
 
@@ -48,6 +51,54 @@ async def require_forum_group(message: Message, telegram_queue: TelegramQueue) -
     if not message.chat.is_forum:
         await telegram_queue.reply(message, strings.TOPICS_REQUIRED_ENABLE)
         return False
+    return True
+
+
+async def require_tmux_exists(
+    message: Message, telegram_queue: TelegramQueue
+) -> bool:
+    """Check: project + cwd + tmux session exists.
+
+    Use for commands that work during startup: /clear, /esc
+    """
+    project = project_manager.get_by_chat(message.chat.id)
+    if not project or not project.cwd:
+        await telegram_queue.reply(message, strings.PROJECT_NOT_READY)
+        return False
+
+    thread = project.threads.get(message.message_thread_id)
+    if not thread:
+        await telegram_queue.reply(message, strings.PROJECT_NOT_READY)
+        return False
+
+    tmux_name = thread.get_tmux_session(project.project_name)
+    if not is_tmux_session_exists(tmux_name):
+        await telegram_queue.reply(message, strings.CLAUDE_NOT_RUNNING.format(cwd=project.cwd))
+        return False
+
+    return True
+
+
+async def require_claude_ready(
+    message: Message, telegram_queue: TelegramQueue
+) -> bool:
+    """Strict check: project + cwd + tmux + Claude ready.
+
+    Use for commands that need Claude running: /new, /thread, /branch, /finish
+    """
+    if not await require_tmux_exists(message, telegram_queue):
+        return False
+
+    # Additional check: Claude is ready (not starting)
+    project = project_manager.get_by_chat(message.chat.id)
+    thread = project.threads.get(message.message_thread_id)
+    tmux_name = thread.get_tmux_session(project.project_name)
+    tmux = TmuxSession(tmux_name, project.cwd)
+
+    if not tmux.is_claude_ready():
+        await telegram_queue.reply(message, strings.CLAUDE_STARTING)
+        return False
+
     return True
 
 
