@@ -183,8 +183,10 @@ async def permission_poller(
                             telegram_queue, project.chat_id, thread_id, context_name,
                             prompt_type=parsed.prompt_type,
                         ):
-                            state = PollerState.IDLE
-                            last_options = None
+                            # Go to SHOWING to reuse existing dedup logic
+                            # (wait for prompt to disappear before accepting new ones)
+                            state = PollerState.SHOWING
+                            last_body = parsed.body
                             continue
 
                     logger.debug(f"{log_prefix} DEBOUNCING->SHOWING: sending to Telegram")
