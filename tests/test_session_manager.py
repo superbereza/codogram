@@ -356,3 +356,17 @@ def test_thread_has_valid_worktree():
     with tempfile.TemporaryDirectory() as tmpdir:
         thread.worktree_path = tmpdir
         assert thread.has_valid_worktree() is True
+
+
+def test_thread_info_verbose_default():
+    """ThreadInfo.verbose defaults to False (short mode)."""
+    from codogram.session_manager import ThreadInfo
+    thread = ThreadInfo(thread_id=None, name="main")
+    assert thread.verbose is False
+
+
+def test_project_state_verbose_default():
+    """ProjectState.verbose defaults to False (short mode)."""
+    from codogram.session_manager import ProjectState
+    project = ProjectState(project_name="test")
+    assert project.verbose is False

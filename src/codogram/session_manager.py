@@ -114,6 +114,9 @@ class ThreadInfo:
     # Auto-accept permissions:
     auto_accept: bool = False          # True = auto-accept permission prompts
 
+    # Verbose output mode (show full body):
+    verbose: bool = False              # False = short (5 lines), True = full
+
     # Runtime-only (not persisted):
     notified_closed: bool = False      # True = already sent "session closed" notification
 
@@ -157,6 +160,9 @@ class ProjectState:
 
     # Auto-accept permissions (project-wide default):
     auto_accept: bool = False
+
+    # Verbose output mode (project-wide default):
+    verbose: bool = False
 
     # DEPRECATED: Legacy fields kept for backward compatibility with old configs.
     # All new code should use threads[None] for main thread.
