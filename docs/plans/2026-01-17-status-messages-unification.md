@@ -608,7 +608,91 @@ git commit -m "refactor(finish): apply send vs edit pattern for status chains"
 
 ---
 
-## Task 15: Final Verification
+## Task 15: Branch Creation UX - Remove Menu, Send Confirmation
+
+**Files:**
+- Modify: `src/codogram/strings.py`
+- Modify: `src/codogram/handlers/branches.py` (or relevant handler)
+
+**Step 1: Add constants to strings.py**
+
+```python
+# В секции # --- Branch Operations ---
+BRANCH_CREATING = f"{STATUS_PENDING} Creating branch `{{name}}`..."
+BRANCH_CREATED = f"{STATUS_OK} Branch `{{name}}` created"
+```
+
+**Step 2: Update branch creation handler**
+
+При подтверждении создания бранча:
+```python
+# 1. Убираем кнопки (edit)
+await telegram_queue.edit(callback.message, strings.BRANCH_CREATING.format(name=branch_name))
+await callback.answer()
+
+# 2. Создаём бранч...
+result = create_branch(...)
+
+# 3. Финальный статус (send)
+await telegram_queue.send(chat_id, strings.BRANCH_CREATED.format(name=branch_name), thread_id=thread_id)
+```
+
+**Step 3: Verify**
+
+Протестировать /branch flow — меню должно исчезнуть, появиться сообщение о создании.
+
+**Step 4: Commit**
+
+```bash
+git add src/codogram/strings.py src/codogram/handlers/branches.py
+git commit -m "feat(branches): remove menu on confirm, send creation status"
+```
+
+---
+
+## Task 16: Thread Creation UX - Remove Menu, Send Confirmation
+
+**Files:**
+- Modify: `src/codogram/strings.py`
+- Modify: `src/codogram/handlers/threads.py` (or relevant handler)
+
+**Step 1: Add constants to strings.py**
+
+```python
+# В секции # --- Project/Thread ---
+THREAD_CREATING = f"{STATUS_PENDING} Creating thread `{{name}}`..."
+THREAD_CREATED = f"{STATUS_OK} Thread `{{name}}` created"
+```
+
+**Step 2: Update thread creation handler**
+
+При подтверждении создания треда:
+```python
+# 1. Убираем кнопки (edit)
+await telegram_queue.edit(callback.message, strings.THREAD_CREATING.format(name=thread_name))
+await callback.answer()
+
+# 2. Создаём тред...
+result = create_thread(...)
+
+# 3. Финальный статус (send)
+await telegram_queue.send(chat_id, strings.THREAD_CREATED.format(name=thread_name), thread_id=thread_id)
+```
+
+**Step 3: Verify**
+
+Протестировать /thread flow — меню должно исчезнуть, появиться сообщение о создании.
+
+**Step 4: Commit**
+
+```bash
+git add src/codogram/strings.py src/codogram/handlers/threads.py
+git commit -m "feat(threads): remove menu on confirm, send creation status"
+```
+
+---
+
+## Task 17: Final Verification
 
 **Step 1: Check no hardcoded status prefixes remain**
 
@@ -656,6 +740,8 @@ git commit -m "chore: final cleanup after strings unification"
 | 12 | strings.py, middleware/admin.py | Extract ~1 constant |
 | 13 | strings.py, launch_animation.py | Verify/fix existing constants |
 | 14 | finish.py | Apply send vs edit pattern |
-| 15 | All | Final verification |
+| 15 | strings.py, branches.py | Branch creation UX - remove menu, send confirmation |
+| 16 | strings.py, threads.py | Thread creation UX - remove menu, send confirmation |
+| 17 | All | Final verification |
 
-**Total:** ~60-70 new constants in strings.py, ~12 files refactored
+**Total:** ~70-75 new constants in strings.py, ~12 files refactored
