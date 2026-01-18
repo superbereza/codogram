@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
 
-from src.codogram.services.whisper import WhisperService, TranscriptionResult
+from codogram.services.whisper import WhisperService, TranscriptionResult
 
 
 class TestWhisperService:
