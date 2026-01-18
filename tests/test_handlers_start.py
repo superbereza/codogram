@@ -10,6 +10,7 @@ os.environ.setdefault("ADMIN_IDS", "123")
 os.environ.setdefault("BASE_DIR", "/tmp")
 
 from aiogram.types import Message, Chat
+from aiogram.enums import ChatType
 from aiogram.fsm.context import FSMContext
 
 from codogram.handlers.start import cmd_start
@@ -24,6 +25,8 @@ def mock_message():
     message.chat = Mock(spec=Chat)
     message.chat.id = 123
     message.chat.title = "Test Chat"
+    message.chat.type = ChatType.GROUP  # Not PRIVATE - start.py skips DMs
+    message.chat.is_forum = False
     message.text = "/start"
     message.message_thread_id = None
     message.answer = AsyncMock()
