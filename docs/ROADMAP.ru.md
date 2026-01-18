@@ -311,7 +311,7 @@ Emoji pack из аватарок участников группы:
 - Генерация placeholder (буква + цвет) для юзеров без аватарки
 - Уведомление: "`[v]` Gift unlocked — avatar pack for topic icons"
 - Ограничение: Premium нужен для установки custom emoji как иконки топика
-- См. [docs/plans/2026-01-18-emoji-pack-design.md](plans/2026-01-18-emoji-pack-design.md)
+- См. [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
 
 ## Backlog
 
