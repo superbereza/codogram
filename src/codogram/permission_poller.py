@@ -368,7 +368,9 @@ async def permission_poller(
         # Stuck message detection (before permission state machine)
         input_text = extract_input_text(screen)
         if input_text:
-            last_msg = thread.last_sent_message if thread else None
+            # For project-level poller (thread=None), get the null thread from project
+            effective_thread = thread if thread else project.threads.get(None)
+            last_msg = effective_thread.last_sent_message if effective_thread else None
 
             # Compare first line only (input_text is single line, last_msg may be multiline)
             is_potentially_stuck = (
@@ -391,8 +393,8 @@ async def permission_poller(
                     stuck_input_text = None
                     stuck_seen_count = 0
                     # Clear last_sent_message to prevent re-triggering
-                    if thread:
-                        thread.last_sent_message = None
+                    if effective_thread:
+                        effective_thread.last_sent_message = None
             else:
                 # Not a stuck message, reset
                 stuck_input_text = None
