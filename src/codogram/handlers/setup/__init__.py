@@ -8,9 +8,18 @@ This module provides the new onboarding flow (v2) that triggers when:
 
 See docs/designs/2026-01-18-start-flow-v2.md for flow diagrams.
 """
-from aiogram import Router
+from aiogram import F, Router
+from aiogram.types import CallbackQuery
 
 setup_router = Router(name="setup")
+
+
+# --- Common handlers ---
+
+@setup_router.callback_query(F.data == "noop")
+async def on_noop(callback: CallbackQuery):
+    """Acknowledge non-interactive button tap (e.g., pagination indicator)."""
+    await callback.answer()
 
 # Import routers after setup_router is defined to avoid circular imports
 from . import triggers  # noqa: E402, F401

@@ -3,9 +3,9 @@
 import logging
 from pathlib import Path
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 from ...domain.states import SetupFlow
 from ...keyboards.setup import go_back_keyboard
@@ -14,6 +14,19 @@ from ... import strings
 logger = logging.getLogger(__name__)
 
 router = Router(name="setup_launch")
+
+
+@router.callback_query(F.data == "error:retry")
+async def on_error_retry(callback: CallbackQuery, state: FSMContext):
+    """Retry setup after error."""
+    await callback.answer()
+
+    # Clear state and restart setup
+    await state.clear()
+
+    # Restart setup flow
+    from .triggers import _start_setup_flow
+    await _start_setup_flow(callback.bot, callback.message.chat, state)
 
 
 async def do_launch(message: Message, state: FSMContext):
