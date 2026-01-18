@@ -865,6 +865,12 @@ async def cmd_reset_all(message: Message, state: FSMContext, telegram_queue: Tel
         await telegram_queue.reply(message, strings.RESET_FLOW_IN_PROGRESS)
         return
 
+    # Check if setup flow is in progress - cancel it
+    if current_state and str(current_state).startswith("SetupFlow:"):
+        await state.clear()
+        await telegram_queue.reply(message, strings.SETUP_CANCELLED)
+        return
+
     project = project_manager.get_by_chat(message.chat.id)
 
     # No project registered

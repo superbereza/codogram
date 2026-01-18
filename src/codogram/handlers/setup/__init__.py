@@ -32,7 +32,7 @@ from . import rename  # noqa: E402, F401
 from . import launch  # noqa: E402, F401
 
 # Include sub-routers
-setup_router.include_router(triggers.router)
+# Order matters: specific state handlers first, triggers (catch-all) last
 setup_router.include_router(admin_check.router)
 setup_router.include_router(setup_type.router)
 setup_router.include_router(clone_flow.router)
@@ -40,3 +40,5 @@ setup_router.include_router(connect_flow.router)
 setup_router.include_router(new_project_flow.router)
 setup_router.include_router(rename.router)
 setup_router.include_router(launch.router)
+# triggers.router has on_any_message catch-all, must be LAST
+setup_router.include_router(triggers.router)

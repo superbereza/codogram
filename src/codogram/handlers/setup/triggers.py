@@ -9,7 +9,7 @@ Entry points (per design):
 import logging
 
 from aiogram import Bot, F, Router
-from aiogram.filters import Command
+from aiogram.filters import Command, BaseFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Chat, ChatMemberUpdated, Message
 
@@ -24,6 +24,28 @@ logger = logging.getLogger(__name__)
 router = Router(name="setup_triggers")
 
 
+class ProjectNotRegistered(BaseFilter):
+    """Filter that passes only if chat has no registered project."""
+
+    async def __call__(self, message: Message) -> bool:
+        pm = ProjectManager()
+        result = pm.get_by_chat(message.chat.id) is None
+        logger.debug(f"ProjectNotRegistered filter: chat={message.chat.id}, result={result}")
+        return result
+
+
+class NotInSetupFlow(BaseFilter):
+    """Filter that passes only if NOT in SetupFlow state.
+
+    Used to prevent on_any_message from intercepting allowed commands
+    during setup (like /reset_all).
+    """
+
+    async def __call__(self, message: Message, state: FSMContext) -> bool:
+        current_state = await state.get_state()
+        return not (current_state and current_state.startswith("SetupFlow:"))
+
+
 def _is_group_chat(chat_type: str) -> bool:
     """Check if chat type is a group (not private/channel)."""
     return chat_type in ("group", "supergroup")
@@ -32,7 +54,7 @@ def _is_group_chat(chat_type: str) -> bool:
 def _is_project_registered(chat_id: int) -> bool:
     """Check if chat has a registered project."""
     pm = ProjectManager()
-    return pm.get_project_by_chat_id(chat_id) is not None
+    return pm.get_by_chat(chat_id) is not None
 
 
 # --- Entry Point 1: Bot added to chat ---
@@ -70,46 +92,44 @@ async def on_bot_added(event: ChatMemberUpdated, state: FSMContext):
 
 # --- Entry Point 2: /start in unregistered chat ---
 
-@router.message(Command("start"), F.chat.type.in_({"group", "supergroup"}))
+@router.message(
+    Command("start"),
+    F.chat.type.in_({"group", "supergroup"}),
+    ProjectNotRegistered(),
+)
 async def on_start_command(message: Message, state: FSMContext):
     """Handle /start command in group chats without project."""
+    logger.info(f"on_start_command triggered, chat={message.chat.id}")
     chat = message.chat
 
     # Check if setup already in progress
     current_state = await state.get_state()
+    logger.info(f"Current state: {current_state}")
     if current_state and current_state.startswith("SetupFlow:"):
         # /start during setup restarts the flow (per design line 535)
+        logger.info("Clearing state for restart")
         await state.clear()
-
-    # Check if project already registered - /start shows status
-    if _is_project_registered(chat.id):
-        # Delegate to existing start handler for status display
-        return  # Let other handlers process this
 
     await _start_setup_flow(message.bot, chat, state)
 
 
 # --- Entry Point 3: Any message in unregistered chat ---
 
-@router.message(F.chat.type.in_({"group", "supergroup"}))
+@router.message(
+    F.chat.type.in_({"group", "supergroup"}),
+    ProjectNotRegistered(),
+    NotInSetupFlow(),
+)
 async def on_any_message(message: Message, state: FSMContext):
     """Handle any message in group chat without project.
 
     This is a catch-all that triggers setup if no project registered.
     Must be registered LAST to not intercept other handlers.
+
+    Note: NotInSetupFlow filter ensures we don't match during setup,
+    allowing commands like /reset_all to reach their handlers.
     """
-    chat = message.chat
-
-    # Skip if setup already in progress
-    current_state = await state.get_state()
-    if current_state and current_state.startswith("SetupFlow:"):
-        return
-
-    # Skip if project already registered
-    if _is_project_registered(chat.id):
-        return
-
-    await _start_setup_flow(message.bot, chat, state)
+    await _start_setup_flow(message.bot, message.chat, state)
 
 
 # --- Shared setup start logic ---

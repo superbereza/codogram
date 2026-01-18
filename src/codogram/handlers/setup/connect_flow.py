@@ -155,9 +155,11 @@ async def on_view_connected(callback: CallbackQuery, state: FSMContext):
         pm = ProjectManager()
 
         for folder_name, chat_id in connected.items():
-            project = pm.projects.get(folder_name, {})
-            chat_title = project.get("chat_title", folder_name)
-            chat_type = project.get("chat_type", "group")
+            project = pm.projects.get(folder_name)
+            # Use project name as title (we don't store chat_title in ProjectState)
+            chat_title = folder_name
+            # Detect chat type from chat_id format: -100xxx = supergroup
+            chat_type = "supergroup" if str(chat_id).startswith("-100") else "group"
 
             link = get_chat_link(chat_id, chat_type)
             if link:
@@ -202,7 +204,7 @@ async def on_folder_back(callback: CallbackQuery, state: FSMContext):
     )
 
 
-@router.message(SetupFlow.awaiting_folder_select)
+@router.message(SetupFlow.awaiting_folder_select, F.text, ~F.text.startswith("/"))
 async def on_folder_text_input(message: Message, state: FSMContext):
     """Handle text input during folder selection (not expected)."""
     await message.answer(

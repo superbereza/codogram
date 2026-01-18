@@ -66,7 +66,7 @@ async def on_name_back(callback: CallbackQuery, state: FSMContext):
     )
 
 
-@router.message(SetupFlow.awaiting_project_name)
+@router.message(SetupFlow.awaiting_project_name, F.text, ~F.text.startswith("/"))
 async def on_project_name_input(message: Message, state: FSMContext):
     """Handle custom project name input."""
     name = message.text.strip()

@@ -58,8 +58,9 @@ def get_connected_folders() -> dict[str, int]:
     pm = ProjectManager()
     result = {}
 
-    for project_name, project_data in pm.projects.items():
-        result[project_name] = project_data.get("chat_id")
+    for project_name, project in pm.projects.items():
+        if project.chat_id:
+            result[project_name] = project.chat_id
 
     return result
 

@@ -10,6 +10,7 @@ def setup_type_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=strings.BTN_CLONE, callback_data="setup:clone")],
         [InlineKeyboardButton(text=strings.BTN_CONNECT, callback_data="setup:connect")],
         [InlineKeyboardButton(text=strings.BTN_NEW, callback_data="setup:new")],
+        [InlineKeyboardButton(text=strings.BTN_CANCEL, callback_data="setup:cancel")],
     ])
 
 

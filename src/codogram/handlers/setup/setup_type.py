@@ -66,3 +66,17 @@ async def on_new_selected(callback: CallbackQuery, state: FSMContext):
     from .new_project_flow import show_project_name_prompt
 
     await show_project_name_prompt(callback.message, state)
+
+
+@router.callback_query(
+    SetupFlow.awaiting_setup_type,
+    F.data == "setup:cancel"
+)
+async def on_setup_cancel(callback: CallbackQuery, state: FSMContext):
+    """Handle Cancel - abort setup flow."""
+    await callback.answer()
+    await state.clear()
+
+    await callback.message.edit_text(
+        strings.SETUP_CANCELLED,
+    )

@@ -452,6 +452,7 @@ SETUP_ADMIN_CHECK_FAILED = f"{STATUS_WARN} Still missing admin rights"
 # Chat type errors
 SETUP_PRIVATE_CHAT = f"{STATUS_ERR} Add bot to a group chat"
 SETUP_CHANNEL_NOT_SUPPORTED = f"{STATUS_ERR} Channels not supported"
+SETUP_CANCELLED = f"{STATUS_INFO} Setup cancelled. Use /start to begin again."
 SETUP_ALREADY_IN_PROGRESS = f"{STATUS_INFO} Setup already in progress"
 
 # Command blocking during setup

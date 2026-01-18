@@ -103,7 +103,7 @@ async def on_exists_rename(callback: CallbackQuery, state: FSMContext):
     )
 
 
-@router.message(SetupFlow.awaiting_clone_url)
+@router.message(SetupFlow.awaiting_clone_url, F.text, ~F.text.startswith("/"))
 async def on_clone_url(message: Message, state: FSMContext):
     """Handle clone URL input."""
     url = message.text.strip()
