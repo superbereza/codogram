@@ -239,7 +239,7 @@
 - Фото сохраняются в `tmp/input-files/{thread}/` с таймстемпом в имени
 - Документы (PDF, txt, md и др.) с whitelist расширений
 - Формат: `See file: ./path/to/file` для чтения Claude
-- Видео/аудио/голосовые отклоняются с "Coming soon with Whisper"
+- Видео отклоняются (аудио/голосовые обрабатываются через Whisper)
 - Защита от path traversal и лимит 20MB
 - См. [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
 
@@ -263,6 +263,14 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Кнопка Cancel и /reset_all для отмены setup
 - Навигация с кнопками Go back
 - См. [docs/designs/done/2026-01-18-start-flow-v2.md](designs/done/2026-01-18-start-flow-v2.md)
+
+### Voice → Whisper транскрипция
+Голосовые и аудио файлы транскрибируются через OpenAI Whisper:
+- Голосовые (.ogg), аудио файлы (.mp3 и др.), видео-кружочки
+- Статус "Transcribing...", затем "«текст» → Claude" при успехе
+- Дружелюбные ошибки (файл слишком большой, таймаут, нет речи и т.д.)
+- Настройка через OPENAI_API_KEY, OPENAI_BASE_URL, WHISPER_TIMEOUT
+- См. [docs/designs/done/2026-01-18-whisper-transcription-design.md](designs/done/2026-01-18-whisper-transcription-design.md)
 
 ### Compacting detection
 Уведомление когда Claude компактит conversation:
@@ -312,11 +320,6 @@ Emoji pack из аватарок участников группы:
 - Уведомление: "`[v]` Gift unlocked — avatar pack for topic icons"
 - Ограничение: Premium нужен для установки custom emoji как иконки топика
 - См. [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
-
-### Voice → Whisper
-Голосовые сообщения через Whisper transcription:
-- Использовать код из bz-merch-assistant
-- `ai_bot_core/services/whisper.py`
 
 ## Backlog
 

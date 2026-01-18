@@ -203,6 +203,11 @@ def parse_screen(output: str) -> ScreenState:
     body = re.sub(r'╌{10,}', SEPARATOR_DASHED, body)
     body = body.strip()
 
+    # Detect trust-related prompts (should not be auto-accepted)
+    body_lower = body.lower()
+    if "trust" in body_lower or "folder" in body_lower:
+        return PermissionPrompt(options=options, body=body, prompt_type=PromptType.MCP_TRUST)
+
     return PermissionPrompt(options=options, body=body)
 
 

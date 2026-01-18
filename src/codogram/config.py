@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     claude_launch_timeout: int = 120
     project_cleanup_days: int = 30
 
+    # OpenAI / Whisper
+    openai_api_key: str | None = None
+    openai_base_url: str = "https://api.openai.com/v1"
+    whisper_timeout: int = 60  # seconds
+
     def get_admin_ids(self) -> set[int]:
         """Parse admin_ids string into set of ints."""
         return {int(x.strip()) for x in self.admin_ids.split(",") if x.strip()}

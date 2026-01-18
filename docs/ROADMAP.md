@@ -239,7 +239,7 @@ Send images and files from Telegram to Claude:
 - Photos saved to `tmp/input-files/{thread}/` with timestamped names
 - Documents (PDF, txt, md, etc.) supported with extension whitelist
 - Format: `See file: ./path/to/file` for Claude to read
-- Video/audio/voice rejected with "Coming soon with Whisper" message
+- Video files rejected (audio/voice handled by Whisper transcription)
 - Path traversal protection and 20MB size limit
 - See [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
 
@@ -263,6 +263,14 @@ Full redesign of /start flow with robust error handling and intuitive setup UX:
 - Cancel button and /reset_all to abort setup
 - Proper navigation with Go back buttons
 - See [docs/designs/done/2026-01-18-start-flow-v2.md](designs/done/2026-01-18-start-flow-v2.md)
+
+### Voice → Whisper transcription
+Voice messages and audio files transcribed via OpenAI Whisper:
+- Voice messages (.ogg), audio files (.mp3, etc.), and video notes (круглые видео)
+- "Transcribing..." status, then "«text» → Claude" on success
+- Friendly error messages for API errors (too large, timeout, no speech, etc.)
+- Configurable via OPENAI_API_KEY, OPENAI_BASE_URL, WHISPER_TIMEOUT
+- See [docs/designs/done/2026-01-18-whisper-transcription-design.md](designs/done/2026-01-18-whisper-transcription-design.md)
 
 ### Compacting detection
 Detect when Claude compacts conversation and notify user:
@@ -312,11 +320,6 @@ Custom emoji pack from group members' avatars:
 - Notification: "`[v]` Gift unlocked — avatar pack for topic icons"
 - Limitation: Premium required to set custom emoji as topic icon
 - See [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
-
-### Voice → Whisper
-Voice messages via Whisper transcription:
-- Use existing code from bz-merch-assistant
-- `ai_bot_core/services/whisper.py`
 
 ## Backlog
 

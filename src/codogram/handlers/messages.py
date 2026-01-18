@@ -48,9 +48,9 @@ async def _route_message(message: Message, telegram_queue: TelegramQueue):
     text = message.text
     has_file = bool(message.photo or message.document)
 
-    # Block video/audio
-    if message.video or message.video_note or message.audio or message.voice:
-        await telegram_queue.reply(message, strings.FILE_AUDIO_VIDEO_NOT_SUPPORTED)
+    # Block video files (not video_note - those are handled by audio router)
+    if message.video:
+        await telegram_queue.reply(message, strings.FILE_VIDEO_NOT_SUPPORTED)
         return
 
     # Skip empty messages (no text and no file)

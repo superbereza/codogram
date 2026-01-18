@@ -185,8 +185,21 @@ TOPIC_DELETE_ERROR = "Error deleting topic: {error}"
 
 # --- File input ---
 
-FILE_AUDIO_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video and audio not supported yet. Coming soon with Whisper!"
+FILE_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video files are not supported"
 FILE_TYPE_NOT_SUPPORTED = "This file type is not supported"
+
+
+# --- Audio/Whisper ---
+
+AUDIO_TRANSCRIBING = f"{STATUS_PENDING} Transcribing..."
+AUDIO_SENT = f"{STATUS_OK} «{{text}}» → Claude"
+
+AUDIO_ERR_TOO_LARGE = f"{STATUS_ERR} Transcription failed: file too large"
+AUDIO_ERR_FORMAT = f"{STATUS_ERR} Transcription failed: unsupported format"
+AUDIO_ERR_TIMEOUT = f"{STATUS_ERR} Transcription failed: timeout, try again"
+AUDIO_ERR_GENERIC = f"{STATUS_ERR} Transcription failed: {{error}}"
+AUDIO_ERR_NO_SPEECH = f"{STATUS_ERR} No speech detected"
+AUDIO_ERR_NOT_CONFIGURED = f"{STATUS_INFO} Voice messages? Nice! But admin needs to set OPENAI_API_KEY first"
 FILE_TOO_LARGE = "File too large. Max 20MB"
 FILE_DOWNLOAD_FAILED = "Download failed. Try again"
 
@@ -323,9 +336,9 @@ FINISH_ARCHIVED_KEPT = f"""{STATUS_OK} Branch `{{branch}}` archived
 Worktree kept for potential resume
 Use /start to resume"""
 
-FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
+FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Asked Claude to commit\\. One moment\\.\\.\\.
 
-Run /finish again after commit"""
+Then run /finish"""
 
 
 # --- Start Flow ---
@@ -423,9 +436,9 @@ BRANCH_DIR_EXISTS = f"{STATUS_ERR} Directory already exists: `{{path}}`"
 BRANCH_UNCOMMITTED_CHANGES = f"{STATUS_WARN} Uncommitted changes detected"
 BRANCH_UNCOMMITTED_IN_BASE = f"{STATUS_WARN} Uncommitted changes in {{base_branch}}"
 
-BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
+BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Asked Claude to commit\\. One moment\\.\\.\\.
 
-Run `/branch_create {{branch_name}}` again after commit"""
+Then run `/branch_create {{branch_name}}`"""
 
 BRANCH_CREATING = f"{STATUS_PENDING} Creating branch `{{name}}`..."
 BRANCH_CREATED = f"{STATUS_OK} Branch `{{name}}` created"

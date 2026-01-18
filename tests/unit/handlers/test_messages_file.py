@@ -77,7 +77,7 @@ class TestFileMessageHandler:
 
     @pytest.mark.asyncio
     async def test_video_rejected(self):
-        """Video messages should be rejected with friendly message."""
+        """Video files should be rejected (not video_note which goes to audio router)."""
         from codogram.handlers.messages import on_message
 
         message = MagicMock()
@@ -99,11 +99,11 @@ class TestFileMessageHandler:
 
             telegram_queue.reply.assert_called_once()
             reply_text = telegram_queue.reply.call_args[0][1]
-            assert "whisper" in reply_text.lower()
+            assert "video" in reply_text.lower() and "not supported" in reply_text.lower()
 
     @pytest.mark.asyncio
-    async def test_audio_rejected(self):
-        """Audio messages should be rejected with friendly message."""
+    async def test_audio_passthrough_to_audio_router(self):
+        """Audio messages pass through to audio router (no reply from messages handler)."""
         from codogram.handlers.messages import on_message
 
         message = MagicMock()
@@ -123,13 +123,12 @@ class TestFileMessageHandler:
         with patch("codogram.handlers.messages.handle_name_input", new_callable=AsyncMock, return_value=False):
             await on_message(message, telegram_queue)
 
-            telegram_queue.reply.assert_called_once()
-            reply_text = telegram_queue.reply.call_args[0][1]
-            assert "whisper" in reply_text.lower()
+            # Audio is handled by audio router, not messages handler
+            telegram_queue.reply.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_voice_rejected(self):
-        """Voice messages should be rejected with friendly message."""
+    async def test_voice_passthrough_to_audio_router(self):
+        """Voice messages pass through to audio router (no reply from messages handler)."""
         from codogram.handlers.messages import on_message
 
         message = MagicMock()
@@ -150,9 +149,8 @@ class TestFileMessageHandler:
         with patch("codogram.handlers.messages.handle_name_input", new_callable=AsyncMock, return_value=False):
             await on_message(message, telegram_queue)
 
-            telegram_queue.reply.assert_called_once()
-            reply_text = telegram_queue.reply.call_args[0][1]
-            assert "whisper" in reply_text.lower()
+            # Voice is handled by audio router, not messages handler
+            telegram_queue.reply.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_file_download_error_shows_message(self, tmp_path):
