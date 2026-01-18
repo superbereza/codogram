@@ -452,7 +452,7 @@ SETUP_ADMIN_CHECK_FAILED = f"{STATUS_WARN} Still missing admin rights"
 # Chat type errors
 SETUP_PRIVATE_CHAT = f"{STATUS_ERR} Add bot to a group chat"
 SETUP_CHANNEL_NOT_SUPPORTED = f"{STATUS_ERR} Channels not supported"
-SETUP_CANCELLED = f"{STATUS_INFO} Setup cancelled. Use /start to begin again."
+SETUP_CANCELLED = f"{STATUS_INFO} Setup cancelled\\. Use /start to begin again\\."
 SETUP_ALREADY_IN_PROGRESS = f"{STATUS_INFO} Setup already in progress"
 
 # Command blocking during setup
@@ -471,7 +471,7 @@ SETUP_CLONE_URL_PROMPT = """Send repository URL:
 • SSH: `git@github.com:user/repo.git`
 • HTTPS: `https://github.com/user/repo.git`"""
 
-SETUP_CLONE_PROGRESS = f"{STATUS_PENDING} Cloning repository..."
+SETUP_CLONE_PROGRESS = f"{STATUS_PENDING} Cloning repository\\.\\.\\."
 SETUP_CLONE_FAILED = f"{STATUS_ERR} Clone failed: {{error}}"
 SETUP_CLONE_SSH_HINT = "SSH key may not be configured. Try HTTPS URL instead."
 SETUP_CLONE_AUTH_HINT = "Repository may be private. Check authentication."
@@ -481,7 +481,7 @@ SETUP_FOLDER_SELECT = "Select folder to connect:"
 SETUP_FOLDER_EMPTY = f"{STATUS_WARN} No folders found in `{{base_dir}}`"
 SETUP_FOLDER_ALL_CONNECTED = f"""{STATUS_INFO} All folders are already connected
 
-Start a new project instead?"""
+Start a new project instead\\?"""
 SETUP_FOLDER_NOT_FOUND = f"{STATUS_ERR} Folder `{{name}}` not found"
 SETUP_FOLDER_USE_BUTTONS = "Select a folder from the list above\\nor use \\[<< Go back\\] to return\\."
 
@@ -501,19 +501,19 @@ Or send custom name"""
 SETUP_PROJECT_NAME_INVALID = f"{STATUS_ERR} Invalid name\\. Use letters, digits, \\- and \\_ only"
 SETUP_PROJECT_EXISTS = f"""{STATUS_WARN} Folder `{{name}}` already exists
 
-What to do?"""
+What to do\\?"""
 
 # Git choice
-SETUP_GIT_CHOICE = "Git setup for `{folder}`?"
+SETUP_GIT_CHOICE = "Git setup for `{folder}`\\?"
 SETUP_GIT_GH_NOT_INSTALLED = f"{STATUS_ERR} `gh` CLI not installed\\. Install from https://cli\\.github\\.com"
 SETUP_GIT_GH_NOT_AUTH = f"{STATUS_ERR} `gh` not authenticated\\. Run `gh auth login` first"
 
 # Rename
-SETUP_RENAME_PROMPT = "Rename chat to `{name}`?"
+SETUP_RENAME_PROMPT = "Rename chat to `{name}`\\?"
 SETUP_RENAME_FAILED = f"{STATUS_WARN} Couldn't rename chat \\(missing permissions?\\)\\nContinuing with project setup\\.\\.\\."
 
 # Launch
-SETUP_LAUNCH_PROGRESS = f"{STATUS_PENDING} Setting up project..."
+SETUP_LAUNCH_PROGRESS = f"{STATUS_PENDING} Setting up project\\.\\.\\."
 SETUP_LAUNCH_MKDIR_FAILED = f"{STATUS_ERR} Failed to create directory: {{error}}"
 SETUP_LAUNCH_SUCCESS = f"""{STATUS_OK} Project `{{project}}` ready
 
