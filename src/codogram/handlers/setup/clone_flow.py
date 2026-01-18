@@ -1,7 +1,6 @@
 # src/codogram/handlers/setup/clone_flow.py
 """Clone repository flow handlers."""
 import logging
-import re
 from pathlib import Path
 
 from aiogram import F, Router
@@ -10,33 +9,13 @@ from aiogram.types import CallbackQuery, Message
 
 from ...config import settings
 from ...domain.states import SetupFlow
-from ...domain.validators import validate_git_url
+from ...domain.validators import validate_git_url, extract_project_name_from_url
 from ...keyboards.setup import go_back_keyboard, setup_type_keyboard, folder_exists_keyboard, clone_error_keyboard
 from ... import strings
 
 logger = logging.getLogger(__name__)
 
 router = Router(name="setup_clone")
-
-
-def extract_project_name_from_url(url: str) -> str | None:
-    """Extract project name from git URL.
-
-    Examples:
-        https://github.com/user/awesome-project.git -> awesome-project
-        git@github.com:user/awesome-project.git -> awesome-project
-    """
-    # HTTPS format
-    https_match = re.search(r'/([^/]+?)(?:\.git)?$', url)
-    if https_match:
-        return https_match.group(1)
-
-    # SSH format
-    ssh_match = re.search(r':([^/]+/)?([^/]+?)(?:\.git)?$', url)
-    if ssh_match:
-        return ssh_match.group(2)
-
-    return None
 
 
 @router.callback_query(

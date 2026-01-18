@@ -12,4 +12,7 @@ def rename_confirm_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=strings.BTN_RENAME_YES, callback_data="rename:yes"),
             InlineKeyboardButton(text=strings.BTN_RENAME_NO, callback_data="rename:no"),
         ],
+        [
+            InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data="rename:back"),
+        ],
     ])

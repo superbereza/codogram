@@ -2,7 +2,6 @@
 """Git operations service."""
 import asyncio
 import logging
-import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,32 +15,6 @@ class GitResult:
     success: bool
     error: str | None = None
     output: str | None = None
-
-
-def extract_project_name_from_url(url: str) -> str | None:
-    """Extract project name from git URL.
-
-    Examples:
-        https://github.com/user/awesome-project.git -> awesome-project
-        git@github.com:user/awesome-project.git -> awesome-project
-    """
-    # HTTPS format
-    https_match = re.search(r'/([^/]+?)(?:\.git)?$', url)
-    if https_match:
-        name = https_match.group(1)
-        if name.endswith(".git"):
-            name = name[:-4]
-        return name
-
-    # SSH format
-    ssh_match = re.search(r':(?:[^/]+/)?([^/]+?)(?:\.git)?$', url)
-    if ssh_match:
-        name = ssh_match.group(1)
-        if name.endswith(".git"):
-            name = name[:-4]
-        return name
-
-    return None
 
 
 async def git_init(target_dir: Path) -> GitResult:

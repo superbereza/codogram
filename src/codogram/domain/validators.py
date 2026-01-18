@@ -29,6 +29,33 @@ def validate_git_url(url: str) -> tuple[bool, str | None]:
     return True, None
 
 
+def extract_project_name_from_url(url: str) -> str | None:
+    """Extract project name from git URL.
+
+    Examples:
+        https://github.com/user/awesome-project.git -> awesome-project
+        git@github.com:user/awesome-project.git -> awesome-project
+        ssh://git@github.com/user/project -> project
+    """
+    # HTTPS format: https://github.com/user/repo.git
+    https_match = re.search(r'/([^/]+?)(?:\.git)?$', url)
+    if https_match:
+        name = https_match.group(1)
+        if name.endswith(".git"):
+            name = name[:-4]
+        return name
+
+    # SSH format: git@github.com:user/repo.git
+    ssh_match = re.search(r':(?:[^/]+/)?([^/]+?)(?:\.git)?$', url)
+    if ssh_match:
+        name = ssh_match.group(1)
+        if name.endswith(".git"):
+            name = name[:-4]
+        return name
+
+    return None
+
+
 def is_valid_project_name(name: str) -> bool:
     """Check if project name is valid.
 

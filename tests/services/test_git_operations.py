@@ -2,11 +2,8 @@
 import pytest
 from unittest.mock import patch, AsyncMock
 
-from codogram.services.setup.git_operations import (
-    git_init,
-    check_gh_cli,
-    extract_project_name_from_url,
-)
+from codogram.services.setup.git_operations import git_init, check_gh_cli
+from codogram.domain.validators import extract_project_name_from_url
 
 
 def test_extract_project_name_https():
