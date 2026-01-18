@@ -449,6 +449,21 @@ async def permission_poller(
                 content_msg_ids = []
                 kb_msg_id = None
             elif parsed.options != last_options or parsed.body != last_body:
+                # Check auto-accept first (race condition: prompt may change before tmux processes key)
+                auto_accept_enabled = thread.auto_accept if thread else project.auto_accept
+                verbose_enabled = thread.verbose if thread else project.verbose
+                if auto_accept_enabled:
+                    if await try_auto_accept(
+                        parsed.options, parsed.body, tmux,
+                        telegram_queue, project.chat_id, thread_id, context_name,
+                        prompt_type=parsed.prompt_type,
+                        verbose=verbose_enabled,
+                    ):
+                        logger.debug(f"{log_prefix} SHOWING: body/options changed, auto-accepted again")
+                        last_options = parsed.options
+                        last_body = parsed.body
+                        continue
+
                 logger.debug(f"{log_prefix} SHOWING: body/options changed, resending")
                 try:
                     # Delete old messages
