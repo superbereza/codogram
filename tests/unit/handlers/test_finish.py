@@ -11,6 +11,7 @@ def mock_message():
     msg.chat = MagicMock(spec=Chat)
     msg.chat.id = -100123
     msg.chat.type = "supergroup"
+    msg.chat.is_forum = True
     msg.message_thread_id = 456
     msg.text = "/finish"
     return msg
