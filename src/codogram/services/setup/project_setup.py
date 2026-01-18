@@ -1,30 +1,11 @@
 # src/codogram/services/setup/project_setup.py
-"""Project setup service with atomic operations and rollback."""
-import asyncio
+"""Project setup service - creates directory and registers project."""
 import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from ...tmux import TmuxSession
-
 logger = logging.getLogger(__name__)
-
-
-def create_session_name(project_name: str) -> str:
-    """Generate tmux session name from project name."""
-    return f"claude-{project_name}"
-
-
-async def create_tmux_session(name: str, cwd: str) -> bool:
-    """Create a tmux session. Returns True on success."""
-    try:
-        session = TmuxSession(name, cwd)
-        session.create()
-        return session.exists()
-    except Exception as e:
-        logger.warning(f"Failed to create tmux session: {e}")
-        return False
 
 
 @dataclass
@@ -32,7 +13,6 @@ class SetupResult:
     """Result of project setup."""
     success: bool
     error: str | None = None
-    tmux_name: str | None = None
 
 
 async def setup_project(
@@ -42,11 +22,9 @@ async def setup_project(
     chat_title: str,
     chat_type: str,
 ) -> SetupResult:
-    """Set up project with atomic operations.
+    """Set up project directory and register in config.
 
-    Phases:
-    1. Filesystem - create dir if needed (rollback: delete)
-    2. Runtime - create tmux, launch Claude, save config
+    Note: tmux creation and Claude launch are handled by launch_with_animation.
 
     Args:
         project_name: Project/folder name
@@ -59,55 +37,27 @@ async def setup_project(
         SetupResult with success/error
     """
     created_dir = False
-    tmux_name = None
 
     try:
-        # Lazy imports to avoid circular dependencies and config loading at import time
-        from ...session_manager import ProjectManager
-
-        # Phase 1: Filesystem
+        # Create directory if needed
         if not target_dir.exists():
             target_dir.mkdir(parents=True)
             created_dir = True
             logger.info(f"Created directory: {target_dir}")
 
-        # Phase 2: Runtime - create tmux session (Claude will be launched by handler with animation)
-        tmux_name = create_session_name(project_name)
+        # Register project in config
+        from ...session_manager import project_manager
+        project = project_manager.get_or_create(project_name)
+        project.chat_id = chat_id
+        project.cwd = str(target_dir)
+        project_manager._save()
 
-        # Create tmux session
-        success = await create_tmux_session(tmux_name, str(target_dir))
-        if not success:
-            raise RuntimeError("Failed to create tmux session")
-
-        # Save to config
-        pm = ProjectManager()
-        pm.register_project(
-            project_name=project_name,
-            chat_id=chat_id,
-            chat_title=chat_title,
-            chat_type=chat_type,
-            tmux_name=tmux_name,
-            cwd=str(target_dir),
-        )
-
-        return SetupResult(success=True, tmux_name=tmux_name)
+        return SetupResult(success=True)
 
     except Exception as e:
         logger.exception(f"Project setup failed: {e}")
 
-        # Rollback Phase 2 - kill tmux if created
-        if tmux_name:
-            try:
-                proc = await asyncio.create_subprocess_exec(
-                    "tmux", "kill-session", "-t", tmux_name,
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
-                )
-                await proc.wait()
-            except Exception:
-                pass
-
-        # Rollback Phase 1 - delete dir if we created it
+        # Rollback - delete dir if we created it
         if created_dir and target_dir.exists():
             try:
                 shutil.rmtree(target_dir)
