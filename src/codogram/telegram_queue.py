@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 from .logging_config import logger
 from .chunker import chunk_message
+from .config import TELEGRAM_MESSAGE_MAX_LENGTH
 
 
 class TelegramQueueTimeout(Exception):
@@ -271,7 +272,7 @@ class TelegramQueue:
         expanded_messages = []
         for msg in converted_messages:
             text = msg.get("text", "")
-            if len(text) > 4000:
+            if len(text) > TELEGRAM_MESSAGE_MAX_LENGTH:
                 chunks = chunk_message(text)
                 logger.debug(f"Chunking message: {len(text)} chars -> {len(chunks)} chunks")
                 for chunk in chunks:

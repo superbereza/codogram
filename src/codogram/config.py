@@ -3,6 +3,15 @@ import json
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Telegram limits
+TELEGRAM_MESSAGE_MAX_LENGTH = 4000
+
+# Screen parsing
+SCREEN_SEPARATOR_MIN_DASHES = 10
+
+# Tmux capture
+TMUX_CAPTURE_LINES_DEFAULT = 30
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 

@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .logging_config import logger
+from .config import TMUX_CAPTURE_LINES_DEFAULT
 
 # Debug log for tmux send operations
 TMUX_DEBUG_LOG = Path(__file__).parent.parent.parent / "logs/tmux-send-debug.log"
@@ -88,7 +89,7 @@ class TmuxSession:
         Returns context_before lines above input, input line, context_after lines below.
         """
         result = subprocess.run(
-            ["tmux", "capture-pane", "-t", self.name, "-p", "-S", "-30"],
+            ["tmux", "capture-pane", "-t", self.name, "-p", "-S", f"-{TMUX_CAPTURE_LINES_DEFAULT}"],
             capture_output=True,
             text=True
         )
