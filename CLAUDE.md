@@ -172,25 +172,39 @@ src/codogram/
 
 **Важно:** Config хранится в `~/.codogram/config.json`, не в репозитории.
 
-**НИКОГДА не убивай процессы вручную!** Скрипты `stop-and-restart.sh` и `dev-run.sh` сами убивают старый процесс бота перед запуском. Команда `pkill -f codogram` убьёт ВСЕ tmux сессии `claude-codogram-*` — это потеря всех Claude сессий пользователя!
+### ⚠️ КРИТИЧЕСКИ ВАЖНО: Запуск бота
 
-**НИКОГДА не запускай `pip install -e .` из worktree!** Это сломает main бота — он начнёт импортировать код из worktree. Для тестирования в worktree используй `dev-run.sh` (он использует PYTHONPATH, не pip). Если нужны новые зависимости — добавь их в pyproject.toml и установи из main.
+**Чтобы запустить/перезапустить бота — просто выполни скрипт:**
+```bash
+# Из worktree:
+./kill-instance-and-start-from-worktree.sh
 
-### Запуск бота
+# Из main:
+./stop-and-restart.sh
+```
+
+**Скрипты САМИ убивают старый процесс.** Не нужно делать pkill, kill, или что-то ещё перед запуском.
+
+**ЗАПРЕЩЕНО:**
+- `pkill -f codogram` — убьёт ВСЕ tmux сессии `claude-codogram-*` (потеря Claude сессий!)
+- `kill <pid>` перед запуском скрипта — скрипт сам это делает
+- `pip install -e .` из worktree — сломает main бота
+
+### Запуск бота (детали)
 
 ```bash
 # Из main (production):
 ./stop-and-restart.sh              # pip install + nohup
 
 # Из worktree (testing):
-./dev-run.sh              # PYTHONPATH + foreground
+./kill-instance-and-start-from-worktree.sh              # PYTHONPATH + foreground
 ```
 
 ### Workflow тестирования из worktree
 
 ```bash
 cd .worktrees/my-feature/
-./dev-run.sh              # Убивает main бота, запускает с кодом worktree
+./kill-instance-and-start-from-worktree.sh              # Убивает main бота, запускает с кодом worktree
 # ... тестируем ...
 # Ctrl+C
 
@@ -201,9 +215,9 @@ cd /path/to/main
 ### Почему так
 
 - `pip install -e` из worktree ломает main бота (Path(__file__) указывает на worktree)
-- `dev-run.sh` использует PYTHONPATH — не трогает venv
+- `kill-instance-and-start-from-worktree.sh` использует PYTHONPATH — не трогает venv
 - Config в ~/.codogram/ — один для всех worktrees
-- .env остаётся в main, dev-run.sh находит его через `../../.env`
+- .env остаётся в main, kill-instance-and-start-from-worktree.sh находит его через `../../.env`
 
 ## Feature Development Flow
 

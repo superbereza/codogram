@@ -199,7 +199,7 @@ AUDIO_ERR_FORMAT = f"{STATUS_ERR} Transcription failed: unsupported format"
 AUDIO_ERR_TIMEOUT = f"{STATUS_ERR} Transcription failed: timeout, try again"
 AUDIO_ERR_GENERIC = f"{STATUS_ERR} Transcription failed: {{error}}"
 AUDIO_ERR_NO_SPEECH = f"{STATUS_ERR} No speech detected"
-AUDIO_ERR_NOT_CONFIGURED = f"{STATUS_ERR} Whisper not configured (missing OPENAI_API_KEY)"
+AUDIO_ERR_NOT_CONFIGURED = f"{STATUS_INFO} Voice messages? Nice! But admin needs to set OPENAI_API_KEY first"
 FILE_TOO_LARGE = "File too large. Max 20MB"
 FILE_DOWNLOAD_FAILED = "Download failed. Try again"
 
