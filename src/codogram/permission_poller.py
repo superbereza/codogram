@@ -241,7 +241,8 @@ async def permission_poller(
             last_thinking_update = 0.0  # Reset for next thinking cycle
 
         # Parse input suggestion (if feature enabled and not thinking)
-        feat_suggestions_enabled = thread.feat_suggestions if thread else project.feat_suggestions
+        # Note: feat_suggestions is chat-wide, not per-thread
+        feat_suggestions_enabled = project.feat_suggestions
         suggestion_key = f"{project.chat_id}:{thread_id}"
 
         if feat_suggestions_enabled and not thinking_text:

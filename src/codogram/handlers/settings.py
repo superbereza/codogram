@@ -251,28 +251,19 @@ async def cmd_exp_thinking_status(message: Message, telegram_queue: TelegramQueu
 
 @router.message(Command("exp_suggestions"))
 async def cmd_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
-    """Toggle suggestions feature."""
+    """Toggle suggestions feature (chat-wide)."""
     chat_id = message.chat.id
-    thread_id = message.message_thread_id
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
         await telegram_queue.reply(message, "No project. Use /start first.")
         return
 
-    thread = None
-    if project.threads:
-        thread = project.threads.get(thread_id)
-
-    if thread:
-        thread.feat_suggestions = not thread.feat_suggestions
-        status = "● on" if thread.feat_suggestions else "○ off"
-    else:
-        project.feat_suggestions = not project.feat_suggestions
-        status = "● on" if project.feat_suggestions else "○ off"
+    project.feat_suggestions = not project.feat_suggestions
+    status = "● on" if project.feat_suggestions else "○ off"
 
     project_manager._save()
-    await telegram_queue.reply(message, f"Suggestions: {status}")
+    await telegram_queue.reply(message, f"Suggestions (all topics): {status}")
 
 
 @router.callback_query(F.data.startswith("set:"))
