@@ -694,24 +694,6 @@ def get_chat_link(chat_id: int) -> str:
 
 ## Implementation Notes
 
-### Timeout Handling
-
-Setup flow должен иметь timeout (30 минут):
-```python
-SETUP_TIMEOUT_MINUTES = 30
-
-async def check_setup_timeout(state: FSMContext) -> bool:
-    """Return True if setup has timed out."""
-    data = await state.get_data()
-    started_at = data.get("setup_started_at")
-    if not started_at:
-        return False
-    elapsed = datetime.now() - datetime.fromisoformat(started_at)
-    return elapsed.total_seconds() > SETUP_TIMEOUT_MINUTES * 60
-```
-
-**При timeout:** Clear state, show "Setup expired. Run /start again."
-
 ### Bot Restart Recovery
 
 При рестарте бота FSM state сохраняется в Redis (если настроен) или теряется.
@@ -781,7 +763,6 @@ async def check_setup_timeout(state: FSMContext) -> bool:
 - [ ] Corner case handling (all tables above)
 - [ ] Error messages (strings.py)
 - [ ] Concurrency protection
-- [ ] Timeout handling
 
 ### Phase 7: Testing
 - [ ] Unit tests для services
