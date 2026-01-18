@@ -315,6 +315,13 @@ Custom emoji pack from group members' avatars:
 
 ## Backlog
 
+### Auto-resume on message
+Auto-launch Claude when user sends message but tmux doesn't exist:
+- Show: `` `[~]` Tmux session not found, launching... ``
+- If `session_id` exists → `claude --resume`, else `claude`
+- Queue all messages (text + files) while launching
+- Send queued messages after Claude ready
+
 ### Merge thread and branch commands
 Simplify by removing separate /thread command:
 - Thread is essentially a branch for main
