@@ -1,0 +1,138 @@
+# src/codogram/handlers/setup/triggers.py
+"""Setup flow trigger handlers.
+
+Entry points (per design):
+1. my_chat_member: bot added to chat or granted admin
+2. /start in chat without registered project
+3. Any message in chat without registered project
+"""
+import logging
+
+from aiogram import Bot, F, Router
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Chat, ChatMemberUpdated, Message
+
+from ...domain.states import SetupFlow
+from ...session_manager import ProjectManager
+from ...services.setup import check_bot_admin_rights
+from ...keyboards.setup import admin_check_keyboard, setup_type_keyboard
+from ... import strings
+
+logger = logging.getLogger(__name__)
+
+router = Router(name="setup_triggers")
+
+
+def _is_group_chat(chat_type: str) -> bool:
+    """Check if chat type is a group (not private/channel)."""
+    return chat_type in ("group", "supergroup")
+
+
+def _is_project_registered(chat_id: int) -> bool:
+    """Check if chat has a registered project."""
+    pm = ProjectManager()
+    return pm.get_project_by_chat_id(chat_id) is not None
+
+
+# --- Entry Point 1: Bot added to chat ---
+
+@router.my_chat_member(
+    F.new_chat_member.status.in_({"member", "administrator"})
+)
+async def on_bot_added(event: ChatMemberUpdated, state: FSMContext):
+    """Handle bot being added to chat or granted admin rights."""
+    chat = event.chat
+
+    # Block private chats
+    if chat.type == "private":
+        await event.answer(strings.SETUP_PRIVATE_CHAT)
+        return
+
+    # Block channels
+    if chat.type == "channel":
+        await event.answer(strings.SETUP_CHANNEL_NOT_SUPPORTED)
+        return
+
+    # Check if setup already in progress
+    current_state = await state.get_state()
+    if current_state and current_state.startswith("SetupFlow:"):
+        logger.debug(f"Setup already in progress for chat {chat.id}")
+        return
+
+    # Check if project already registered
+    if _is_project_registered(chat.id):
+        logger.debug(f"Project already registered for chat {chat.id}")
+        return
+
+    await _start_setup_flow(event.bot, chat, state)
+
+
+# --- Entry Point 2: /start in unregistered chat ---
+
+@router.message(Command("start"), F.chat.type.in_({"group", "supergroup"}))
+async def on_start_command(message: Message, state: FSMContext):
+    """Handle /start command in group chats without project."""
+    chat = message.chat
+
+    # Check if setup already in progress
+    current_state = await state.get_state()
+    if current_state and current_state.startswith("SetupFlow:"):
+        # /start during setup restarts the flow (per design line 535)
+        await state.clear()
+
+    # Check if project already registered - /start shows status
+    if _is_project_registered(chat.id):
+        # Delegate to existing start handler for status display
+        return  # Let other handlers process this
+
+    await _start_setup_flow(message.bot, chat, state)
+
+
+# --- Entry Point 3: Any message in unregistered chat ---
+
+@router.message(F.chat.type.in_({"group", "supergroup"}))
+async def on_any_message(message: Message, state: FSMContext):
+    """Handle any message in group chat without project.
+
+    This is a catch-all that triggers setup if no project registered.
+    Must be registered LAST to not intercept other handlers.
+    """
+    chat = message.chat
+
+    # Skip if setup already in progress
+    current_state = await state.get_state()
+    if current_state and current_state.startswith("SetupFlow:"):
+        return
+
+    # Skip if project already registered
+    if _is_project_registered(chat.id):
+        return
+
+    await _start_setup_flow(message.bot, chat, state)
+
+
+# --- Shared setup start logic ---
+
+async def _start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
+    """Start the setup flow - check admin rights first."""
+    # Check admin rights
+    has_rights = await check_bot_admin_rights(bot, chat.id)
+
+    if not has_rights:
+        # Ask for admin rights
+        await state.set_state(SetupFlow.awaiting_admin_rights)
+        await bot.send_message(
+            chat.id,
+            strings.SETUP_ADMIN_REQUIRED,
+            reply_markup=admin_check_keyboard(),
+        )
+        return
+
+    # Has rights - show setup type selection
+    await state.set_state(SetupFlow.awaiting_setup_type)
+    await bot.send_message(
+        chat.id,
+        strings.SETUP_CHOOSE_TYPE,
+        reply_markup=setup_type_keyboard(),
+    )
