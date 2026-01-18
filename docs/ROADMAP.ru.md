@@ -277,11 +277,12 @@ Per-thread/per-project toggle verbose output и UX настроек:
 ## In Progress
 
 ### Онбординг в боте
-Интерактивный онбординг для новых пользователей.
-- См. [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md)
+Интерактивный онбординг в директ чате с ботом:
+- Welcome flow с объяснением возможностей бота
+- Пошаговое руководство для новых пользователей
 
 ### Редизайн set up flow
-Полный редизайн /start flow, объединяющий robust /start + onboarding.
+Полный редизайн /start flow (robust /start + setup UX).
 - См. [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md) (worktree: set-up-flow-redesign)
 
 ## Backlog

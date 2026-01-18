@@ -277,11 +277,12 @@ Show Claude's suggested input in Telegram:
 ## In Progress
 
 ### Bot onboarding
-Interactive onboarding for new users.
-- See [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md)
+Interactive onboarding in direct messages with bot:
+- Welcome flow explaining bot features
+- Step-by-step guidance for first-time users
 
 ### Set up flow redesign
-Full redesign of /start flow combining robust /start + onboarding.
+Full redesign of /start flow (robust /start + setup UX).
 - See [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md) (worktree: set-up-flow-redesign)
 
 ## Backlog
