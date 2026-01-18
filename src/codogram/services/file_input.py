@@ -23,6 +23,16 @@ class FileInputResult:
     error: str | None = None  # "unsupported_type", "too_large", "download_failed"
 
 
+@dataclass
+class AudioFileInfo:
+    """Information about audio from Telegram message."""
+
+    file_id: str
+    extension: str
+    size: int
+    duration: int | None = None
+
+
 # Type alias for download callback
 DownloadFn = Callable[[str, str], Awaitable[None]]  # (file_id, destination) -> None
 
@@ -67,6 +77,39 @@ class FileInputService:
                 file_id=doc.file_id,
                 extension=ext,
                 size=doc.file_size or 0,
+            )
+
+        return None
+
+    def extract_audio_info(self, message) -> AudioFileInfo | None:
+        """Extract audio info from voice/audio/video_note message.
+
+        Returns AudioFileInfo or None if no audio content.
+        """
+        if message.voice:
+            return AudioFileInfo(
+                file_id=message.voice.file_id,
+                extension="ogg",
+                size=message.voice.file_size or 0,
+                duration=message.voice.duration,
+            )
+
+        if message.audio:
+            filename = message.audio.file_name or ""
+            ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "mp3"
+            return AudioFileInfo(
+                file_id=message.audio.file_id,
+                extension=ext,
+                size=message.audio.file_size or 0,
+                duration=message.audio.duration,
+            )
+
+        if message.video_note:
+            return AudioFileInfo(
+                file_id=message.video_note.file_id,
+                extension="mp4",
+                size=message.video_note.file_size or 0,
+                duration=message.video_note.duration,
             )
 
         return None
