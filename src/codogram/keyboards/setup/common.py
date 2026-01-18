@@ -23,3 +23,21 @@ def clone_error_keyboard() -> InlineKeyboardMarkup:
         ],
         [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data="clone:back")],
     ])
+
+
+def folder_exists_keyboard(context: str) -> InlineKeyboardMarkup:
+    """Create keyboard for folder exists scenario (per design line 295).
+
+    Buttons: [Use existing] [Different name] [<< Back]
+
+    Args:
+        context: "clone" or "new" - determines back callback
+    """
+    back_callback = "clone:back" if context == "clone" else "name:back"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text=strings.BTN_USE_EXISTING, callback_data="exists:use"),
+            InlineKeyboardButton(text=strings.BTN_DIFFERENT_NAME, callback_data="exists:rename"),
+        ],
+        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=back_callback)],
+    ])
