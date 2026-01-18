@@ -62,3 +62,23 @@ def get_connected_folders() -> dict[str, int]:
         result[project_name] = project_data.get("chat_id")
 
     return result
+
+
+def get_chat_link(chat_id: int, chat_type: str) -> str | None:
+    """Generate t.me link for a chat.
+
+    Args:
+        chat_id: Telegram chat ID
+        chat_type: Chat type (supergroup, group, etc.)
+
+    Returns:
+        URL string or None if not possible
+    """
+    if chat_type == "supergroup":
+        # Supergroups have t.me/c/{id} links
+        # chat_id = -1001234567890 → link_id = 1234567890
+        link_id = str(abs(chat_id))[3:]  # remove -100 prefix
+        return f"https://t.me/c/{link_id}"
+
+    # Regular groups don't have stable links
+    return None

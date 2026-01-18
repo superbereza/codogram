@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 from codogram.services.setup.folder_list import (
     list_available_folders,
     get_connected_folders,
+    get_chat_link,
 )
 
 
@@ -47,3 +48,15 @@ def test_list_available_folders_sorted(tmp_path):
 
     folders = list_available_folders(tmp_path, connected=set())
     assert folders == ["alpha", "beta", "zebra"]
+
+
+def test_get_chat_link_supergroup():
+    """Supergroup chat_id converts to t.me/c link."""
+    link = get_chat_link(-1001234567890, "supergroup")
+    assert link == "https://t.me/c/1234567890"
+
+
+def test_get_chat_link_regular_group_returns_none():
+    """Regular groups don't have stable links."""
+    link = get_chat_link(-123456789, "group")
+    assert link is None
