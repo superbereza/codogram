@@ -1,7 +1,7 @@
 """Message routing handler - routes messages to tmux sessions."""
 import asyncio
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.types import Message
 
 from ..services.message_router import MessageRouterService, RouteAction
@@ -27,6 +27,12 @@ _FILE_ERROR_MESSAGES = {
 }
 
 
+@router.message(F.text.startswith("/"))
+async def on_unknown_command(message: Message, telegram_queue: TelegramQueue):
+    """Forward unregistered commands to Claude as text."""
+    await _route_message(message, telegram_queue)
+
+
 @router.message()
 async def on_message(message: Message, telegram_queue: TelegramQueue):
     """Route regular messages to tmux sessions.
@@ -34,6 +40,11 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
     This is the catch-all handler - registered last so commands
     and FSM states are handled first by other routers.
     """
+    await _route_message(message, telegram_queue)
+
+
+async def _route_message(message: Message, telegram_queue: TelegramQueue):
+    """Common routing logic for all messages."""
     text = message.text
     has_file = bool(message.photo or message.document)
 
