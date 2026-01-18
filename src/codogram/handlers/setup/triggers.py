@@ -65,6 +65,13 @@ def _is_project_registered(chat_id: int) -> bool:
 async def on_bot_added(event: ChatMemberUpdated, state: FSMContext):
     """Handle bot being added to chat or granted admin rights."""
     chat = event.chat
+    old_status = event.old_chat_member.status if event.old_chat_member else None
+
+    # Only trigger on actual addition (from left/kicked/restricted to member/admin)
+    # Skip if this is just a promotion (member -> administrator)
+    if old_status in {"member", "administrator"}:
+        logger.debug(f"Bot status changed but not added: {old_status} -> {event.new_chat_member.status}")
+        return
 
     # Block private chats
     if chat.type == "private":
