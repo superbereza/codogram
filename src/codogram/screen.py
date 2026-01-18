@@ -359,6 +359,39 @@ def parse_thinking_status(output: str) -> str | None:
     return None
 
 
+def detect_compacting(output: str) -> bool:
+    """Detect if Claude is currently compacting conversation.
+
+    Looks for spinner + "compacting" in the area above input box.
+    Uses broader spinner set than thinking status (includes · which is common during compact).
+    """
+    # All possible spinners Claude uses (including · for compact)
+    compact_spinners = "·✶✻✽✢*"
+
+    lines = output.split("\n")
+
+    # Find first ──── separator (top of input box)
+    first_sep_idx = -1
+    for i, line in enumerate(lines):
+        if "─" * 10 in line:
+            first_sep_idx = i
+            break
+
+    if first_sep_idx == -1:
+        return False
+
+    # Look at last 5 lines before separator
+    start_idx = max(0, first_sep_idx - 5)
+    recent_lines = lines[start_idx:first_sep_idx]
+
+    for line in recent_lines:
+        stripped = line.strip()
+        if stripped and stripped[0] in compact_spinners:
+            if "compacting" in stripped.lower():
+                return True
+    return False
+
+
 def parse_input_suggestion(output: str) -> str | None:
     """Parse suggestion from input box.
 
