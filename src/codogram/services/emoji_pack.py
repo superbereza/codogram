@@ -94,3 +94,79 @@ class EmojiPackService:
         if avatar:
             return self._process_image(avatar)
         return self._generate_placeholder(user)
+
+    async def _generate_pack_name(self, chat_id: int) -> str:
+        """Generate sticker pack name."""
+        chat_id_str = str(abs(chat_id))
+        bot_username = await self.adapter.get_bot_username()
+        return f"chat_{chat_id_str}_avatars_by_{bot_username}"
+
+    async def create_pack(self, chat_id: int, participants: list[User]) -> str | None:
+        """Create emoji pack with all participants' avatars.
+
+        Returns pack name on success, None on failure.
+        """
+        if not participants:
+            logger.warning(f"No participants to create pack for chat {chat_id}")
+            return None
+
+        project = project_manager.get_by_chat(chat_id)
+        if not project:
+            logger.warning(f"Project not found for chat {chat_id}")
+            return None
+
+        pack_name = await self._generate_pack_name(chat_id)
+        owner_id = settings.get_bot_owner_id()
+
+        try:
+            # Create pack with first participant
+            first_user = participants[0]
+            avatar_bytes = await self._get_avatar_bytes(first_user)
+
+            await self.adapter.create_emoji_pack(
+                owner_id=owner_id,
+                name=pack_name,
+                title="Avatars",
+                sticker_bytes=avatar_bytes,
+                emoji="👤",
+            )
+            logger.info(f"Created emoji pack: {pack_name}")
+
+            # Get emoji_id from created sticker
+            stickers = await self.adapter.get_pack_stickers(pack_name)
+            if stickers:
+                project.emoji_map[first_user.id] = stickers[0].custom_emoji_id
+
+            # Add remaining participants
+            for user in participants[1:]:
+                await asyncio.sleep(0.5)  # Rate limit
+                await self._add_user_to_pack(pack_name, user, project)
+
+            # Save state
+            project.emoji_pack_name = pack_name
+            project.feat_avatar_pack = True
+            project_manager._save()
+
+            return pack_name
+
+        except Exception as e:
+            logger.error(f"Failed to create emoji pack: {e}")
+            return None
+
+    async def _add_user_to_pack(self, pack_name: str, user: User, project) -> str | None:
+        """Add single user's avatar to existing pack."""
+        try:
+            avatar_bytes = await self._get_avatar_bytes(user)
+
+            emoji_id = await self.adapter.add_sticker(
+                owner_id=settings.get_bot_owner_id(),
+                pack_name=pack_name,
+                sticker_bytes=avatar_bytes,
+                emoji="👤",
+            )
+            project.emoji_map[user.id] = emoji_id
+            return emoji_id
+
+        except Exception as e:
+            logger.warning(f"Failed to add user {user.id} to pack: {e}")
+            return None
