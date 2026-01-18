@@ -50,6 +50,8 @@ async def do_launch(message: Message, state: FSMContext):
     )
 
     if not result.success:
+        # Reset to setup type selection so user can retry
+        await state.set_state(SetupFlow.awaiting_setup_type)
         await progress_msg.edit_text(
             f"{strings.STATUS_ERR} Setup failed: {result.error}",
             reply_markup=go_back_keyboard("error:retry"),
