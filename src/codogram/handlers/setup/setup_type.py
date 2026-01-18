@@ -79,4 +79,5 @@ async def on_setup_cancel(callback: CallbackQuery, state: FSMContext):
 
     await callback.message.edit_text(
         strings.SETUP_CANCELLED,
+        parse_mode="MarkdownV2",
     )

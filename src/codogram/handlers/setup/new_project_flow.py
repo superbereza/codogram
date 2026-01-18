@@ -104,6 +104,7 @@ async def _process_project_name(
         await message.edit_text(
             strings.SETUP_PROJECT_EXISTS.format(name=name),
             reply_markup=folder_exists_keyboard("new"),
+            parse_mode="MarkdownV2",
         )
         return
 
@@ -200,6 +201,7 @@ async def on_git_init(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             f"{strings.STATUS_ERR} git init failed: {result.error}",
             reply_markup=go_back_keyboard("git:back"),
+            parse_mode="MarkdownV2",
         )
         return
 
@@ -229,6 +231,7 @@ async def on_git_gh(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             f"{strings.STATUS_ERR} {check.error}",
             reply_markup=git_choice_keyboard(),
+            parse_mode="MarkdownV2",
         )
         return
 
@@ -242,6 +245,7 @@ async def on_git_gh(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             f"{strings.STATUS_ERR} git init failed: {init_result.error}",
             reply_markup=go_back_keyboard("git:back"),
+            parse_mode="MarkdownV2",
         )
         return
 
@@ -251,6 +255,7 @@ async def on_git_gh(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             f"{strings.STATUS_ERR} gh repo create failed: {gh_result.error}",
             reply_markup=go_back_keyboard("git:back"),
+            parse_mode="MarkdownV2",
         )
         return
 
@@ -276,6 +281,7 @@ async def on_git_clone(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             f"{strings.STATUS_ERR} Folder not empty, can't clone",
             reply_markup=go_back_keyboard("git:back"),
+            parse_mode="MarkdownV2",
         )
         return
 

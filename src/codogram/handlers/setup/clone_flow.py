@@ -114,6 +114,7 @@ async def on_clone_url(message: Message, state: FSMContext):
         await message.answer(
             f"{strings.STATUS_ERR} {error}",
             reply_markup=go_back_keyboard("clone:back"),
+            parse_mode="MarkdownV2",
         )
         return
 
@@ -123,6 +124,7 @@ async def on_clone_url(message: Message, state: FSMContext):
         await message.answer(
             f"{strings.STATUS_ERR} Could not extract project name from URL",
             reply_markup=go_back_keyboard("clone:back"),
+            parse_mode="MarkdownV2",
         )
         return
 
@@ -136,6 +138,7 @@ async def on_clone_url(message: Message, state: FSMContext):
         await message.answer(
             strings.SETUP_PROJECT_EXISTS.format(name=project_name),
             reply_markup=folder_exists_keyboard("clone"),
+            parse_mode="MarkdownV2",
         )
         return
 
@@ -158,7 +161,7 @@ async def _do_clone(message: Message, state: FSMContext):
     project_name = data["project_name"]
 
     # Show progress
-    progress_msg = await message.answer(strings.SETUP_CLONE_PROGRESS)
+    progress_msg = await message.answer(strings.SETUP_CLONE_PROGRESS, parse_mode="MarkdownV2")
 
     # Import git_clone from existing service
     from ...services.start_flow import git_clone
@@ -179,6 +182,7 @@ async def _do_clone(message: Message, state: FSMContext):
         await progress_msg.edit_text(
             strings.SETUP_CLONE_FAILED.format(error=error_msg) + hint,
             reply_markup=clone_error_keyboard(),
+            parse_mode="MarkdownV2",
         )
         return
 

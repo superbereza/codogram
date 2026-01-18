@@ -51,7 +51,7 @@ async def do_launch(message: Message, state: FSMContext):
     chat_type = chat.type
 
     # Show progress
-    progress_msg = await message.answer(strings.SETUP_LAUNCH_PROGRESS)
+    progress_msg = await message.answer(strings.SETUP_LAUNCH_PROGRESS, parse_mode="MarkdownV2")
 
     # Run setup
     result = await setup_project(
@@ -68,6 +68,7 @@ async def do_launch(message: Message, state: FSMContext):
         await progress_msg.edit_text(
             f"{strings.STATUS_ERR} Setup failed: {result.error}",
             reply_markup=go_back_keyboard("error:retry"),
+            parse_mode="MarkdownV2",
         )
         return
 
