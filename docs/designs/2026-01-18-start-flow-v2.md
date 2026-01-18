@@ -132,6 +132,14 @@ Bot: [Cloning...] (progress animation)
                                   → LAUNCH
 ```
 
+**Rename failed:**
+Если переименование чата не удалось (нет прав, API ошибка):
+```
+[!] Couldn't rename chat (missing permissions?)
+Continuing with project setup...
+```
+Показываем warning и продолжаем — это не критичная ошибка.
+
 **Валидация URL (уже реализована):**
 - Wiki URLs → ошибка
 - Blob/tree URLs → ошибка
@@ -157,8 +165,8 @@ Bot: ┌────────────────────────
      │ ...                                     │
      │                                         │
      │ Already connected to Codogram:          │
-     │ • codogram → "Codogram Dev"             │
-     │ • personal-agent → "PA Bot"             │
+     │ • codogram → [Codogram Dev](t.me/c/...) │
+     │ • personal-agent → [PA Bot](t.me/c/...) │
      │                                         │
      │        [<]  1/3  [>]                    │
      │         [<< Go back]                    │
@@ -193,6 +201,15 @@ User: [my-project]
 - По 10 папок на страницу
 - Навигация: `[<] 1/3 [>]`
 - `[<< Go back]` — возврат к ASK_SETUP_TYPE
+
+**Ссылки на чаты:**
+"Already connected" показывает ссылки на чаты через `t.me/c/{id}`:
+```python
+# chat_id = -1001234567890
+# link = t.me/c/1234567890  (без -100 префикса)
+link_id = str(abs(chat_id))[3:]
+```
+Если пользователь участник чата — откроется. Если нет — Telegram покажет ошибку (это ок).
 
 ## Flow 3: Start new project
 
@@ -324,6 +341,22 @@ Without topics, you get one Claude session
 for the entire chat.
 ```
 
+## Навигация Go back
+
+Каждый `[<< Go back]` возвращает на предыдущий шаг:
+
+```
+ASK_SETUP_TYPE
+    ↓ ↑ Go back
+ASK_PROJECT_NAME / ASK_CLONE_URL / ASK_FOLDER_SELECT
+    ↓ ↑ Go back
+ASK_GIT_CHOICE / ASK_RENAME_CONFIRM
+    ↓ ↑ Go back
+LAUNCH
+```
+
+Нет прыжков через несколько шагов — всегда один шаг назад.
+
 ## FSM States
 
 ```python
@@ -362,6 +395,12 @@ def list_available_folders(base_dir: Path) -> list[str]:
 
 def sanitize_project_name(title: str) -> str | None:
     """Sanitize chat title to valid project name. Already implemented with unidecode."""
+
+def get_chat_link(chat_id: int) -> str:
+    """Generate t.me/c/ link from chat_id."""
+    # chat_id = -1001234567890 → t.me/c/1234567890
+    link_id = str(abs(chat_id))[3:]  # remove -100 prefix
+    return f"https://t.me/c/{link_id}"
 ```
 
 ## Чеклист реализации
