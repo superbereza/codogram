@@ -134,6 +134,7 @@ async def _check_git_and_proceed(message: Message, state: FSMContext, target_dir
         await message.edit_text(
             strings.SETUP_GIT_CHOICE.format(folder=folder_name),
             reply_markup=git_choice_keyboard(),
+            parse_mode="MarkdownV2",
         )
 
 

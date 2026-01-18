@@ -1,5 +1,6 @@
 # src/codogram/handlers/setup/launch.py
 """Launch phase handler."""
+import asyncio
 import logging
 from pathlib import Path
 
@@ -37,6 +38,9 @@ async def do_launch(message: Message, state: FSMContext):
     # Lazy imports to avoid circular dependencies
     from ...services.setup.project_setup import setup_project
     from ...services.menu import register_menu_for_chat
+    from ...launch_animation import launch_with_animation
+    from ...session_manager import project_manager
+    from ...main import telegram_queue
 
     # Enter launching state (blocks user input)
     await state.set_state(SetupFlow.launching)
@@ -49,11 +53,9 @@ async def do_launch(message: Message, state: FSMContext):
     chat_id = chat.id
     chat_title = chat.title or project_name
     chat_type = chat.type
+    thread_id = message.message_thread_id
 
-    # Show progress
-    progress_msg = await message.answer(strings.SETUP_LAUNCH_PROGRESS, parse_mode="MarkdownV2")
-
-    # Run setup
+    # Run setup (creates dir, tmux session, registers project)
     result = await setup_project(
         project_name=project_name,
         target_dir=target_dir,
@@ -65,7 +67,7 @@ async def do_launch(message: Message, state: FSMContext):
     if not result.success:
         # Reset to setup type selection so user can retry
         await state.set_state(SetupFlow.awaiting_setup_type)
-        await progress_msg.edit_text(
+        await message.answer(
             f"{strings.STATUS_ERR} Setup failed: {result.error}",
             reply_markup=go_back_keyboard("error:retry"),
             parse_mode="MarkdownV2",
@@ -79,17 +81,18 @@ async def do_launch(message: Message, state: FSMContext):
     # Clear FSM state
     await state.clear()
 
-    # Success announcement - use thread message for forum topics
-    is_thread = is_forum and message.message_thread_id
-    if is_thread:
-        success_text = strings.SETUP_LAUNCH_SUCCESS_THREAD.format(
-            thread=project_name,
-            tmux_name=result.tmux_name,
-        )
-    else:
-        success_text = strings.SETUP_LAUNCH_SUCCESS.format(
-            project=project_name,
-            tmux_name=result.tmux_name,
-        )
+    # Get project and thread for animation
+    project = project_manager.get_by_chat(chat_id)
+    thread = project.get_or_create_thread(thread_id, project_name)
 
-    await progress_msg.edit_text(success_text, parse_mode="MarkdownV2")
+    # Launch Claude with animation (this handles everything including success message)
+    thread.launch_task = asyncio.create_task(
+        launch_with_animation(
+            bot=message.bot,
+            chat_id=chat_id,
+            thread_id=thread_id,
+            project=project,
+            thread=thread,
+            queue=telegram_queue,
+        )
+    )
