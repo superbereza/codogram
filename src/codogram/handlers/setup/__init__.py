@@ -17,9 +17,11 @@ from . import triggers  # noqa: E402, F401
 from . import admin_check  # noqa: E402, F401
 from . import setup_type  # noqa: E402, F401
 from . import clone_flow  # noqa: E402, F401
+from . import connect_flow  # noqa: E402, F401
 
 # Include sub-routers
 setup_router.include_router(triggers.router)
 setup_router.include_router(admin_check.router)
 setup_router.include_router(setup_type.router)
 setup_router.include_router(clone_flow.router)
+setup_router.include_router(connect_flow.router)
