@@ -23,7 +23,7 @@ def test_settings_keyboard_button_labels():
     assert kb.inline_keyboard[0][0].text == "/auto_accept"
     assert kb.inline_keyboard[1][0].text == "/verbose"
     assert kb.inline_keyboard[2][0].text == "/shift_tab"
-    assert kb.inline_keyboard[3][0].text == "close"
+    assert kb.inline_keyboard[3][0].text == "Close"
 
 
 def test_settings_keyboard_callback_data():

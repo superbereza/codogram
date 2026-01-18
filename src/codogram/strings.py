@@ -109,7 +109,7 @@ DIR_PATH_PROMPT = "Send project directory path:"
 
 CLAUDE_ACTIVE = "Claude active in `{tmux_name}`"
 CLAUDE_ATTACH = "To see Claude UI: `tmux attach -t {tmux_name}`"
-CLAUDE_NOT_RUNNING = "Claude not running in `{cwd}`.\n\nLaunch?"
+CLAUDE_NOT_RUNNING = f"{STATUS_INFO} Claude not running in `{{cwd}}`\\.\n\nUse /start to launch\\."
 CLAUDE_CONNECTED = "Connected to tmux: `{tmux_session}`"
 CLAUDE_NO_SESSION = "No active Claude session. Use /start to launch"
 CLAUDE_TMUX_NOT_FOUND = "tmux session not found. Start Claude in terminal"

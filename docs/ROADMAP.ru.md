@@ -292,6 +292,13 @@ Per-thread/per-project toggle verbose output и UX настроек:
 
 ## In Progress
 
+### Code cleanup
+Уменьшение технического долга по фазам:
+- **Phase 1 (done):** Circular dependency fix, магические числа → константы
+- **Phase 2 (backlog):** @require_state() декоратор для handlers
+- **Phase 3 (backlog):** LaunchService extraction, DEPRECATED поля, ThreadInfo refactoring
+- См. [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
+
 ### Онбординг в боте
 Интерактивный онбординг в директ чате с ботом:
 - Welcome flow с объяснением возможностей бота
@@ -304,7 +311,12 @@ Emoji pack из аватарок участников группы:
 - Генерация placeholder (буква + цвет) для юзеров без аватарки
 - Уведомление: "`[v]` Gift unlocked — avatar pack for topic icons"
 - Ограничение: Premium нужен для установки custom emoji как иконки топика
-- См. [docs/plans/2026-01-18-emoji-pack-design.md](plans/2026-01-18-emoji-pack-design.md)
+- См. [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
+
+### Voice → Whisper
+Голосовые сообщения через Whisper transcription:
+- Использовать код из bz-merch-assistant
+- `ai_bot_core/services/whisper.py`
 
 ## Backlog
 
@@ -340,6 +352,13 @@ Emoji pack из аватарок участников группы:
 - Toggle видимости команды `/branch`
 - Упрощённое меню для не-power-users
 - Хранить в per-project settings
+
+### Auto-resume при отправке сообщения
+Авто-запуск Claude когда пользователь отправляет сообщение, а tmux не существует:
+- Показать: `` `[~]` Tmux session not found, launching... ``
+- Если есть `session_id` → `claude --resume`, иначе `claude`
+- Очередь всех сообщений (текст + файлы) пока запускается
+- Отправить очередь после готовности Claude
 
 ### Контекст безопасности Telegram
 Подкидывать гайдлайны безопасности при старте треда/бранча/проекта:
@@ -430,11 +449,6 @@ Emoji pack из аватарок участников группы:
 ### GitHub Actions CI
 - Workflow для запуска тестов на PR
 - pytest + type checking
-
-### Voice → Whisper
-Голосовые сообщения через Whisper transcription:
-- Используем существующий код из bz-merch-assistant
-- `ai_bot_core/services/whisper.py`
 
 ### Pin startup message
 Пинить сообщение при запуске сессии:

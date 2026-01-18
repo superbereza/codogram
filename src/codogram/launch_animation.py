@@ -9,7 +9,7 @@ from aiogram import Bot
 from . import strings
 from .config import settings
 from .logging_config import logger
-from .services.start_flow import build_announcement
+from .services.start_flow import build_announcement, build_thread_announcement
 from .session_manager import ProjectState, ThreadInfo, project_manager
 from .telegram_queue import TelegramQueue, EditBatch
 from .tmux import TmuxSession
@@ -178,14 +178,18 @@ async def launch_with_animation(
             except Exception:
                 pass
 
-        # Determine if chat is a forum for announcement
-        try:
-            chat = await bot.get_chat(chat_id)
-            is_forum = chat.is_forum or False
-        except Exception:
-            is_forum = False  # Fallback if chat info unavailable
-
-        announcement = build_announcement(project.project_name, tmux_name, is_forum)
+        # Build announcement: full for General, short for topics
+        if thread_id is None:
+            # General - full announcement with commands
+            try:
+                chat = await bot.get_chat(chat_id)
+                is_forum = chat.is_forum or False
+            except Exception:
+                is_forum = False
+            announcement = build_announcement(project.project_name, tmux_name, is_forum)
+        else:
+            # Topic - short announcement
+            announcement = build_thread_announcement(thread.name, tmux_name)
         logger.info(f"launch_sending_announcement: project={project.project_name}")
         try:
             await queue.send(
