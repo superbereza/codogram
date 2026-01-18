@@ -158,10 +158,13 @@ async def permission_poller(
         thinking_text = parse_thinking_status(screen)
 
         # Compact detection (independent of thinking status, uses broader spinner set)
-        is_compacting = detect_compacting(screen)
-        if is_compacting:
+        compact_state = detect_compacting(screen)
+        if compact_state:
             if not compacting_notified:
-                logger.info(f"{log_prefix}: compact detected, sending notification")
+                if compact_state == "in_progress":
+                    logger.info(f"{log_prefix}: compact in progress, sending notification")
+                else:
+                    logger.info(f"{log_prefix}: compact completed (detected from banner)")
                 batch = OutgoingBatch(
                     chat_id=project.chat_id,
                     thread_id=thread_id,
