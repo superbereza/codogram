@@ -119,7 +119,7 @@ class ThreadInfo:
 
     # Experimental features:
     feat_thinking_status: bool = False  # Show Claude's thinking status
-    feat_suggestions: bool = False      # Show input suggestions as ReplyKeyboard
+    # Note: feat_suggestions is project-level only (in ProjectState)
 
     # Runtime-only (not persisted):
     notified_closed: bool = False      # True = already sent "session closed" notification
@@ -218,6 +218,8 @@ class ProjectManager:
                 project.cwd = data.get("cwd")
                 project.auto_accept = data.get("auto_accept", False)
                 project.verbose = data.get("verbose", False)
+                project.feat_thinking_status = data.get("feat_thinking_status", False)
+                project.feat_suggestions = data.get("feat_suggestions", False)
 
                 # Load explicit threads first
                 threads_data = data.get("threads", {})
@@ -240,7 +242,6 @@ class ProjectManager:
                         auto_accept=thread_data.get("auto_accept", False),
                         verbose=thread_data.get("verbose", False),
                         feat_thinking_status=thread_data.get("feat_thinking_status", False),
-                        feat_suggestions=thread_data.get("feat_suggestions", False),
                         # Assume already notified if session exists but tmux likely dead
                         notified_closed=bool(thread_data.get("session_id")),
                     )
@@ -263,7 +264,14 @@ class ProjectManager:
         for name, p in self.projects.items():
             if p.chat_id is None:
                 continue
-            project_data = {"chat_id": p.chat_id, "cwd": p.cwd, "auto_accept": p.auto_accept, "verbose": p.verbose}
+            project_data = {
+                "chat_id": p.chat_id,
+                "cwd": p.cwd,
+                "auto_accept": p.auto_accept,
+                "verbose": p.verbose,
+                "feat_thinking_status": p.feat_thinking_status,
+                "feat_suggestions": p.feat_suggestions,
+            }
 
             # Backward compat: duplicate threads[None] to legacy fields
             if None in p.threads:
@@ -296,8 +304,6 @@ class ProjectManager:
                         thread_data["verbose"] = t.verbose
                     if t.feat_thinking_status:
                         thread_data["feat_thinking_status"] = t.feat_thinking_status
-                    if t.feat_suggestions:
-                        thread_data["feat_suggestions"] = t.feat_suggestions
                     threads_dict[str(tid) if tid is not None else "null"] = thread_data
                 project_data["threads"] = threads_dict
             projects_data[name] = project_data

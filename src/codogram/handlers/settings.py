@@ -75,9 +75,9 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
 
     # Experimental features
     feat_thinking = thread.feat_thinking_status if thread else project.feat_thinking_status
-    feat_suggestions = thread.feat_suggestions if thread else project.feat_suggestions
+    # Note: feat_suggestions is project-level only
     thinking_status = "● on" if feat_thinking else "○ off"
-    suggestions_status = "● on" if feat_suggestions else "○ off"
+    suggestions_status = "● on" if project.feat_suggestions else "○ off"
 
     lines = [f"**{context_name}**", ""]
     lines.append("chat")
