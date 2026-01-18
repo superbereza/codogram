@@ -174,6 +174,14 @@ SETUP_PRIVATE_CHAT = f"{STATUS_ERR} Add bot to a group chat"
 SETUP_CHANNEL_NOT_SUPPORTED = f"{STATUS_ERR} Channels not supported"
 SETUP_ALREADY_IN_PROGRESS = f"{STATUS_INFO} Setup already in progress"
 
+# Command blocking during setup
+SETUP_COMMAND_BLOCKED = f"""{STATUS_WARN} Complete project setup first
+
+Available commands:
+• /start — restart setup
+• /reset\\_all — cancel setup
+• /help — get help"""
+
 # Setup type selection
 SETUP_CHOOSE_TYPE = "How would you like to set up this project?"
 
@@ -2846,8 +2854,143 @@ git commit -m "feat(setup): add rename confirmation handlers"
 
 **Files:**
 - Create: `src/codogram/services/setup/project_setup.py`
+- Test: `tests/services/test_project_setup.py`
 
-**Step 1: Write implementation**
+**Step 1: Write the failing test**
+
+```python
+# tests/services/test_project_setup.py
+import pytest
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+from dataclasses import dataclass
+
+from codogram.services.setup.project_setup import setup_project, SetupResult
+
+
+@dataclass
+class MockLaunchResult:
+    success: bool
+    error: str | None = None
+
+
+@pytest.mark.asyncio
+async def test_setup_project_success(tmp_path):
+    """setup_project returns success when all phases complete."""
+    target_dir = tmp_path / "new-project"
+
+    with patch("codogram.services.setup.project_setup.create_session_name") as mock_name, \
+         patch("codogram.services.setup.project_setup.create_tmux_session") as mock_tmux, \
+         patch("codogram.services.setup.project_setup.launch_claude") as mock_launch, \
+         patch("codogram.services.setup.project_setup.ProjectManager") as mock_pm:
+
+        mock_name.return_value = "claude-new-project-main"
+        mock_tmux.return_value = True
+        mock_launch.return_value = MockLaunchResult(success=True)
+
+        result = await setup_project(
+            project_name="new-project",
+            target_dir=target_dir,
+            chat_id=-1001234567890,
+            chat_title="New Project Chat",
+            chat_type="supergroup",
+        )
+
+        assert result.success is True
+        assert result.tmux_name == "claude-new-project-main"
+        assert target_dir.exists()  # Directory created
+        mock_pm.return_value.register_project.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_setup_project_rollback_on_tmux_failure(tmp_path):
+    """setup_project rolls back directory on tmux failure."""
+    target_dir = tmp_path / "failed-project"
+
+    with patch("codogram.services.setup.project_setup.create_session_name") as mock_name, \
+         patch("codogram.services.setup.project_setup.create_tmux_session") as mock_tmux:
+
+        mock_name.return_value = "claude-failed-project-main"
+        mock_tmux.return_value = False  # Tmux fails
+
+        result = await setup_project(
+            project_name="failed-project",
+            target_dir=target_dir,
+            chat_id=-1001234567890,
+            chat_title="Failed Chat",
+            chat_type="group",
+        )
+
+        assert result.success is False
+        assert "tmux" in result.error.lower()
+        assert not target_dir.exists()  # Directory rolled back
+
+
+@pytest.mark.asyncio
+async def test_setup_project_rollback_on_launch_failure(tmp_path):
+    """setup_project rolls back on Claude launch failure."""
+    target_dir = tmp_path / "launch-fail"
+
+    with patch("codogram.services.setup.project_setup.create_session_name") as mock_name, \
+         patch("codogram.services.setup.project_setup.create_tmux_session") as mock_tmux, \
+         patch("codogram.services.setup.project_setup.launch_claude") as mock_launch, \
+         patch("asyncio.create_subprocess_exec") as mock_proc:
+
+        mock_name.return_value = "claude-launch-fail-main"
+        mock_tmux.return_value = True
+        mock_launch.return_value = MockLaunchResult(success=False, error="Claude crashed")
+
+        # Mock tmux kill-session for rollback
+        proc_mock = AsyncMock()
+        proc_mock.wait = AsyncMock()
+        mock_proc.return_value = proc_mock
+
+        result = await setup_project(
+            project_name="launch-fail",
+            target_dir=target_dir,
+            chat_id=-1001234567890,
+            chat_title="Launch Fail",
+            chat_type="supergroup",
+        )
+
+        assert result.success is False
+        assert "claude" in result.error.lower()
+        assert not target_dir.exists()  # Directory rolled back
+        mock_proc.assert_called()  # tmux kill-session called
+
+
+@pytest.mark.asyncio
+async def test_setup_project_preserves_existing_dir(tmp_path):
+    """setup_project does not delete pre-existing directory on failure."""
+    target_dir = tmp_path / "existing-project"
+    target_dir.mkdir()  # Pre-existing
+    (target_dir / "important.txt").write_text("don't delete me")
+
+    with patch("codogram.services.setup.project_setup.create_session_name") as mock_name, \
+         patch("codogram.services.setup.project_setup.create_tmux_session") as mock_tmux:
+
+        mock_name.return_value = "claude-existing-main"
+        mock_tmux.return_value = False  # Fail
+
+        result = await setup_project(
+            project_name="existing-project",
+            target_dir=target_dir,
+            chat_id=-1001234567890,
+            chat_title="Existing",
+            chat_type="group",
+        )
+
+        assert result.success is False
+        assert target_dir.exists()  # NOT deleted (was pre-existing)
+        assert (target_dir / "important.txt").exists()
+```
+
+**Step 2: Run test to verify it fails**
+
+Run: `pytest tests/services/test_project_setup.py -v`
+Expected: FAIL with "ModuleNotFoundError"
+
+**Step 3: Write implementation**
 
 ```python
 # src/codogram/services/setup/project_setup.py
@@ -2959,10 +3102,15 @@ async def setup_project(
         return SetupResult(success=False, error=str(e))
 ```
 
-**Step 2: Commit**
+**Step 4: Run tests to verify they pass**
+
+Run: `pytest tests/services/test_project_setup.py -v`
+Expected: PASS (4 tests)
+
+**Step 5: Commit**
 
 ```bash
-git add src/codogram/services/setup/project_setup.py
+git add tests/services/test_project_setup.py src/codogram/services/setup/project_setup.py
 git commit -m "feat(setup): add project setup service with rollback"
 ```
 
@@ -3308,10 +3456,82 @@ git commit -m "feat(setup): register setup blocker middleware"
 ### Task 28: Add Base Dir Check to Triggers
 
 **Files:**
-- Modify: `src/codogram/handlers/setup/triggers.py`
 - Create: `src/codogram/services/setup/base_dir.py`
+- Test: `tests/services/test_base_dir.py`
+- Modify: `src/codogram/handlers/setup/triggers.py`
 
-**Step 1: Create base_dir service**
+**Step 1: Write the failing test**
+
+```python
+# tests/services/test_base_dir.py
+import pytest
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+
+from codogram.services.setup.base_dir import check_base_dir
+
+
+def test_check_base_dir_returns_none_when_not_configured():
+    """Returns None when base_dir is not set."""
+    mock_settings = MagicMock()
+    mock_settings.base_dir = None
+
+    with patch("codogram.services.setup.base_dir.settings", mock_settings):
+        result = check_base_dir()
+        assert result is None
+
+
+def test_check_base_dir_returns_none_when_dir_not_exists():
+    """Returns None when base_dir doesn't exist."""
+    mock_settings = MagicMock()
+    mock_settings.base_dir = "/nonexistent/path/12345"
+
+    with patch("codogram.services.setup.base_dir.settings", mock_settings):
+        result = check_base_dir()
+        assert result is None
+
+
+def test_check_base_dir_returns_path_when_valid(tmp_path):
+    """Returns Path when base_dir exists."""
+    mock_settings = MagicMock()
+    mock_settings.base_dir = str(tmp_path)
+
+    with patch("codogram.services.setup.base_dir.settings", mock_settings):
+        result = check_base_dir()
+        assert result == tmp_path
+
+
+def test_check_base_dir_expands_tilde(tmp_path, monkeypatch):
+    """Expands ~ in base_dir path."""
+    # Create a subdir to simulate home
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+
+    mock_settings = MagicMock()
+    mock_settings.base_dir = "~/dev"
+
+    # Mock expanduser to use our tmp home
+    def mock_expanduser(p):
+        return Path(str(p).replace("~", str(home_dir)))
+
+    with patch("codogram.services.setup.base_dir.settings", mock_settings):
+        with patch.object(Path, "expanduser", mock_expanduser):
+            # Directory doesn't exist yet
+            result = check_base_dir()
+            assert result is None
+
+            # Create it
+            (home_dir / "dev").mkdir()
+            result = check_base_dir()
+            assert result is not None
+```
+
+**Step 2: Run test to verify it fails**
+
+Run: `pytest tests/services/test_base_dir.py -v`
+Expected: FAIL with "ModuleNotFoundError"
+
+**Step 3: Create base_dir service**
 
 ```python
 # src/codogram/services/setup/base_dir.py
@@ -3338,7 +3558,12 @@ def check_base_dir() -> Path | None:
     return path
 ```
 
-**Step 2: Update triggers.py**
+**Step 4: Run test to verify it passes**
+
+Run: `pytest tests/services/test_base_dir.py -v`
+Expected: PASS
+
+**Step 5: Update triggers.py**
 
 ```python
 # Update _start_setup_flow in triggers.py
@@ -3373,10 +3598,10 @@ async def _start_setup_flow(event: ChatMemberUpdated, state: FSMContext):
     # ... rest unchanged
 ```
 
-**Step 3: Commit**
+**Step 6: Commit**
 
 ```bash
-git add src/codogram/services/setup/base_dir.py src/codogram/handlers/setup/triggers.py
+git add src/codogram/services/setup/base_dir.py tests/services/test_base_dir.py src/codogram/handlers/setup/triggers.py
 git commit -m "feat(setup): add base_dir check before setup flow"
 ```
 
