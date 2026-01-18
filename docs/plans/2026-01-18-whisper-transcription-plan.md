@@ -13,11 +13,11 @@
 ## Task 1: Add OpenAI config fields
 
 **Files:**
-- Modify: `src/codogram/config.py:6-28`
+- Modify: `src/codogram/config.py`
 
 **Step 1: Add config fields**
 
-Add to `Settings` class after line 12:
+Add to `Settings` class after line 22 (`project_cleanup_days`):
 
 ```python
     # OpenAI / Whisper
@@ -50,7 +50,7 @@ git commit -m "feat(config): add OpenAI API key and base URL settings"
 
 **Step 1: Add audio strings section**
 
-Add after line 139 (after `FILE_DOWNLOAD_FAILED`):
+Add after line 188 (after `FILE_AUDIO_VIDEO_NOT_SUPPORTED`):
 
 ```python
 
@@ -69,7 +69,7 @@ AUDIO_ERR_NOT_CONFIGURED = f"{STATUS_ERR} Whisper not configured (missing OPENAI
 
 **Step 2: Remove old audio blocker string**
 
-Delete line 136:
+Delete line 188:
 ```python
 FILE_AUDIO_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video and audio not supported yet. Coming soon with Whisper!"
 ```
@@ -851,14 +851,14 @@ git commit -m "feat(audio): add handler for voice/audio/video_note transcription
 
 **Step 1: Register audio router**
 
-In `src/codogram/handlers/__init__.py`, add import and registration:
+In `src/codogram/handlers/__init__.py`:
 
-Add import at line 4:
+Update import at line 4 to add `audio`:
 ```python
 from . import permissions, start, threads, branches, sessions, settings, shift_tab, finish, create_flow, common, messages, migration, audio
 ```
 
-Add router before messages (around line 28, before `dp.include_router(messages.router)`):
+Add router before messages.router (around line 30, before line 31 `dp.include_router(messages.router)`):
 ```python
     dp.include_router(audio.router)         # Voice/audio/video transcription
     dp.include_router(messages.router)      # Catch-all for tmux routing (LAST!)
@@ -866,7 +866,7 @@ Add router before messages (around line 28, before `dp.include_router(messages.r
 
 **Step 2: Remove audio blocking from messages handler**
 
-In `src/codogram/handlers/messages.py`, remove lines 39-42:
+In `src/codogram/handlers/messages.py`, remove lines 40-43:
 
 ```python
     # Block video/audio
