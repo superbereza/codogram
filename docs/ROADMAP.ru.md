@@ -290,6 +290,15 @@ Per-thread/per-project toggle verbose output и UX настроек:
 
 ## Backlog
 
+### Avatar emoji pack
+Emoji pack из аватарок участников группы:
+- Создание pack при миграции группа → супергруппа (async)
+- Добавление аватарки при входе участника, удаление при выходе
+- Генерация placeholder (буква + цвет) для юзеров без аватарки
+- Уведомление: "`[v]` Gift unlocked — avatar pack for topic icons"
+- Ограничение: Premium нужен для установки custom emoji как иконки топика
+- См. [docs/plans/2026-01-18-emoji-pack-design.md](plans/2026-01-18-emoji-pack-design.md)
+
 ### Онбординг в боте
 Интерактивный онбординг для новых пользователей:
 - Welcome flow с объяснением возможностей бота
