@@ -297,7 +297,7 @@ Custom emoji pack from group members' avatars:
 - Generate placeholder (letter + color) for users without avatar
 - Notification: "`[v]` Gift unlocked — avatar pack for topic icons"
 - Limitation: Premium required to set custom emoji as topic icon
-- See [docs/plans/2026-01-18-emoji-pack-design.md](plans/2026-01-18-emoji-pack-design.md)
+- See [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
 
 ### Bot onboarding
 Interactive onboarding for new users:
