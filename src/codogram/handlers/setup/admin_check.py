@@ -43,11 +43,8 @@ async def on_check_rights(callback: CallbackQuery, state: FSMContext):
             reply_markup=setup_type_keyboard(),
         )
     else:
-        # Still no rights - show message again
-        await callback.message.edit_text(
-            strings.SETUP_ADMIN_REQUIRED + f"\n\n{strings.SETUP_ADMIN_CHECK_FAILED}",
-            reply_markup=admin_check_keyboard(),
-        )
+        # Still no rights - show toast notification
+        await callback.answer(strings.SETUP_ADMIN_CHECK_FAILED, show_alert=True)
 
 
 @router.my_chat_member(

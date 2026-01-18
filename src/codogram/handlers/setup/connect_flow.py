@@ -41,6 +41,7 @@ async def show_folder_selection(message: Message, state: FSMContext, page: int =
         await message.edit_text(
             text,
             reply_markup=go_back_keyboard("folder:back"),
+            parse_mode="MarkdownV2",
         )
         return
 
@@ -88,6 +89,7 @@ async def on_folder_selected(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             strings.SETUP_FOLDER_NOT_FOUND.format(name=folder_name),
             reply_markup=go_back_keyboard("folder:back"),
+            parse_mode="MarkdownV2",
         )
         return
 

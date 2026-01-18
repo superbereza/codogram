@@ -166,6 +166,7 @@ async def _start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
             chat.id,
             strings.SETUP_ADMIN_REQUIRED,
             reply_markup=admin_check_keyboard(),
+            parse_mode="MarkdownV2",
         )
         return
 
