@@ -1,7 +1,7 @@
 """DM-specific handlers for onboarding and dashboard."""
 from aiogram import Bot, Router, F
-from aiogram.types import Message, CallbackQuery
-from aiogram.filters import Command
+from aiogram.types import Message, CallbackQuery, ChatMemberUpdated
+from aiogram.filters import Command, ChatMemberUpdatedFilter, IS_NOT_MEMBER, ADMINISTRATOR, MEMBER
 from aiogram.enums import ChatType
 
 from .. import strings
@@ -255,3 +255,46 @@ async def on_dash_refresh(callback: CallbackQuery, telegram_queue: TelegramQueue
 
     await show_dashboard(callback.message.chat.id, telegram_queue, bot)
     await callback.answer("Refreshed")
+
+
+# ===== Bot added to chat =====
+
+@router.my_chat_member(
+    ChatMemberUpdatedFilter(member_status_changed=IS_NOT_MEMBER >> (ADMINISTRATOR | MEMBER))
+)
+async def on_bot_added_to_chat(event: ChatMemberUpdated, bot: Bot):
+    """Handle bot being added to a chat."""
+    # Skip DM
+    if event.chat.type == ChatType.PRIVATE:
+        return
+
+    chat_name = event.chat.title or "Untitled"
+    creator = event.from_user.username or str(event.from_user.id)
+
+    # Try to get invite link
+    link = None
+    try:
+        link = event.chat.invite_link
+    except Exception:
+        pass
+
+    # Format message
+    if link:
+        text = strings.DM_BOT_ADDED_WITH_LINK.format(
+            chat_name=chat_name,
+            link=link,
+            creator=creator,
+        )
+    else:
+        text = strings.DM_BOT_ADDED.format(
+            chat_name=chat_name,
+            creator=creator,
+        )
+
+    # Send to all admins
+    for admin_id in settings.get_admin_ids():
+        try:
+            await bot.send_message(admin_id, text)
+        except Exception:
+            # Admin might have blocked bot or never started DM
+            pass
