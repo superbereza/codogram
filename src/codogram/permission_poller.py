@@ -134,6 +134,9 @@ async def permission_poller(
     # Suggestion state
     suggestion_msg_key: str | None = None
 
+    # Compact notification state
+    compacting_notified: bool = False
+
     # Stuck message detection state
     stuck_input_text: str | None = None
     stuck_seen_count: int = 0
@@ -151,11 +154,27 @@ async def permission_poller(
             logger.warning(f"{log_prefix}: capture error: {e}")
             continue
 
-        # Parse and display thinking status (if feature enabled)
-        feat_thinking_enabled = thread.feat_thinking_status if thread else project.feat_thinking_status
-        thinking_text = parse_thinking_status(screen) if feat_thinking_enabled else None
+        # Parse thinking status always (for compact detection)
+        thinking_text = parse_thinking_status(screen)
 
-        if thinking_text:
+        # Compact notification (one-time, regardless of thinking feature)
+        if thinking_text and "compacting" in thinking_text.lower():
+            if not compacting_notified:
+                logger.info(f"{log_prefix}: compact detected, sending notification")
+                batch = OutgoingBatch(
+                    chat_id=project.chat_id,
+                    thread_id=thread_id,
+                    messages=[{"text": strings.COMPACTING_STARTED, "parse_mode": "MarkdownV2"}],
+                )
+                await telegram_queue.enqueue_nowait(batch)
+                compacting_notified = True
+        elif not thinking_text:
+            # Reset when thinking ends
+            compacting_notified = False
+
+        # Display thinking status only if feature enabled
+        feat_thinking_enabled = thread.feat_thinking_status if thread else project.feat_thinking_status
+        if feat_thinking_enabled and thinking_text:
             now = asyncio.get_event_loop().time()
             # Throttle: update every 3 seconds
             if now - last_thinking_update >= 3.0:

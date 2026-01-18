@@ -253,6 +253,12 @@ Per-thread/per-project verbose output toggle and /settings UX:
 - Close button deletes settings message
 - See [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
+### Compacting notification
+Detect when Claude compacts conversation and notify user:
+- Parse thinking status for "Compacting" keyword
+- One-time notification `[i] Claude is compacting conversation...`
+- Works regardless of `feat_thinking_status` toggle
+
 ## Beta Test
 
 ### Activity indicators
@@ -414,10 +420,6 @@ Display CPU/RAM usage:
 - Graph or text indicator in /settings
 - Monitor Claude process resource consumption
 
-### Compacting indicator
-Show context compacting progress:
-- Detect compacting from tmux capture-pane
-- Show progress in Telegram
 
 ### Tool results formatting
 Beautiful tool results formatting:

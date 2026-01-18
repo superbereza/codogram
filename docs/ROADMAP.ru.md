@@ -253,6 +253,12 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Кнопка close удаляет сообщение с настройками
 - См. [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
+### Compacting notification
+Уведомление когда Claude компактит conversation:
+- Парсинг thinking status на ключевое слово "Compacting"
+- Одноразовое уведомление `[i] Claude is compacting conversation...`
+- Работает независимо от toggle `feat_thinking_status`
+
 ## Beta Test
 
 ### Activity indicators
@@ -414,10 +420,6 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - График или текстовый индикатор в /settings
 - Мониторинг потребления ресурсов Claude процессом
 
-### Compacting indicator
-Отображение процесса компактинга контекста:
-- Детектить compacting из tmux capture-pane
-- Показывать прогресс в Telegram
 
 ### Tool results formatting
 Красивое форматирование результатов тулов:

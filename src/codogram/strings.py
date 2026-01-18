@@ -49,6 +49,8 @@ CLEAR_SESSION = f"{STATUS_PENDING} Clearing session..."
 
 CLAUDE_CRASHED = f"{STATUS_WARN} Claude crashed: {{reason}}\nUse /restart to restart"
 
+COMPACTING_STARTED = f"{STATUS_INFO} Claude is compacting conversation\\.\\.\\."
+
 
 # --- Project/Thread ---
 
