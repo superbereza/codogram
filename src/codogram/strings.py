@@ -25,7 +25,7 @@ LAUNCH_WAITING = f"{STATUS_PENDING} Waiting for Claude..."
 LAUNCH_TIMEOUT = f"{STATUS_ERR} Timeout: Claude didn't start in 2 minutes"
 LAUNCH_ERROR = f"{STATUS_ERR} Launch error: {{error}}"
 LAUNCH_READY = f"{STATUS_OK} Claude ready"
-LAUNCH_READY_WITH_ATTACH = f"{STATUS_OK} Claude ready\n\nAttach: `tmux attach -t {{tmux_name}}`"
+LAUNCH_READY_WITH_ATTACH = f"{STATUS_OK} Claude ready\n\nTo see Claude UI: `tmux attach -t {{tmux_name}}`"
 LAUNCH_PROJECT_CWD_NOT_SET = f"{STATUS_ERR} Project cwd not set. Re-register with /start"
 
 # Launch service (worktree creation)
@@ -108,7 +108,7 @@ DIR_PATH_PROMPT = "Send project directory path:"
 # --- Claude status ---
 
 CLAUDE_ACTIVE = "Claude active in `{tmux_name}`"
-CLAUDE_ATTACH = "Attach: `tmux attach -t {tmux_name}`"
+CLAUDE_ATTACH = "To see Claude UI: `tmux attach -t {tmux_name}`"
 CLAUDE_NOT_RUNNING = "Claude not running in `{cwd}`.\n\nLaunch?"
 CLAUDE_CONNECTED = "Connected to tmux: `{tmux_session}`"
 CLAUDE_NO_SESSION = "No active Claude session. Use /start to launch"
@@ -242,6 +242,11 @@ BTN_KEEP_DIR = "Keep directory"
 BTN_DELETE_DIR = "Delete"
 BTN_DELETE_ANYWAY = "Delete anyway"
 BTN_GO_BACK = "[<<] Go back"
+BTN_MAGIC_NAME = "🔮 Magic name"
+BTN_RECREATE_WORKTREE = "Recreate worktree"
+BTN_CREATE_NEW = "Create new"
+BTN_RESUME_IN_MAIN = "Resume in main"
+BTN_CLOSE = "Close"
 
 
 # --- Worktree Recovery ---
@@ -339,11 +344,11 @@ START_SESSION_KILLED = "Session killed. Use /start to restart"
 
 START_THREAD_RUNNING = f"""{STATUS_OK} Thread `{{thread_name}}` running
 
-Attach: `tmux attach -t {{tmux_session}}`"""
+To see Claude UI: `tmux attach -t {{tmux_session}}`"""
 
 START_ALREADY_RUNNING = f"""{STATUS_OK} Already running
 
-Attach: `tmux attach -t {{tmux_name}}`"""
+To see Claude UI: `tmux attach -t {{tmux_name}}`"""
 
 START_THREAD_UPGRADED = "Thread upgraded to `{thread_name}`"
 START_TOPIC_REGISTERED = "Topic registered as `{thread_name}`"

@@ -3,6 +3,8 @@
 import hashlib
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+from .. import strings
+
 
 def _short_id(tmux_session: str) -> str:
     """Generate short ID from tmux session name (12 chars max)."""
@@ -36,7 +38,7 @@ def settings_keyboard(tmux_session: str) -> InlineKeyboardMarkup:
             callback_data=f"set:m:{sid}"
         )],
         [InlineKeyboardButton(
-            text="close",
+            text=strings.BTN_CLOSE,
             callback_data="set:close"
         )],
     ])
