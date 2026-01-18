@@ -358,14 +358,20 @@ def parse_thinking_status(output: str) -> str | None:
 
 
 def detect_compacting(output: str) -> bool:
-    """Detect if Claude is currently compacting conversation.
+    """Detect if Claude is compacting or just compacted conversation.
 
-    Looks for spinner + "compacting" in the area above input box.
-    Uses broader spinner set than thinking status (includes · which is common during compact).
+    Detects two patterns:
+    1. During: spinner + "compacting" (e.g., "· Compacting conversation…")
+    2. After: banner "Conversation compacted" (e.g., "═══ Conversation compacted ═══")
     """
-    # All possible spinners Claude uses (including · for compact)
-    compact_spinners = "·✶✻✽✢*"
+    output_lower = output.lower()
 
+    # Check for completed compact banner (catches post-fact)
+    if "conversation compacted" in output_lower:
+        return True
+
+    # Check for in-progress compact status
+    compact_spinners = "·✶✻✽✢*"
     lines = output.split("\n")
 
     # Find first ──── separator (top of input box)
