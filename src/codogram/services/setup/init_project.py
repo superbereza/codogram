@@ -1,5 +1,5 @@
-# src/codogram/services/setup/project_setup.py
-"""Project setup service - creates directory and registers project."""
+# src/codogram/services/setup/init_project.py
+"""Project initialization - creates directory and registers in config."""
 import logging
 import shutil
 from dataclasses import dataclass
@@ -9,32 +9,28 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class SetupResult:
-    """Result of project setup."""
+class InitResult:
+    """Result of project initialization."""
     success: bool
     error: str | None = None
 
 
-async def setup_project(
+async def init_project(
     project_name: str,
     target_dir: Path,
     chat_id: int,
-    chat_title: str,
-    chat_type: str,
-) -> SetupResult:
-    """Set up project directory and register in config.
+) -> InitResult:
+    """Initialize project: create directory and register in config.
 
-    Note: tmux creation and Claude launch are handled by launch_with_animation.
+    Note: tmux and Claude launch are handled separately by launch_with_animation.
 
     Args:
         project_name: Project/folder name
         target_dir: Full path to project directory
         chat_id: Telegram chat ID
-        chat_title: Chat title for config
-        chat_type: Chat type (group/supergroup)
 
     Returns:
-        SetupResult with success/error
+        InitResult with success/error
     """
     created_dir = False
 
@@ -52,10 +48,10 @@ async def setup_project(
         project.cwd = str(target_dir)
         project_manager._save()
 
-        return SetupResult(success=True)
+        return InitResult(success=True)
 
     except Exception as e:
-        logger.exception(f"Project setup failed: {e}")
+        logger.exception(f"Project init failed: {e}")
 
         # Rollback - delete dir if we created it
         if created_dir and target_dir.exists():
@@ -65,4 +61,4 @@ async def setup_project(
             except Exception as cleanup_error:
                 logger.warning(f"Rollback failed: {cleanup_error}")
 
-        return SetupResult(success=False, error=str(e))
+        return InitResult(success=False, error=str(e))
