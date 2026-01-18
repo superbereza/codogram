@@ -68,7 +68,7 @@ THREAD_NAME_INVALID = "Name can only contain letters, digits, - and _"
 THREAD_CLOSE_CONFIRM = "Close thread '{name}'?\nTopic and tmux session will be deleted"
 THREAD_NOT_LINKED = "This topic is not linked to a Claude session"
 THREAD_TOPIC_ONLY = "This command can only be used in a topic"
-THREAD_CONNECT_HINT = "Use /start or /session_new to connect Claude to this topic"
+THREAD_CONNECT_HINT = "Use /start to connect Claude"
 
 THREAD_CREATING = f"{STATUS_PENDING} Creating thread `{{name}}`..."
 THREAD_CREATED = f"{STATUS_OK} Thread `{{name}}` created"
@@ -119,7 +119,14 @@ CLAUDE_NO_RESTART = "No active session to restart"
 # --- Misc ---
 
 TOPICS_REQUIRED_GROUP = f"{STATUS_WARN} This command requires a group with topics"
-TOPICS_REQUIRED_ENABLE = f"{STATUS_WARN} Topics required. Enable in group settings -> Topics"
+TOPICS_REQUIRED_ENABLE = f"""{STATUS_WARN} Topics required
+
+To enable:
+1. Open group settings \\(tap group name\\)
+2. Edit \\(pencil icon\\)
+3. Topics → Enable
+
+_Requires admin rights_"""
 
 CREATE_PROJECT_NOT_FOUND = f"{STATUS_WARN} Project not found"
 CREATE_TOPIC_ERROR = f"{STATUS_ERR} Error creating topic"

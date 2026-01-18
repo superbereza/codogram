@@ -70,10 +70,11 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
 
         case RouteAction.CREATE_PENDING:
             # Unknown topic - create pending thread
+            logger.info(f"CREATE_PENDING: chat={chat_id} thread_id={thread_id}")
             thread = ThreadInfo(thread_id=thread_id, name="pending")
             result.project.threads[thread_id] = thread
             project_manager._save()
-            await telegram_queue.reply(message, "Use /start or /thread_create to connect Claude to this topic")
+            await telegram_queue.reply(message, strings.THREAD_CONNECT_HINT)
             return
 
         case RouteAction.SKIP_PENDING:
