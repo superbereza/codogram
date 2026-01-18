@@ -10,6 +10,33 @@
 
 ---
 
+## Pre-requisites
+
+Before starting, verify:
+
+**1. TelegramQueue API**
+
+Check that `telegram_queue.send()` and `telegram_queue.edit()` accept `reply_markup` and `parse_mode` kwargs:
+
+```bash
+grep -n "def send" src/codogram/telegram_queue.py
+grep -n "def edit" src/codogram/telegram_queue.py
+```
+
+If they don't, Task 7 will need adjustments.
+
+**2. Test directories**
+
+Ensure test init files exist (create if missing):
+
+```bash
+touch tests/services/__init__.py
+touch tests/keyboards/__init__.py
+touch tests/handlers/__init__.py
+```
+
+---
+
 ## Task 1: Extend Config for User Storage
 
 **Files:**
@@ -692,10 +719,18 @@ def dashboard_keyboard() -> InlineKeyboardMarkup:
 Run: `pytest tests/keyboards/test_dm_onboarding.py -v`
 Expected: PASS
 
-**Step 5: Commit**
+**Step 5: Update keyboards/__init__.py**
+
+Add export to `src/codogram/keyboards/__init__.py` (if it has exports):
+
+```python
+from .dm_onboarding import carousel_keyboard, validation_recheck_keyboard, dashboard_keyboard
+```
+
+**Step 6: Commit**
 
 ```bash
-git add src/codogram/keyboards/dm_onboarding.py tests/keyboards/test_dm_onboarding.py
+git add src/codogram/keyboards/dm_onboarding.py src/codogram/keyboards/__init__.py tests/keyboards/test_dm_onboarding.py
 git commit -m "feat(keyboards): add carousel and dashboard keyboards"
 ```
 
@@ -772,7 +807,7 @@ Expected: FAIL
 ```python
 # src/codogram/services/dm_onboarding/onboarding.py
 """DM onboarding business logic."""
-from .. import strings
+from ... import strings  # 3 levels up: dm_onboarding -> services -> codogram
 
 
 SLIDES = [
@@ -1481,37 +1516,51 @@ git commit -m "feat(dm): add push notification when bot added to chat"
 ## Task 9: Register DM Router in Main
 
 **Files:**
-- Modify: `src/codogram/main.py`
 - Modify: `src/codogram/handlers/__init__.py`
 
-**Step 1: Add dm router to handlers __init__**
+**Step 1: Add dm import**
 
-Add to `src/codogram/handlers/__init__.py`:
-
-```python
-from .dm import router as dm_router
-```
-
-And add to `__all__` list.
-
-**Step 2: Register in main.py**
-
-Find where other routers are included in `src/codogram/main.py` and add:
+Add to imports at top of `src/codogram/handlers/__init__.py`:
 
 ```python
-from .handlers.dm import router as dm_router
-
-# In setup_dispatcher or wherever routers are registered:
-dp.include_router(dm_router)
+from . import permissions, start, threads, branches, sessions, settings, shift_tab, finish, create_flow, common, messages, migration, dm
 ```
 
-**Important:** The DM router should be registered BEFORE the main start router so it catches DM /start first.
+**Step 2: Register dm router BEFORE start router**
+
+Update `register_handlers` function. DM router must be before `start.router` so it catches `/start` in private chats first:
+
+```python
+def register_handlers(dp: Dispatcher):
+    """Register all handler routers.
+
+    Order matters:
+    - dm.router handles private chat commands (before start!)
+    - Specific command handlers first
+    - common.router has cb_cancel (generic cancel)
+    - messages.router is catch-all (must be last)
+    """
+    dp.include_router(migration.router)      # Migration events (must be early)
+    dp.include_router(dm.router)             # DM onboarding (BEFORE start!)
+    dp.include_router(setup_router)          # Setup flow (my_chat_member, onboarding)
+    dp.include_router(permissions.router)    # Permission callbacks
+    dp.include_router(start.router)          # /start, /restart + FSM
+    dp.include_router(threads.router)        # /thread_create, /thread_delete
+    dp.include_router(branches.router)       # /branch_create, /branch_finish
+    dp.include_router(sessions.router)       # /new, /clear, /esc, /resume
+    dp.include_router(settings.router)       # /settings, /auto_accept, /help
+    dp.include_router(shift_tab.router)      # /shift_tab
+    dp.include_router(finish.router)         # /finish
+    dp.include_router(create_flow.router)    # Create flow name selection
+    dp.include_router(common.router)         # cb_cancel
+    dp.include_router(messages.router)       # Catch-all for tmux routing (LAST!)
+```
 
 **Step 3: Commit**
 
 ```bash
-git add src/codogram/main.py src/codogram/handlers/__init__.py
-git commit -m "feat(dm): register DM router in main"
+git add src/codogram/handlers/__init__.py
+git commit -m "feat(dm): register DM router before start router"
 ```
 
 ---
