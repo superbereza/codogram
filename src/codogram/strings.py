@@ -15,6 +15,9 @@ STATUS_INFO = "`[i]`"
 STATUS_ON = "`● on`"
 STATUS_OFF = "`○ off`"
 
+# Truncation marker (ASCII scissors)
+SNIP = "[--- 8< ---]"
+
 
 # --- Launch animation ---
 
