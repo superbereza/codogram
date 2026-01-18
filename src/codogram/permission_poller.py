@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
 from .telegram_queue import OutgoingBatch, EditBatch, DeleteBatch
-from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status, parse_input_suggestion, extract_input_text, PASTED_PATTERN
+from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status, parse_input_suggestion, extract_input_text, PASTED_PATTERN, detect_compacting
 from .keyboards import permission_keyboard
 from .state import permission_messages
 from .session_manager import ProjectState, ThreadInfo
@@ -154,11 +154,12 @@ async def permission_poller(
             logger.warning(f"{log_prefix}: capture error: {e}")
             continue
 
-        # Parse thinking status always (for compact detection)
+        # Parse thinking status for display
         thinking_text = parse_thinking_status(screen)
 
-        # Compact notification (one-time, regardless of thinking feature)
-        if thinking_text and "compacting" in thinking_text.lower():
+        # Compact detection (independent of thinking status, uses broader spinner set)
+        is_compacting = detect_compacting(screen)
+        if is_compacting:
             if not compacting_notified:
                 logger.info(f"{log_prefix}: compact detected, sending notification")
                 batch = OutgoingBatch(
@@ -168,8 +169,8 @@ async def permission_poller(
                 )
                 await telegram_queue.enqueue_nowait(batch)
                 compacting_notified = True
-        elif not thinking_text:
-            # Reset when thinking ends
+        else:
+            # Reset when compacting ends
             compacting_notified = False
 
         # Display thinking status only if feature enabled
