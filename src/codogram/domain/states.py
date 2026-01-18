@@ -28,3 +28,20 @@ class ResetFlow(StatesGroup):
 
     awaiting_confirm = State()
     awaiting_dir_choice = State()
+
+
+class SetupFlow(StatesGroup):
+    """States for new onboarding flow (v2).
+
+    See docs/designs/2026-01-18-start-flow-v2.md for flow diagrams.
+    """
+
+    awaiting_admin_rights = State()
+    awaiting_setup_type = State()        # Clone/Connect/New
+    awaiting_clone_url = State()
+    awaiting_folder_select = State()     # pagination in callback_data
+    viewing_connected_projects = State()
+    awaiting_project_name = State()
+    awaiting_git_choice = State()
+    awaiting_rename_confirm = State()
+    launching = State()                   # Blocking state during launch
