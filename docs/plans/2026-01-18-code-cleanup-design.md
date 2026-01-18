@@ -11,7 +11,7 @@
 
 | Фаза | Риск | Scope | Статус |
 |------|------|-------|--------|
-| Phase 1 | Low | Circular dependency, magic numbers | In Progress |
+| Phase 1 | Low | Circular dependency, magic numbers | ✅ Done |
 | Phase 2 | Medium | @require_state() decorator | Backlog |
 | Phase 3 | High | LaunchService, DEPRECATED fields, ThreadInfo | Backlog |
 

@@ -294,7 +294,7 @@ Auto-detect and resend messages stuck in Claude's input:
 
 ### Code cleanup
 Technical debt reduction in phases:
-- **Phase 1 (now):** Circular dependency fix, magic numbers → constants
+- **Phase 1 (done):** Circular dependency fix, magic numbers → constants
 - **Phase 2 (backlog):** @require_state() decorator for handlers
 - **Phase 3 (backlog):** LaunchService extraction, DEPRECATED fields, ThreadInfo refactoring
 - See [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
@@ -312,6 +312,11 @@ Custom emoji pack from group members' avatars:
 - Notification: "`[v]` Gift unlocked — avatar pack for topic icons"
 - Limitation: Premium required to set custom emoji as topic icon
 - See [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
+
+### Voice → Whisper
+Voice messages via Whisper transcription:
+- Use existing code from bz-merch-assistant
+- `ai_bot_core/services/whisper.py`
 
 ## Backlog
 
@@ -444,11 +449,6 @@ Explicit deletion of archived branches when disk space or git cleanup needed:
 ### GitHub Actions CI
 - Workflow for running tests on PR
 - pytest + type checking
-
-### Voice → Whisper
-Voice messages via Whisper transcription:
-- Use existing code from bz-merch-assistant
-- `ai_bot_core/services/whisper.py`
 
 ### Pin startup message
 Pin message on session start:
