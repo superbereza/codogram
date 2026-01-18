@@ -2,7 +2,10 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
-THINKING_SPINNERS = "·✶✻✽*✢"
+# Claude thinking status spinners (unique Unicode chars)
+# Excluded: * (too common in text) and · (middle dot, appears in bullet lists)
+# These remaining chars are specific enough to not need content validation
+THINKING_SPINNERS = "✶✻✽✢"
 
 
 # Pattern for pasted content placeholder: [Pasted text #1 +51 lines]
@@ -315,9 +318,9 @@ def parse_thinking_status(output: str) -> str | None:
     """Parse thinking status line from area just above input box.
 
     Formats vary:
-    - · Wibbling… (ctrl+c to interrupt)
     - ✶ Wibbling… (ctrl+c to interrupt · 30s · ↓ 914 tokens · thinking)
     - ✻ Cooked for 35s
+    - ✽ Compacting conversation...
 
     Only looks at last 5 lines before first ──── separator to avoid
     picking up old thinking statuses from scrollback.
@@ -345,11 +348,7 @@ def parse_thinking_status(output: str) -> str | None:
     for line in recent_lines:
         stripped = line.strip()
         if stripped and stripped[0] in THINKING_SPINNERS:
-            # Validate this is actually a thinking status, not random spinner character
-            # Known patterns: "to interrupt", "Cooked for", "tokens"
-            if not any(p in stripped for p in ("to interrupt", "Cooked for", "tokens")):
-                continue
-
+            # THINKING_SPINNERS are unique enough - no content validation needed
             # Replace ctrl+c first, then esc (but only standalone, not /esc)
             result = stripped.replace("ctrl+c to interrupt", "/esc to interrupt")
             # Use regex to replace only standalone "esc to interrupt" (not "/esc")
