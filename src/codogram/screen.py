@@ -166,13 +166,13 @@ def parse_screen(output: str) -> ScreenState:
     if mcp_result:
         return mcp_result
 
-    # 2. Find last solid separator ────
-    last_sep_idx = -1
+    # 2. Find all solid separators ────
+    sep_indices = []
     for i, line in enumerate(lines):
         if "─" * 10 in line:
-            last_sep_idx = i
+            sep_indices.append(i)
 
-    if last_sep_idx == -1:
+    if not sep_indices:
         # No separator - but check if there's ❯ with numbered options (trust folder prompt, etc.)
         if "❯" in output:
             result = _parse_options_without_separator(lines)
@@ -180,8 +180,23 @@ def parse_screen(output: str) -> ScreenState:
                 return result
         return _check_tool_progress(output)
 
-    # Get lines after separator
-    after_sep = lines[last_sep_idx + 1:]
+    # AskUserQuestion has options BETWEEN two separators
+    # Regular prompts have options AFTER the last separator
+    if len(sep_indices) >= 2:
+        # Try between last two separators first (AskUserQuestion format)
+        start_idx = sep_indices[-2]
+        end_idx = sep_indices[-1]
+        between_sep = lines[start_idx + 1:end_idx]
+        if "❯" in "\n".join(between_sep):
+            body_lines, options = _extract_options(between_sep)
+            if options:
+                body = "\n".join(body_lines)
+                body = re.sub(r'╌{10,}', SEPARATOR_DASHED, body)
+                body = body.strip()
+                return PermissionPrompt(options=options, body=body)
+
+    # Fall back to after last separator (regular permission prompts)
+    after_sep = lines[sep_indices[-1] + 1:]
 
     # Check: if there's ● after separator, it's not a permission prompt
     for line in after_sep:
