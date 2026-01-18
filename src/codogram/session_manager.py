@@ -239,6 +239,8 @@ class ProjectManager:
                         archived=thread_data.get("archived", False),
                         auto_accept=thread_data.get("auto_accept", False),
                         verbose=thread_data.get("verbose", False),
+                        feat_thinking_status=thread_data.get("feat_thinking_status", False),
+                        feat_suggestions=thread_data.get("feat_suggestions", False),
                         # Assume already notified if session exists but tmux likely dead
                         notified_closed=bool(thread_data.get("session_id")),
                     )
@@ -292,6 +294,10 @@ class ProjectManager:
                         thread_data["auto_accept"] = t.auto_accept
                     if t.verbose:
                         thread_data["verbose"] = t.verbose
+                    if t.feat_thinking_status:
+                        thread_data["feat_thinking_status"] = t.feat_thinking_status
+                    if t.feat_suggestions:
+                        thread_data["feat_suggestions"] = t.feat_suggestions
                     threads_dict[str(tid) if tid is not None else "null"] = thread_data
                 project_data["threads"] = threads_dict
             projects_data[name] = project_data
