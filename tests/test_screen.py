@@ -321,13 +321,13 @@ def test_parse_thinking_status_basic():
     """Parse basic thinking status line."""
     output = """
 Some previous output
-· Wibbling… (ctrl+c to interrupt)
+✻ Wibbling… (ctrl+c to interrupt)
 ────────────────────────────────────────
 ❯
 ────────────────────────────────────────
 """
     result = parse_thinking_status(output)
-    assert result == "· Wibbling… (/esc to interrupt)"
+    assert result == "✻ Wibbling… (/esc to interrupt)"
 
 
 def test_parse_thinking_status_with_details():
@@ -343,13 +343,13 @@ def test_parse_thinking_status_with_details():
 def test_parse_thinking_status_esc():
     """Parse with esc instead of ctrl+c."""
     output = """
-· Thinking… (esc to interrupt · 5s)
+✻ Thinking… (esc to interrupt · 5s)
 ────────────────────────────────────────
 ❯
 ────────────────────────────────────────
 """
     result = parse_thinking_status(output)
-    assert result == "· Thinking… (/esc to interrupt · 5s)"
+    assert result == "✻ Thinking… (/esc to interrupt · 5s)"
 
 
 def test_parse_thinking_status_cooked():

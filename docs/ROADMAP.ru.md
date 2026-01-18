@@ -255,6 +255,15 @@ Per-thread/per-project toggle verbose output и UX настроек:
 
 ## Beta Test
 
+### Редизайн set up flow + robust start
+Полный редизайн /start flow с устойчивой обработкой ошибок и интуитивным UX настройки:
+- Три пути настройки: Clone repository, Connect existing folder, New project
+- SetupFlow FSM со состояниями для каждого шага
+- SetupBlockerMiddleware блокирует не-setup команды во время flow
+- Кнопка Cancel и /reset_all для отмены setup
+- Навигация с кнопками Go back
+- См. [docs/designs/done/2026-01-18-start-flow-v2.md](designs/done/2026-01-18-start-flow-v2.md)
+
 ### Compacting detection
 Уведомление когда Claude компактит conversation:
 - Парсинг thinking status на ключевое слово "Compacting"
@@ -287,10 +296,6 @@ Per-thread/per-project toggle verbose output и UX настроек:
 Интерактивный онбординг в директ чате с ботом:
 - Welcome flow с объяснением возможностей бота
 - Пошаговое руководство для новых пользователей
-
-### Редизайн set up flow + robust start
-Полный редизайн /start flow с устойчивой обработкой ошибок и интуитивным UX настройки.
-- См. [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md) (worktree: set-up-flow-redesign)
 
 ### Avatar emoji pack
 Emoji pack из аватарок участников группы:

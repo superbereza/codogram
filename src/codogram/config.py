@@ -31,6 +31,11 @@ settings = Settings()
 CONFIG_DIR = Path.home() / ".codogram"
 CONFIG_PATH = CONFIG_DIR / "config.json"
 
+def get_config_path() -> Path:
+    """Return the config file path, ensuring parent directory exists."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    return CONFIG_PATH
+
 def load_config() -> dict:
     """Load config.json or return default."""
     if CONFIG_PATH.exists():

@@ -1,6 +1,6 @@
 # Bug: Magic name collision after restart
 
-**Date:** 2025-01-01
+**Date:** 2026-01-01
 **Severity:** High
 **Status:** Open
 

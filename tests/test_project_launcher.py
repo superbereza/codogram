@@ -15,6 +15,7 @@ from codogram.project_launcher import (
     is_tmux_session_exists,
     create_tmux_with_claude,
     LaunchResult,
+    git_clone,
 )
 
 
@@ -73,3 +74,38 @@ def test_create_tmux_with_claude(tmp_path):
         # Cleanup
         subprocess.run(["tmux", "kill-session", "-t", session_name],
                       capture_output=True)
+
+
+def test_git_clone_cleans_up_on_failure(tmp_path):
+    """git_clone should remove partial directory on failure."""
+    target = tmp_path / "test-repo"
+
+    # Clone from nonexistent GitHub repo - will definitely fail
+    result = git_clone(str(target), "https://github.com/nonexistent-user-12345/nonexistent-repo-67890.git")
+
+    assert result.success is False
+    # Directory should NOT exist after failed clone
+    assert not target.exists(), "Failed clone should clean up directory"
+
+
+def test_git_clone_cleans_up_partial_directory(tmp_path):
+    """git_clone should clean up if directory is left in partial state."""
+    target = tmp_path / "test-repo"
+
+    # Mock subprocess.run to simulate a failed clone that leaves partial directory
+    def mock_subprocess_run(cmd, **kwargs):
+        # Create partial directory to simulate interrupted clone
+        target.mkdir(exist_ok=True)
+        (target / ".git").mkdir()
+        # Return failed result
+        result = MagicMock()
+        result.returncode = 128
+        result.stderr = "fatal: repository not found"
+        return result
+
+    with patch("codogram.project_launcher.subprocess.run", side_effect=mock_subprocess_run):
+        result = git_clone(str(target), "https://github.com/example/repo.git")
+
+    assert result.success is False
+    # Directory should be cleaned up even though git left it
+    assert not target.exists(), "Failed clone should clean up partial directory"

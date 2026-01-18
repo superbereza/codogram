@@ -1,5 +1,6 @@
 """Background permission poller - independent of jsonl watcher."""
 import asyncio
+import time
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -13,7 +14,7 @@ from .telegram_queue import OutgoingBatch, EditBatch, DeleteBatch
 from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status, parse_input_suggestion, extract_input_text, PASTED_PATTERN
 from .keyboards import permission_keyboard
 from .state import permission_messages
-from .session_manager import ProjectState, ThreadInfo
+from .session_manager import ProjectState, ThreadInfo, project_manager
 from .tmux import TmuxSession
 from .logging_config import logger
 from .auto_accept import try_auto_accept
@@ -72,6 +73,36 @@ def _detect_crash(screen: str) -> str | None:
         if sig in last_lines:
             return sig
     return None
+
+
+def _detect_exit(screen: str) -> bool:
+    """Detect if Claude exited normally (no crash).
+
+    NOTE: Currently unused - has false positives.
+    See: docs/bugs/active/2026-01-18-auto-restart-false-positives.md
+
+    Returns True if:
+    1. Claude UI NOT visible
+    2. Shell prompt visible
+    3. NO crash signatures (not a crash)
+    """
+    if is_claude_ready(screen):
+        return False
+
+    lines = screen.split("\n")
+    last_lines = "\n".join(lines[-15:])
+
+    # Must have shell prompt
+    has_shell = any(p in last_lines for p in SHELL_PROMPTS)
+    if not has_shell:
+        return False
+
+    # Must NOT have crash signatures
+    for sig in CRASH_SIGNATURES:
+        if sig in last_lines:
+            return False
+
+    return True
 
 
 async def create_poller_task(bot: Bot, project: ProjectState, telegram_queue: "TelegramQueue") -> asyncio.Task:
@@ -141,8 +172,22 @@ async def permission_poller(
     stuck_input_text: str | None = None
     stuck_seen_count: int = 0
 
+    # Auto-restart state (cooldown to prevent infinite loops)
+    last_restart_time: float = 0.0
+    RESTART_COOLDOWN = 60.0  # Don't restart more than once per minute
+
     debounce_time = settings.permission_poller_debounce
     poll_interval = settings.permission_poller_interval
+
+    # Cleanup old suggestion message from previous session (survives restart)
+    if thread and thread.last_suggestion_msg_id:
+        try:
+            await bot.delete_message(project.chat_id, thread.last_suggestion_msg_id)
+            logger.info(f"{log_prefix}: cleaned up old suggestion msg {thread.last_suggestion_msg_id}")
+        except Exception as e:
+            logger.debug(f"{log_prefix}: failed to cleanup old suggestion: {e}")
+        thread.last_suggestion_msg_id = None
+        project_manager._save()
 
     while True:
         await asyncio.sleep(poll_interval)
@@ -263,12 +308,15 @@ async def permission_poller(
                     ),
                     replace_key=suggestion_msg_key,
                 )
-                await telegram_queue.enqueue_nowait(batch)
+                msg_ids = await telegram_queue.enqueue(batch)
                 _last_suggestions[suggestion_key] = suggestion
+                # Persist message ID for cleanup after restart
+                if thread and msg_ids:
+                    thread.last_suggestion_msg_id = msg_ids[0]
+                    project_manager._save()
 
             elif not suggestion and _last_suggestions.get(suggestion_key):
                 # Suggestion gone — delete 💡 message
-                # Note: ReplyKeyboard persists until user interacts (one_time_keyboard=True helps)
                 logger.debug(f"{log_prefix}: suggestion DELETE")
                 if suggestion_msg_key:
                     batch = DeleteBatch(
@@ -278,6 +326,10 @@ async def permission_poller(
                     )
                     await telegram_queue.enqueue_nowait(batch)
                     suggestion_msg_key = None
+                # Clear persisted message ID
+                if thread:
+                    thread.last_suggestion_msg_id = None
+                    project_manager._save()
                 _last_suggestions[suggestion_key] = None
 
         elif suggestion_msg_key:
@@ -307,14 +359,23 @@ async def permission_poller(
                 pass
             return  # Exit poller
 
+        # Exit detection + auto-restart
+        # NOTE: Disabled - false positives when Claude is running
+        # See: docs/bugs/active/2026-01-18-auto-restart-false-positives.md
+        # if _detect_exit(screen):
+        #     ...
+
         # Stuck message detection (before permission state machine)
         input_text = extract_input_text(screen)
         if input_text:
-            last_msg = thread.last_sent_message if thread else None
+            # For project-level poller (thread=None), get the null thread from project
+            effective_thread = thread if thread else project.threads.get(None)
+            last_msg = effective_thread.last_sent_message if effective_thread else None
 
+            # Compare first line only (input_text is single line, last_msg may be multiline)
             is_potentially_stuck = (
                 PASTED_PATTERN.match(input_text) is not None or
-                (last_msg is not None and input_text == last_msg)
+                (last_msg is not None and input_text == last_msg.split('\n')[0])
             )
 
             if is_potentially_stuck:
@@ -332,8 +393,8 @@ async def permission_poller(
                     stuck_input_text = None
                     stuck_seen_count = 0
                     # Clear last_sent_message to prevent re-triggering
-                    if thread:
-                        thread.last_sent_message = None
+                    if effective_thread:
+                        effective_thread.last_sent_message = None
             else:
                 # Not a stuck message, reset
                 stuck_input_text = None

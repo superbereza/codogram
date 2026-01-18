@@ -11,6 +11,7 @@ from ..telegram_queue import TelegramQueue
 from ..logging_config import logger
 from .. import strings
 from .create_flow import handle_name_input
+from .common import normalize_thread_id
 
 router = Router(name="messages")
 
@@ -52,17 +53,14 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
         f"chat={message.chat.id} thread={message.message_thread_id}: {content_preview}"
     )
 
-    # Skip commands
-    if text and text.startswith("/"):
-        return
-
     chat_id = message.chat.id
 
     # Check if awaiting name input for create flow
     if await handle_name_input(message, telegram_queue):
         return
 
-    thread_id = message.message_thread_id
+    # Normalize thread_id - ignore in non-forum chats
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
 
     # Route the message
     result = _message_router.route(chat_id, thread_id, text)
@@ -74,10 +72,11 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
 
         case RouteAction.CREATE_PENDING:
             # Unknown topic - create pending thread
+            logger.info(f"CREATE_PENDING: chat={chat_id} thread_id={thread_id}")
             thread = ThreadInfo(thread_id=thread_id, name="pending")
             result.project.threads[thread_id] = thread
             project_manager._save()
-            await telegram_queue.reply(message, "Use /start or /thread_create to connect Claude to this topic")
+            await telegram_queue.reply(message, strings.THREAD_CONNECT_HINT)
             return
 
         case RouteAction.SKIP_PENDING:
@@ -140,6 +139,10 @@ async def _send_content(message: Message, result, telegram_queue: TelegramQueue)
         content = _file_input.format_message(message.caption, [save_result.path], result.cwd)
     else:
         content = message.text
+
+    # Track for stuck message detection
+    if result.thread:
+        result.thread.last_sent_message = content
 
     return _message_router.send_to_tmux(result, content)
 
