@@ -207,7 +207,7 @@ class StartFlowService:
         """
         # Topic mode
         if thread_id is not None:
-            return self._handle_topic_start(chat_id, thread_id, args)
+            return self._handle_topic_start(chat_id, thread_id, args, chat_title)
 
         # Case 1: project name provided in args
         if args:
@@ -243,12 +243,16 @@ class StartFlowService:
         return FlowResult(action=FlowAction.ASK_PROJECT_NAME)
 
     def _handle_topic_start(
-        self, chat_id: int, thread_id: int, args: list[str]
+        self, chat_id: int, thread_id: int, args: list[str], chat_title: str | None = None
     ) -> FlowResult:
         """Handle /start in a topic."""
-        # Case 1: No project for this chat
+        # Case 1: No project for this chat - try auto-detect from title
         project = self.pm.get_by_chat(chat_id)
         if not project:
+            if chat_title:
+                sanitized = sanitize_project_name(chat_title)
+                if sanitized:
+                    return self._start_project_flow(chat_id, sanitized, thread_id)
             return FlowResult(
                 action=FlowAction.ASK_PROJECT_NAME,
                 thread_id=thread_id,
@@ -351,7 +355,7 @@ class StartFlowService:
 
         return self._start_project_flow(chat_id, project_name)
 
-    def _start_project_flow(self, chat_id: int, project_name: str) -> FlowResult:
+    def _start_project_flow(self, chat_id: int, project_name: str, thread_id: int | None = None) -> FlowResult:
         """Resolve path and decide next step."""
         project = self.pm.get_or_create(project_name)
         project.chat_id = chat_id
@@ -368,12 +372,13 @@ class StartFlowService:
         if exists:
             project.cwd = path
             self.pm._save()
-            return self._connect_or_launch(project)
+            return self._connect_or_launch(project, thread_id)
         else:
             return FlowResult(
                 action=FlowAction.ASK_DIR_CHOICE,
                 project=project_name,
                 path=path,
+                thread_id=thread_id,
             )
 
     def _connect_or_launch(self, project) -> FlowResult:

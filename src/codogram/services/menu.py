@@ -22,6 +22,7 @@ _ALL_COMMANDS = [
     ("restart", "Force restart Claude", True),
     ("get_debug_ids", "Show chat and thread IDs", True),
     ("help", "List all commands", True),
+    ("reset_all", "Reset project completely", True),
 ]
 
 # Derived lists (no duplication)
