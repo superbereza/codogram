@@ -1,18 +1,20 @@
 """Background permission poller - independent of jsonl watcher."""
 import asyncio
+import time
 from enum import Enum
 from typing import TYPE_CHECKING
 
 from aiogram import Bot
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 if TYPE_CHECKING:
     from .telegram_queue import TelegramQueue
 
-from .telegram_queue import OutgoingBatch
-from .screen import parse_screen, PermissionPrompt, is_claude_ready, extract_input_text, PASTED_PATTERN
+from .telegram_queue import OutgoingBatch, EditBatch, DeleteBatch
+from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status, parse_input_suggestion, extract_input_text, PASTED_PATTERN, detect_compacting
 from .keyboards import permission_keyboard
 from .state import permission_messages
-from .session_manager import ProjectState, ThreadInfo
+from .session_manager import ProjectState, ThreadInfo, project_manager
 from .tmux import TmuxSession
 from .logging_config import logger
 from .auto_accept import try_auto_accept
@@ -42,6 +44,9 @@ CRASH_SIGNATURES = [
 # Shell prompts indicating Claude exited
 SHELL_PROMPTS = ["➜", "$ ", "# ", "❯ "]
 
+# Track last suggestion per thread to avoid duplicates
+_last_suggestions: dict[str, str | None] = {}
+
 
 def _detect_crash(screen: str) -> str | None:
     """Detect if Claude has crashed. Returns crash reason or None.
@@ -68,6 +73,36 @@ def _detect_crash(screen: str) -> str | None:
         if sig in last_lines:
             return sig
     return None
+
+
+def _detect_exit(screen: str) -> bool:
+    """Detect if Claude exited normally (no crash).
+
+    NOTE: Currently unused - has false positives.
+    See: docs/bugs/active/2026-01-18-auto-restart-false-positives.md
+
+    Returns True if:
+    1. Claude UI NOT visible
+    2. Shell prompt visible
+    3. NO crash signatures (not a crash)
+    """
+    if is_claude_ready(screen):
+        return False
+
+    lines = screen.split("\n")
+    last_lines = "\n".join(lines[-15:])
+
+    # Must have shell prompt
+    has_shell = any(p in last_lines for p in SHELL_PROMPTS)
+    if not has_shell:
+        return False
+
+    # Must NOT have crash signatures
+    for sig in CRASH_SIGNATURES:
+        if sig in last_lines:
+            return False
+
+    return True
 
 
 async def create_poller_task(bot: Bot, project: ProjectState, telegram_queue: "TelegramQueue") -> asyncio.Task:
@@ -122,12 +157,37 @@ async def permission_poller(
     content_msg_ids: list[int] = []
     kb_msg_id: int | None = None
 
+    # Thinking status state
+    thinking_msg_key: str | None = None
+    last_thinking_update: float = 0.0
+    last_thinking_text: str | None = None
+
+    # Suggestion state
+    suggestion_msg_key: str | None = None
+
+    # Compact notification state
+    compacting_notified: bool = False
+
     # Stuck message detection state
     stuck_input_text: str | None = None
     stuck_seen_count: int = 0
 
+    # Auto-restart state (cooldown to prevent infinite loops)
+    last_restart_time: float = 0.0
+    RESTART_COOLDOWN = 60.0  # Don't restart more than once per minute
+
     debounce_time = settings.permission_poller_debounce
     poll_interval = settings.permission_poller_interval
+
+    # Cleanup old suggestion message from previous session (survives restart)
+    if thread and thread.last_suggestion_msg_id:
+        try:
+            await bot.delete_message(project.chat_id, thread.last_suggestion_msg_id)
+            logger.info(f"{log_prefix}: cleaned up old suggestion msg {thread.last_suggestion_msg_id}")
+        except Exception as e:
+            logger.debug(f"{log_prefix}: failed to cleanup old suggestion: {e}")
+        thread.last_suggestion_msg_id = None
+        project_manager._save()
 
     while True:
         await asyncio.sleep(poll_interval)
@@ -138,6 +198,152 @@ async def permission_poller(
         except Exception as e:
             logger.warning(f"{log_prefix}: capture error: {e}")
             continue
+
+        # Parse thinking status for display
+        thinking_text = parse_thinking_status(screen)
+
+        # Compact detection (independent of thinking status, uses broader spinner set)
+        is_compacting = detect_compacting(screen)
+        if is_compacting:
+            if not compacting_notified:
+                logger.info(f"{log_prefix}: compact detected, sending notification")
+                batch = OutgoingBatch(
+                    chat_id=project.chat_id,
+                    thread_id=thread_id,
+                    messages=[{"text": strings.COMPACTING_STARTED, "parse_mode": "MarkdownV2"}],
+                )
+                await telegram_queue.enqueue_nowait(batch)
+                compacting_notified = True
+        else:
+            # Reset when compacting ends
+            compacting_notified = False
+
+        # Display thinking status only if feature enabled
+        feat_thinking_enabled = thread.feat_thinking_status if thread else project.feat_thinking_status
+        if feat_thinking_enabled and thinking_text:
+            now = asyncio.get_event_loop().time()
+            # Throttle: update every 3 seconds
+            if now - last_thinking_update >= 3.0:
+                key = f"thinking:{project.chat_id}:{thread_id}"
+                needs_resend = thread.thinking_needs_resend if thread else False
+
+                if thinking_msg_key is None:
+                    # First time — send new message
+                    logger.debug(f"{log_prefix}: thinking status SEND: {thinking_text[:50]}...")
+                    batch = OutgoingBatch(
+                        chat_id=project.chat_id,
+                        thread_id=thread_id,
+                        messages=[{"text": thinking_text}],
+                        replace_key=key,
+                    )
+                    thinking_msg_key = key
+                    await telegram_queue.enqueue_nowait(batch)
+
+                elif needs_resend:
+                    # Watcher sent message — delete + send to keep at bottom
+                    logger.debug(f"{log_prefix}: thinking status RESEND: {thinking_text[:50]}...")
+                    delete_batch = DeleteBatch(
+                        chat_id=project.chat_id,
+                        message_id=0,
+                        replace_key=thinking_msg_key,
+                    )
+                    await telegram_queue.enqueue_nowait(delete_batch)
+
+                    batch = OutgoingBatch(
+                        chat_id=project.chat_id,
+                        thread_id=thread_id,
+                        messages=[{"text": thinking_text}],
+                        replace_key=key,
+                    )
+                    await telegram_queue.enqueue_nowait(batch)
+                    if thread:
+                        thread.thinking_needs_resend = False
+
+                else:
+                    # No new messages — just edit in place
+                    logger.debug(f"{log_prefix}: thinking status EDIT: {thinking_text[:50]}...")
+                    batch = EditBatch(
+                        chat_id=project.chat_id,
+                        message_id=0,
+                        text=thinking_text,
+                        replace_key=key,
+                    )
+                    await telegram_queue.enqueue_nowait(batch)
+
+                last_thinking_update = now
+                last_thinking_text = thinking_text
+
+        elif thinking_msg_key:
+            # Claude finished thinking — delete status message
+            logger.debug(f"{log_prefix}: thinking status DELETE")
+            batch = DeleteBatch(
+                chat_id=project.chat_id,
+                message_id=0,
+                replace_key=thinking_msg_key,
+            )
+            await telegram_queue.enqueue_nowait(batch)
+            thinking_msg_key = None
+            last_thinking_text = None
+            last_thinking_update = 0.0  # Reset for next thinking cycle
+
+        # Parse input suggestion (if feature enabled and not thinking)
+        # Note: feat_suggestions is chat-wide, not per-thread
+        feat_suggestions_enabled = project.feat_suggestions
+        suggestion_key = f"{project.chat_id}:{thread_id}"
+
+        if feat_suggestions_enabled and not thinking_text:
+            suggestion = parse_input_suggestion(screen)
+
+            if suggestion and suggestion != _last_suggestions.get(suggestion_key):
+                # New suggestion — send 💡 with ReplyKeyboard
+                logger.debug(f"{log_prefix}: suggestion NEW: {suggestion[:50]}...")
+                suggestion_msg_key = f"suggestion:{project.chat_id}:{thread_id}"
+                batch = OutgoingBatch(
+                    chat_id=project.chat_id,
+                    thread_id=thread_id,
+                    messages=[{"text": "💡"}],
+                    reply_markup=ReplyKeyboardMarkup(
+                        keyboard=[[KeyboardButton(text=suggestion)]],
+                        resize_keyboard=True,
+                        one_time_keyboard=True,
+                    ),
+                    replace_key=suggestion_msg_key,
+                )
+                msg_ids = await telegram_queue.enqueue(batch)
+                _last_suggestions[suggestion_key] = suggestion
+                # Persist message ID for cleanup after restart
+                if thread and msg_ids:
+                    thread.last_suggestion_msg_id = msg_ids[0]
+                    project_manager._save()
+
+            elif not suggestion and _last_suggestions.get(suggestion_key):
+                # Suggestion gone — delete 💡 message
+                logger.debug(f"{log_prefix}: suggestion DELETE")
+                if suggestion_msg_key:
+                    batch = DeleteBatch(
+                        chat_id=project.chat_id,
+                        message_id=0,  # Lookup from sent_statuses
+                        replace_key=suggestion_msg_key,
+                    )
+                    await telegram_queue.enqueue_nowait(batch)
+                    suggestion_msg_key = None
+                # Clear persisted message ID
+                if thread:
+                    thread.last_suggestion_msg_id = None
+                    project_manager._save()
+                _last_suggestions[suggestion_key] = None
+
+        elif suggestion_msg_key:
+            # Feature disabled but message exists — cleanup
+            logger.debug(f"{log_prefix}: suggestion DELETE (feature disabled)")
+            batch = DeleteBatch(
+                chat_id=project.chat_id,
+                message_id=0,
+                replace_key=suggestion_msg_key,
+            )
+            await telegram_queue.enqueue_nowait(batch)
+            suggestion_msg_key = None
+            _last_suggestions[suggestion_key] = None
 
         # Crash detection
         crash_reason = _detect_crash(screen)
@@ -154,14 +360,23 @@ async def permission_poller(
                 pass
             return  # Exit poller
 
+        # Exit detection + auto-restart
+        # NOTE: Disabled - false positives when Claude is running
+        # See: docs/bugs/active/2026-01-18-auto-restart-false-positives.md
+        # if _detect_exit(screen):
+        #     ...
+
         # Stuck message detection (before permission state machine)
         input_text = extract_input_text(screen)
         if input_text:
-            last_msg = thread.last_sent_message if thread else None
+            # For project-level poller (thread=None), get the null thread from project
+            effective_thread = thread if thread else project.threads.get(None)
+            last_msg = effective_thread.last_sent_message if effective_thread else None
 
+            # Compare first line only (input_text is single line, last_msg may be multiline)
             is_potentially_stuck = (
                 PASTED_PATTERN.match(input_text) is not None or
-                (last_msg is not None and input_text == last_msg)
+                (last_msg is not None and input_text == last_msg.split('\n')[0])
             )
 
             if is_potentially_stuck:
@@ -179,8 +394,8 @@ async def permission_poller(
                     stuck_input_text = None
                     stuck_seen_count = 0
                     # Clear last_sent_message to prevent re-triggering
-                    if thread:
-                        thread.last_sent_message = None
+                    if effective_thread:
+                        effective_thread.last_sent_message = None
             else:
                 # Not a stuck message, reset
                 stuck_input_text = None
@@ -297,6 +512,21 @@ async def permission_poller(
                 content_msg_ids = []
                 kb_msg_id = None
             elif parsed.options != last_options or parsed.body != last_body:
+                # Check auto-accept first (race condition: prompt may change before tmux processes key)
+                auto_accept_enabled = thread.auto_accept if thread else project.auto_accept
+                verbose_enabled = thread.verbose if thread else project.verbose
+                if auto_accept_enabled:
+                    if await try_auto_accept(
+                        parsed.options, parsed.body, tmux,
+                        telegram_queue, project.chat_id, thread_id, context_name,
+                        prompt_type=parsed.prompt_type,
+                        verbose=verbose_enabled,
+                    ):
+                        logger.debug(f"{log_prefix} SHOWING: body/options changed, auto-accepted again")
+                        last_options = parsed.options
+                        last_body = parsed.body
+                        continue
+
                 logger.debug(f"{log_prefix} SHOWING: body/options changed, resending")
                 try:
                     # Delete old messages

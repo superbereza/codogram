@@ -8,6 +8,7 @@ from aiogram.filters import Command
 from .. import strings
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
+from .common import require_claude_ready
 from ..services.branch import archive_thread
 from ..git_utils import has_uncommitted_changes, get_default_branch, branch_exists
 from ..worktree import merge_branch, push_branch, remove_worktree
@@ -18,10 +19,12 @@ router = Router(name="finish")
 
 # ===== /finish command =====
 
-@router.message(Command("finish"))
+@router.message(Command("finish", ignore_case=True))
 async def cmd_finish(message: Message, telegram_queue: TelegramQueue):
     """Unified finish command: archive topic or merge branch."""
-    thread_id = message.message_thread_id
+    # Note: We don't require Claude running - archive/merge works without it
+    from .common import normalize_thread_id
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
 
     # In General topic - nothing to finish
     if thread_id is None:

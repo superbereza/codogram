@@ -312,6 +312,138 @@ class TestParseStatusBar:
         assert result.context_percent is None
 
 
+# Thinking Status Tests
+
+from codogram.screen import parse_thinking_status
+
+
+def test_parse_thinking_status_basic():
+    """Parse basic thinking status line."""
+    output = """
+Some previous output
+✻ Wibbling… (ctrl+c to interrupt)
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
+    result = parse_thinking_status(output)
+    assert result == "✻ Wibbling… (/esc to interrupt)"
+
+
+def test_parse_thinking_status_with_details():
+    """Parse thinking status with time and tokens."""
+    output = """
+✶ Hatching… (ctrl+c to interrupt · 30s · ↓ 914 tokens · thinking)
+────────────────────────────────────────
+"""
+    result = parse_thinking_status(output)
+    assert result == "✶ Hatching… (/esc to interrupt · 30s · ↓ 914 tokens · thinking)"
+
+
+def test_parse_thinking_status_esc():
+    """Parse with esc instead of ctrl+c."""
+    output = """
+✻ Thinking… (esc to interrupt · 5s)
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
+    result = parse_thinking_status(output)
+    assert result == "✻ Thinking… (/esc to interrupt · 5s)"
+
+
+def test_parse_thinking_status_cooked():
+    """Parse completion status."""
+    output = """
+✻ Cooked for 35s
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
+    result = parse_thinking_status(output)
+    assert result == "✻ Cooked for 35s"
+
+
+def test_parse_thinking_status_ignores_scrollback():
+    """Ignore thinking status in scrollback (far from input box)."""
+    output = """
+· Old thinking status from scrollback
+lots of other output
+more output
+even more output
+another line
+yet another line
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
+    result = parse_thinking_status(output)
+    assert result is None
+
+
+def test_parse_thinking_status_none():
+    """Return None when no thinking status."""
+    output = """
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
+    result = parse_thinking_status(output)
+    assert result is None
+
+
+def test_parse_thinking_status_false_positive():
+    """Spinner character without thinking pattern should be ignored."""
+    output = """
+· Just a bullet point, not thinking
+Some other text
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
+    result = parse_thinking_status(output)
+    assert result is None
+
+
+# Input Suggestion Tests
+
+from codogram.screen import parse_input_suggestion
+
+
+def test_parse_input_suggestion_basic():
+    """Parse suggestion from input box."""
+    output = """
+● Response text
+────────────────────────────────────────
+❯ посмотри что залогировалось                                            ↵ send
+────────────────────────────────────────
+"""
+    result = parse_input_suggestion(output)
+    assert result == "посмотри что залогировалось"
+
+
+def test_parse_input_suggestion_empty():
+    """Return None for empty input."""
+    output = """
+────────────────────────────────────────
+❯
+────────────────────────────────────────
+"""
+    result = parse_input_suggestion(output)
+    assert result is None
+
+
+def test_parse_input_suggestion_user_typing():
+    """Return None when user is typing (no ↵ send)."""
+    output = """
+────────────────────────────────────────
+❯ my custom text
+────────────────────────────────────────
+"""
+    result = parse_input_suggestion(output)
+    assert result is None
+
+
 # extract_input_text Tests
 
 class TestExtractInputText:
@@ -365,4 +497,3 @@ class TestPastedPattern:
     def test_not_matching_old_format(self):
         # Old assumed format - should not match
         assert not PASTED_PATTERN.match("[Pasted 3 lines]")
-

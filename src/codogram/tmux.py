@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .logging_config import logger
+from .config import TMUX_CAPTURE_LINES_DEFAULT
 
 # Debug log for tmux send operations
 TMUX_DEBUG_LOG = Path(__file__).parent.parent.parent / "logs/tmux-send-debug.log"
@@ -32,8 +33,8 @@ class TmuxSession:
         _log_tmux_debug(f"{'='*60}")
         _log_tmux_debug(f"SEND session={self.name} text={repr(text)}")
 
-        # Capture state BEFORE
-        before = self._capture_last_lines(20)
+        # Capture state BEFORE (compact: around input line)
+        before = self._capture_around_input()
         _log_tmux_debug(f"BEFORE:\n{before}")
 
         # Step 0: Cancel permission prompt if active
@@ -45,22 +46,10 @@ class TmuxSession:
             ["tmux", "send-keys", "-t", self.name, "C-c"],
             check=True
         )
-        time.sleep(0.05)
+        time.sleep(0.15)  # Increased from 0.05 to give Claude TUI time to process
 
-        after_cc = self._capture_last_lines(20)
+        after_cc = self._capture_around_input()
         _log_tmux_debug(f"AFTER C-c:\n{after_cc}")
-
-        # Step 1.5: Send Escape to cancel exit confirmation mode
-        # (C-c when idle triggers "Press Ctrl-C again to exit" which eats input)
-        _log_tmux_debug("[1.5] Sending Escape to cancel exit mode...")
-        subprocess.run(
-            ["tmux", "send-keys", "-t", self.name, "Escape"],
-            check=True
-        )
-        time.sleep(0.05)
-
-        after_esc = self._capture_last_lines(20)
-        _log_tmux_debug(f"AFTER Escape:\n{after_esc}")
 
         # Step 2: Send text with -l (literal)
         _log_tmux_debug(f"[2] Sending text with -l...")
@@ -70,7 +59,7 @@ class TmuxSession:
         )
         time.sleep(0.3)
 
-        after_text = self._capture_last_lines(20)
+        after_text = self._capture_around_input()
         _log_tmux_debug(f"AFTER text:\n{after_text}")
 
         # Step 3: Send Enter
@@ -81,7 +70,7 @@ class TmuxSession:
         )
         time.sleep(0.2)
 
-        after_enter = self._capture_last_lines(20)
+        after_enter = self._capture_around_input()
         _log_tmux_debug(f"AFTER Enter:\n{after_enter}")
         _log_tmux_debug(f"DONE\n")
 
@@ -93,6 +82,40 @@ class TmuxSession:
             text=True
         )
         return result.stdout if result.returncode == 0 else f"<capture failed: {result.stderr}>"
+
+    def _capture_around_input(self, context_before: int = 3, context_after: int = 3) -> str:
+        """Capture lines around the input line (❯) for compact debugging.
+
+        Returns context_before lines above input, input line, context_after lines below.
+        """
+        result = subprocess.run(
+            ["tmux", "capture-pane", "-t", self.name, "-p", "-S", f"-{TMUX_CAPTURE_LINES_DEFAULT}"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            return f"<capture failed: {result.stderr}>"
+
+        lines = result.stdout.splitlines()
+
+        # Find input line (starts with ❯ or >)
+        input_idx = None
+        for i, line in enumerate(lines):
+            stripped = line.lstrip()
+            if stripped.startswith("❯") or stripped.startswith(">"):
+                input_idx = i
+                # Don't break - we want the LAST input line (most recent)
+
+        if input_idx is None:
+            # No input line found, return last few lines
+            return "\n".join(lines[-7:])
+
+        # Extract context around input
+        start = max(0, input_idx - context_before)
+        end = min(len(lines), input_idx + context_after + 1)
+
+        extracted = lines[start:end]
+        return "\n".join(extracted)
 
     def _cancel_permission_if_active(self, max_attempts: int = 3) -> bool:
         """Cancel permission prompt if active.
@@ -170,6 +193,9 @@ class TmuxSession:
                 ["tmux", "new-session", "-d", "-s", self.name, "-c", self.cwd],
                 check=True
             )
+            # Wait for shell to initialize (zsh config, oh-my-zsh, etc.)
+            # Without this, first character of next command may be lost
+            time.sleep(0.5)
 
     def attach_command(self) -> str:
         return f"tmux attach -t {self.name}"

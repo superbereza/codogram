@@ -2,6 +2,8 @@
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+from .. import strings
+
 
 def permission_keyboard(options: list[str], tmux_session: str) -> InlineKeyboardMarkup:
     """Build inline keyboard from permission options.
@@ -31,7 +33,7 @@ def permission_keyboard(options: list[str], tmux_session: str) -> InlineKeyboard
 
     # Always add Esc button
     buttons.append([InlineKeyboardButton(
-        text="[x] Cancel",
+        text=strings.BTN_CANCEL_X,
         callback_data=f"perm:esc:{tmux_session}"
     )])
 

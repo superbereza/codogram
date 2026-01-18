@@ -1,5 +1,8 @@
 # src/codogram/chunker.py
-def chunk_message(text: str, max_len: int = 4000) -> list[str]:
+from .config import TELEGRAM_MESSAGE_MAX_LENGTH
+
+
+def chunk_message(text: str, max_len: int = TELEGRAM_MESSAGE_MAX_LENGTH) -> list[str]:
     """Split text into chunks, preferring natural breakpoints."""
     if len(text) <= max_len:
         return [text]

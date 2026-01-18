@@ -24,6 +24,7 @@ class TestFileMessageHandler:
         message.photo = [photo]
         message.document = None
         message.video = None
+        message.video_note = None
         message.audio = None
         message.voice = None
         message.chat = MagicMock(id=-100123)
@@ -136,6 +137,7 @@ class TestFileMessageHandler:
         message.photo = None
         message.document = None
         message.video = None
+        message.video_note = None
         message.audio = None
         message.voice = MagicMock()
         message.chat = MagicMock(id=-100123)
@@ -169,6 +171,7 @@ class TestFileMessageHandler:
         message.photo = [photo]
         message.document = None
         message.video = None
+        message.video_note = None
         message.audio = None
         message.voice = None
         message.chat = MagicMock(id=-100123)
@@ -229,6 +232,7 @@ class TestFileMessageHandler:
         message.photo = [photo]
         message.document = None
         message.video = None
+        message.video_note = None
         message.audio = None
         message.voice = None
         message.chat = MagicMock(id=-100123)
@@ -288,6 +292,7 @@ class TestFileMessageHandler:
         message.photo = None
         message.document = doc
         message.video = None
+        message.video_note = None
         message.audio = None
         message.voice = None
         message.chat = MagicMock(id=-100123)

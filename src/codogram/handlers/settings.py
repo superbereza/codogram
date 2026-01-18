@@ -5,11 +5,12 @@ from aiogram.filters import Command
 
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
+from .. import strings
 
 router = Router(name="settings")
 
 
-@router.message(Command("get_debug_ids"))
+@router.message(Command("get_debug_ids", ignore_case=True))
 async def cmd_get_debug_ids(message: Message, telegram_queue: TelegramQueue):
     """Show debug IDs - admin only (protected by middleware)."""
     thread_id = message.message_thread_id
@@ -21,7 +22,7 @@ async def cmd_get_debug_ids(message: Message, telegram_queue: TelegramQueue):
     )
 
 
-@router.message(Command("help"))
+@router.message(Command("help", ignore_case=True))
 async def cmd_help(message: Message, telegram_queue: TelegramQueue):
     """Show available commands."""
     text = """*Everyday:*
@@ -68,9 +69,15 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
         context_name = project.project_name
         cwd = project.cwd
 
-    # Format toggle indicators
+    # Format toggle indicators (strip backticks for inline display)
     auto_status = "● on" if auto_accept else "○ off"
     verbose_status = "● on" if verbose else "○ off"
+
+    # Experimental features
+    feat_thinking = thread.feat_thinking_status if thread else project.feat_thinking_status
+    # Note: feat_suggestions is project-level only
+    thinking_status = "● on" if feat_thinking else "○ off"
+    suggestions_status = "● on" if project.feat_suggestions else "○ off"
 
     lines = [f"**{context_name}**", ""]
     lines.append("chat")
@@ -112,10 +119,15 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
         lines.append("• background tasks: ?")
         lines.append("• context: ?")
 
+    lines.append("")
+    lines.append("experimental features")
+    lines.append(f"• /exp\\_thinking\\_status: {thinking_status}")
+    lines.append(f"• /exp\\_suggestions: {suggestions_status}")
+
     return "\n".join(lines)
 
 
-@router.message(Command("settings"))
+@router.message(Command("settings", ignore_case=True))
 async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     """Show current settings including Claude session state."""
     from ..keyboards import settings_keyboard
@@ -143,7 +155,7 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, text, reply_markup=kb)
 
 
-@router.message(Command("auto_accept"))
+@router.message(Command("auto_accept", ignore_case=True))
 async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
     """Toggle auto-accept or reset all."""
     chat_id = message.chat.id
@@ -184,7 +196,7 @@ async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
     project_manager._save()
 
 
-@router.message(Command("verbose"))
+@router.message(Command("verbose", ignore_case=True))
 async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
     """Toggle verbose output mode."""
     chat_id = message.chat.id
@@ -209,6 +221,49 @@ async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
 
     project_manager._save()
     await telegram_queue.reply(message, f"Verbose output: {status}")
+
+
+@router.message(Command("exp_thinking_status", ignore_case=True))
+async def cmd_exp_thinking_status(message: Message, telegram_queue: TelegramQueue):
+    """Toggle thinking status feature."""
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    thread = None
+    if project.threads:
+        thread = project.threads.get(thread_id)
+
+    if thread:
+        thread.feat_thinking_status = not thread.feat_thinking_status
+        status = "● on" if thread.feat_thinking_status else "○ off"
+    else:
+        project.feat_thinking_status = not project.feat_thinking_status
+        status = "● on" if project.feat_thinking_status else "○ off"
+
+    project_manager._save()
+    await telegram_queue.reply(message, f"Thinking status: {status}")
+
+
+@router.message(Command("exp_suggestions", ignore_case=True))
+async def cmd_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
+    """Toggle suggestions feature (chat-wide)."""
+    chat_id = message.chat.id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    project.feat_suggestions = not project.feat_suggestions
+    status = "● on" if project.feat_suggestions else "○ off"
+
+    project_manager._save()
+    await telegram_queue.reply(message, f"Suggestions (all topics): {status}")
 
 
 @router.callback_query(F.data.startswith("set:"))

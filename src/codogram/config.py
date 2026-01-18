@@ -3,6 +3,15 @@ import json
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Telegram limits
+TELEGRAM_MESSAGE_MAX_LENGTH = 4000
+
+# Screen parsing
+SCREEN_SEPARATOR_MIN_DASHES = 10
+
+# Tmux capture
+TMUX_CAPTURE_LINES_DEFAULT = 30
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
@@ -30,6 +39,11 @@ settings = Settings()
 # Config file path - in ~/.codogram/ to avoid worktree issues
 CONFIG_DIR = Path.home() / ".codogram"
 CONFIG_PATH = CONFIG_DIR / "config.json"
+
+def get_config_path() -> Path:
+    """Return the config file path, ensuring parent directory exists."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    return CONFIG_PATH
 
 def load_config() -> dict:
     """Load config.json or return default."""

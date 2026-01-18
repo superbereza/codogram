@@ -253,39 +253,80 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Кнопка close удаляет сообщение с настройками
 - См. [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
-## In Progress
+## Beta Test
 
-### Robust /start flow
-Атомарность и error recovery для flow создания проекта:
-- **Атомарность** — project entry создаётся только после успешного clone/init
-- **Валидация URL** — проверка wiki/blob/gist ссылок ДО клонирования
-- **retry при невалидном URL** — остаёмся в FSM state, просим валидный URL
-- **require_project_ready()** — helper для проверки cwd + tmux + Claude ready
-- **Скрытие команд** — /clear, /esc etc недоступны пока проект не готов
-- **/reset_all** — команда для сброса проекта на этапе сетапа (до запуска Claude)
-- **sanitize_project_name с unidecode** — "Мой Проект 🚀" → `moj-proekt`
-- **Анонс команд по типу чата** — после успешного запуска показываем доступные команды
-- См. docs/designs/2026-01-17-robust-start-flow.md (planned)
+### Редизайн set up flow + robust start
+Полный редизайн /start flow с устойчивой обработкой ошибок и интуитивным UX настройки:
+- Три пути настройки: Clone repository, Connect existing folder, New project
+- SetupFlow FSM со состояниями для каждого шага
+- SetupBlockerMiddleware блокирует не-setup команды во время flow
+- Кнопка Cancel и /reset_all для отмены setup
+- Навигация с кнопками Go back
+- См. [docs/designs/done/2026-01-18-start-flow-v2.md](designs/done/2026-01-18-start-flow-v2.md)
 
-### Inline suggests к сообщениям Claude
-Кнопки-саджесты прикреплённые к ответам Claude:
-- Клик отправляет предложенное действие/ответ
-- Context-aware на основе содержимого сообщения
-- Быстрые follow-up действия
+### Compacting detection
+Уведомление когда Claude компактит conversation:
+- Парсинг thinking status на ключевое слово "Compacting"
+- Одноразовое уведомление `[i] Claude is compacting conversation...`
+- Включено для всех, ещё в отладке
 
 ### Activity indicators
 Отображение что Claude думает/работает:
 - Индикатор генерации над input box в tmux
-- Парсить из tmux capture-pane
-- Показывать typing indicator или статус в Telegram
+- Парсинг из tmux capture-pane
+- Показ thinking status в Telegram
+- Toggle: `/exp_thinking_status`
+
+### Input suggestions
+Показ саджестов Claude в Telegram:
+- Парсинг саджеста из input box (текст с маркером `↵ send`)
+- Отображение как ReplyKeyboard для отправки в один тап
+- Toggle: `/exp_suggestions`
+
+### Stuck message recovery
+Автоопределение и переотправка застрявших сообщений:
+- Детект `[Pasted X lines]` или last_sent_message застрявшего в input
+- Debounce: отправка Enter только после двух одинаковых состояний
+- Предотвращает потерю сообщений из-за race conditions
+- См. [docs/designs/done/2026-01-17-stuck-message-recovery.md](designs/done/2026-01-17-stuck-message-recovery.md)
+
+## In Progress
+
+### Code cleanup
+Уменьшение технического долга по фазам:
+- **Phase 1 (done):** Circular dependency fix, магические числа → константы
+- **Phase 2 (backlog):** @require_state() декоратор для handlers
+- **Phase 3 (backlog):** LaunchService extraction, DEPRECATED поля, ThreadInfo refactoring
+- См. [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
+
+### Онбординг в боте
+Интерактивный онбординг в директ чате с ботом:
+- Welcome flow с объяснением возможностей бота
+- Пошаговое руководство для новых пользователей
+
+### Avatar emoji pack
+Emoji pack из аватарок участников группы:
+- Создание pack при миграции группа → супергруппа (async)
+- Добавление аватарки при входе участника, удаление при выходе
+- Генерация placeholder (буква + цвет) для юзеров без аватарки
+- Уведомление: "`[v]` Gift unlocked — avatar pack for topic icons"
+- Ограничение: Premium нужен для установки custom emoji как иконки топика
+- См. [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
+
+### Voice → Whisper
+Голосовые сообщения через Whisper transcription:
+- Использовать код из bz-merch-assistant
+- `ai_bot_core/services/whisper.py`
 
 ## Backlog
 
-### Онбординг в боте
-Интерактивный онбординг для новых пользователей:
-- Welcome flow с объяснением возможностей бота
-- Пошаговое руководство по настройке
-- Подсказки при первом использовании
+### Объединить команды thread и branch
+Упростить, убрав отдельную команду /thread:
+- Thread по сути это branch от main
+- Одна команда `/branch` для всех случаев
+- Без аргумента = branch от main (текущее поведение /thread)
+- С аргументом = branch от текущей ветки
+- Меньше когнитивной нагрузки для пользователей
 
 ### Упрощение названий в меню
 Сделать названия команд более понятными:
@@ -312,6 +353,13 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Упрощённое меню для не-power-users
 - Хранить в per-project settings
 
+### Auto-resume при отправке сообщения
+Авто-запуск Claude когда пользователь отправляет сообщение, а tmux не существует:
+- Показать: `` `[~]` Tmux session not found, launching... ``
+- Если есть `session_id` → `claude --resume`, иначе `claude`
+- Очередь всех сообщений (текст + файлы) пока запускается
+- Отправить очередь после готовности Claude
+
 ### Контекст безопасности Telegram
 Подкидывать гайдлайны безопасности при старте треда/бранча/проекта:
 - Объяснить Claude что безопасно делать в Telegram окружении
@@ -325,6 +373,13 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Или sandbox/изолированное выполнение
 - Простое восстановление если что-то сломалось
 - Нужен R&D по лучшему подходу
+
+### Рефакторинг permission poller
+Разбить god-function на handler классы:
+- Разбить 500-строчный `permission_poller()` на отдельные handlers
+- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
+- Каждый handler 20-150 строк, unit-тестируемый
+- См. [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
 
 ### Скрытые tool calls
 Скрывать internal tool calls по умолчанию:
@@ -395,11 +450,6 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Workflow для запуска тестов на PR
 - pytest + type checking
 
-### Voice → Whisper
-Голосовые сообщения через Whisper transcription:
-- Используем существующий код из bz-merch-assistant
-- `ai_bot_core/services/whisper.py`
-
 ### Pin startup message
 Пинить сообщение при запуске сессии:
 - `Claude started in claude-codogram-sublime`
@@ -411,10 +461,6 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - График или текстовый индикатор в /settings
 - Мониторинг потребления ресурсов Claude процессом
 
-### Compacting indicator
-Отображение процесса компактинга контекста:
-- Детектить compacting из tmux capture-pane
-- Показывать прогресс в Telegram
 
 ### Tool results formatting
 Красивое форматирование результатов тулов:

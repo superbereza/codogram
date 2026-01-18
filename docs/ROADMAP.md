@@ -253,39 +253,80 @@ Per-thread/per-project verbose output toggle and /settings UX:
 - Close button deletes settings message
 - See [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
-## In Progress
+## Beta Test
 
-### Robust /start flow
-Atomicity and error recovery for project creation flow:
-- **Atomicity** — project entry created only after successful clone/init
-- **URL validation** — check wiki/blob/gist URLs BEFORE cloning
-- **Retry on invalid URL** — stay in FSM state, ask for valid URL
-- **require_project_ready()** — helper to check cwd + tmux + Claude ready
-- **Hide commands** — /clear, /esc etc unavailable until project ready
-- **/reset_all** — command to reset project during setup (before Claude launches)
-- **sanitize_project_name with unidecode** — "Мой Проект 🚀" → `moj-proekt`
-- **Announce commands by chat type** — show available commands after successful launch
-- See docs/designs/2026-01-17-robust-start-flow.md (planned)
+### Set up flow redesign + robust start
+Full redesign of /start flow with robust error handling and intuitive setup UX:
+- Three setup paths: Clone repository, Connect existing folder, New project
+- SetupFlow FSM with states for each step
+- SetupBlockerMiddleware blocks non-setup commands during flow
+- Cancel button and /reset_all to abort setup
+- Proper navigation with Go back buttons
+- See [docs/designs/done/2026-01-18-start-flow-v2.md](designs/done/2026-01-18-start-flow-v2.md)
 
-### Inline suggests on Claude messages
-Suggestion buttons attached to Claude's responses:
-- Click to send suggested action/response
-- Context-aware based on message content
-- Quick follow-up actions
+### Compacting detection
+Detect when Claude compacts conversation and notify user:
+- Parse thinking status for "Compacting" keyword
+- One-time notification `[i] Claude is compacting conversation...`
+- Enabled for all, still debugging
 
 ### Activity indicators
 Show that Claude is thinking/working:
 - Generation indicator appears ABOVE input box in tmux
 - Parse from tmux capture-pane
-- Show typing indicator or status in Telegram
+- Show thinking status in Telegram
+- Toggle: `/exp_thinking_status`
+
+### Input suggestions
+Show Claude's suggested input in Telegram:
+- Parse suggestion from input box (text with `↵ send` marker)
+- Display as ReplyKeyboard for one-tap send
+- Toggle: `/exp_suggestions`
+
+### Stuck message recovery
+Auto-detect and resend messages stuck in Claude's input:
+- Detect `[Pasted X lines]` or last sent message stuck in input field
+- Debounce: send Enter only after seeing same stuck text twice
+- Prevents messages from getting lost due to race conditions
+- See [docs/designs/done/2026-01-17-stuck-message-recovery.md](designs/done/2026-01-17-stuck-message-recovery.md)
+
+## In Progress
+
+### Code cleanup
+Technical debt reduction in phases:
+- **Phase 1 (done):** Circular dependency fix, magic numbers → constants
+- **Phase 2 (backlog):** @require_state() decorator for handlers
+- **Phase 3 (backlog):** LaunchService extraction, DEPRECATED fields, ThreadInfo refactoring
+- See [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
+
+### Bot onboarding
+Interactive onboarding in direct messages with bot:
+- Welcome flow explaining bot features
+- Step-by-step guidance for first-time users
+
+### Avatar emoji pack
+Custom emoji pack from group members' avatars:
+- Create pack on group → supergroup migration (async)
+- Add avatar when member joins, remove when leaves
+- Generate placeholder (letter + color) for users without avatar
+- Notification: "`[v]` Gift unlocked — avatar pack for topic icons"
+- Limitation: Premium required to set custom emoji as topic icon
+- See [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
+
+### Voice → Whisper
+Voice messages via Whisper transcription:
+- Use existing code from bz-merch-assistant
+- `ai_bot_core/services/whisper.py`
 
 ## Backlog
 
-### Bot onboarding
-Interactive onboarding for new users:
-- Welcome flow explaining bot features
-- Step-by-step setup guidance
-- Tips and hints during first use
+### Merge thread and branch commands
+Simplify by removing separate /thread command:
+- Thread is essentially a branch for main
+- Single `/branch` command for all cases
+- No argument = branch from main (current /thread behavior)
+- With argument = branch from current branch
+- Reduces cognitive load for users
 
 ### Menu naming simplification
 Make command names more intuitive:
@@ -312,6 +353,13 @@ Admin commands to enable/disable features:
 - Simplify menu for non-power-users
 - Store in per-project settings
 
+### Auto-resume on message
+Auto-launch Claude when user sends message but tmux doesn't exist:
+- Show: `` `[~]` Tmux session not found, launching... ``
+- If `session_id` exists → `claude --resume`, else `claude`
+- Queue all messages (text + files) while launching
+- Send queued messages after Claude ready
+
 ### Telegram safety context
 Inject safety guidelines when starting thread/branch/project:
 - Tell Claude what's safe to do in Telegram environment
@@ -325,6 +373,13 @@ Allow product managers to use Claude without breaking environment:
 - Or sandboxed/isolated execution
 - Easy recovery if something breaks
 - Need R&D on best approach
+
+### Permission poller refactoring
+Refactor god-function into handler classes:
+- Split 500-line `permission_poller()` into separate handlers
+- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
+- Each handler 20-150 lines, unit-testable
+- See [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
 
 ### Hidden tool calls
 Hide internal tool calls by default:
@@ -395,11 +450,6 @@ Explicit deletion of archived branches when disk space or git cleanup needed:
 - Workflow for running tests on PR
 - pytest + type checking
 
-### Voice → Whisper
-Voice messages via Whisper transcription:
-- Use existing code from bz-merch-assistant
-- `ai_bot_core/services/whisper.py`
-
 ### Pin startup message
 Pin message on session start:
 - `Claude started in claude-codogram-sublime`
@@ -411,10 +461,6 @@ Display CPU/RAM usage:
 - Graph or text indicator in /settings
 - Monitor Claude process resource consumption
 
-### Compacting indicator
-Show context compacting progress:
-- Detect compacting from tmux capture-pane
-- Show progress in Telegram
 
 ### Tool results formatting
 Beautiful tool results formatting:

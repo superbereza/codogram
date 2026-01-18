@@ -10,9 +10,12 @@ from codogram.session_manager import ThreadInfo
 
 @pytest.fixture
 def recovery_handler():
+    mock_queue = MagicMock()
+    mock_queue.edit = AsyncMock()
+    mock_queue.send = AsyncMock()
     handler = WorktreeRecoveryHandler(
         project_manager=MagicMock(),
-        queue=MagicMock(),
+        queue=mock_queue,
         bot=MagicMock(),
     )
     return handler
@@ -103,8 +106,9 @@ class TestWorktreeRecoveryCallbacks:
             await recovery_handler.handle_wr_recreate(mock_callback)
 
         # Should show error with options
-        call_args = mock_callback.message.edit_text.call_args
-        text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
+        recovery_handler.queue.edit.assert_called()
+        call_args = recovery_handler.queue.edit.call_args
+        text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "[x]" in text
         assert "/finish" in text
         assert "/thread" in text
@@ -122,8 +126,9 @@ class TestWorktreeRecoveryEdgeCases:
 
         await recovery_handler.handle_wr_recreate(mock_callback)
 
-        call_args = mock_callback.message.edit_text.call_args
-        text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
+        recovery_handler.queue.edit.assert_called()
+        call_args = recovery_handler.queue.edit.call_args
+        text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "not found" in text.lower()
 
     @pytest.mark.asyncio
@@ -136,8 +141,9 @@ class TestWorktreeRecoveryEdgeCases:
 
         await recovery_handler.handle_wr_create(mock_callback)
 
-        call_args = mock_callback.message.edit_text.call_args
-        text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
+        recovery_handler.queue.edit.assert_called()
+        call_args = recovery_handler.queue.edit.call_args
+        text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "not found" in text.lower()
 
     @pytest.mark.asyncio
@@ -150,8 +156,9 @@ class TestWorktreeRecoveryEdgeCases:
 
         await recovery_handler.handle_wr_main(mock_callback)
 
-        call_args = mock_callback.message.edit_text.call_args
-        text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
+        recovery_handler.queue.edit.assert_called()
+        call_args = recovery_handler.queue.edit.call_args
+        text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "not found" in text.lower()
 
     @pytest.mark.asyncio
@@ -161,8 +168,9 @@ class TestWorktreeRecoveryEdgeCases:
 
         await recovery_handler.handle_wr_recreate(mock_callback)
 
-        call_args = mock_callback.message.edit_text.call_args
-        text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
+        recovery_handler.queue.edit.assert_called()
+        call_args = recovery_handler.queue.edit.call_args
+        text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "invalid" in text.lower()
 
     @pytest.mark.asyncio
@@ -172,8 +180,9 @@ class TestWorktreeRecoveryEdgeCases:
 
         await recovery_handler.handle_wr_create(mock_callback)
 
-        call_args = mock_callback.message.edit_text.call_args
-        text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
+        recovery_handler.queue.edit.assert_called()
+        call_args = recovery_handler.queue.edit.call_args
+        text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "invalid" in text.lower()
 
     @pytest.mark.asyncio
@@ -183,6 +192,7 @@ class TestWorktreeRecoveryEdgeCases:
 
         await recovery_handler.handle_wr_main(mock_callback)
 
-        call_args = mock_callback.message.edit_text.call_args
-        text = call_args[0][0] if call_args[0] else call_args[1].get("text", "")
+        recovery_handler.queue.edit.assert_called()
+        call_args = recovery_handler.queue.edit.call_args
+        text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "invalid" in text.lower()

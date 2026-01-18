@@ -1,7 +1,7 @@
 """Message routing handler - routes messages to tmux sessions."""
 import asyncio
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.types import Message
 
 from ..services.message_router import MessageRouterService, RouteAction
@@ -11,6 +11,7 @@ from ..telegram_queue import TelegramQueue
 from ..logging_config import logger
 from .. import strings
 from .create_flow import handle_name_input
+from .common import normalize_thread_id
 
 router = Router(name="messages")
 
@@ -26,6 +27,12 @@ _FILE_ERROR_MESSAGES = {
 }
 
 
+@router.message(F.text.startswith("/"))
+async def on_unknown_command(message: Message, telegram_queue: TelegramQueue):
+    """Forward unregistered commands to Claude as text."""
+    await _route_message(message, telegram_queue)
+
+
 @router.message()
 async def on_message(message: Message, telegram_queue: TelegramQueue):
     """Route regular messages to tmux sessions.
@@ -33,6 +40,11 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
     This is the catch-all handler - registered last so commands
     and FSM states are handled first by other routers.
     """
+    await _route_message(message, telegram_queue)
+
+
+async def _route_message(message: Message, telegram_queue: TelegramQueue):
+    """Common routing logic for all messages."""
     text = message.text
     has_file = bool(message.photo or message.document)
 
@@ -52,17 +64,14 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
         f"chat={message.chat.id} thread={message.message_thread_id}: {content_preview}"
     )
 
-    # Skip commands
-    if text and text.startswith("/"):
-        return
-
     chat_id = message.chat.id
 
     # Check if awaiting name input for create flow
     if await handle_name_input(message, telegram_queue):
         return
 
-    thread_id = message.message_thread_id
+    # Normalize thread_id - ignore in non-forum chats
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
 
     # Route the message
     result = _message_router.route(chat_id, thread_id, text)
@@ -74,10 +83,11 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
 
         case RouteAction.CREATE_PENDING:
             # Unknown topic - create pending thread
+            logger.info(f"CREATE_PENDING: chat={chat_id} thread_id={thread_id}")
             thread = ThreadInfo(thread_id=thread_id, name="pending")
             result.project.threads[thread_id] = thread
             project_manager._save()
-            await telegram_queue.reply(message, "Use /start or /thread_create to connect Claude to this topic")
+            await telegram_queue.reply(message, strings.THREAD_CONNECT_HINT)
             return
 
         case RouteAction.SKIP_PENDING:
@@ -86,7 +96,7 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
 
         case RouteAction.START_BINDING:
             # Need to bind session - start binding task
-            await _start_binding(message, result)
+            await _start_binding(message, result, telegram_queue)
             # Still try to send to tmux (supports files too)
             await _send_content(message, result, telegram_queue)
             return
@@ -141,6 +151,10 @@ async def _send_content(message: Message, result, telegram_queue: TelegramQueue)
     else:
         content = message.text
 
+    # Track for stuck message detection
+    if result.thread:
+        result.thread.last_sent_message = content
+
     return _message_router.send_to_tmux(result, content)
 
 
@@ -155,10 +169,9 @@ def _try_send_to_tmux(result, text: str) -> bool:
     return False
 
 
-async def _start_binding(message: Message, result):
+async def _start_binding(message: Message, result, telegram_queue: TelegramQueue):
     """Start session binding for unbound thread."""
     from ..history_watcher import poll_for_session_thread
-    from .. import main
 
     thread = result.thread
     project = result.project
@@ -170,15 +183,15 @@ async def _start_binding(message: Message, result):
 
         async def start_poller(p):
             from ..permission_poller import create_poller_task
-            return await create_poller_task(message.bot, p, main.telegram_queue)
+            return await create_poller_task(message.bot, p, telegram_queue)
 
         async def start_watcher(p, send_missed=False):
             from ..watcher import create_watcher_task
-            return await create_watcher_task(message.bot, p, main.telegram_queue, send_missed)
+            return await create_watcher_task(message.bot, p, telegram_queue, send_missed)
 
         thread.binding_task = asyncio.create_task(
             poll_for_session_thread(
                 project, thread, message.bot,
-                start_poller, start_watcher, main.telegram_queue
+                start_poller, start_watcher, telegram_queue
             )
         )

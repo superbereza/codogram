@@ -22,6 +22,10 @@ class TestFlowAction:
     def test_has_launch(self):
         assert FlowAction.LAUNCH.value == "launch"
 
+    def test_ask_clone_url_retry_action_exists(self):
+        assert hasattr(FlowAction, 'ASK_CLONE_URL_RETRY')
+        assert FlowAction.ASK_CLONE_URL_RETRY.value == "ask_clone_url_retry"
+
 
 class TestFlowResult:
     def test_default_values(self):
@@ -72,10 +76,10 @@ class TestHandleStartWithProjectName:
         assert "letters, digits" in result.error.lower() or "only contain" in result.error.lower()
 
     def test_project_name_too_long(self):
-        """Project name > 35 chars -> ERROR."""
+        """Project name > 50 chars -> ERROR."""
         service = StartFlowService(Mock(), Mock())
 
-        result = service.handle_start(chat_id=123, args=["a" * 40])
+        result = service.handle_start(chat_id=123, args=["a" * 55])
 
         assert result.action == FlowAction.ERROR
         assert "too long" in result.error.lower()
@@ -105,13 +109,14 @@ class TestHandleStartNoArgs:
         with patch(
             "codogram.services.start_flow.resolve_project_path"
         ) as mock_resolve:
-            mock_resolve.return_value = Mock(path="/tmp/My-Project", exists=False)
+            mock_resolve.return_value = Mock(path="/tmp/my-project", exists=False)
             result = service.handle_start(
                 chat_id=123, args=[], chat_title="My Project!"
             )
 
         assert result.action == FlowAction.ASK_DIR_CHOICE
-        assert result.project == "My-Project"
+        # sanitize_project_name now lowercases the result
+        assert result.project == "my-project"
 
     def test_ignores_invalid_chat_title(self):
         """Chat title that sanitizes to empty -> ASK_PROJECT_NAME."""
@@ -421,6 +426,36 @@ class TestGitMethods:
 class TestHandleCloneUrl:
     """Tests for handle_clone_url."""
 
+    def test_validates_wiki_url(self):
+        """Wiki URL -> ASK_CLONE_URL_RETRY with wiki error."""
+        pm = Mock()
+        service = StartFlowService(pm, None)
+
+        result = service.handle_clone_url(
+            chat_id=123,
+            project="test",
+            path="/tmp/test",
+            url="https://github.com/user/repo/wiki/Page",
+        )
+
+        assert result.action == FlowAction.ASK_CLONE_URL_RETRY
+        assert "wiki" in result.error.lower()
+
+    def test_validates_blob_url(self):
+        """Blob URL -> ASK_CLONE_URL_RETRY with file error."""
+        pm = Mock()
+        service = StartFlowService(pm, None)
+
+        result = service.handle_clone_url(
+            chat_id=123,
+            project="test",
+            path="/tmp/test",
+            url="https://github.com/user/repo/blob/main/file.py",
+        )
+
+        assert result.action == FlowAction.ASK_CLONE_URL_RETRY
+        assert "file" in result.error.lower()
+
     def test_valid_https_url(self):
         mock_pm = Mock()
         mock_pm.get_or_create.return_value = Mock(cwd=None, chat_id=None)
@@ -457,6 +492,7 @@ class TestHandleCloneUrl:
         assert result.action == FlowAction.LAUNCH
 
     def test_invalid_url_format(self):
+        """Invalid URL format -> ASK_CLONE_URL_RETRY to allow correction."""
         service = StartFlowService(Mock(), Mock())
         result = service.handle_clone_url(
             chat_id=123,
@@ -465,10 +501,11 @@ class TestHandleCloneUrl:
             url="not-a-valid-url",
         )
 
-        assert result.action == FlowAction.ERROR
+        assert result.action == FlowAction.ASK_CLONE_URL_RETRY
         assert "invalid" in result.error.lower() or "url" in result.error.lower()
 
     def test_clone_failure(self):
+        """Clone failure -> ASK_CLONE_URL_RETRY to allow URL correction."""
         service = StartFlowService(Mock(), Mock())
 
         with patch("codogram.services.start_flow.git_clone") as mock_clone:
@@ -480,7 +517,8 @@ class TestHandleCloneUrl:
                 url="https://github.com/user/repo.git",
             )
 
-        assert result.action == FlowAction.ERROR
+        assert result.action == FlowAction.ASK_CLONE_URL_RETRY
+        assert "clone failed" in result.error.lower()
 
 
 class TestHandleTmuxSelected:
@@ -804,3 +842,120 @@ class TestHandleRestartConfirm:
         result = service.handle_cancel()
 
         assert result.action == FlowAction.CANCELLED
+
+
+class TestIsSetupPhase:
+    """Tests for is_setup_phase() function."""
+
+    def test_is_setup_phase_no_threads(self):
+        """No threads at all -> True."""
+        from codogram.services.start_flow import is_setup_phase
+        from codogram.session_manager import ProjectState
+
+        project = ProjectState(project_name="test")
+        assert is_setup_phase(project) is True
+
+    def test_is_setup_phase_main_thread_no_session(self):
+        """Main thread exists but no session_id -> True."""
+        from codogram.services.start_flow import is_setup_phase
+        from codogram.session_manager import ProjectState, ThreadInfo
+
+        project = ProjectState(project_name="test")
+        project.threads[None] = ThreadInfo(thread_id=None, name="main")
+        assert is_setup_phase(project) is True
+
+    def test_is_setup_phase_main_thread_with_session(self):
+        """Main thread has session_id -> False."""
+        from codogram.services.start_flow import is_setup_phase
+        from codogram.session_manager import ProjectState, ThreadInfo
+
+        project = ProjectState(project_name="test")
+        project.threads[None] = ThreadInfo(thread_id=None, name="main", session_id="abc123")
+        assert is_setup_phase(project) is False
+
+    def test_is_setup_phase_legacy_session_id(self):
+        """Legacy projects have session_id on project, not thread."""
+        from codogram.services.start_flow import is_setup_phase
+        from codogram.session_manager import ProjectState
+
+        project = ProjectState(project_name="test")
+        project.session_id = "legacy-session"
+        assert is_setup_phase(project) is False
+
+
+class TestCleanupProject:
+    """Tests for cleanup_project() helper."""
+
+    def test_cleanup_project_kills_tmux(self):
+        """cleanup_project should kill tmux for all threads."""
+        from unittest.mock import MagicMock, patch
+        from codogram.services.start_flow import cleanup_project
+        from codogram.session_manager import ProjectState, ThreadInfo
+
+        project = ProjectState(project_name="test", cwd="/test/path")
+        project.threads[None] = ThreadInfo(thread_id=None, name="main")
+        project.threads[123] = ThreadInfo(thread_id=123, name="feature")
+
+        with patch('codogram.services.start_flow.is_tmux_session_exists') as exists, \
+             patch('codogram.services.start_flow.kill_tmux_session') as kill, \
+             patch('codogram.session_manager.project_manager') as pm:
+
+            exists.return_value = True
+            pm.projects = {"test": project}
+
+            result = cleanup_project(project, delete_directory=False)
+
+            # Should kill tmux for both threads
+            assert kill.call_count == 2
+            assert result.success is True
+
+    def test_cleanup_project_reports_failed_deletion(self):
+        """cleanup_project should report if directory deletion fails."""
+        from unittest.mock import MagicMock, patch
+        from codogram.services.start_flow import cleanup_project
+        from codogram.session_manager import ProjectState, ThreadInfo
+
+        project = ProjectState(project_name="test", cwd="/nonexistent/protected/path")
+        project.threads[None] = ThreadInfo(thread_id=None, name="main")
+
+        with patch('codogram.services.start_flow.is_tmux_session_exists') as exists, \
+             patch('codogram.services.start_flow.kill_tmux_session') as kill, \
+             patch('codogram.session_manager.project_manager') as pm, \
+             patch('codogram.services.start_flow.Path') as MockPath:
+
+            exists.return_value = False
+            pm.projects = {"test": project}
+            # Simulate directory still exists after rmtree
+            MockPath.return_value.exists.return_value = True
+
+            result = cleanup_project(project, delete_directory=True)
+
+            assert result.success is False
+            assert "could not delete" in result.error.lower()
+
+
+class TestBuildAnnouncement:
+    """Tests for build_announcement() helper."""
+
+    def test_build_announcement_non_forum(self):
+        from codogram.services.start_flow import build_announcement
+
+        result = build_announcement("test-project", "claude-test", is_forum=False)
+
+        assert "test-project" in result
+        assert "claude-test" in result
+        assert "/esc" in result
+        assert "/clear" in result
+        assert "/auto_accept" in result
+        assert "/thread" not in result  # Forum-only
+        assert "/branch" not in result
+        assert "/finish" not in result
+
+    def test_build_announcement_forum(self):
+        from codogram.services.start_flow import build_announcement
+
+        result = build_announcement("test-project", "claude-test", is_forum=True)
+
+        assert "/thread" in result
+        assert "/branch" in result
+        assert "/finish" in result

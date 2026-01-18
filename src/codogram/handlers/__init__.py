@@ -2,6 +2,7 @@
 from aiogram import Dispatcher
 
 from . import permissions, start, threads, branches, sessions, settings, shift_tab, finish, create_flow, common, messages, migration
+from .setup import setup_router
 
 
 def register_handlers(dp: Dispatcher):
@@ -16,6 +17,7 @@ def register_handlers(dp: Dispatcher):
     - messages.router is catch-all (must be last)
     """
     dp.include_router(migration.router)      # Migration events (must be early)
+    dp.include_router(setup_router)          # Setup flow (my_chat_member, onboarding)
     dp.include_router(permissions.router)   # Permission callbacks
     dp.include_router(start.router)         # /start, /restart + FSM
     dp.include_router(threads.router)       # /thread_create, /thread_delete

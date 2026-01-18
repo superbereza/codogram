@@ -11,6 +11,10 @@ STATUS_PENDING = "`[~]`"
 STATUS_QUESTION = "`[?]`"
 STATUS_INFO = "`[i]`"
 
+# Toggle states
+STATUS_ON = "`● on`"
+STATUS_OFF = "`○ off`"
+
 
 # --- Launch animation ---
 
@@ -21,7 +25,7 @@ LAUNCH_WAITING = f"{STATUS_PENDING} Waiting for Claude..."
 LAUNCH_TIMEOUT = f"{STATUS_ERR} Timeout: Claude didn't start in 2 minutes"
 LAUNCH_ERROR = f"{STATUS_ERR} Launch error: {{error}}"
 LAUNCH_READY = f"{STATUS_OK} Claude ready"
-LAUNCH_READY_WITH_ATTACH = f"{STATUS_OK} Claude ready\n\nAttach: `tmux attach -t {{tmux_name}}`"
+LAUNCH_READY_WITH_ATTACH = f"{STATUS_OK} Claude ready\n\nTo see Claude UI: `tmux attach -t {{tmux_name}}`"
 LAUNCH_PROJECT_CWD_NOT_SET = f"{STATUS_ERR} Project cwd not set. Re-register with /start"
 
 # Launch service (worktree creation)
@@ -34,7 +38,7 @@ LAUNCH_WORKTREE_CREATED = f"{STATUS_OK} Worktree: `{{path}}`"
 
 SESSION_BOUND = f"{STATUS_OK} New session bound"
 SESSION_CLOSED = f"{STATUS_WARN} Claude session closed: {{name}}"
-SESSION_NOT_FOUND = f"{STATUS_WARN} Session not found. Make sure Claude is running"
+SESSION_NOT_FOUND = f"{STATUS_WARN} Session not found. Try /start"
 SESSION_EXPIRED = "Session expired"
 SESSION_EXPIRED_START = "Session expired, start again with /start"
 SESSION_STOPPED = "Session stopped. Use /start to launch"
@@ -44,6 +48,9 @@ NEW_SESSION = f"{STATUS_PENDING} Creating new session..."
 CLEAR_SESSION = f"{STATUS_PENDING} Clearing session..."
 
 CLAUDE_CRASHED = f"{STATUS_WARN} Claude crashed: {{reason}}\nUse /restart to restart"
+CLAUDE_AUTO_RESTARTED = f"{STATUS_INFO} Claude exited, auto\\-restarting\\.\\.\\."
+
+COMPACTING_STARTED = f"{STATUS_INFO} Claude is compacting conversation\\.\\.\\."
 
 
 # --- Project/Thread ---
@@ -61,7 +68,7 @@ THREAD_NAME_INVALID = "Name can only contain letters, digits, - and _"
 THREAD_CLOSE_CONFIRM = "Close thread '{name}'?\nTopic and tmux session will be deleted"
 THREAD_NOT_LINKED = "This topic is not linked to a Claude session"
 THREAD_TOPIC_ONLY = "This command can only be used in a topic"
-THREAD_CONNECT_HINT = "Use /start or /session_new to connect Claude to this topic"
+THREAD_CONNECT_HINT = "Use /start to connect Claude"
 
 THREAD_CREATING = f"{STATUS_PENDING} Creating thread `{{name}}`..."
 THREAD_CREATED = f"{STATUS_OK} Thread `{{name}}` created"
@@ -101,18 +108,69 @@ DIR_PATH_PROMPT = "Send project directory path:"
 # --- Claude status ---
 
 CLAUDE_ACTIVE = "Claude active in `{tmux_name}`"
-CLAUDE_ATTACH = "Attach: `tmux attach -t {tmux_name}`"
-CLAUDE_NOT_RUNNING = "Claude not running in `{cwd}`.\n\nLaunch?"
+CLAUDE_ATTACH = "To see Claude UI: `tmux attach -t {tmux_name}`"
+CLAUDE_NOT_RUNNING = f"{STATUS_INFO} Claude not running in `{{cwd}}`\\.\n\nUse /start to launch\\."
 CLAUDE_CONNECTED = "Connected to tmux: `{tmux_session}`"
 CLAUDE_NO_SESSION = "No active Claude session. Use /start to launch"
 CLAUDE_TMUX_NOT_FOUND = "tmux session not found. Start Claude in terminal"
 CLAUDE_NO_RESTART = "No active session to restart"
 
 
+# --- URL Validation ---
+
+GIT_URL_INVALID_WIKI = f"{STATUS_ERR} This is a wiki page, not a repository"
+GIT_URL_INVALID_BLOB = f"{STATUS_ERR} This is a file link. Use repository URL"
+GIT_URL_INVALID_GIST = f"{STATUS_ERR} Gists cannot be cloned as projects"
+GIT_URL_INVALID_FORMAT = f"{STATUS_ERR} Invalid URL. Use https:// or git@ format"
+GIT_URL_RETRY_PROMPT = "Send valid repository URL:"
+
+
+# --- Project State ---
+
+PROJECT_NOT_READY = f"{STATUS_WARN} Project not ready. Use /start first"
+CLAUDE_STARTING = f"{STATUS_WARN} Claude is starting... wait a moment"
+
+
+# --- Clone Progress ---
+
+CLONE_IN_PROGRESS = f"{STATUS_PENDING} Cloning repository... may take several minutes for large repos"
+
+
+# --- Reset Flow ---
+
+RESET_FLOW_IN_PROGRESS = f"{STATUS_WARN} Start flow in progress. Wait for completion or use /cancel"
+RESET_CLEANUP_FAILED = f"{STATUS_WARN} Could not delete directory `{{path}}`\\n\\nDelete manually: `rm -rf {{path}}`"
+
+RESET_NO_PROJECT = f"{STATUS_INFO} Nothing to reset. Use /start to begin."
+RESET_COMPLETE = f"{STATUS_OK} Reset complete. Use /start to begin."
+RESET_CONFIRM = f"""{STATUS_QUESTION} Reset project `{{name}}`?
+
+This will disconnect Claude and clear settings."""
+RESET_CONFIRM_TOPIC = f"""{STATUS_QUESTION} Reset entire project `{{name}}`?
+
+This will disconnect Claude in all topics and clear settings."""
+RESET_UNCOMMITTED = f"{STATUS_WARN} Uncommitted changes in `{{path}}`"
+RESET_DIR_CHOICE = f"{STATUS_QUESTION} Delete directory `{{path}}`?"
+RESET_DONE = f"""{STATUS_OK} Project reset
+
+• Config cleared
+• Claude stopped
+• Directory {{dir_status}}
+
+/start to begin new project"""
+
+
 # --- Misc ---
 
 TOPICS_REQUIRED_GROUP = f"{STATUS_WARN} This command requires a group with topics"
-TOPICS_REQUIRED_ENABLE = f"{STATUS_WARN} Topics required. Enable in group settings -> Topics"
+TOPICS_REQUIRED_ENABLE = f"""{STATUS_WARN} Topics required
+
+To enable:
+1. Open group settings \\(tap group name\\)
+2. Edit \\(pencil icon\\)
+3. Topics → Enable
+
+_Requires admin rights_"""
 
 CREATE_PROJECT_NOT_FOUND = f"{STATUS_WARN} Project not found"
 CREATE_TOPIC_ERROR = f"{STATUS_ERR} Error creating topic"
@@ -179,6 +237,16 @@ BTN_CANCEL_X = "[x] Cancel"
 BTN_CREATE = "Create"
 BTN_DIFFERENT_PATH = "Different path"
 BTN_NO_GIT = "No git"
+BTN_CONTINUE = "Continue"
+BTN_KEEP_DIR = "Keep directory"
+BTN_DELETE_DIR = "Delete"
+BTN_DELETE_ANYWAY = "Delete anyway"
+BTN_GO_BACK = "[<<] Go back"
+BTN_MAGIC_NAME = "🔮 Magic name"
+BTN_RECREATE_WORKTREE = "Recreate worktree"
+BTN_CREATE_NEW = "Create new"
+BTN_RESUME_IN_MAIN = "Resume in main"
+BTN_CLOSE = "Close"
 
 
 # --- Worktree Recovery ---
@@ -276,11 +344,11 @@ START_SESSION_KILLED = "Session killed. Use /start to restart"
 
 START_THREAD_RUNNING = f"""{STATUS_OK} Thread `{{thread_name}}` running
 
-Attach: `tmux attach -t {{tmux_session}}`"""
+To see Claude UI: `tmux attach -t {{tmux_session}}`"""
 
 START_ALREADY_RUNNING = f"""{STATUS_OK} Already running
 
-Attach: `tmux attach -t {{tmux_name}}`"""
+To see Claude UI: `tmux attach -t {{tmux_name}}`"""
 
 START_THREAD_UPGRADED = "Thread upgraded to `{thread_name}`"
 START_TOPIC_REGISTERED = "Topic registered as `{thread_name}`"
@@ -363,3 +431,126 @@ BRANCH_CREATING = f"{STATUS_PENDING} Creating branch `{{name}}`..."
 BRANCH_CREATED = f"{STATUS_OK} Branch `{{name}}` created"
 
 BRANCH_FINISH_USE_FINISH = f"{STATUS_INFO} Use /finish to complete branches"
+
+
+# --- Setup Flow v2 ---
+
+# Base directory
+SETUP_BASE_DIR_MISSING = f"""{STATUS_ERR} Configure base directory first
+
+Set BASE_DIR in \\.env file:
+`BASE_DIR=/home/user/dev`
+
+Then restart the bot\\."""
+
+# Admin rights
+SETUP_ADMIN_REQUIRED = f"""{STATUS_WARN} Grant admin rights to continue
+
+Bot needs admin rights to:
+• Rename chat to match project
+• Manage topics for branches
+
+Open chat settings → Administrators → Add bot as admin"""
+
+SETUP_ADMIN_CHECK_FAILED = f"{STATUS_WARN} Still missing admin rights"
+
+# Chat type errors
+SETUP_PRIVATE_CHAT = f"{STATUS_ERR} Add bot to a group chat"
+SETUP_CHANNEL_NOT_SUPPORTED = f"{STATUS_ERR} Channels not supported"
+SETUP_CANCELLED = f"{STATUS_INFO} Setup cancelled\\. Use /start to begin again\\."
+SETUP_ALREADY_IN_PROGRESS = f"{STATUS_INFO} Setup already in progress"
+
+# Command blocking during setup
+SETUP_COMMAND_BLOCKED = f"""{STATUS_WARN} Complete project setup first
+
+Available commands:
+• /start — restart setup
+• /reset\\_all — cancel setup
+• /help — get help"""
+
+# Setup type selection
+SETUP_CHOOSE_TYPE = "How would you like to set up this project?"
+
+# Clone flow
+SETUP_CLONE_URL_PROMPT = """Send repository URL:
+• SSH: `git@github.com:user/repo.git`
+• HTTPS: `https://github.com/user/repo.git`"""
+
+SETUP_CLONE_PROGRESS = f"{STATUS_PENDING} Cloning repository\\.\\.\\."
+SETUP_CLONE_FAILED = f"{STATUS_ERR} Clone failed: {{error}}"
+SETUP_CLONE_SSH_HINT = "SSH key may not be configured. Try HTTPS URL instead."
+SETUP_CLONE_AUTH_HINT = "Repository may be private. Check authentication."
+
+# Folder selection
+SETUP_FOLDER_SELECT = "Select folder to connect:"
+SETUP_FOLDER_EMPTY = f"{STATUS_WARN} No folders found in `{{base_dir}}`"
+SETUP_FOLDER_ALL_CONNECTED = f"""{STATUS_INFO} All folders are already connected
+
+Start a new project instead\\?"""
+SETUP_FOLDER_NOT_FOUND = f"{STATUS_ERR} Folder `{{name}}` not found"
+SETUP_FOLDER_USE_BUTTONS = "Select a folder from the list above\\nor use \\[<< Go back\\] to return\\."
+
+# View connected
+SETUP_CONNECTED_HEADER = "Connected projects:"
+SETUP_CONNECTED_EMPTY = "No projects connected yet"
+SETUP_CONNECTED_TAP_HINT = "Tap chat name to open\\."
+SETUP_CONNECTED_NO_LINK = "(no link)"
+
+# New project
+SETUP_PROJECT_NAME_PROMPT = """Project folder name?
+
+Suggested: `{suggested}`
+
+Or send custom name"""
+
+SETUP_PROJECT_NAME_INVALID = f"{STATUS_ERR} Invalid name\\. Use letters, digits, \\- and \\_ only"
+SETUP_PROJECT_EXISTS = f"""{STATUS_WARN} Folder `{{name}}` already exists
+
+What to do\\?"""
+
+# Git choice
+SETUP_GIT_CHOICE = "Git setup for `{folder}`\\?"
+SETUP_GIT_GH_NOT_INSTALLED = f"{STATUS_ERR} `gh` CLI not installed\\. Install from https://cli\\.github\\.com"
+SETUP_GIT_GH_NOT_AUTH = f"{STATUS_ERR} `gh` not authenticated\\. Run `gh auth login` first"
+
+# Rename
+SETUP_RENAME_PROMPT = "Rename chat to `{name}`\\?"
+SETUP_RENAME_FAILED = f"{STATUS_WARN} Couldn't rename chat \\(missing permissions?\\)\\nContinuing with project setup\\.\\.\\."
+
+# Launch
+SETUP_LAUNCH_PROGRESS = f"{STATUS_PENDING} Setting up project\\.\\.\\."
+SETUP_LAUNCH_MKDIR_FAILED = f"{STATUS_ERR} Failed to create directory: {{error}}"
+SETUP_LAUNCH_SUCCESS = f"""{STATUS_OK} Project `{{project}}` ready
+
+Commands available:
+• /esc — cancel operation
+• /clear — clear context
+• /auto_accept — toggle auto\\-accept
+• /thread — new topic
+
+To see Claude UI: `tmux attach \\-t {{tmux_name}}`"""
+
+SETUP_LAUNCH_SUCCESS_THREAD = f"""{STATUS_OK} Thread `{{thread}}` running
+
+To see Claude UI: `tmux attach \\-t {{tmux_name}}`"""
+
+# Buttons
+BTN_CLONE = "Clone repository"
+BTN_CONNECT = "Connect to existing folder"
+BTN_NEW = "Start new project"
+BTN_CHECK_RIGHTS = "Check rights"
+BTN_BACK_TO_FOLDERS = "<< Back to folders"
+BTN_VIEW_CONNECTED = "View connected projects"
+BTN_RENAME_YES = "Yes, rename"
+BTN_RENAME_NO = "No"
+BTN_GIT_INIT = "git init"
+BTN_GIT_GH = "git init + gh repo create"
+BTN_GIT_CLONE = "git clone"
+BTN_GIT_NONE = "No git"
+BTN_RETRY = "Retry"
+BTN_CHANGE_URL = "Change URL"
+BTN_USE_EXISTING = "Use existing"
+BTN_DIFFERENT_NAME = "Different name"
+
+# Stale button debounce (5 minutes per design)
+STALE_BUTTON_SECONDS = 300

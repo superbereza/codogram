@@ -2,6 +2,13 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
+from .config import SCREEN_SEPARATOR_MIN_DASHES
+
+# Claude thinking status spinners (unique Unicode chars)
+# Excluded: * (too common in text) and · (middle dot, appears in bullet lists)
+# These remaining chars are specific enough to not need content validation
+THINKING_SPINNERS = "✶✻✽✢"
+
 
 # Pattern for pasted content placeholder: [Pasted text #1 +51 lines]
 PASTED_PATTERN = re.compile(r'\[Pasted text #\d+ \+\d+ lines?\]')
@@ -164,7 +171,7 @@ def parse_screen(output: str) -> ScreenState:
     # 2. Find last solid separator ────
     last_sep_idx = -1
     for i, line in enumerate(lines):
-        if "─" * 10 in line:
+        if "─" * SCREEN_SEPARATOR_MIN_DASHES in line:
             last_sep_idx = i
 
     if last_sep_idx == -1:
@@ -249,7 +256,7 @@ def is_claude_ready(output: str) -> bool:
     lines = output.split('\n')
     solid_line_count = 0
     for line in lines:
-        if '─' * 10 in line:
+        if '─' * SCREEN_SEPARATOR_MIN_DASHES in line:
             solid_line_count += 1
             if solid_line_count >= 2:
                 return True
@@ -275,7 +282,7 @@ def parse_status_bar(output: str) -> StatusBar:
     # Find last separator (bottom of input box)
     last_sep_idx = -1
     for i, line in enumerate(lines):
-        if "─" * 10 in line:
+        if "─" * SCREEN_SEPARATOR_MIN_DASHES in line:
             last_sep_idx = i
 
     # Get lines after last separator (status bar area)
@@ -307,3 +314,115 @@ def parse_status_bar(output: str) -> StatusBar:
         background_tasks=background_tasks,
         context_percent=context_percent,
     )
+
+
+def parse_thinking_status(output: str) -> str | None:
+    """Parse thinking status line from area just above input box.
+
+    Formats vary:
+    - ✶ Wibbling… (ctrl+c to interrupt · 30s · ↓ 914 tokens · thinking)
+    - ✻ Cooked for 35s
+    - ✽ Compacting conversation...
+
+    Only looks at last 5 lines before first ──── separator to avoid
+    picking up old thinking statuses from scrollback.
+
+    Returns raw line with command injection:
+    - 'ctrl+c to interrupt' → '/esc to interrupt'
+    - 'esc to interrupt' → '/esc to interrupt'
+    """
+    lines = output.split("\n")
+
+    # Find first ──── separator (top of input box)
+    first_sep_idx = -1
+    for i, line in enumerate(lines):
+        if "─" * SCREEN_SEPARATOR_MIN_DASHES in line:
+            first_sep_idx = i
+            break
+
+    if first_sep_idx == -1:
+        return None
+
+    # Look at last 5 lines before separator (where thinking status appears)
+    start_idx = max(0, first_sep_idx - 5)
+    recent_lines = lines[start_idx:first_sep_idx]
+
+    for line in recent_lines:
+        stripped = line.strip()
+        if stripped and stripped[0] in THINKING_SPINNERS:
+            # THINKING_SPINNERS are unique enough - no content validation needed
+            # Replace ctrl+c first, then esc (but only standalone, not /esc)
+            result = stripped.replace("ctrl+c to interrupt", "/esc to interrupt")
+            # Use regex to replace only standalone "esc to interrupt" (not "/esc")
+            result = re.sub(r'(?<!/)(esc to interrupt)', r'/\1', result)
+            return result
+    return None
+
+
+def detect_compacting(output: str) -> bool:
+    """Detect if Claude is currently compacting conversation.
+
+    Looks for spinner + "compacting" in the area above input box.
+    Uses broader spinner set than thinking status (includes · which is common during compact).
+    """
+    # All possible spinners Claude uses (including · for compact)
+    compact_spinners = "·✶✻✽✢*"
+
+    lines = output.split("\n")
+
+    # Find first ──── separator (top of input box)
+    first_sep_idx = -1
+    for i, line in enumerate(lines):
+        if "─" * 10 in line:
+            first_sep_idx = i
+            break
+
+    if first_sep_idx == -1:
+        return False
+
+    # Look at last 5 lines before separator
+    start_idx = max(0, first_sep_idx - 5)
+    recent_lines = lines[start_idx:first_sep_idx]
+
+    for line in recent_lines:
+        stripped = line.strip()
+        if stripped and stripped[0] in compact_spinners:
+            if "compacting" in stripped.lower():
+                return True
+    return False
+
+
+def parse_input_suggestion(output: str) -> str | None:
+    """Parse suggestion from input box.
+
+    Format: ❯ suggestion text                    ↵ send
+    Located between last two ──── lines (input box).
+
+    Returns suggestion text or None if no suggestion.
+    """
+    lines = output.split("\n")
+
+    # Find last two ──── separators
+    sep_indices = []
+    for i, line in enumerate(lines):
+        if "─" * SCREEN_SEPARATOR_MIN_DASHES in line:
+            sep_indices.append(i)
+
+    if len(sep_indices) < 2:
+        return None
+
+    # Get content between last two separators
+    start = sep_indices[-2]
+    end = sep_indices[-1]
+
+    content = "\n".join(lines[start + 1:end]).strip()
+
+    # Match pattern: ❯ text ↵ send
+    # \xa0 is non-breaking space that Claude uses
+    match = re.match(r'❯[\s\xa0]*(.+?)[\s\xa0]*↵\s*send', content)
+    if match:
+        suggestion = match.group(1).strip()
+        if suggestion:
+            return suggestion
+
+    return None

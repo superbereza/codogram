@@ -366,3 +366,144 @@ async def test_edit_helper():
         assert batch.chat_id == 123
         assert batch.message_id == 456
         assert batch.text == "Updated"
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_deletes_message():
+    """DeleteBatch should call bot.delete_message."""
+    from unittest.mock import MagicMock
+    from codogram.telegram_queue import DeleteBatch
+
+    bot = MagicMock()
+    bot.delete_message = AsyncMock()
+
+    queue = TelegramQueue(bot)
+    batch = DeleteBatch(chat_id=123, message_id=456)
+
+    await queue.enqueue(batch)
+
+    bot.delete_message.assert_called_once_with(123, 456)
+    await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_replace_key_deduplicates_in_queue():
+    """Messages with same replace_key should replace each other in queue."""
+    from unittest.mock import MagicMock
+
+    bot = MagicMock()
+    sent_texts = []
+
+    async def mock_send(*args, **kwargs):
+        sent_texts.append(kwargs.get("text"))
+        msg = MagicMock()
+        msg.message_id = len(sent_texts)
+        return msg
+
+    bot.send_message = mock_send
+
+    queue = TelegramQueue(bot)
+
+    # Enqueue 3 messages with same replace_key, only last should be sent
+    batch1 = OutgoingBatch(chat_id=123, thread_id=None, messages=[{"text": "first"}], replace_key="status:123")
+    batch2 = OutgoingBatch(chat_id=123, thread_id=None, messages=[{"text": "second"}], replace_key="status:123")
+    batch3 = OutgoingBatch(chat_id=123, thread_id=None, messages=[{"text": "third"}], replace_key="status:123")
+
+    # Add all without waiting
+    await queue.enqueue_nowait(batch1)
+    await queue.enqueue_nowait(batch2)
+    await queue.enqueue_nowait(batch3)
+
+    # Wait for processing
+    await asyncio.sleep(0.5)
+
+    # Only "third" should be sent
+    assert sent_texts == ["third"]
+    await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_sent_statuses_tracks_message_ids():
+    """After sending with replace_key, msg_id should be stored in sent_statuses."""
+    from unittest.mock import MagicMock
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))
+
+    queue = TelegramQueue(bot)
+    batch = OutgoingBatch(
+        chat_id=123,
+        thread_id=None,
+        messages=[{"text": "test"}],
+        replace_key="thinking:123:456"
+    )
+
+    await queue.enqueue(batch)
+
+    assert queue.sent_statuses.get("thinking:123:456") == 999
+    await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_edit_by_replace_key():
+    """EditBatch with replace_key should use stored msg_id."""
+    from unittest.mock import MagicMock
+    from codogram.telegram_queue import EditBatch
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))
+    bot.edit_message_text = AsyncMock()
+
+    queue = TelegramQueue(bot)
+
+    # First send
+    send_batch = OutgoingBatch(
+        chat_id=123, thread_id=None,
+        messages=[{"text": "original"}],
+        replace_key="status:1"
+    )
+    await queue.enqueue(send_batch)
+
+    # Then edit by key
+    edit_batch = EditBatch(
+        chat_id=123, message_id=0,  # 0 = use sent_statuses
+        text="updated",
+        replace_key="status:1"
+    )
+    await queue.enqueue(edit_batch)
+
+    bot.edit_message_text.assert_called_with(
+        chat_id=123, message_id=999, text="updated",
+        parse_mode=None, reply_markup=None
+    )
+    await queue.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_delete_by_replace_key():
+    """DeleteBatch with replace_key should use stored msg_id and clean up."""
+    from unittest.mock import MagicMock
+    from codogram.telegram_queue import DeleteBatch
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))
+    bot.delete_message = AsyncMock()
+
+    queue = TelegramQueue(bot)
+
+    # First send
+    send_batch = OutgoingBatch(
+        chat_id=123, thread_id=None,
+        messages=[{"text": "temp"}],
+        replace_key="status:1"
+    )
+    await queue.enqueue(send_batch)
+    assert queue.sent_statuses.get("status:1") == 999
+
+    # Then delete by key
+    delete_batch = DeleteBatch(chat_id=123, message_id=0, replace_key="status:1")
+    await queue.enqueue(delete_batch)
+
+    bot.delete_message.assert_called_with(123, 999)
+    assert "status:1" not in queue.sent_statuses
+    await queue.shutdown()
