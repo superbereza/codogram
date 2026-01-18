@@ -276,23 +276,17 @@ Show Claude's suggested input in Telegram:
 
 ## In Progress
 
-### Bot onboarding
-Interactive onboarding for new users:
-- Welcome flow explaining bot features
-- Step-by-step setup guidance
-- Tips and hints during first use
-
-### Robust /start flow
-Atomicity and error recovery for project creation flow:
-- **Atomicity** — project entry created only after successful clone/init
-- **URL validation** — check wiki/blob/gist URLs BEFORE cloning
-- **Retry on invalid URL** — stay in FSM state, ask for valid URL
-- **require_project_ready()** — helper to check cwd + tmux + Claude ready
-- **Hide commands** — /clear, /esc etc unavailable until project ready
-- **/reset_all** — command to reset project during setup (before Claude launches)
-- **sanitize_project_name with unidecode** — "Мой Проект 🚀" → `moj-proekt`
-- **Announce commands by chat type** — show available commands after successful launch
-- See docs/designs/2026-01-17-robust-start-flow.md (planned)
+### Set up flow redesign (Start flow v2)
+Full redesign of /start flow for wider audience. Combines robust /start + onboarding:
+- **Auto-trigger** — bot added to chat, /start, or any message in unconfigured chat
+- **Admin rights check** — request permissions before proceeding
+- **Three setup modes** — Clone repo / Connect existing folder / New project
+- **Folder selection** — paginated list of available folders in base_dir
+- **Chat renaming** — rename chat to match project name
+- **Git setup options** — git init / git init + gh / git clone / no git
+- **Atomic launch** — rollback on failure
+- **SETUP_COMMANDS** — limited menu during onboarding
+- See [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md) (worktree: set-up-flow-redesign)
 
 ## Backlog
 

@@ -276,23 +276,17 @@ Per-thread/per-project toggle verbose output и UX настроек:
 
 ## In Progress
 
-### Онбординг в боте
-Интерактивный онбординг для новых пользователей:
-- Welcome flow с объяснением возможностей бота
-- Пошаговое руководство по настройке
-- Подсказки при первом использовании
-
-### Robust /start flow
-Атомарность и error recovery для flow создания проекта:
-- **Атомарность** — project entry создаётся только после успешного clone/init
-- **Валидация URL** — проверка wiki/blob/gist ссылок ДО клонирования
-- **retry при невалидном URL** — остаёмся в FSM state, просим валидный URL
-- **require_project_ready()** — helper для проверки cwd + tmux + Claude ready
-- **Скрытие команд** — /clear, /esc etc недоступны пока проект не готов
-- **/reset_all** — команда для сброса проекта на этапе сетапа (до запуска Claude)
-- **sanitize_project_name с unidecode** — "Мой Проект 🚀" → `moj-proekt`
-- **Анонс команд по типу чата** — после успешного запуска показываем доступные команды
-- См. docs/designs/2026-01-17-robust-start-flow.md (planned)
+### Редизайн set up flow (Start flow v2)
+Полный редизайн /start flow для широкой аудитории. Объединяет robust /start + onboarding:
+- **Авто-триггер** — бот добавлен в чат, /start, или любое сообщение в ненастроенном чате
+- **Проверка admin прав** — запрос разрешений перед продолжением
+- **Три режима setup** — Clone repo / Connect existing folder / New project
+- **Выбор папки** — пагинированный список папок в base_dir
+- **Переименование чата** — под имя проекта
+- **Git setup опции** — git init / git init + gh / git clone / no git
+- **Атомарный launch** — rollback при ошибке
+- **SETUP_COMMANDS** — ограниченное меню во время onboarding
+- См. [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md) (worktree: set-up-flow-redesign)
 
 ## Backlog
 
