@@ -13,6 +13,7 @@ from aiogram import Bot, Dispatcher
 from .config import settings
 from .middleware.admin import AdminMiddleware
 from .middleware.clear_create_state import ClearCreateStateMiddleware
+from .middleware.normalize_command import NormalizeCommandMiddleware
 from .middleware.setup_blocker import SetupBlockerMiddleware
 from .handlers import register_handlers
 from .session_manager import project_manager, ProjectState
@@ -35,6 +36,9 @@ async def main():
     telegram_queue = TelegramQueue(bot)
     dp = Dispatcher()
     dp["telegram_queue"] = telegram_queue  # Register for aiogram DI
+
+    # Normalize command case (/Branch -> /branch) - must be first
+    dp.message.outer_middleware(NormalizeCommandMiddleware())
 
     # Global admin check - protects ALL routers
     dp.message.middleware(AdminMiddleware())
