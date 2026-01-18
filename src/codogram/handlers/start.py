@@ -454,7 +454,8 @@ async def _connect_to_session_from_callback(callback: CallbackQuery, result: Flo
 @router.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /start command."""
-    thread_id = message.message_thread_id
+    from .common import normalize_thread_id
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
 
     # Check for stale worktree in topic before delegating to flow
     if thread_id is not None:
@@ -711,11 +712,12 @@ async def on_tmux_selected(callback: CallbackQuery, state: FSMContext, telegram_
 @router.message(Command("restart"))
 async def cmd_restart(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /restart command."""
+    from .common import normalize_thread_id
     start_flow = StartFlowService(project_manager, None)
 
     result = start_flow.handle_restart(
         chat_id=message.chat.id,
-        thread_id=message.message_thread_id,
+        thread_id=normalize_thread_id(message.chat, message.message_thread_id),
     )
 
     if result.action == FlowAction.ASK_RESTART_CONFIRM:
@@ -743,9 +745,10 @@ async def on_restart_confirm(callback: CallbackQuery, state: FSMContext, telegra
         return
 
     # Cancel background tasks before killing tmux
+    from .common import normalize_thread_id
     project = project_manager.get_by_chat(callback.message.chat.id)
     if project:
-        thread = project.get_thread(callback.message.message_thread_id)
+        thread = project.get_thread(normalize_thread_id(callback.message.chat, callback.message.message_thread_id))
         if thread:
             for task in [thread.launch_task, thread.watcher_task, thread.poller_task, thread.binding_task]:
                 if task and not task.done():

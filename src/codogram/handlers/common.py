@@ -15,6 +15,21 @@ router = Router(name="common")
 _flow_state: dict[tuple[int, int | None], dict] = {}
 
 
+def normalize_thread_id(chat, thread_id: int | None) -> int | None:
+    """Normalize thread_id - ignore in non-forum chats.
+
+    In forums, thread_id identifies the topic.
+    In regular groups, thread_id may come from replies but should be ignored.
+    """
+    from ..logging_config import logger
+
+    if not getattr(chat, 'is_forum', False):
+        if thread_id is not None:
+            logger.debug(f"normalize_thread_id: ignoring thread_id={thread_id} in non-forum chat={chat.id}")
+        return None
+    return thread_id
+
+
 def get_flow_state(chat_id: int, thread_id: int | None) -> dict | None:
     """Get flow state for chat/thread."""
     return _flow_state.get((chat_id, thread_id))
@@ -66,7 +81,8 @@ async def require_tmux_exists(
         await telegram_queue.reply(message, strings.PROJECT_NOT_READY)
         return False
 
-    thread = project.threads.get(message.message_thread_id)
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
+    thread = project.threads.get(thread_id)
     if not thread:
         await telegram_queue.reply(message, strings.PROJECT_NOT_READY)
         return False
@@ -91,7 +107,8 @@ async def require_claude_ready(
 
     # Additional check: Claude is ready (not starting)
     project = project_manager.get_by_chat(message.chat.id)
-    thread = project.threads.get(message.message_thread_id)
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
+    thread = project.threads.get(thread_id)
     tmux_name = thread.get_tmux_session(project.project_name)
     tmux = TmuxSession(tmux_name, project.cwd)
 
@@ -106,7 +123,7 @@ async def require_claude_ready(
 async def cb_cancel(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle generic cancel button."""
     chat_id = callback.message.chat.id
-    thread_id = callback.message.message_thread_id
+    thread_id = normalize_thread_id(callback.message.chat, callback.message.message_thread_id)
     clear_flow_state(chat_id, thread_id)
     await telegram_queue.edit(callback.message, strings.CANCELLED)
     await callback.answer()

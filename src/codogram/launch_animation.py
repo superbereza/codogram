@@ -186,12 +186,17 @@ async def launch_with_animation(
             is_forum = False  # Fallback if chat info unavailable
 
         announcement = build_announcement(project.project_name, tmux_name, is_forum)
-        await queue.send(
-            chat_id,
-            announcement,
-            thread_id=thread_id,
-            parse_mode="MarkdownV2",
-        )
+        logger.info(f"launch_sending_announcement: project={project.project_name}")
+        try:
+            await queue.send(
+                chat_id,
+                announcement,
+                thread_id=thread_id,
+                parse_mode="MarkdownV2",
+            )
+            logger.info(f"launch_announcement_sent: project={project.project_name}")
+        except Exception as e:
+            logger.error(f"launch_announcement_failed: {e}")
 
         # 5. Start monitoring
         await _start_monitoring(bot, project, thread, queue)

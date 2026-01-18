@@ -11,6 +11,7 @@ from ..telegram_queue import TelegramQueue
 from ..logging_config import logger
 from .. import strings
 from .create_flow import handle_name_input
+from .common import normalize_thread_id
 
 router = Router(name="messages")
 
@@ -58,7 +59,8 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
     if await handle_name_input(message, telegram_queue):
         return
 
-    thread_id = message.message_thread_id
+    # Normalize thread_id - ignore in non-forum chats
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
 
     # Route the message
     result = _message_router.route(chat_id, thread_id, text)
