@@ -312,9 +312,10 @@ async def permission_poller(
         if input_text:
             last_msg = thread.last_sent_message if thread else None
 
+            # Compare first line only (input_text is single line, last_msg may be multiline)
             is_potentially_stuck = (
                 PASTED_PATTERN.match(input_text) is not None or
-                (last_msg is not None and input_text == last_msg)
+                (last_msg is not None and input_text == last_msg.split('\n')[0])
             )
 
             if is_potentially_stuck:

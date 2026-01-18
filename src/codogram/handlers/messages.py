@@ -52,10 +52,6 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
         f"chat={message.chat.id} thread={message.message_thread_id}: {content_preview}"
     )
 
-    # Skip commands
-    if text and text.startswith("/"):
-        return
-
     chat_id = message.chat.id
 
     # Check if awaiting name input for create flow
