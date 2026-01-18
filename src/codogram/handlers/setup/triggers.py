@@ -15,7 +15,7 @@ from aiogram.types import Chat, ChatMemberUpdated, Message
 
 from ...domain.states import SetupFlow
 from ...session_manager import ProjectManager
-from ...services.setup import check_bot_admin_rights
+from ...services.setup import check_bot_admin_rights, check_base_dir
 from ...keyboards.setup import admin_check_keyboard, setup_type_keyboard
 from ... import strings
 
@@ -115,7 +115,17 @@ async def on_any_message(message: Message, state: FSMContext):
 # --- Shared setup start logic ---
 
 async def _start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
-    """Start the setup flow - check admin rights first."""
+    """Start the setup flow - check base_dir first, then admin rights."""
+    # Check base_dir FIRST
+    base_path = check_base_dir()
+    if not base_path:
+        await bot.send_message(
+            chat.id,
+            strings.SETUP_BASE_DIR_MISSING,
+            parse_mode="MarkdownV2",
+        )
+        return  # Flow blocked
+
     # Register SETUP_COMMANDS menu for this chat
     from ...services.menu import SETUP_COMMANDS
     from aiogram.types import BotCommandScopeChat
