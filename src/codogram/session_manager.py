@@ -178,6 +178,11 @@ class ProjectState:
     feat_thinking_status: bool = False
     feat_suggestions: bool = False
 
+    # Avatar emoji pack:
+    feat_avatar_pack: bool = False
+    emoji_pack_name: str | None = None
+    emoji_map: dict[int, str] = field(default_factory=dict)  # {user_id: custom_emoji_id}
+
     # DEPRECATED: Legacy fields kept for backward compatibility with old configs.
     # All new code should use threads[None] for main thread.
     # These fields are used by: handlers/, permission_poller.py (permission_poller),
@@ -225,6 +230,11 @@ class ProjectManager:
                 project.verbose = data.get("verbose", False)
                 project.feat_thinking_status = data.get("feat_thinking_status", False)
                 project.feat_suggestions = data.get("feat_suggestions", False)
+                project.feat_avatar_pack = data.get("feat_avatar_pack", False)
+                project.emoji_pack_name = data.get("emoji_pack_name")
+                # Convert string keys back to int (JSON serialization converts int keys to strings)
+                emoji_map_raw = data.get("emoji_map", {})
+                project.emoji_map = {int(k): v for k, v in emoji_map_raw.items()}
 
                 # Load explicit threads first
                 threads_data = data.get("threads", {})
@@ -294,6 +304,9 @@ class ProjectManager:
                         "verbose": p.verbose,
                         "feat_thinking_status": p.feat_thinking_status,
                         "feat_suggestions": p.feat_suggestions,
+                        "feat_avatar_pack": p.feat_avatar_pack,
+                        "emoji_pack_name": p.emoji_pack_name,
+                        "emoji_map": p.emoji_map,
                     }
 
                     # Backward compat: duplicate threads[None] to legacy fields
