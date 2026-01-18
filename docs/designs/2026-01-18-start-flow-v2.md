@@ -27,28 +27,54 @@ Flow запускается при:
 ```
 Bot added / message received
          ↓
-    Has admin rights?
-    ↓ No              ↓ Yes
-    ↓                 ↓
-"Grant admin rights   → ASK_SETUP_TYPE
- to continue"
-    ↓
-[Wait for ChatMemberUpdated]
-    ↓
-    → ASK_SETUP_TYPE
-         ↓
-┌────────────────────────────────┐
-│ [Clone repository]             │
-│ [Connect to existing folder]   │
-│ [Start new project]            │
-└────────────────────────────────┘
-         ↓
-    (see detailed flows below)
-         ↓
-      LAUNCH
-         ↓
-    SUCCESS + announcement
+    base_dir exists?
+    ↓ No                      ↓ Yes
+    ↓                         ↓
+"Configure base_dir first"    Has admin rights?
+[Instructions for             ↓ No              ↓ Yes
+ ~/.codogram/config.json]     ↓                 ↓
+         ↓                 "Grant admin rights   → ASK_SETUP_TYPE
+    (blocked)               to continue"
+                            [Check rights]
+                                ↓
+                           [Wait for ChatMemberUpdated
+                            OR button press]
+                                ↓
+                            → ASK_SETUP_TYPE
+                                 ↓
+                        ┌────────────────────────────────┐
+                        │ [Clone repository]             │
+                        │ [Connect to existing folder]   │
+                        │ [Start new project]            │
+                        └────────────────────────────────┘
+                                 ↓
+                            (see detailed flows below)
+                                 ↓
+                              LAUNCH
+                                 ↓
+                            SUCCESS + announcement
 ```
+
+## Base Directory Check
+
+**Первый шаг — проверка base_dir:**
+
+Если `~/.codogram/config.json` не существует или `base_dir` не указан:
+```
+[!] Configure base directory first
+
+Set where your projects are stored:
+
+1. Create config file:
+   mkdir -p ~/.codogram
+   echo '{"base_dir": "~/dev"}' > ~/.codogram/config.json
+
+2. Restart setup with /start
+
+Default: ~/dev
+```
+
+**Поведение:** Flow заблокирован до настройки. После создания конфига — `/start` для продолжения.
 
 ## Admin Rights
 
@@ -65,9 +91,18 @@ Bot needs admin rights to:
 • Manage topics for branches
 
 Open chat settings → Administrators → Add bot as admin
+
+[Check rights]
 ```
 
-**Поведение:** Блокируем flow до получения прав. При `ChatMemberUpdated` с правами — продолжаем.
+**Поведение:**
+- Блокируем flow до получения прав
+- При `ChatMemberUpdated` с правами — автоматически продолжаем
+- Кнопка `[Check rights]` — ручная проверка (если event потерялся)
+
+**При нажатии "Check rights":**
+- Права есть → продолжаем к ASK_SETUP_TYPE
+- Прав нет → показываем то же сообщение снова
 
 ## Меню команд
 
@@ -158,18 +193,17 @@ Continuing with project setup...
 User: [Connect to existing folder]
          ↓
 Bot: ┌─────────────────────────────────────────┐
-     │ Available folders:                      │
+     │ Select folder to connect:               │
+     │                                         │
      │ [my-project]                            │
      │ [another-project]                       │
      │ [scripts]                               │
      │ ...                                     │
      │                                         │
-     │ Already connected to Codogram:          │
-     │ • codogram → [Codogram Dev](t.me/c/...) │
-     │ • personal-agent → [PA Bot](t.me/c/...) │
-     │                                         │
      │        [<]  1/3  [>]                    │
-     │         [<< Go back]                    │
+     │                                         │
+     │ [View connected projects]               │
+     │ [<< Go back]                            │
      └─────────────────────────────────────────┘
          ↓
 User: [my-project]
@@ -192,10 +226,28 @@ User: [my-project]
              → LAUNCH
 ```
 
+**Экран "View connected projects":**
+```
+User: [View connected projects]
+         ↓
+Bot: ┌─────────────────────────────────────────┐
+     │ Connected projects:                     │
+     │                                         │
+     │ • codogram → Codogram Dev               │
+     │ • personal-agent → PA Bot               │
+     │ • scripts → Scripts Chat                │
+     │                                         │
+     │ Tap chat name to open.                  │
+     │                                         │
+     │ [<< Back to folders]                    │
+     └─────────────────────────────────────────┘
+```
+Названия чатов — кликабельные ссылки `t.me/c/{id}`.
+
 **Источник списка папок:**
-- `base_dir` из `~/.codogram/config.json`, fallback `~/dev/`
+- `base_dir` из `~/.codogram/config.json` (проверяется на старте flow)
 - Все папки первого уровня
-- Минус те что уже в конфиге codogram
+- Минус те что уже подключены к Codogram
 
 **Пагинация:**
 - По 10 папок на страницу
@@ -203,7 +255,6 @@ User: [my-project]
 - `[<< Go back]` — возврат к ASK_SETUP_TYPE
 
 **Ссылки на чаты:**
-"Already connected" показывает ссылки на чаты через `t.me/c/{id}`:
 ```python
 # chat_id = -1001234567890
 # link = t.me/c/1234567890  (без -100 префикса)
@@ -349,22 +400,24 @@ for the entire chat.
 ASK_SETUP_TYPE
     ↓ ↑ Go back
 ASK_PROJECT_NAME / ASK_CLONE_URL / ASK_FOLDER_SELECT
-    ↓ ↑ Go back
-ASK_GIT_CHOICE / ASK_RENAME_CONFIRM
+    ↓ ↑ Go back                        ↓ ↑ Back to folders
+ASK_GIT_CHOICE / ASK_RENAME_CONFIRM   VIEWING_CONNECTED_PROJECTS
     ↓ ↑ Go back
 LAUNCH
 ```
 
 Нет прыжков через несколько шагов — всегда один шаг назад.
+`[<< Back to folders]` из VIEWING_CONNECTED_PROJECTS возвращает к ASK_FOLDER_SELECT.
 
 ## FSM States
 
 ```python
 class SetupFlow(StatesGroup):
     awaiting_admin_rights = State()
-    awaiting_setup_type = State()      # Clone/Connect/New
+    awaiting_setup_type = State()       # Clone/Connect/New
     awaiting_clone_url = State()
-    awaiting_folder_select = State()   # + pagination page in data
+    awaiting_folder_select = State()    # + pagination page in data
+    viewing_connected_projects = State() # View connected screen
     awaiting_project_name = State()
     awaiting_git_choice = State()
     awaiting_rename_confirm = State()
