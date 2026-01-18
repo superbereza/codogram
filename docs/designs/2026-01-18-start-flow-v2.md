@@ -243,21 +243,33 @@ Continuing with project setup...
 ```
 Показываем warning и продолжаем — это не критичная ошибка.
 
-**Обработка ошибок rename:**
+**Обработка ошибок rename с retry:**
 ```python
-async def rename_chat_safe(bot: Bot, chat_id: int, title: str) -> bool:
-    """Try to rename chat, return False on failure."""
-    try:
-        await bot.set_chat_title(chat_id, title)
-        return True
-    except TelegramBadRequest as e:
-        # Not enough rights, chat title too long, etc.
-        logger.warning(f"Rename failed: {e}")
-        return False
-    except TelegramAPIError as e:
-        # Network, rate limit, etc.
-        logger.warning(f"Rename failed: {e}")
-        return False
+async def rename_chat_safe(bot: Bot, chat_id: int, title: str, max_retries: int = 3) -> bool:
+    """Try to rename chat with exponential backoff, return False on failure."""
+    for attempt in range(max_retries):
+        try:
+            await bot.set_chat_title(chat_id, title)
+            return True
+        except TelegramRetryAfter as e:
+            # Rate limited — wait and retry
+            if attempt < max_retries - 1:
+                await asyncio.sleep(e.retry_after)
+                continue
+            logger.warning(f"Rename failed after {max_retries} retries: rate limited")
+            return False
+        except TelegramBadRequest as e:
+            # Not enough rights, chat title too long — no retry
+            logger.warning(f"Rename failed: {e}")
+            return False
+        except TelegramAPIError as e:
+            # Network error — retry with backoff
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt)  # 1s, 2s, 4s
+                continue
+            logger.warning(f"Rename failed after {max_retries} retries: {e}")
+            return False
+    return False
 ```
 
 **Валидация URL (уже реализована):**
