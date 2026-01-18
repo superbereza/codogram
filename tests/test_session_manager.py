@@ -382,6 +382,7 @@ def test_verbose_persisted_in_config(tmp_path, monkeypatch):
     test_config = tmp_path / "config.json"
     monkeypatch.setattr(config, "CONFIG_PATH", test_config)
     monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(config, "get_config_path", lambda: test_config)
 
     # Create manager and set verbose
     manager = ProjectManager()
@@ -404,3 +405,53 @@ def test_verbose_persisted_in_config(tmp_path, monkeypatch):
     assert project2.verbose is True
     thread2 = project2.get_thread(None)
     assert thread2.verbose is True
+
+
+def test_save_is_thread_safe(tmp_path, monkeypatch):
+    """Multiple saves should not corrupt config."""
+    import threading
+    import time
+    from codogram import config
+
+    # Use temp config file
+    config_file = tmp_path / "config.json"
+    monkeypatch.setattr(config, "CONFIG_PATH", config_file)
+    monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
+    # Patch get_config_path in config module (session_manager imports it from there)
+    monkeypatch.setattr(config, "get_config_path", lambda: config_file)
+
+    from codogram.session_manager import ProjectManager
+
+    pm = ProjectManager()
+
+    errors = []
+
+    def save_project(name):
+        try:
+            for _ in range(10):
+                p = pm.get_or_create(name)
+                p.chat_id = hash(name) % 1000000
+                pm._save()
+                time.sleep(0.01)
+        except Exception as e:
+            errors.append(e)
+
+    threads = [
+        threading.Thread(target=save_project, args=(f"project-{i}",))
+        for i in range(5)
+    ]
+
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(errors) == 0, f"Save errors: {errors}"
+
+    # Verify config is valid JSON and has all projects
+    import json
+    saved = json.loads(config_file.read_text())
+    assert "projects" in saved
+    # All 5 projects should be present
+    for i in range(5):
+        assert f"project-{i}" in saved["projects"]

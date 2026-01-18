@@ -134,10 +134,11 @@ docs/e2e/
 ├── CLAUDE.md           # Это руководство
 ├── suites/
 │   ├── smoke.md        # [~2 мин] Продакшн проверка
-│   ├── critical.md     # [~15 мин] Основной набор
-│   └── full.md         # [~30 мин] Полное покрытие
+│   ├── critical.md     # [~25 мин] Основной набор
+│   └── full.md         # [~40 мин] Полное покрытие
 └── commands/
-    ├── start.md        # /start, /restart
+    ├── setup.md        # Setup flow v2 (onboarding)
+    ├── start.md        # /start, /restart (existing project)
     ├── sessions.md     # /new, /clear, /esc, /resume
     ├── threads.md      # /thread
     ├── branches.md     # /branch

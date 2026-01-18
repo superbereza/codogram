@@ -40,9 +40,10 @@ class TestFinishStaleWorktree:
 
         with patch("codogram.handlers.finish.project_manager") as mock_pm:
             mock_pm.get_by_chat.return_value = mock_project
-            with patch("codogram.handlers.finish.archive_thread") as mock_archive:
-                mock_archive.return_value = True
-                await cmd_finish(mock_message, mock_queue)
+            with patch("codogram.handlers.finish.require_claude_ready", new_callable=AsyncMock, return_value=True):
+                with patch("codogram.handlers.finish.archive_thread") as mock_archive:
+                    mock_archive.return_value = True
+                    await cmd_finish(mock_message, mock_queue)
 
         # Should show warning about stale worktree
         call_args = mock_queue.reply.call_args_list

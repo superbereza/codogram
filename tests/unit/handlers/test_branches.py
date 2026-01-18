@@ -56,7 +56,8 @@ class TestBranchStaleWorktree:
                     mock_state.return_value = WorktreeState.MISSING_WITH_BRANCH
                     with patch("codogram.handlers.branches.get_default_branch", return_value="main"):
                         with patch("codogram.handlers.branches.require_forum_group", new_callable=AsyncMock, return_value=True):
-                            await cmd_branch_create(mock_message, mock_queue)
+                            with patch("codogram.handlers.branches.require_claude_ready", new_callable=AsyncMock, return_value=True):
+                                await cmd_branch_create(mock_message, mock_queue)
 
         # Verify warning shown and flow continues
         call_args = mock_queue.reply.call_args
@@ -89,7 +90,8 @@ class TestBranchStaleWorktree:
                     mock_state.return_value = WorktreeState.MISSING_NO_BRANCH
                     with patch("codogram.handlers.branches.get_default_branch", return_value="main"):
                         with patch("codogram.handlers.branches.require_forum_group", new_callable=AsyncMock, return_value=True):
-                            await cmd_branch_create(mock_message, mock_queue)
+                            with patch("codogram.handlers.branches.require_claude_ready", new_callable=AsyncMock, return_value=True):
+                                await cmd_branch_create(mock_message, mock_queue)
 
         # Verify warning shown
         call_args = mock_queue.reply.call_args
@@ -121,9 +123,10 @@ class TestBranchStaleWorktree:
                     mock_state.return_value = WorktreeState.OK
                     with patch("codogram.handlers.branches.get_default_branch", return_value="main"):
                         with patch("codogram.handlers.branches.require_forum_group", new_callable=AsyncMock, return_value=True):
-                            with patch("codogram.handlers.branches.create_flow_service") as mock_service:
-                                mock_service.should_show_prompt.return_value = True
-                                await cmd_branch_create(mock_message, mock_queue)
+                            with patch("codogram.handlers.branches.require_claude_ready", new_callable=AsyncMock, return_value=True):
+                                with patch("codogram.handlers.branches.create_flow_service") as mock_service:
+                                    mock_service.should_show_prompt.return_value = True
+                                    await cmd_branch_create(mock_message, mock_queue)
 
         # Normal flow - should show name prompt
         call_args = mock_queue.reply.call_args

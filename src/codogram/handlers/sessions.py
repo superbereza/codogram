@@ -12,6 +12,7 @@ from ..project_launcher import is_tmux_session_exists
 from ..tmux import TmuxSession
 from ..logging_config import logger
 from ..telegram_queue import TelegramQueue
+from .common import require_tmux_exists, require_claude_ready
 
 router = Router(name="sessions")
 
@@ -86,6 +87,8 @@ async def _wait_for_claude_ready(
 @router.message(Command("new"))
 async def cmd_new(message: Message, telegram_queue: TelegramQueue):
     """Start new Claude session in current thread."""
+    if not await require_claude_ready(message, telegram_queue):
+        return
     tmux = await _send_session_command(message, telegram_queue, "/new", strings.NEW_SESSION)
     if tmux:
         await _wait_for_claude_ready(tmux, telegram_queue, message.chat.id, message.message_thread_id)
@@ -94,14 +97,18 @@ async def cmd_new(message: Message, telegram_queue: TelegramQueue):
 @router.message(Command("clear"))
 async def cmd_clear(message: Message, telegram_queue: TelegramQueue):
     """Clear Claude session and start fresh."""
+    if not await require_tmux_exists(message, telegram_queue):
+        return
     tmux = await _send_session_command(message, telegram_queue, "/clear", strings.CLEAR_SESSION)
     if tmux:
         await _wait_for_claude_ready(tmux, telegram_queue, message.chat.id, message.message_thread_id)
 
 
 @router.message(Command("esc"))
-async def cmd_esc(message: Message):
+async def cmd_esc(message: Message, telegram_queue: TelegramQueue):
     """Send Escape to current thread's tmux."""
+    if not await require_tmux_exists(message, telegram_queue):
+        return
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 

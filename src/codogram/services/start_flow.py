@@ -1,12 +1,16 @@
 """StartFlowService - business logic for /start flow."""
+import shutil
+import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .. import strings
 from ..domain.validators import (
     is_valid_project_name,
     sanitize_project_name,
+    validate_git_url,
     MAX_PROJECT_NAME_LENGTH,
 )
 from ..magic_names import get_random_magic_name
@@ -15,7 +19,115 @@ from ..session_manager import ThreadInfo
 from ..tmux import find_all_tmux_by_cwd, find_tmux_by_convention, TmuxSession, kill_tmux_session
 
 if TYPE_CHECKING:
-    from ..session_manager import ProjectManager
+    from ..session_manager import ProjectManager, ProjectState
+
+
+def build_announcement(project_name: str, tmux_name: str, is_forum: bool) -> str:
+    """Build project ready announcement message.
+
+    Args:
+        project_name: Name of the project
+        tmux_name: Name of the tmux session
+        is_forum: Whether chat is a forum (has topics)
+
+    Returns:
+        Formatted announcement message
+    """
+    commands = [
+        "• /esc — cancel operation",
+        "• /clear — clear context",
+        "• /auto_accept — toggle auto-accept",
+    ]
+    if is_forum:
+        commands.extend([
+            "• /thread — new topic",
+            "• /branch — new branch + topic",
+            "• /finish — merge and archive",
+        ])
+
+    return f"""`[v]` Project `{project_name}` ready
+
+Commands available in this chat:
+{chr(10).join(commands)}
+
+To see Claude's UI, run in terminal:
+`tmux attach -t {tmux_name}`"""
+
+
+def is_setup_phase(project: "ProjectState") -> bool:
+    """Check if project is in setup phase (Claude never ran).
+
+    Returns True if no session ever started in main thread.
+    Handles legacy projects that have session_id on project instead of thread.
+    """
+    # Check new threads structure
+    main_thread = project.threads.get(None)
+    if main_thread and main_thread.session_id:
+        return False
+
+    # Fallback: legacy session_id field
+    if project.session_id:
+        return False
+
+    return True
+
+
+@dataclass
+class CleanupResult:
+    """Result of project cleanup operation."""
+    success: bool
+    error: str | None = None
+
+
+def cleanup_project(project: "ProjectState", delete_directory: bool) -> CleanupResult:
+    """Full project cleanup.
+
+    Args:
+        project: Project to cleanup
+        delete_directory: Whether to delete the project directory
+
+    Returns:
+        CleanupResult with success=False if directory deletion failed
+    """
+    # 1. Kill all tmux sessions (main + topics)
+    for thread in project.threads.values():
+        tmux_name = thread.get_tmux_session(project.project_name)
+        if is_tmux_session_exists(tmux_name):
+            kill_tmux_session(tmux_name)
+
+    # 2. Remove worktrees (if any)
+    if project.cwd:
+        for thread in project.threads.values():
+            if thread.worktree_path:
+                try:
+                    subprocess.run(
+                        ["git", "worktree", "remove", "--force", thread.worktree_path],
+                        cwd=project.cwd,
+                        capture_output=True,
+                    )
+                except Exception:
+                    pass  # Best effort
+
+    # 3. Delete main directory (if requested)
+    cleanup_failed = False
+    if delete_directory and project.cwd:
+        shutil.rmtree(project.cwd, ignore_errors=True)
+        # Verify deletion succeeded
+        if Path(project.cwd).exists():
+            cleanup_failed = True
+
+    # 4. Remove from config
+    from ..session_manager import project_manager
+    if project.project_name in project_manager.projects:
+        del project_manager.projects[project.project_name]
+        project_manager._save()
+
+    if cleanup_failed:
+        return CleanupResult(
+            success=False,
+            error=strings.RESET_CLEANUP_FAILED.format(path=project.cwd)
+        )
+    return CleanupResult(success=True)
 
 
 class FlowAction(Enum):
@@ -27,6 +139,7 @@ class FlowAction(Enum):
     ASK_GIT_CHOICE = "ask_git_choice"
     ASK_GH_VISIBILITY = "ask_gh_visibility"
     ASK_CLONE_URL = "ask_clone_url"
+    ASK_CLONE_URL_RETRY = "ask_clone_url_retry"  # Shows error + re-prompt
     ASK_CUSTOM_PATH = "ask_custom_path"
     ASK_LAUNCH_CONFIRM = "ask_launch_confirm"
 
@@ -94,7 +207,7 @@ class StartFlowService:
         """
         # Topic mode
         if thread_id is not None:
-            return self._handle_topic_start(chat_id, thread_id, args)
+            return self._handle_topic_start(chat_id, thread_id, args, chat_title)
 
         # Case 1: project name provided in args
         if args:
@@ -130,12 +243,16 @@ class StartFlowService:
         return FlowResult(action=FlowAction.ASK_PROJECT_NAME)
 
     def _handle_topic_start(
-        self, chat_id: int, thread_id: int, args: list[str]
+        self, chat_id: int, thread_id: int, args: list[str], chat_title: str | None = None
     ) -> FlowResult:
         """Handle /start in a topic."""
-        # Case 1: No project for this chat
+        # Case 1: No project for this chat - try auto-detect from title
         project = self.pm.get_by_chat(chat_id)
         if not project:
+            if chat_title:
+                sanitized = sanitize_project_name(chat_title)
+                if sanitized:
+                    return self._start_project_flow(chat_id, sanitized, thread_id)
             return FlowResult(
                 action=FlowAction.ASK_PROJECT_NAME,
                 thread_id=thread_id,
@@ -238,7 +355,7 @@ class StartFlowService:
 
         return self._start_project_flow(chat_id, project_name)
 
-    def _start_project_flow(self, chat_id: int, project_name: str) -> FlowResult:
+    def _start_project_flow(self, chat_id: int, project_name: str, thread_id: int | None = None) -> FlowResult:
         """Resolve path and decide next step."""
         project = self.pm.get_or_create(project_name)
         project.chat_id = chat_id
@@ -255,12 +372,13 @@ class StartFlowService:
         if exists:
             project.cwd = path
             self.pm._save()
-            return self._connect_or_launch(project)
+            return self._connect_or_launch(project, thread_id)
         else:
             return FlowResult(
                 action=FlowAction.ASK_DIR_CHOICE,
                 project=project_name,
                 path=path,
+                thread_id=thread_id,
             )
 
     def _connect_or_launch(self, project) -> FlowResult:
@@ -410,18 +528,23 @@ class StartFlowService:
     ) -> FlowResult:
         """Handle user input for git clone URL."""
         # Validate URL format
-        if not url.startswith(("https://", "git@", "ssh://")):
+        is_valid, error_msg = validate_git_url(url)
+        if not is_valid:
             return FlowResult(
-                action=FlowAction.ERROR,
-                error="Invalid URL. Use https:// or git@ format",
+                action=FlowAction.ASK_CLONE_URL_RETRY,
+                error=error_msg,
+                project=project,
+                path=path,
             )
 
         result = git_clone(path, url)
 
         if not result.success:
             return FlowResult(
-                action=FlowAction.ERROR,
+                action=FlowAction.ASK_CLONE_URL_RETRY,
                 error=f"Clone failed: {result.error}",
+                project=project,
+                path=path,
             )
 
         proj = self.pm.get_or_create(project)

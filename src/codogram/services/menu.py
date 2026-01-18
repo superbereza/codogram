@@ -22,6 +22,7 @@ _ALL_COMMANDS = [
     ("restart", "Force restart Claude", True),
     ("get_debug_ids", "Show chat and thread IDs", True),
     ("help", "List all commands", True),
+    ("reset_all", "Reset project completely", True),
 ]
 
 # Derived lists (no duplication)
@@ -33,6 +34,14 @@ BASIC_COMMANDS = [
 FORUM_COMMANDS = [
     BotCommand(command=cmd, description=desc)
     for cmd, desc, _ in _ALL_COMMANDS
+]
+
+# Setup commands (during onboarding)
+SETUP_COMMANDS = [
+    BotCommand(command="start", description="Restart setup"),
+    BotCommand(command="reset_all", description="Cancel setup"),
+    BotCommand(command="help", description="Get help"),
+    BotCommand(command="get_debug_ids", description="Show debug IDs"),
 ]
 
 

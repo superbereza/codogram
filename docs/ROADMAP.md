@@ -255,6 +255,15 @@ Per-thread/per-project verbose output toggle and /settings UX:
 
 ## Beta Test
 
+### Set up flow redesign + robust start
+Full redesign of /start flow with robust error handling and intuitive setup UX:
+- Three setup paths: Clone repository, Connect existing folder, New project
+- SetupFlow FSM with states for each step
+- SetupBlockerMiddleware blocks non-setup commands during flow
+- Cancel button and /reset_all to abort setup
+- Proper navigation with Go back buttons
+- See [docs/designs/done/2026-01-18-start-flow-v2.md](designs/done/2026-01-18-start-flow-v2.md)
+
 ### Compacting detection
 Detect when Claude compacts conversation and notify user:
 - Parse thinking status for "Compacting" keyword
@@ -287,10 +296,6 @@ Auto-detect and resend messages stuck in Claude's input:
 Interactive onboarding in direct messages with bot:
 - Welcome flow explaining bot features
 - Step-by-step guidance for first-time users
-
-### Set up flow redesign + robust start
-Full redesign of /start flow with robust error handling and intuitive setup UX.
-- See [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md) (worktree: set-up-flow-redesign)
 
 ### Avatar emoji pack
 Custom emoji pack from group members' avatars:
