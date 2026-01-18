@@ -81,7 +81,8 @@ async def do_launch(message: Message, state: FSMContext):
 
     # Get project and thread for animation
     project = project_manager.get_by_chat(chat_id)
-    thread = project.get_or_create_thread(thread_id, project_name)
+    thread_name = project_name if thread_id else "main"
+    thread = project.get_or_create_thread(thread_id, thread_name)
 
     # Launch Claude with animation (this handles everything including success message)
     thread.launch_task = asyncio.create_task(
