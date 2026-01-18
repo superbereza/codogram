@@ -116,6 +116,16 @@ async def on_any_message(message: Message, state: FSMContext):
 
 async def _start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
     """Start the setup flow - check admin rights first."""
+    # Register SETUP_COMMANDS menu for this chat
+    from ...services.menu import SETUP_COMMANDS
+    from aiogram.types import BotCommandScopeChat
+
+    scope = BotCommandScopeChat(chat_id=chat.id)
+    try:
+        await bot.set_my_commands(SETUP_COMMANDS, scope=scope)
+    except Exception as e:
+        logger.warning(f"Failed to set setup menu: {e}")
+
     # Check admin rights
     has_rights = await check_bot_admin_rights(bot, chat.id)
 
