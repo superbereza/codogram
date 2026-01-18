@@ -130,10 +130,10 @@ async def on_clone_url(message: Message, state: FSMContext):
     url = message.text.strip()
 
     # Validate URL
-    validation = validate_git_url(url)
-    if not validation.is_valid:
+    is_valid, error = validate_git_url(url)
+    if not is_valid:
         await message.answer(
-            f"{strings.STATUS_ERR} {validation.error}",
+            f"{strings.STATUS_ERR} {error}",
             reply_markup=go_back_keyboard("clone:back"),
         )
         return
