@@ -350,6 +350,13 @@ Emoji pack из аватарок участников группы:
 - Простое восстановление если что-то сломалось
 - Нужен R&D по лучшему подходу
 
+### Рефакторинг permission poller
+Разбить god-function на handler классы:
+- Разбить 500-строчный `permission_poller()` на отдельные handlers
+- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
+- Каждый handler 20-150 строк, unit-тестируемый
+- См. [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
+
 ### Скрытые tool calls
 Скрывать internal tool calls по умолчанию:
 - Скрывать tool calls (TodoWrite, Read и т.д.) из вывода

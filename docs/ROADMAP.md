@@ -350,6 +350,13 @@ Allow product managers to use Claude without breaking environment:
 - Easy recovery if something breaks
 - Need R&D on best approach
 
+### Permission poller refactoring
+Refactor god-function into handler classes:
+- Split 500-line `permission_poller()` into separate handlers
+- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
+- Each handler 20-150 lines, unit-testable
+- See [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
+
 ### Hidden tool calls
 Hide internal tool calls by default:
 - Hide tool calls (TodoWrite, Read, etc.) from output
