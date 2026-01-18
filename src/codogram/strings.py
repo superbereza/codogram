@@ -336,9 +336,9 @@ FINISH_ARCHIVED_KEPT = f"""{STATUS_OK} Branch `{{branch}}` archived
 Worktree kept for potential resume
 Use /start to resume"""
 
-FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
+FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Asked Claude to commit\\. One moment\\.\\.\\.
 
-Run /finish again after commit"""
+Then run /finish"""
 
 
 # --- Start Flow ---
@@ -436,9 +436,9 @@ BRANCH_DIR_EXISTS = f"{STATUS_ERR} Directory already exists: `{{path}}`"
 BRANCH_UNCOMMITTED_CHANGES = f"{STATUS_WARN} Uncommitted changes detected"
 BRANCH_UNCOMMITTED_IN_BASE = f"{STATUS_WARN} Uncommitted changes in {{base_branch}}"
 
-BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
+BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Asked Claude to commit\\. One moment\\.\\.\\.
 
-Run `/branch_create {{branch_name}}` again after commit"""
+Then run `/branch_create {{branch_name}}`"""
 
 BRANCH_CREATING = f"{STATUS_PENDING} Creating branch `{{name}}`..."
 BRANCH_CREATED = f"{STATUS_OK} Branch `{{name}}` created"
