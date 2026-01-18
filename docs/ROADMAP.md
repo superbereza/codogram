@@ -276,16 +276,12 @@ Show Claude's suggested input in Telegram:
 
 ## In Progress
 
-### Set up flow redesign (Start flow v2)
-Full redesign of /start flow for wider audience. Combines robust /start + onboarding:
-- **Auto-trigger** — bot added to chat, /start, or any message in unconfigured chat
-- **Admin rights check** — request permissions before proceeding
-- **Three setup modes** — Clone repo / Connect existing folder / New project
-- **Folder selection** — paginated list of available folders in base_dir
-- **Chat renaming** — rename chat to match project name
-- **Git setup options** — git init / git init + gh / git clone / no git
-- **Atomic launch** — rollback on failure
-- **SETUP_COMMANDS** — limited menu during onboarding
+### Bot onboarding
+Interactive onboarding for new users.
+- See [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md)
+
+### Set up flow redesign
+Full redesign of /start flow combining robust /start + onboarding.
 - See [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md) (worktree: set-up-flow-redesign)
 
 ## Backlog
