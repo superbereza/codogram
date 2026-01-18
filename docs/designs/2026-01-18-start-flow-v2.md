@@ -388,6 +388,12 @@ kb = folder_select_keyboard(folders, page=0)
 ```
 Не кэшируем в FSM state. Пользователь мог создать папку в терминале между шагами.
 
+**Если пользователь отправит текст вместо нажатия кнопки:**
+```
+Select a folder from the list above
+or use [<< Go back] to return.
+```
+
 ### Connect Flow Corner Cases
 
 | Case | Handling |
@@ -578,13 +584,58 @@ LAUNCH
 ```python
 class SetupFlow(StatesGroup):
     awaiting_admin_rights = State()
-    awaiting_setup_type = State()       # Clone/Connect/New
+    awaiting_setup_type = State()        # Clone/Connect/New
     awaiting_clone_url = State()
-    awaiting_folder_select = State()    # + pagination page in data
-    viewing_connected_projects = State() # View connected screen
+    awaiting_folder_select = State()     # pagination in callback_data
+    viewing_connected_projects = State()  # View connected screen
     awaiting_project_name = State()
     awaiting_git_choice = State()
     awaiting_rename_confirm = State()
+    launching = State()                   # Blocking state during launch
+```
+
+**`launching` state:**
+- Входим перед Phase 1 (filesystem)
+- Блокирует любые действия пользователя
+- Выходим после SUCCESS или ERROR с rollback
+
+## Callback Data Registry
+
+Полный список callback_data для всех кнопок:
+
+```python
+# Setup type selection
+"setup:clone"           # Clone repository
+"setup:connect"         # Connect to existing folder
+"setup:new"             # Start new project
+
+# Admin rights
+"admin:check"           # Check rights button
+
+# Clone flow
+"clone:back"            # << Go back
+
+# Folder selection
+"folder:page:{n}"       # Pagination (0-indexed)
+"folder:select:{name}"  # Select folder
+"folder:view_connected" # View connected projects
+"folder:back"           # << Go back to setup type
+"folder:back_connected" # << Back to folders (from view connected)
+
+# Rename confirm
+"rename:yes"            # Yes, rename
+"rename:no"             # No, keep current name
+
+# Git choice
+"git:init"              # git init
+"git:gh"                # git init + gh repo create
+"git:clone"             # git clone
+"git:none"              # No git
+"git:back"              # << Go back
+
+# Error recovery
+"error:retry"           # Retry failed operation
+"error:back"            # << Go back
 ```
 
 ## Модульная структура файлов
