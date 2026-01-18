@@ -451,7 +451,7 @@ async def _connect_to_session_from_callback(callback: CallbackQuery, result: Flo
 
 # ===== Commands =====
 
-@router.message(Command("start"))
+@router.message(Command("start", ignore_case=True))
 async def cmd_start(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /start command."""
     from .common import normalize_thread_id
@@ -709,7 +709,7 @@ async def on_tmux_selected(callback: CallbackQuery, state: FSMContext, telegram_
 
 # ===== Restart Flow =====
 
-@router.message(Command("restart"))
+@router.message(Command("restart", ignore_case=True))
 async def cmd_restart(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /restart command."""
     from .common import normalize_thread_id
@@ -859,7 +859,7 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
 
 # ===== Reset Flow =====
 
-@router.message(Command("reset_all"))
+@router.message(Command("reset_all", ignore_case=True))
 async def cmd_reset_all(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /reset_all command."""
     # Check if start flow is in progress (e.g., clone running)

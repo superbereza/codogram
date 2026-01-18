@@ -10,7 +10,7 @@ from .. import strings
 router = Router(name="settings")
 
 
-@router.message(Command("get_debug_ids"))
+@router.message(Command("get_debug_ids", ignore_case=True))
 async def cmd_get_debug_ids(message: Message, telegram_queue: TelegramQueue):
     """Show debug IDs - admin only (protected by middleware)."""
     thread_id = message.message_thread_id
@@ -22,7 +22,7 @@ async def cmd_get_debug_ids(message: Message, telegram_queue: TelegramQueue):
     )
 
 
-@router.message(Command("help"))
+@router.message(Command("help", ignore_case=True))
 async def cmd_help(message: Message, telegram_queue: TelegramQueue):
     """Show available commands."""
     text = """*Everyday:*
@@ -127,7 +127,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     return "\n".join(lines)
 
 
-@router.message(Command("settings"))
+@router.message(Command("settings", ignore_case=True))
 async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     """Show current settings including Claude session state."""
     from ..keyboards import settings_keyboard
@@ -155,7 +155,7 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, text, reply_markup=kb)
 
 
-@router.message(Command("auto_accept"))
+@router.message(Command("auto_accept", ignore_case=True))
 async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
     """Toggle auto-accept or reset all."""
     chat_id = message.chat.id
@@ -196,7 +196,7 @@ async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
     project_manager._save()
 
 
-@router.message(Command("verbose"))
+@router.message(Command("verbose", ignore_case=True))
 async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
     """Toggle verbose output mode."""
     chat_id = message.chat.id
@@ -223,7 +223,7 @@ async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, f"Verbose output: {status}")
 
 
-@router.message(Command("exp_thinking_status"))
+@router.message(Command("exp_thinking_status", ignore_case=True))
 async def cmd_exp_thinking_status(message: Message, telegram_queue: TelegramQueue):
     """Toggle thinking status feature."""
     chat_id = message.chat.id
@@ -249,7 +249,7 @@ async def cmd_exp_thinking_status(message: Message, telegram_queue: TelegramQueu
     await telegram_queue.reply(message, f"Thinking status: {status}")
 
 
-@router.message(Command("exp_suggestions"))
+@router.message(Command("exp_suggestions", ignore_case=True))
 async def cmd_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
     """Toggle suggestions feature (chat-wide)."""
     chat_id = message.chat.id
