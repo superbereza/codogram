@@ -38,7 +38,7 @@ LAUNCH_WORKTREE_CREATED = f"{STATUS_OK} Worktree: `{{path}}`"
 
 SESSION_BOUND = f"{STATUS_OK} New session bound"
 SESSION_CLOSED = f"{STATUS_WARN} Claude session closed: {{name}}"
-SESSION_NOT_FOUND = f"{STATUS_WARN} Session not found. Make sure Claude is running"
+SESSION_NOT_FOUND = f"{STATUS_WARN} Session not found. Try /start"
 SESSION_EXPIRED = "Session expired"
 SESSION_EXPIRED_START = "Session expired, start again with /start"
 SESSION_STOPPED = "Session stopped. Use /start to launch"
