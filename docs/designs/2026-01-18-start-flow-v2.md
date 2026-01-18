@@ -380,6 +380,14 @@ def get_chat_link(chat_id: int, chat_type: str) -> str | None:
 ```
 Текст без ссылки, пометка "(no link)".
 
+**Folder list — всегда свежий:**
+```python
+# При каждом входе/возврате в folder select — свежий список
+folders = list_available_folders(settings.base_dir)
+kb = folder_select_keyboard(folders, page=0)
+```
+Не кэшируем в FSM state. Пользователь мог создать папку в терминале между шагами.
+
 ### Connect Flow Corner Cases
 
 | Case | Handling |
@@ -391,6 +399,7 @@ def get_chat_link(chat_id: int, chat_type: str) -> str | None:
 | 100+ folders | Pagination handles it |
 | Folder deleted between list and select | Check existence, show error |
 | All folders already connected | "All folders connected. Create new project?" |
+| New folder created mid-setup | Fresh list on every view |
 
 ## Flow 3: Start new project
 
