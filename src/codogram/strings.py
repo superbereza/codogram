@@ -567,3 +567,95 @@ BTN_DIFFERENT_NAME = "Different name"
 
 # Stale button debounce (5 minutes per design)
 STALE_BUTTON_SECONDS = 300
+
+
+# --- DM Onboarding ---
+
+DM_WELCOME = """👋 Привет!
+
+Я Codogram — бот для управления Claude Code через Telegram."""
+
+DM_SLIDE_1 = """📱 *Мобильность*
+
+Запускай задачи с телефона, работай откуда угодно.
+
+Claude работает на сервере — тебе нужен только Telegram."""
+
+DM_SLIDE_2 = """⏰ *Асинхронность*
+
+Запустил задачу → занялся своим → получил уведомление.
+
+Не нужно сидеть и смотреть в терминал."""
+
+DM_SLIDE_3 = """👥 *Команда*
+
+Настрой один раз — работай с коллегами.
+
+Каждый видит что делает Claude, может подтвердить действие."""
+
+DM_VALIDATION_CHECKING = f"{STATUS_PENDING} Проверяю окружение..."
+
+DM_VALIDATION_OK = f"""{STATUS_OK} Окружение готово
+
+Теперь создай группу в Telegram и добавь меня админом.
+
+Я автоматически подхвачу её."""
+
+DM_VALIDATION_ERROR = f"""{STATUS_ERR} Есть проблемы с окружением
+
+{{errors}}
+
+Исправь и нажми «Проверить снова»."""
+
+DM_VALIDATION_WARNINGS = f"""{STATUS_WARN} Предупреждения (не критично):
+
+{{warnings}}"""
+
+DM_CTA = """✅ *Финальный шаг*
+
+Создай группу в Telegram и добавь @{bot_username} админом.
+
+Бот автоматически подхватит её — /start в группе не нужен."""
+
+DM_MINI_STATUS = """👋 С возвращением!
+
+Активных проектов: {projects}
+Сессий Claude: {sessions}
+
+/dash — подробный список проектов
+/intro — посмотреть введение ещё раз"""
+
+DM_BOT_ADDED = """Меня добавили в «{chat_name}»
+Создатель: @{creator}"""
+
+DM_BOT_ADDED_WITH_LINK = """Меня добавили в «{chat_name}»
+Чат: {link}
+Создатель: @{creator}"""
+
+# --- Dashboard ---
+
+DASH_HEADER = "📊 Проекты"
+
+DASH_PROJECT = """{num}. {chat_name}
+   📁 {directory}
+   👤 Создатель: @{creator}
+   👥 {members} участник(ов)
+   {status}"""
+
+DASH_STATUS_ACTIVE = "🤖 {count} сессий Claude"
+DASH_STATUS_INACTIVE = "💤 не активен"
+
+DASH_FOOTER = "Всего: {total} проектов, {active} активных сессий"
+
+DASH_EMPTY = """📊 Проекты
+
+Пока нет подключённых проектов.
+
+Создай группу и добавь меня — я подхвачу автоматически."""
+
+# --- DM Buttons ---
+
+BTN_NEXT = "Далее →"
+BTN_PREV = "← Назад"
+BTN_RECHECK = "Проверить снова"
+BTN_REFRESH = "Обновить"
