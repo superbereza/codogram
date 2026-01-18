@@ -14,7 +14,7 @@ from .telegram_queue import OutgoingBatch, EditBatch, DeleteBatch
 from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status, parse_input_suggestion, extract_input_text, PASTED_PATTERN
 from .keyboards import permission_keyboard
 from .state import permission_messages
-from .session_manager import ProjectState, ThreadInfo
+from .session_manager import ProjectState, ThreadInfo, project_manager
 from .tmux import TmuxSession
 from .logging_config import logger
 from .auto_accept import try_auto_accept
@@ -179,6 +179,16 @@ async def permission_poller(
     debounce_time = settings.permission_poller_debounce
     poll_interval = settings.permission_poller_interval
 
+    # Cleanup old suggestion message from previous session (survives restart)
+    if thread and thread.last_suggestion_msg_id:
+        try:
+            await bot.delete_message(project.chat_id, thread.last_suggestion_msg_id)
+            logger.info(f"{log_prefix}: cleaned up old suggestion msg {thread.last_suggestion_msg_id}")
+        except Exception as e:
+            logger.debug(f"{log_prefix}: failed to cleanup old suggestion: {e}")
+        thread.last_suggestion_msg_id = None
+        project_manager._save()
+
     while True:
         await asyncio.sleep(poll_interval)
 
@@ -298,12 +308,15 @@ async def permission_poller(
                     ),
                     replace_key=suggestion_msg_key,
                 )
-                await telegram_queue.enqueue_nowait(batch)
+                msg_ids = await telegram_queue.enqueue(batch)
                 _last_suggestions[suggestion_key] = suggestion
+                # Persist message ID for cleanup after restart
+                if thread and msg_ids:
+                    thread.last_suggestion_msg_id = msg_ids[0]
+                    project_manager._save()
 
             elif not suggestion and _last_suggestions.get(suggestion_key):
                 # Suggestion gone — delete 💡 message
-                # Note: ReplyKeyboard persists until user interacts (one_time_keyboard=True helps)
                 logger.debug(f"{log_prefix}: suggestion DELETE")
                 if suggestion_msg_key:
                     batch = DeleteBatch(
@@ -313,6 +326,10 @@ async def permission_poller(
                     )
                     await telegram_queue.enqueue_nowait(batch)
                     suggestion_msg_key = None
+                # Clear persisted message ID
+                if thread:
+                    thread.last_suggestion_msg_id = None
+                    project_manager._save()
                 _last_suggestions[suggestion_key] = None
 
         elif suggestion_msg_key:

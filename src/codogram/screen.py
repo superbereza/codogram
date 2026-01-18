@@ -3,10 +3,9 @@ from dataclasses import dataclass
 from enum import Enum
 
 # Claude thinking status spinners (unique Unicode chars)
-# Excluded: * (too common in text)
-# Kept · (middle dot) - Claude uses it, and position check (last 5 lines before separator)
-# minimizes false positives from bullet lists in scrollback
-THINKING_SPINNERS = "·✶✻✽✢"
+# Excluded: * (too common in text) and · (middle dot, appears in bullet lists)
+# These remaining chars are specific enough to not need content validation
+THINKING_SPINNERS = "✶✻✽✢"
 
 
 # Pattern for pasted content placeholder: [Pasted text #1 +51 lines]
