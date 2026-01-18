@@ -39,7 +39,7 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
 
     # Block video/audio
     if message.video or message.video_note or message.audio or message.voice:
-        await telegram_queue.reply(message, strings.FILE_AUDIO_VIDEO_NOT_SUPPORTED)
+        await telegram_queue.reply(message, strings.FILE_VIDEO_NOT_SUPPORTED)
         return
 
     # Skip empty messages (no text and no file)

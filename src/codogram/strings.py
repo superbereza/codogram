@@ -185,8 +185,21 @@ TOPIC_DELETE_ERROR = "Error deleting topic: {error}"
 
 # --- File input ---
 
-FILE_AUDIO_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video and audio not supported yet. Coming soon with Whisper!"
+FILE_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video files are not supported"
 FILE_TYPE_NOT_SUPPORTED = "This file type is not supported"
+
+
+# --- Audio/Whisper ---
+
+AUDIO_TRANSCRIBING = f"{STATUS_PENDING} Transcribing..."
+AUDIO_SENT = f"{STATUS_OK} «{{text}}» → Claude"
+
+AUDIO_ERR_TOO_LARGE = f"{STATUS_ERR} Transcription failed: file too large"
+AUDIO_ERR_FORMAT = f"{STATUS_ERR} Transcription failed: unsupported format"
+AUDIO_ERR_TIMEOUT = f"{STATUS_ERR} Transcription failed: timeout, try again"
+AUDIO_ERR_GENERIC = f"{STATUS_ERR} Transcription failed: {{error}}"
+AUDIO_ERR_NO_SPEECH = f"{STATUS_ERR} No speech detected"
+AUDIO_ERR_NOT_CONFIGURED = f"{STATUS_ERR} Whisper not configured (missing OPENAI_API_KEY)"
 FILE_TOO_LARGE = "File too large. Max 20MB"
 FILE_DOWNLOAD_FAILED = "Download failed. Try again"
 
