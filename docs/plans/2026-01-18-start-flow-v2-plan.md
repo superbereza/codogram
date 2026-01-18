@@ -259,15 +259,40 @@ BTN_GIT_GH = "git init + gh repo create"
 BTN_GIT_CLONE = "git clone"
 BTN_GIT_NONE = "No git"
 BTN_RETRY = "Retry"
+BTN_CHANGE_URL = "Change URL"
 BTN_USE_EXISTING = "Use existing"
 BTN_DIFFERENT_NAME = "Different name"
+
+# Stale button debounce (5 minutes per design)
+STALE_BUTTON_SECONDS = 300
 ```
 
-**Step 2: Commit**
+**Step 2: Add stale button helper**
+
+Add utility function to `src/codogram/utils.py` (or create if missing):
+
+```python
+# src/codogram/utils.py
+from datetime import datetime, timezone
+
+from .strings import STALE_BUTTON_SECONDS
+
+
+def is_stale_callback(message_date: datetime) -> bool:
+    """Check if callback button is stale (>5 minutes old).
+
+    Per design: ignore callback_query.message.date if older than 5 minutes.
+    """
+    now = datetime.now(timezone.utc)
+    age_seconds = (now - message_date).total_seconds()
+    return age_seconds > STALE_BUTTON_SECONDS
+```
+
+**Step 3: Commit**
 
 ```bash
-git add src/codogram/strings.py
-git commit -m "feat(setup): add setup flow v2 strings"
+git add src/codogram/strings.py src/codogram/utils.py
+git commit -m "feat(setup): add setup flow v2 strings and stale button utility"
 ```
 
 ---
@@ -552,23 +577,26 @@ from . import triggers  # noqa: E402, F401
 setup_router.include_router(triggers.router)
 ```
 
-**Step 3: Write triggers.py with my_chat_member handler**
+**Step 3: Write triggers.py with all entry points**
 
 ```python
 # src/codogram/handlers/setup/triggers.py
 """Setup flow trigger handlers.
 
-Entry points:
-- my_chat_member: bot added to chat or granted admin
-- /start in unregistered chat
+Entry points (per design):
+1. my_chat_member: bot added to chat or granted admin
+2. /start in chat without registered project
+3. Any message in chat without registered project
 """
 import logging
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import ChatMemberUpdated
+from aiogram.types import Chat, ChatMemberUpdated, Message
 
 from ...domain.states import SetupFlow
+from ...session_manager import ProjectManager
 from ...services.setup import check_bot_admin_rights
 from ...keyboards.setup import admin_check_keyboard, setup_type_keyboard
 from ... import strings
@@ -583,14 +611,19 @@ def _is_group_chat(chat_type: str) -> bool:
     return chat_type in ("group", "supergroup")
 
 
+def _is_project_registered(chat_id: int) -> bool:
+    """Check if chat has a registered project."""
+    pm = ProjectManager()
+    return pm.get_project_by_chat_id(chat_id) is not None
+
+
+# --- Entry Point 1: Bot added to chat ---
+
 @router.my_chat_member(
     F.new_chat_member.status.in_({"member", "administrator"})
 )
 async def on_bot_added(event: ChatMemberUpdated, state: FSMContext):
-    """Handle bot being added to chat or granted admin rights.
-
-    Triggers setup flow for new chats.
-    """
+    """Handle bot being added to chat or granted admin rights."""
     chat = event.chat
 
     # Block private chats
@@ -609,17 +642,62 @@ async def on_bot_added(event: ChatMemberUpdated, state: FSMContext):
         logger.debug(f"Setup already in progress for chat {chat.id}")
         return
 
-    # TODO: Check if project already registered for this chat
-    # For now, always start setup
+    # Check if project already registered
+    if _is_project_registered(chat.id):
+        logger.debug(f"Project already registered for chat {chat.id}")
+        return
 
-    await _start_setup_flow(event, state)
+    await _start_setup_flow(event.bot, chat, state)
 
 
-async def _start_setup_flow(event: ChatMemberUpdated, state: FSMContext):
+# --- Entry Point 2: /start in unregistered chat ---
+
+@router.message(Command("start"), F.chat.type.in_({"group", "supergroup"}))
+async def on_start_command(message: Message, state: FSMContext):
+    """Handle /start command in group chats without project."""
+    chat = message.chat
+
+    # Check if setup already in progress
+    current_state = await state.get_state()
+    if current_state and current_state.startswith("SetupFlow:"):
+        # /start during setup restarts the flow (per design line 535)
+        await state.clear()
+
+    # Check if project already registered - /start shows status
+    if _is_project_registered(chat.id):
+        # Delegate to existing start handler for status display
+        return  # Let other handlers process this
+
+    await _start_setup_flow(message.bot, chat, state)
+
+
+# --- Entry Point 3: Any message in unregistered chat ---
+
+@router.message(F.chat.type.in_({"group", "supergroup"}))
+async def on_any_message(message: Message, state: FSMContext):
+    """Handle any message in group chat without project.
+
+    This is a catch-all that triggers setup if no project registered.
+    Must be registered LAST to not intercept other handlers.
+    """
+    chat = message.chat
+
+    # Skip if setup already in progress
+    current_state = await state.get_state()
+    if current_state and current_state.startswith("SetupFlow:"):
+        return
+
+    # Skip if project already registered
+    if _is_project_registered(chat.id):
+        return
+
+    await _start_setup_flow(message.bot, chat, state)
+
+
+# --- Shared setup start logic ---
+
+async def _start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
     """Start the setup flow - check admin rights first."""
-    chat = event.chat
-    bot = event.bot
-
     # Check admin rights
     has_rights = await check_bot_admin_rights(bot, chat.id)
 
@@ -641,6 +719,8 @@ async def _start_setup_flow(event: ChatMemberUpdated, state: FSMContext):
         reply_markup=setup_type_keyboard(),
     )
 ```
+
+**Important:** The `on_any_message` handler must be registered LAST in the router chain to avoid intercepting other message handlers.
 
 **Step 4: Commit**
 
@@ -695,11 +775,12 @@ import logging
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, ChatMemberUpdated
 
 from ...domain.states import SetupFlow
 from ...services.setup import check_bot_admin_rights
 from ...keyboards.setup import admin_check_keyboard, setup_type_keyboard
+from ...utils import is_stale_callback
 from ... import strings
 
 logger = logging.getLogger(__name__)
@@ -713,6 +794,11 @@ router = Router(name="setup_admin_check")
 )
 async def on_check_rights(callback: CallbackQuery, state: FSMContext):
     """Handle Check rights button press."""
+    # Ignore stale buttons (>5 min old per design)
+    if is_stale_callback(callback.message.date):
+        await callback.answer("Button expired, use /start")
+        return
+
     await callback.answer()  # Acknowledge callback
 
     chat_id = callback.message.chat.id
@@ -869,16 +955,54 @@ def go_back_keyboard(callback_data: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=callback_data)],
     ])
+
+
+def clone_error_keyboard() -> InlineKeyboardMarkup:
+    """Create keyboard for clone error recovery (per design line 229).
+
+    Buttons: [Retry] [Change URL] [<< Back]
+    """
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text=strings.BTN_RETRY, callback_data="clone:retry"),
+            InlineKeyboardButton(text=strings.BTN_CHANGE_URL, callback_data="clone:change_url"),
+        ],
+        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data="clone:back")],
+    ])
+
+
+def folder_exists_keyboard(context: str) -> InlineKeyboardMarkup:
+    """Create keyboard for folder exists scenario (per design line 295).
+
+    Buttons: [Use existing] [Different name] [<< Back]
+
+    Args:
+        context: "clone" or "new" - determines back callback
+    """
+    back_callback = "clone:back" if context == "clone" else "name:back"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text=strings.BTN_USE_EXISTING, callback_data="exists:use"),
+            InlineKeyboardButton(text=strings.BTN_DIFFERENT_NAME, callback_data="exists:rename"),
+        ],
+        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=back_callback)],
+    ])
 ```
 
 **Step 3: Update keyboards __init__.py**
 
 ```python
 # src/codogram/keyboards/setup/__init__.py
-from .common import go_back_keyboard
+from .common import go_back_keyboard, clone_error_keyboard, folder_exists_keyboard
 from .setup_type import admin_check_keyboard, setup_type_keyboard
 
-__all__ = ["setup_type_keyboard", "admin_check_keyboard", "go_back_keyboard"]
+__all__ = [
+    "setup_type_keyboard",
+    "admin_check_keyboard",
+    "go_back_keyboard",
+    "clone_error_keyboard",
+    "folder_exists_keyboard",
+]
 ```
 
 **Step 4: Update handlers __init__.py**
@@ -964,6 +1088,76 @@ async def on_clone_back(callback: CallbackQuery, state: FSMContext):
     )
 
 
+@router.callback_query(
+    SetupFlow.awaiting_clone_url,
+    F.data == "clone:retry"
+)
+async def on_clone_retry(callback: CallbackQuery, state: FSMContext):
+    """Handle Retry button after clone failure."""
+    await callback.answer()
+
+    # Retry the clone with stored data
+    await _do_clone(callback.message, state)
+
+
+@router.callback_query(
+    SetupFlow.awaiting_clone_url,
+    F.data == "clone:change_url"
+)
+async def on_clone_change_url(callback: CallbackQuery, state: FSMContext):
+    """Handle Change URL button after clone failure."""
+    await callback.answer()
+
+    # Go back to URL prompt
+    await callback.message.edit_text(
+        strings.SETUP_CLONE_URL_PROMPT,
+        reply_markup=go_back_keyboard("clone:back"),
+    )
+
+
+@router.callback_query(
+    SetupFlow.awaiting_clone_url,
+    F.data == "exists:use"
+)
+async def on_exists_use(callback: CallbackQuery, state: FSMContext):
+    """Handle Use existing folder button."""
+    await callback.answer()
+
+    # Use existing folder - proceed to rename check or launch
+    data = await state.get_data()
+    project_name = data["project_name"]
+    chat_title = callback.message.chat.title or ""
+
+    if chat_title != project_name:
+        await state.set_state(SetupFlow.awaiting_rename_confirm)
+        await state.update_data(rename_to=project_name)
+
+        from ...keyboards.setup.confirm import rename_confirm_keyboard
+        await callback.message.edit_text(
+            strings.SETUP_RENAME_PROMPT.format(name=project_name),
+            reply_markup=rename_confirm_keyboard(),
+        )
+    else:
+        # Proceed to launch
+        await _proceed_to_launch(callback.message, state)
+
+
+@router.callback_query(
+    SetupFlow.awaiting_clone_url,
+    F.data == "exists:rename"
+)
+async def on_exists_rename(callback: CallbackQuery, state: FSMContext):
+    """Handle Different name button - ask for new URL."""
+    await callback.answer()
+
+    # Clear stored data and ask for new URL
+    await state.update_data(clone_url=None, project_name=None, target_dir=None)
+    await callback.message.edit_text(
+        strings.SETUP_CLONE_URL_PROMPT,
+        reply_markup=go_back_keyboard("clone:back"),
+    )
+
+
 @router.message(SetupFlow.awaiting_clone_url)
 async def on_clone_url(message: Message, state: FSMContext):
     """Handle clone URL input."""
@@ -992,11 +1186,12 @@ async def on_clone_url(message: Message, state: FSMContext):
     target_dir = base_dir / project_name
 
     if target_dir.exists():
-        await state.update_data(clone_url=url, project_name=project_name)
-        # TODO: Show "folder exists" dialog
+        await state.update_data(clone_url=url, project_name=project_name, target_dir=str(target_dir))
+        # Folder exists - offer Use existing / Different name (per design line 295)
+        from ...keyboards.setup.common import folder_exists_keyboard
         await message.answer(
             strings.SETUP_PROJECT_EXISTS.format(name=project_name),
-            reply_markup=go_back_keyboard("clone:back"),
+            reply_markup=folder_exists_keyboard("clone"),
         )
         return
 
@@ -1036,9 +1231,11 @@ async def _do_clone(message: Message, state: FSMContext):
         elif "Authentication failed" in error_msg or "401" in error_msg:
             hint = f"\n\n{strings.SETUP_CLONE_AUTH_HINT}"
 
+        # Show Retry/Change URL/Back buttons (per design line 229)
+        from ...keyboards.setup.common import clone_error_keyboard
         await progress_msg.edit_text(
             strings.SETUP_CLONE_FAILED.format(error=error_msg) + hint,
-            reply_markup=go_back_keyboard("clone:back"),
+            reply_markup=clone_error_keyboard(),
         )
         return
 
@@ -2598,19 +2795,37 @@ async def on_git_none(callback: CallbackQuery, state: FSMContext):
     F.data == "git:back"
 )
 async def on_git_back(callback: CallbackQuery, state: FSMContext):
-    """Go back from git choice."""
+    """Go back from git choice.
+
+    Per design navigation (lines 577-592):
+    - If rename was shown, go back to ASK_RENAME_CONFIRM
+    - Otherwise go back to previous step (folder select or project name)
+    """
     await callback.answer()
 
     data = await state.get_data()
     setup_type = data.get("setup_type")
+    project_name = data.get("project_name")
+    chat_title = callback.message.chat.title or ""
 
-    if setup_type == "connect":
-        # Back to folder selection
+    # Check if rename step was/should be shown
+    # (chat title differs from project name)
+    if chat_title != project_name:
+        # Go back to rename confirm
+        await state.set_state(SetupFlow.awaiting_rename_confirm)
+        await state.update_data(rename_to=project_name)
+        from ...keyboards.setup.confirm import rename_confirm_keyboard
+        await callback.message.edit_text(
+            strings.SETUP_RENAME_PROMPT.format(name=project_name),
+            reply_markup=rename_confirm_keyboard(),
+        )
+    elif setup_type == "connect":
+        # Back to folder selection (rename was skipped)
         await state.set_state(SetupFlow.awaiting_folder_select)
         from .connect_flow import show_folder_selection
         await show_folder_selection(callback.message, state)
     else:
-        # Back to project name
+        # Back to project name (for "new" flow, rename was skipped)
         await state.set_state(SetupFlow.awaiting_project_name)
         await show_project_name_prompt(callback.message, state)
 ```
@@ -2803,18 +3018,30 @@ async def on_rename_yes(callback: CallbackQuery, state: FSMContext):
     rename_to = data.get("rename_to")
 
     if rename_to:
-        success = await rename_chat_safe(
-            callback.bot,
-            callback.message.chat.id,
-            rename_to,
-        )
+        # Re-check admin rights before rename (per design line 537)
+        from ...services.setup import check_bot_admin_rights
+        has_rights = await check_bot_admin_rights(callback.bot, callback.message.chat.id)
 
-        if not success:
-            # Warn but continue
+        if not has_rights:
+            # Warn and continue without rename
             await callback.message.answer(
                 strings.SETUP_RENAME_FAILED,
                 parse_mode="MarkdownV2",
             )
+        else:
+            # Try to rename
+            success = await rename_chat_safe(
+                callback.bot,
+                callback.message.chat.id,
+                rename_to,
+            )
+
+            if not success:
+                # Warn but continue
+                await callback.message.answer(
+                    strings.SETUP_RENAME_FAILED,
+                    parse_mode="MarkdownV2",
+                )
 
     # Proceed to launch
     from .launch import do_launch
