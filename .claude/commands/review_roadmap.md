@@ -1,6 +1,5 @@
 ---
 description: Review current roadmap status and active bugs
-allowed-tools: Bash, Read, Grep
 ---
 
 # Review Roadmap

@@ -320,13 +320,6 @@ Voice messages via Whisper transcription:
 
 ## Backlog
 
-### Auto-resume on message
-Auto-launch Claude when user sends message but tmux doesn't exist:
-- Show: `` `[~]` Tmux session not found, launching... ``
-- If `session_id` exists → `claude --resume`, else `claude`
-- Queue all messages (text + files) while launching
-- Send queued messages after Claude ready
-
 ### Merge thread and branch commands
 Simplify by removing separate /thread command:
 - Thread is essentially a branch for main
@@ -359,6 +352,13 @@ Admin commands to enable/disable features:
 - Toggle `/branch` command visibility
 - Simplify menu for non-power-users
 - Store in per-project settings
+
+### Auto-resume on message
+Auto-launch Claude when user sends message but tmux doesn't exist:
+- Show: `` `[~]` Tmux session not found, launching... ``
+- If `session_id` exists → `claude --resume`, else `claude`
+- Queue all messages (text + files) while launching
+- Send queued messages after Claude ready
 
 ### Telegram safety context
 Inject safety guidelines when starting thread/branch/project:
