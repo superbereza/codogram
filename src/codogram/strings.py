@@ -426,3 +426,121 @@ BRANCH_CREATING = f"{STATUS_PENDING} Creating branch `{{name}}`..."
 BRANCH_CREATED = f"{STATUS_OK} Branch `{{name}}` created"
 
 BRANCH_FINISH_USE_FINISH = f"{STATUS_INFO} Use /finish to complete branches"
+
+
+# --- Setup Flow v2 ---
+
+# Base directory
+SETUP_BASE_DIR_MISSING = f"""{STATUS_ERR} Configure base directory first
+
+Set BASE_DIR in \\.env file:
+`BASE_DIR=/home/user/dev`
+
+Then restart the bot\\."""
+
+# Admin rights
+SETUP_ADMIN_REQUIRED = f"""{STATUS_WARN} Grant admin rights to continue
+
+Bot needs admin rights to:
+• Rename chat to match project
+• Manage topics for branches
+
+Open chat settings → Administrators → Add bot as admin"""
+
+SETUP_ADMIN_CHECK_FAILED = f"{STATUS_WARN} Still missing admin rights"
+
+# Chat type errors
+SETUP_PRIVATE_CHAT = f"{STATUS_ERR} Add bot to a group chat"
+SETUP_CHANNEL_NOT_SUPPORTED = f"{STATUS_ERR} Channels not supported"
+SETUP_ALREADY_IN_PROGRESS = f"{STATUS_INFO} Setup already in progress"
+
+# Command blocking during setup
+SETUP_COMMAND_BLOCKED = f"""{STATUS_WARN} Complete project setup first
+
+Available commands:
+• /start — restart setup
+• /reset\\_all — cancel setup
+• /help — get help"""
+
+# Setup type selection
+SETUP_CHOOSE_TYPE = "How would you like to set up this project?"
+
+# Clone flow
+SETUP_CLONE_URL_PROMPT = """Send repository URL:
+• SSH: `git@github.com:user/repo.git`
+• HTTPS: `https://github.com/user/repo.git`"""
+
+SETUP_CLONE_PROGRESS = f"{STATUS_PENDING} Cloning repository..."
+SETUP_CLONE_FAILED = f"{STATUS_ERR} Clone failed: {{error}}"
+SETUP_CLONE_SSH_HINT = "SSH key may not be configured. Try HTTPS URL instead."
+SETUP_CLONE_AUTH_HINT = "Repository may be private. Check authentication."
+
+# Folder selection
+SETUP_FOLDER_SELECT = "Select folder to connect:"
+SETUP_FOLDER_EMPTY = f"{STATUS_WARN} No folders found in `{{base_dir}}`"
+SETUP_FOLDER_ALL_CONNECTED = f"""{STATUS_INFO} All folders are already connected
+
+Start a new project instead?"""
+SETUP_FOLDER_NOT_FOUND = f"{STATUS_ERR} Folder `{{name}}` not found"
+SETUP_FOLDER_USE_BUTTONS = "Select a folder from the list above\\nor use \\[<< Go back\\] to return\\."
+
+# View connected
+SETUP_CONNECTED_HEADER = "Connected projects:"
+SETUP_CONNECTED_EMPTY = "No projects connected yet"
+SETUP_CONNECTED_TAP_HINT = "Tap chat name to open\\."
+SETUP_CONNECTED_NO_LINK = "(no link)"
+
+# New project
+SETUP_PROJECT_NAME_PROMPT = """Project folder name?
+
+Suggested: `{suggested}`
+
+Or send custom name"""
+
+SETUP_PROJECT_NAME_INVALID = f"{STATUS_ERR} Invalid name\\. Use letters, digits, \\- and \\_ only"
+SETUP_PROJECT_EXISTS = f"""{STATUS_WARN} Folder `{{name}}` already exists
+
+What to do?"""
+
+# Git choice
+SETUP_GIT_CHOICE = "Git setup for `{folder}`?"
+SETUP_GIT_GH_NOT_INSTALLED = f"{STATUS_ERR} `gh` CLI not installed\\. Install from https://cli\\.github\\.com"
+SETUP_GIT_GH_NOT_AUTH = f"{STATUS_ERR} `gh` not authenticated\\. Run `gh auth login` first"
+
+# Rename
+SETUP_RENAME_PROMPT = "Rename chat to `{name}`?"
+SETUP_RENAME_FAILED = f"{STATUS_WARN} Couldn't rename chat \\(missing permissions?\\)\\nContinuing with project setup\\.\\.\\."
+
+# Launch
+SETUP_LAUNCH_PROGRESS = f"{STATUS_PENDING} Setting up project..."
+SETUP_LAUNCH_MKDIR_FAILED = f"{STATUS_ERR} Failed to create directory: {{error}}"
+SETUP_LAUNCH_SUCCESS = f"""{STATUS_OK} Project `{{project}}` ready
+
+Commands available:
+• /esc — cancel operation
+• /clear — clear context
+• /auto_accept — toggle auto\\-accept
+• /thread — new topic
+
+Terminal: `tmux attach \\-t {{tmux_name}}`"""
+
+# Buttons
+BTN_CLONE = "Clone repository"
+BTN_CONNECT = "Connect to existing folder"
+BTN_NEW = "Start new project"
+BTN_CHECK_RIGHTS = "Check rights"
+BTN_BACK_TO_FOLDERS = "<< Back to folders"
+BTN_VIEW_CONNECTED = "View connected projects"
+BTN_RENAME_YES = "Yes, rename"
+BTN_RENAME_NO = "No"
+BTN_GIT_INIT = "git init"
+BTN_GIT_GH = "git init + gh repo create"
+BTN_GIT_CLONE = "git clone"
+BTN_GIT_NONE = "No git"
+BTN_RETRY = "Retry"
+BTN_CHANGE_URL = "Change URL"
+BTN_USE_EXISTING = "Use existing"
+BTN_DIFFERENT_NAME = "Different name"
+
+# Stale button debounce (5 minutes per design)
+STALE_BUTTON_SECONDS = 300
