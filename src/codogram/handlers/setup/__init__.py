@@ -20,6 +20,7 @@ from . import clone_flow  # noqa: E402, F401
 from . import connect_flow  # noqa: E402, F401
 from . import new_project_flow  # noqa: E402, F401
 from . import rename  # noqa: E402, F401
+from . import launch  # noqa: E402, F401
 
 # Include sub-routers
 setup_router.include_router(triggers.router)
@@ -29,3 +30,4 @@ setup_router.include_router(clone_flow.router)
 setup_router.include_router(connect_flow.router)
 setup_router.include_router(new_project_flow.router)
 setup_router.include_router(rename.router)
+setup_router.include_router(launch.router)
