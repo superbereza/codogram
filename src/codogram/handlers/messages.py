@@ -137,6 +137,10 @@ async def _send_content(message: Message, result, telegram_queue: TelegramQueue)
     else:
         content = message.text
 
+    # Track for stuck message detection
+    if result.thread:
+        result.thread.last_sent_message = content
+
     return _message_router.send_to_tmux(result, content)
 
 
