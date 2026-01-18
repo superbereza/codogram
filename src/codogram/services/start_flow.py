@@ -50,8 +50,7 @@ def build_announcement(project_name: str, tmux_name: str, is_forum: bool) -> str
 Commands available in this chat:
 {chr(10).join(commands)}
 
-To see Claude's UI, run in terminal:
-`tmux attach -t {tmux_name}`"""
+To see Claude UI: `tmux attach -t {tmux_name}`"""
 
 
 def is_setup_phase(project: "ProjectState") -> bool:

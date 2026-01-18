@@ -2,6 +2,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from ..domain.create_flow import CreateType
+from .. import strings
 
 # Callback data constants
 CALLBACK_MAGIC_PREFIX = "create_magic:"
@@ -12,11 +13,11 @@ def build_name_prompt_keyboard(create_type: CreateType) -> InlineKeyboardMarkup:
     """Build keyboard for name prompt."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text="🔮 Magic name",
+            text=strings.BTN_MAGIC_NAME,
             callback_data=f"{CALLBACK_MAGIC_PREFIX}{create_type.value}"
         )],
         [InlineKeyboardButton(
-            text="[<<] Go back",
+            text=strings.BTN_GO_BACK,
             callback_data=CALLBACK_CANCEL
         )],
     ])
