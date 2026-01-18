@@ -6,6 +6,7 @@ from aiogram.filters import Command
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
 from .. import strings
+from ..logging_config import logger
 from ..adapters.sticker import StickerAdapter
 from ..services.emoji_pack import EmojiPackService
 from ..keyboards import avatar_pack_create_keyboard, avatar_pack_disable_keyboard
@@ -290,7 +291,11 @@ async def cmd_exp_avatar_pack(message: Message, telegram_queue: TelegramQueue):
 @router.callback_query(F.data.startswith("avatar_pack:"))
 async def callback_avatar_pack(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle avatar pack button presses."""
-    action = callback.data.split(":")[1]
+    parts = callback.data.split(":")
+    if len(parts) < 2:
+        await callback.answer("Invalid callback")
+        return
+    action = parts[1]
     chat_id = callback.message.chat.id
 
     project = project_manager.get_by_chat(chat_id)
@@ -308,6 +313,7 @@ async def callback_avatar_pack(callback: CallbackQuery, telegram_queue: Telegram
     service = EmojiPackService(adapter)
 
     if action == "create":
+        logger.info(f"Avatar pack creation started for chat {chat_id}")
         await telegram_queue.edit(callback.message, strings.EMOJI_PACK_CREATING)
         await callback.answer()
 
@@ -338,6 +344,7 @@ async def callback_avatar_pack(callback: CallbackQuery, telegram_queue: Telegram
             )
 
     elif action == "disable":
+        logger.info(f"Avatar pack deletion requested for chat {chat_id}")
         await telegram_queue.edit(callback.message, strings.EMOJI_PACK_DELETED)
         await callback.answer()
         await service.delete_pack(chat_id)
