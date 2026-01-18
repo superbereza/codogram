@@ -48,6 +48,7 @@ NEW_SESSION = f"{STATUS_PENDING} Creating new session..."
 CLEAR_SESSION = f"{STATUS_PENDING} Clearing session..."
 
 CLAUDE_CRASHED = f"{STATUS_WARN} Claude crashed: {{reason}}\nUse /restart to restart"
+CLAUDE_AUTO_RESTARTED = f"{STATUS_INFO} Claude exited, auto\\-restarting\\.\\.\\."
 
 COMPACTING_STARTED = f"{STATUS_INFO} Claude is compacting conversation\\.\\.\\."
 

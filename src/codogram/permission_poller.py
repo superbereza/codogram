@@ -1,5 +1,6 @@
 """Background permission poller - independent of jsonl watcher."""
 import asyncio
+import time
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -74,6 +75,36 @@ def _detect_crash(screen: str) -> str | None:
     return None
 
 
+def _detect_exit(screen: str) -> bool:
+    """Detect if Claude exited normally (no crash).
+
+    NOTE: Currently unused - has false positives.
+    See: docs/bugs/active/2026-01-18-auto-restart-false-positives.md
+
+    Returns True if:
+    1. Claude UI NOT visible
+    2. Shell prompt visible
+    3. NO crash signatures (not a crash)
+    """
+    if is_claude_ready(screen):
+        return False
+
+    lines = screen.split("\n")
+    last_lines = "\n".join(lines[-15:])
+
+    # Must have shell prompt
+    has_shell = any(p in last_lines for p in SHELL_PROMPTS)
+    if not has_shell:
+        return False
+
+    # Must NOT have crash signatures
+    for sig in CRASH_SIGNATURES:
+        if sig in last_lines:
+            return False
+
+    return True
+
+
 async def create_poller_task(bot: Bot, project: ProjectState, telegram_queue: "TelegramQueue") -> asyncio.Task:
     """Create permission poller task for project (no thread)."""
     return asyncio.create_task(permission_poller(bot, project, telegram_queue, thread=None))
@@ -140,6 +171,10 @@ async def permission_poller(
     # Stuck message detection state
     stuck_input_text: str | None = None
     stuck_seen_count: int = 0
+
+    # Auto-restart state (cooldown to prevent infinite loops)
+    last_restart_time: float = 0.0
+    RESTART_COOLDOWN = 60.0  # Don't restart more than once per minute
 
     debounce_time = settings.permission_poller_debounce
     poll_interval = settings.permission_poller_interval
@@ -306,6 +341,12 @@ async def permission_poller(
             except Exception:
                 pass
             return  # Exit poller
+
+        # Exit detection + auto-restart
+        # NOTE: Disabled - false positives when Claude is running
+        # See: docs/bugs/active/2026-01-18-auto-restart-false-positives.md
+        # if _detect_exit(screen):
+        #     ...
 
         # Stuck message detection (before permission state machine)
         input_text = extract_input_text(screen)
