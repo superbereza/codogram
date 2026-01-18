@@ -36,7 +36,7 @@ async def do_launch(message: Message, state: FSMContext):
     This is called from various flows after all setup is complete.
     """
     # Lazy imports to avoid circular dependencies
-    from ...services.setup.project_setup import setup_project
+    from ...services.setup.init_project import init_project
     from ...services.menu import register_menu_for_chat
     from ...launch_animation import launch_with_animation
     from ...session_manager import project_manager
@@ -55,13 +55,11 @@ async def do_launch(message: Message, state: FSMContext):
     chat_type = chat.type
     thread_id = message.message_thread_id
 
-    # Run setup (creates dir, tmux session, registers project)
-    result = await setup_project(
+    # Initialize project (creates dir, registers in config)
+    result = await init_project(
         project_name=project_name,
         target_dir=target_dir,
         chat_id=chat_id,
-        chat_title=chat_title,
-        chat_type=chat_type,
     )
 
     if not result.success:
