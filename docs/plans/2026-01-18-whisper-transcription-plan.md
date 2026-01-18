@@ -23,6 +23,7 @@ Add to `Settings` class after line 22 (`project_cleanup_days`):
     # OpenAI / Whisper
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
+    whisper_timeout: int = 60  # seconds
 ```
 
 **Step 2: Verify config loads**
@@ -65,13 +66,19 @@ AUDIO_ERR_TIMEOUT = f"{STATUS_ERR} Transcription failed: timeout, try again"
 AUDIO_ERR_GENERIC = f"{STATUS_ERR} Transcription failed: {{error}}"
 AUDIO_ERR_NO_SPEECH = f"{STATUS_ERR} No speech detected"
 AUDIO_ERR_NOT_CONFIGURED = f"{STATUS_ERR} Whisper not configured (missing OPENAI_API_KEY)"
+
+FILE_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video files are not supported"
 ```
 
-**Step 2: Remove old audio blocker string**
+**Step 2: Update audio blocker string**
 
-Delete line 188:
+Replace line 188 - change from audio+video to video-only:
 ```python
+# Old:
 FILE_AUDIO_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video and audio not supported yet. Coming soon with Whisper!"
+
+# New (rename and update message):
+FILE_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video files are not supported"
 ```
 
 **Step 3: Verify imports**
@@ -282,10 +289,12 @@ class WhisperService:
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://api.openai.com/v1"
+        base_url: str = "https://api.openai.com/v1",
+        timeout: int = 60
     ):
         self.api_key = api_key
         self.base_url = base_url
+        self.timeout = timeout
         self._client: AsyncOpenAI | None = None
 
     def _get_client(self) -> AsyncOpenAI:
@@ -293,7 +302,8 @@ class WhisperService:
         if self._client is None:
             self._client = AsyncOpenAI(
                 api_key=self.api_key,
-                base_url=self.base_url
+                base_url=self.base_url,
+                timeout=self.timeout
             )
         return self._client
 
@@ -489,7 +499,7 @@ Expected: FAIL with `ImportError: cannot import name 'AudioFileInfo'`
 
 **Step 3: Add AudioFileInfo and extract_audio_info**
 
-Add to `src/codogram/services/file_input.py` after `FileInfo` class (around line 15):
+Add to `src/codogram/services/file_input.py` after `FileInputResult` class (after line 24):
 
 ```python
 @dataclass
@@ -502,7 +512,7 @@ class AudioFileInfo:
     duration: int | None = None
 ```
 
-Add method to `FileInputService` class (after `extract_info` method, around line 72):
+Add method to `FileInputService` class after `extract_info` method (after line 72):
 
 ```python
     def extract_audio_info(self, message) -> AudioFileInfo | None:
@@ -793,7 +803,8 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
         # Transcribe
         whisper = WhisperService(
             api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url
+            base_url=settings.openai_base_url,
+            timeout=settings.whisper_timeout
         )
         transcription = await whisper.transcribe(file_path)
 
@@ -858,9 +869,10 @@ Update import at line 4 to add `audio`:
 from . import permissions, start, threads, branches, sessions, settings, shift_tab, finish, create_flow, common, messages, migration, audio
 ```
 
-Add router before messages.router (around line 30, before line 31 `dp.include_router(messages.router)`):
+Insert audio router **before** `common.router` (line 30), so the order is:
 ```python
     dp.include_router(audio.router)         # Voice/audio/video transcription
+    dp.include_router(common.router)        # cb_cancel
     dp.include_router(messages.router)      # Catch-all for tmux routing (LAST!)
 ```
 
@@ -875,11 +887,11 @@ In `src/codogram/handlers/messages.py`, remove lines 40-43:
         return
 ```
 
-Replace with just video block (video files without audio track):
+Replace with just video block (video files without audio track), using the new string constant:
 ```python
     # Block video files (not video_note - those are handled by audio router)
     if message.video:
-        await telegram_queue.reply(message, "Video files are not supported")
+        await telegram_queue.reply(message, strings.FILE_VIDEO_NOT_SUPPORTED)
         return
 ```
 
@@ -920,13 +932,14 @@ If file exists, append. If not, create with full example. Add these lines:
 # Whisper (audio transcription)
 OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.openai.com/v1
+WHISPER_TIMEOUT=60
 ```
 
 **Step 3: Commit**
 
 ```bash
 git add .env.example
-git commit -m "docs: add OpenAI config to .env.example"
+git commit -m "docs: add OpenAI/Whisper config to .env.example"
 ```
 
 ---
