@@ -52,7 +52,7 @@ async def _create_emoji_pack_background(bot: Bot, chat_id: int, telegram_queue: 
             await telegram_queue.enqueue(batch)
             logger.info(f"Emoji pack created on migration: {pack_name}")
     except Exception as e:
-        logger.error(f"Failed to create emoji pack on migration: {e}")
+        logger.exception(f"Failed to create emoji pack on migration: {e}")
 
 
 @router.message(F.migrate_to_chat_id)
