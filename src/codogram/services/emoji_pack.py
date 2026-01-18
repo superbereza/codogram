@@ -170,3 +170,63 @@ class EmojiPackService:
         except Exception as e:
             logger.warning(f"Failed to add user {user.id} to pack: {e}")
             return None
+
+    async def add_member(self, chat_id: int, user: User) -> str | None:
+        """Add member's avatar to existing pack."""
+        project = project_manager.get_by_chat(chat_id)
+        if not project or not project.emoji_pack_name:
+            return None
+
+        # Check if already in pack
+        if user.id in project.emoji_map:
+            return project.emoji_map[user.id]
+
+        emoji_id = await self._add_user_to_pack(project.emoji_pack_name, user, project)
+        if emoji_id:
+            project_manager._save()
+        return emoji_id
+
+    async def remove_member(self, chat_id: int, user_id: int) -> None:
+        """Remove member's avatar from pack."""
+        project = project_manager.get_by_chat(chat_id)
+        if not project or not project.emoji_pack_name:
+            return
+
+        emoji_id = project.emoji_map.get(user_id)
+        if not emoji_id:
+            logger.debug(f"User {user_id} not in emoji_map for chat {chat_id}")
+            return
+
+        try:
+            await self.adapter.remove_sticker(project.emoji_pack_name, emoji_id)
+            del project.emoji_map[user_id]
+            project_manager._save()
+            logger.info(f"Removed user {user_id} from emoji pack")
+        except Exception as e:
+            logger.warning(f"Failed to remove user {user_id} from pack: {e}")
+
+    async def delete_pack(self, chat_id: int) -> bool:
+        """Delete entire pack and clear state."""
+        project = project_manager.get_by_chat(chat_id)
+        if not project or not project.emoji_pack_name:
+            return False
+
+        try:
+            await self.adapter.delete_pack(project.emoji_pack_name)
+            logger.info(f"Deleted emoji pack: {project.emoji_pack_name}")
+        except Exception as e:
+            logger.warning(f"Failed to delete pack (may not exist): {e}")
+
+        # Clear state regardless
+        project.emoji_pack_name = None
+        project.emoji_map = {}
+        project.feat_avatar_pack = False
+        project_manager._save()
+        return True
+
+    def get_emoji_id(self, chat_id: int, user_id: int) -> str | None:
+        """Get custom_emoji_id for user."""
+        project = project_manager.get_by_chat(chat_id)
+        if not project:
+            return None
+        return project.emoji_map.get(user_id)
