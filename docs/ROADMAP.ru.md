@@ -292,6 +292,13 @@ Per-thread/per-project toggle verbose output и UX настроек:
 
 ## In Progress
 
+### Code cleanup
+Уменьшение технического долга по фазам:
+- **Phase 1 (сейчас):** Circular dependency fix, магические числа → константы
+- **Phase 2 (backlog):** @require_state() декоратор для handlers
+- **Phase 3 (backlog):** LaunchService extraction, DEPRECATED поля, ThreadInfo refactoring
+- См. [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
+
 ### Онбординг в боте
 Интерактивный онбординг в директ чате с ботом:
 - Welcome flow с объяснением возможностей бота

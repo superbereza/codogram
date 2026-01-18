@@ -292,6 +292,13 @@ Auto-detect and resend messages stuck in Claude's input:
 
 ## In Progress
 
+### Code cleanup
+Technical debt reduction in phases:
+- **Phase 1 (now):** Circular dependency fix, magic numbers → constants
+- **Phase 2 (backlog):** @require_state() decorator for handlers
+- **Phase 3 (backlog):** LaunchService extraction, DEPRECATED fields, ThreadInfo refactoring
+- See [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
+
 ### Bot onboarding
 Interactive onboarding in direct messages with bot:
 - Welcome flow explaining bot features
