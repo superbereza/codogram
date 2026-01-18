@@ -1,9 +1,9 @@
 ---
-description: Generate formatted roadmap and bugs list for user review
+description: Review current roadmap status and active bugs
 allowed-tools: Bash, Read, Grep
 ---
 
-# Generate Roadmap List
+# Review Roadmap
 
 Read the current state from:
 1. `docs/ROADMAP.md` - Beta Test, In Progress, Backlog sections
