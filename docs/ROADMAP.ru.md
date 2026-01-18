@@ -292,6 +292,15 @@ Per-thread/per-project toggle verbose output и UX настроек:
 Полный редизайн /start flow с устойчивой обработкой ошибок и интуитивным UX настройки.
 - См. [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md) (worktree: set-up-flow-redesign)
 
+### Avatar emoji pack
+Emoji pack из аватарок участников группы:
+- Создание pack при миграции группа → супергруппа (async)
+- Добавление аватарки при входе участника, удаление при выходе
+- Генерация placeholder (буква + цвет) для юзеров без аватарки
+- Уведомление: "`[v]` Gift unlocked — avatar pack for topic icons"
+- Ограничение: Premium нужен для установки custom emoji как иконки топика
+- См. [docs/plans/2026-01-18-emoji-pack-design.md](plans/2026-01-18-emoji-pack-design.md)
+
 ## Backlog
 
 ### Объединить команды thread и branch
@@ -301,15 +310,6 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Без аргумента = branch от main (текущее поведение /thread)
 - С аргументом = branch от текущей ветки
 - Меньше когнитивной нагрузки для пользователей
-
-### Avatar emoji pack
-Emoji pack из аватарок участников группы:
-- Создание pack при миграции группа → супергруппа (async)
-- Добавление аватарки при входе участника, удаление при выходе
-- Генерация placeholder (буква + цвет) для юзеров без аватарки
-- Уведомление: "`[v]` Gift unlocked — avatar pack for topic icons"
-- Ограничение: Premium нужен для установки custom emoji как иконки топика
-- См. [docs/plans/2026-01-18-emoji-pack-design.md](plans/2026-01-18-emoji-pack-design.md)
 
 ### Упрощение названий в меню
 Сделать названия команд более понятными:

@@ -292,6 +292,15 @@ Interactive onboarding in direct messages with bot:
 Full redesign of /start flow with robust error handling and intuitive setup UX.
 - See [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md) (worktree: set-up-flow-redesign)
 
+### Avatar emoji pack
+Custom emoji pack from group members' avatars:
+- Create pack on group → supergroup migration (async)
+- Add avatar when member joins, remove when leaves
+- Generate placeholder (letter + color) for users without avatar
+- Notification: "`[v]` Gift unlocked — avatar pack for topic icons"
+- Limitation: Premium required to set custom emoji as topic icon
+- See [docs/plans/2026-01-18-emoji-pack-design.md](plans/2026-01-18-emoji-pack-design.md)
+
 ## Backlog
 
 ### Merge thread and branch commands
@@ -301,15 +310,6 @@ Simplify by removing separate /thread command:
 - No argument = branch from main (current /thread behavior)
 - With argument = branch from current branch
 - Reduces cognitive load for users
-
-### Avatar emoji pack
-Custom emoji pack from group members' avatars:
-- Create pack on group → supergroup migration (async)
-- Add avatar when member joins, remove when leaves
-- Generate placeholder (letter + color) for users without avatar
-- Notification: "`[v]` Gift unlocked — avatar pack for topic icons"
-- Limitation: Premium required to set custom emoji as topic icon
-- See [docs/plans/2026-01-18-emoji-pack-design.md](plans/2026-01-18-emoji-pack-design.md)
 
 ### Menu naming simplification
 Make command names more intuitive:
