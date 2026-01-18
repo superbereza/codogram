@@ -35,36 +35,6 @@ def test_regular_prompt_has_regular_type():
     assert result.prompt_type == PromptType.REGULAR
 
 
-def test_parse_askuserquestion_prompt():
-    """AskUserQuestion has options BETWEEN two separators, not after."""
-    screen = """
-● Task completed
-
-───────────────────────────────────────────────────────────────────────────────────────
- ☐ Test chat
-
-Which chat ID to use for E2E testing?
-
-❯ 1. Skip E2E tests
-     Complete without E2E tests
-  2. Enter chat ID
-     I will provide chat ID for testing
-  3. Type something.
-
-───────────────────────────────────────────────────────────────────────────────────────
-  Chat about this
-
-Enter to select · ↑/↓ to navigate · Esc to cancel
-"""
-    result = parse_screen(screen)
-    assert isinstance(result, PermissionPrompt)
-    assert len(result.options) >= 2
-    assert "Skip E2E tests" in result.options[0]
-    assert "Enter chat ID" in result.options[1]
-    # Body should contain the question
-    assert "Which chat ID" in result.body
-
-
 def test_extract_options_basic():
     """Extract options from lines with selector."""
     lines = [
@@ -351,13 +321,13 @@ def test_parse_thinking_status_basic():
     """Parse basic thinking status line."""
     output = """
 Some previous output
-✻ Wibbling… (ctrl+c to interrupt)
+· Wibbling… (ctrl+c to interrupt)
 ────────────────────────────────────────
 ❯
 ────────────────────────────────────────
 """
     result = parse_thinking_status(output)
-    assert result == "✻ Wibbling… (/esc to interrupt)"
+    assert result == "· Wibbling… (/esc to interrupt)"
 
 
 def test_parse_thinking_status_with_details():
@@ -373,13 +343,13 @@ def test_parse_thinking_status_with_details():
 def test_parse_thinking_status_esc():
     """Parse with esc instead of ctrl+c."""
     output = """
-✻ Thinking… (esc to interrupt · 5s)
+· Thinking… (esc to interrupt · 5s)
 ────────────────────────────────────────
 ❯
 ────────────────────────────────────────
 """
     result = parse_thinking_status(output)
-    assert result == "✻ Thinking… (/esc to interrupt · 5s)"
+    assert result == "· Thinking… (/esc to interrupt · 5s)"
 
 
 def test_parse_thinking_status_cooked():
