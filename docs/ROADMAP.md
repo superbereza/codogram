@@ -276,6 +276,12 @@ Show Claude's suggested input in Telegram:
 
 ## In Progress
 
+### Bot onboarding
+Interactive onboarding for new users:
+- Welcome flow explaining bot features
+- Step-by-step setup guidance
+- Tips and hints during first use
+
 ### Robust /start flow
 Atomicity and error recovery for project creation flow:
 - **Atomicity** — project entry created only after successful clone/init
@@ -290,6 +296,14 @@ Atomicity and error recovery for project creation flow:
 
 ## Backlog
 
+### Merge thread and branch commands
+Simplify by removing separate /thread command:
+- Thread is essentially a branch for main
+- Single `/branch` command for all cases
+- No argument = branch from main (current /thread behavior)
+- With argument = branch from current branch
+- Reduces cognitive load for users
+
 ### Avatar emoji pack
 Custom emoji pack from group members' avatars:
 - Create pack on group → supergroup migration (async)
@@ -298,12 +312,6 @@ Custom emoji pack from group members' avatars:
 - Notification: "`[v]` Gift unlocked — avatar pack for topic icons"
 - Limitation: Premium required to set custom emoji as topic icon
 - See [docs/plans/2026-01-18-emoji-pack-design.md](plans/2026-01-18-emoji-pack-design.md)
-
-### Bot onboarding
-Interactive onboarding for new users:
-- Welcome flow explaining bot features
-- Step-by-step setup guidance
-- Tips and hints during first use
 
 ### Menu naming simplification
 Make command names more intuitive:
