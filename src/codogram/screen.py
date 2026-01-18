@@ -364,20 +364,15 @@ def parse_thinking_status(output: str) -> str | None:
     return None
 
 
-def detect_compacting(output: str) -> bool:
+def detect_compacting(output: str) -> str | None:
     """Detect if Claude is compacting or just compacted conversation.
 
-    Detects two patterns:
-    1. During: spinner + "compacting" (e.g., "· Compacting conversation…")
-    2. After: banner "Conversation compacted" (e.g., "═══ Conversation compacted ═══")
+    Returns:
+        "in_progress" - spinner + "compacting" detected
+        "completed" - banner "Conversation compacted" detected
+        None - no compact detected
     """
-    output_lower = output.lower()
-
-    # Check for completed compact banner (catches post-fact)
-    if "conversation compacted" in output_lower:
-        return True
-
-    # Check for in-progress compact status
+    # Check for in-progress compact status first (more specific)
     compact_spinners = "·✶✻✽✢*"
     lines = output.split("\n")
 
@@ -388,19 +383,22 @@ def detect_compacting(output: str) -> bool:
             first_sep_idx = i
             break
 
-    if first_sep_idx == -1:
-        return False
+    if first_sep_idx != -1:
+        # Look at last 5 lines before separator
+        start_idx = max(0, first_sep_idx - 5)
+        recent_lines = lines[start_idx:first_sep_idx]
 
-    # Look at last 5 lines before separator
-    start_idx = max(0, first_sep_idx - 5)
-    recent_lines = lines[start_idx:first_sep_idx]
+        for line in recent_lines:
+            stripped = line.strip()
+            if stripped and stripped[0] in compact_spinners:
+                if "compacting" in stripped.lower():
+                    return "in_progress"
 
-    for line in recent_lines:
-        stripped = line.strip()
-        if stripped and stripped[0] in compact_spinners:
-            if "compacting" in stripped.lower():
-                return True
-    return False
+    # Check for completed compact banner (catches post-fact)
+    if "conversation compacted" in output.lower():
+        return "completed"
+
+    return None
 
 
 def parse_input_suggestion(output: str) -> str | None:
