@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 def build_announcement(project_name: str, tmux_name: str, is_forum: bool) -> str:
-    """Build project ready announcement message.
+    """Build project ready announcement for General (full command list).
 
     Args:
         project_name: Name of the project
@@ -49,6 +49,21 @@ def build_announcement(project_name: str, tmux_name: str, is_forum: bool) -> str
 
 Commands available in this chat:
 {chr(10).join(commands)}
+
+To see Claude UI: `tmux attach -t {tmux_name}`"""
+
+
+def build_thread_announcement(thread_name: str, tmux_name: str) -> str:
+    """Build short announcement for topics (no command list).
+
+    Args:
+        thread_name: Name of the thread
+        tmux_name: Name of the tmux session
+
+    Returns:
+        Formatted announcement message
+    """
+    return f"""`[v]` Thread `{thread_name}` running
 
 To see Claude UI: `tmux attach -t {tmux_name}`"""
 
