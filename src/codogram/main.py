@@ -13,6 +13,7 @@ from aiogram import Bot, Dispatcher
 from .config import settings
 from .middleware.admin import AdminMiddleware
 from .middleware.clear_create_state import ClearCreateStateMiddleware
+from .middleware.setup_blocker import SetupBlockerMiddleware
 from .handlers import register_handlers
 from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
@@ -41,6 +42,9 @@ async def main():
 
     # Clear create flow state when any command is sent
     dp.message.middleware(ClearCreateStateMiddleware())
+
+    # Block non-setup commands during setup flow
+    dp.message.middleware(SetupBlockerMiddleware())
 
     # Register handler routers (all protected by AdminMiddleware)
     register_handlers(dp)
