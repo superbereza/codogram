@@ -523,7 +523,11 @@ Commands available:
 • /auto_accept — toggle auto\\-accept
 • /thread — new topic
 
-Terminal: `tmux attach \\-t {{tmux_name}}`"""
+To see Claude UI: `tmux attach \\-t {{tmux_name}}`"""
+
+SETUP_LAUNCH_SUCCESS_THREAD = f"""{STATUS_OK} Thread `{{thread}}` running
+
+To see Claude UI: `tmux attach \\-t {{tmux_name}}`"""
 
 # Buttons
 BTN_CLONE = "Clone repository"

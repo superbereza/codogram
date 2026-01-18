@@ -79,11 +79,17 @@ async def do_launch(message: Message, state: FSMContext):
     # Clear FSM state
     await state.clear()
 
-    # Success announcement
-    await progress_msg.edit_text(
-        strings.SETUP_LAUNCH_SUCCESS.format(
+    # Success announcement - use thread message for forum topics
+    is_thread = is_forum and message.message_thread_id
+    if is_thread:
+        success_text = strings.SETUP_LAUNCH_SUCCESS_THREAD.format(
+            thread=project_name,
+            tmux_name=result.tmux_name,
+        )
+    else:
+        success_text = strings.SETUP_LAUNCH_SUCCESS.format(
             project=project_name,
             tmux_name=result.tmux_name,
-        ),
-        parse_mode="MarkdownV2",
-    )
+        )
+
+    await progress_msg.edit_text(success_text, parse_mode="MarkdownV2")
