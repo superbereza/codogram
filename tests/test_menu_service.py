@@ -1,6 +1,6 @@
 # tests/test_menu_service.py
 import pytest
-from codogram.services.menu import BASIC_COMMANDS, FORUM_COMMANDS, register_menu_for_chat
+from codogram.services.menu import BASIC_COMMANDS, FORUM_COMMANDS, SETUP_COMMANDS, register_menu_for_chat
 
 
 def test_basic_commands_count():
@@ -49,3 +49,14 @@ def test_register_menu_for_chat_callable():
     """register_menu_for_chat should be async callable."""
     import asyncio
     assert asyncio.iscoroutinefunction(register_menu_for_chat)
+
+
+def test_setup_commands_count():
+    """Setup menu has 4 commands."""
+    assert len(SETUP_COMMANDS) == 4
+
+
+def test_setup_commands_list():
+    """Setup commands are start, reset_all, help, get_debug_ids."""
+    commands = [c.command for c in SETUP_COMMANDS]
+    assert commands == ["start", "reset_all", "help", "get_debug_ids"]

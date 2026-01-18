@@ -36,6 +36,14 @@ FORUM_COMMANDS = [
     for cmd, desc, _ in _ALL_COMMANDS
 ]
 
+# Setup commands (during onboarding)
+SETUP_COMMANDS = [
+    BotCommand(command="start", description="Restart setup"),
+    BotCommand(command="reset_all", description="Cancel setup"),
+    BotCommand(command="help", description="Get help"),
+    BotCommand(command="get_debug_ids", description="Show debug IDs"),
+]
+
 
 async def register_menu_for_chat(bot: Bot, chat_id: int, is_forum: bool) -> None:
     """Register scope-based menu for a specific chat.
