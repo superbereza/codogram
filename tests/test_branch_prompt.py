@@ -41,14 +41,23 @@ def mock_queue():
     return queue
 
 
+@pytest.fixture
+def require_claude_ready_patch():
+    """Patch require_claude_ready to return True."""
+    async def _mock(*args, **kwargs):
+        return True
+    return patch("codogram.handlers.branches.require_claude_ready", side_effect=_mock)
+
+
 @pytest.mark.asyncio
-async def test_branch_without_arg_shows_prompt(mock_message, mock_project, mock_queue):
+async def test_branch_without_arg_shows_prompt(mock_message, mock_project, mock_queue, require_claude_ready_patch):
     """/branch without argument shows name prompt with buttons."""
     from codogram.handlers.branches import cmd_branch_create
 
     mock_message.text = "/branch"
 
-    with patch("codogram.handlers.branches.project_manager") as mock_pm, \
+    with require_claude_ready_patch, \
+         patch("codogram.handlers.branches.project_manager") as mock_pm, \
          patch("codogram.handlers.branches.is_git_repo", return_value=True), \
          patch("codogram.handlers.branches.get_default_branch", return_value="main"):
         mock_pm.get_by_chat.return_value = mock_project
@@ -71,13 +80,14 @@ async def test_branch_without_arg_shows_prompt(mock_message, mock_project, mock_
 
 
 @pytest.mark.asyncio
-async def test_branch_with_name_validates_and_creates(mock_message, mock_project, mock_queue):
+async def test_branch_with_name_validates_and_creates(mock_message, mock_project, mock_queue, require_claude_ready_patch):
     """/branch mystic validates and creates branch directly."""
     from codogram.handlers.branches import cmd_branch_create
 
     mock_message.text = "/branch mystic"
 
-    with patch("codogram.handlers.branches.project_manager") as mock_pm, \
+    with require_claude_ready_patch, \
+         patch("codogram.handlers.branches.project_manager") as mock_pm, \
          patch("codogram.handlers.branches.is_git_repo", return_value=True), \
          patch("codogram.handlers.branches.branch_exists", return_value=False), \
          patch("codogram.handlers.branches.has_uncommitted_changes", return_value=False), \
@@ -100,14 +110,15 @@ async def test_branch_with_name_validates_and_creates(mock_message, mock_project
 
 
 @pytest.mark.asyncio
-async def test_branch_with_invalid_name_shows_error(mock_message, mock_project, mock_queue):
+async def test_branch_with_invalid_name_shows_error(mock_message, mock_project, mock_queue, require_claude_ready_patch):
     """/branch with invalid name shows validation error."""
     from codogram.handlers.branches import cmd_branch_create
 
     # Use a very long name that exceeds max length
     mock_message.text = "/branch " + "a" * 100
 
-    with patch("codogram.handlers.branches.project_manager") as mock_pm, \
+    with require_claude_ready_patch, \
+         patch("codogram.handlers.branches.project_manager") as mock_pm, \
          patch("codogram.handlers.branches.is_git_repo", return_value=True), \
          patch("codogram.handlers.branches.get_default_branch", return_value="main"):
         mock_pm.get_by_chat.return_value = mock_project
@@ -123,13 +134,14 @@ async def test_branch_with_invalid_name_shows_error(mock_message, mock_project, 
 
 
 @pytest.mark.asyncio
-async def test_branch_create_also_shows_prompt(mock_message, mock_project, mock_queue):
+async def test_branch_create_also_shows_prompt(mock_message, mock_project, mock_queue, require_claude_ready_patch):
     """/branch_create without argument shows name prompt."""
     from codogram.handlers.branches import cmd_branch_create
 
     mock_message.text = "/branch_create"
 
-    with patch("codogram.handlers.branches.project_manager") as mock_pm, \
+    with require_claude_ready_patch, \
+         patch("codogram.handlers.branches.project_manager") as mock_pm, \
          patch("codogram.handlers.branches.is_git_repo", return_value=True), \
          patch("codogram.handlers.branches.get_default_branch", return_value="main"):
         mock_pm.get_by_chat.return_value = mock_project
@@ -144,13 +156,14 @@ async def test_branch_create_also_shows_prompt(mock_message, mock_project, mock_
 
 
 @pytest.mark.asyncio
-async def test_branch_with_duplicate_name_shows_error(mock_message, mock_project, mock_queue):
+async def test_branch_with_duplicate_name_shows_error(mock_message, mock_project, mock_queue, require_claude_ready_patch):
     """/branch with existing branch name shows error."""
     from codogram.handlers.branches import cmd_branch_create
 
     mock_message.text = "/branch existing"
 
-    with patch("codogram.handlers.branches.project_manager") as mock_pm, \
+    with require_claude_ready_patch, \
+         patch("codogram.handlers.branches.project_manager") as mock_pm, \
          patch("codogram.handlers.branches.is_git_repo", return_value=True), \
          patch("codogram.handlers.branches.branch_exists", return_value=True), \
          patch("codogram.handlers.branches.get_default_branch", return_value="main"):

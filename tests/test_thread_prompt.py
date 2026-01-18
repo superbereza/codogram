@@ -41,15 +41,24 @@ def cleanup_flow_state():
     clear_flow_state(-100123, 456)
 
 
+@pytest.fixture
+def require_claude_ready_patch():
+    """Patch require_claude_ready to return True."""
+    async def _mock(*args, **kwargs):
+        return True
+    return patch("codogram.handlers.threads.require_claude_ready", side_effect=_mock)
+
+
 @pytest.mark.asyncio
-async def test_thread_without_arg_shows_prompt(mock_message, mock_project):
+async def test_thread_without_arg_shows_prompt(mock_message, mock_project, require_claude_ready_patch):
     """Test /thread without argument shows name prompt with buttons."""
     from codogram.handlers.threads import cmd_thread_create
 
     mock_message.text = "/thread"
     mock_queue = AsyncMock()
 
-    with patch("codogram.handlers.threads.project_manager") as mock_pm:
+    with require_claude_ready_patch, \
+         patch("codogram.handlers.threads.project_manager") as mock_pm:
         mock_pm.get_by_chat.return_value = mock_project
 
         await cmd_thread_create(mock_message, mock_queue)
@@ -68,14 +77,15 @@ async def test_thread_without_arg_shows_prompt(mock_message, mock_project):
 
 
 @pytest.mark.asyncio
-async def test_thread_with_name_validates_and_creates(mock_message, mock_project):
+async def test_thread_with_name_validates_and_creates(mock_message, mock_project, require_claude_ready_patch):
     """Test /thread mystic validates and creates directly."""
     from codogram.handlers.threads import cmd_thread_create
 
     mock_message.text = "/thread mystic"
     mock_queue = AsyncMock()
 
-    with patch("codogram.handlers.threads.project_manager") as mock_pm, \
+    with require_claude_ready_patch, \
+         patch("codogram.handlers.threads.project_manager") as mock_pm, \
          patch("codogram.handlers.threads.create_thread_with_session") as mock_create:
         mock_pm.get_by_chat.return_value = mock_project
         mock_create.return_value = MagicMock()  # Successful thread creation
@@ -92,14 +102,15 @@ async def test_thread_with_name_validates_and_creates(mock_message, mock_project
 
 
 @pytest.mark.asyncio
-async def test_thread_with_invalid_name_shows_error(mock_message, mock_project):
+async def test_thread_with_invalid_name_shows_error(mock_message, mock_project, require_claude_ready_patch):
     """Test /thread with invalid name shows error."""
     from codogram.handlers.threads import cmd_thread_create
 
     mock_message.text = "/thread !!!"
     mock_queue = AsyncMock()
 
-    with patch("codogram.handlers.threads.project_manager") as mock_pm, \
+    with require_claude_ready_patch, \
+         patch("codogram.handlers.threads.project_manager") as mock_pm, \
          patch("codogram.handlers.threads.create_thread_with_session") as mock_create:
         mock_pm.get_by_chat.return_value = mock_project
 
@@ -114,14 +125,15 @@ async def test_thread_with_invalid_name_shows_error(mock_message, mock_project):
 
 
 @pytest.mark.asyncio
-async def test_thread_with_empty_arg_shows_prompt(mock_message, mock_project):
+async def test_thread_with_empty_arg_shows_prompt(mock_message, mock_project, require_claude_ready_patch):
     """Test /thread with empty/whitespace arg shows prompt."""
     from codogram.handlers.threads import cmd_thread_create
 
     mock_message.text = "/thread   "  # Just whitespace
     mock_queue = AsyncMock()
 
-    with patch("codogram.handlers.threads.project_manager") as mock_pm:
+    with require_claude_ready_patch, \
+         patch("codogram.handlers.threads.project_manager") as mock_pm:
         mock_pm.get_by_chat.return_value = mock_project
 
         await cmd_thread_create(mock_message, mock_queue)
