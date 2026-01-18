@@ -288,8 +288,8 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Welcome flow с объяснением возможностей бота
 - Пошаговое руководство для новых пользователей
 
-### Редизайн set up flow
-Полный редизайн /start flow (robust /start + setup UX).
+### Редизайн set up flow + robust start
+Полный редизайн /start flow с устойчивой обработкой ошибок и интуитивным UX настройки.
 - См. [docs/designs/2026-01-18-start-flow-v2.md](designs/2026-01-18-start-flow-v2.md) (worktree: set-up-flow-redesign)
 
 ## Backlog
