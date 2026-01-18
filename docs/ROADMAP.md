@@ -253,13 +253,13 @@ Per-thread/per-project verbose output toggle and /settings UX:
 - Close button deletes settings message
 - See [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
-### Compacting notification
+## Beta Test
+
+### Compacting detection
 Detect when Claude compacts conversation and notify user:
 - Parse thinking status for "Compacting" keyword
 - One-time notification `[i] Claude is compacting conversation...`
-- Works regardless of `feat_thinking_status` toggle
-
-## Beta Test
+- Enabled for all, still debugging
 
 ### Activity indicators
 Show that Claude is thinking/working:
@@ -273,6 +273,13 @@ Show Claude's suggested input in Telegram:
 - Parse suggestion from input box (text with `↵ send` marker)
 - Display as ReplyKeyboard for one-tap send
 - Toggle: `/exp_suggestions`
+
+### Stuck message recovery
+Auto-detect and resend messages stuck in Claude's input:
+- Detect `[Pasted X lines]` or last sent message stuck in input field
+- Debounce: send Enter only after seeing same stuck text twice
+- Prevents messages from getting lost due to race conditions
+- See [docs/designs/done/2026-01-17-stuck-message-recovery.md](designs/done/2026-01-17-stuck-message-recovery.md)
 
 ## In Progress
 

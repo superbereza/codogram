@@ -253,13 +253,13 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Кнопка close удаляет сообщение с настройками
 - См. [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
-### Compacting notification
+## Beta Test
+
+### Compacting detection
 Уведомление когда Claude компактит conversation:
 - Парсинг thinking status на ключевое слово "Compacting"
 - Одноразовое уведомление `[i] Claude is compacting conversation...`
-- Работает независимо от toggle `feat_thinking_status`
-
-## Beta Test
+- Включено для всех, ещё в отладке
 
 ### Activity indicators
 Отображение что Claude думает/работает:
@@ -273,6 +273,13 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Парсинг саджеста из input box (текст с маркером `↵ send`)
 - Отображение как ReplyKeyboard для отправки в один тап
 - Toggle: `/exp_suggestions`
+
+### Stuck message recovery
+Автоопределение и переотправка застрявших сообщений:
+- Детект `[Pasted X lines]` или last_sent_message застрявшего в input
+- Debounce: отправка Enter только после двух одинаковых состояний
+- Предотвращает потерю сообщений из-за race conditions
+- См. [docs/designs/done/2026-01-17-stuck-message-recovery.md](designs/done/2026-01-17-stuck-message-recovery.md)
 
 ## In Progress
 
