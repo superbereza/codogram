@@ -85,7 +85,7 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
 
         case RouteAction.START_BINDING:
             # Need to bind session - start binding task
-            await _start_binding(message, result)
+            await _start_binding(message, result, telegram_queue)
             # Still try to send to tmux (supports files too)
             await _send_content(message, result, telegram_queue)
             return
@@ -158,10 +158,9 @@ def _try_send_to_tmux(result, text: str) -> bool:
     return False
 
 
-async def _start_binding(message: Message, result):
+async def _start_binding(message: Message, result, telegram_queue: TelegramQueue):
     """Start session binding for unbound thread."""
     from ..history_watcher import poll_for_session_thread
-    from .. import main
 
     thread = result.thread
     project = result.project
@@ -173,15 +172,15 @@ async def _start_binding(message: Message, result):
 
         async def start_poller(p):
             from ..permission_poller import create_poller_task
-            return await create_poller_task(message.bot, p, main.telegram_queue)
+            return await create_poller_task(message.bot, p, telegram_queue)
 
         async def start_watcher(p, send_missed=False):
             from ..watcher import create_watcher_task
-            return await create_watcher_task(message.bot, p, main.telegram_queue, send_missed)
+            return await create_watcher_task(message.bot, p, telegram_queue, send_missed)
 
         thread.binding_task = asyncio.create_task(
             poll_for_session_thread(
                 project, thread, message.bot,
-                start_poller, start_watcher, main.telegram_queue
+                start_poller, start_watcher, telegram_queue
             )
         )
