@@ -653,6 +653,14 @@ Fix and hit "Recheck\""""
 DM_VALIDATION_WARNINGS = """
 {warnings}"""
 
+# Manual check hint - shown after validation passes
+DM_MANUAL_CHECK = """`[!]` One more thing
+
+Disable privacy mode in [@BotFather](https://t.me/BotFather):
+/setprivacy → your bot → Disable
+
+Otherwise bot won't see your messages in groups"""
+
 # CTA - separate message after validation passes
 DM_CTA = """`[>>]` Next step
 

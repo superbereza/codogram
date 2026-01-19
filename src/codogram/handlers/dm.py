@@ -218,6 +218,12 @@ async def run_validation_check(
     text = "\n".join(lines)
     await telegram_queue.send(chat_id, text)
 
+    # Delay before manual check hint
+    await asyncio.sleep(0.5)
+
+    # Send privacy mode hint
+    await telegram_queue.send(chat_id, strings.DM_MANUAL_CHECK)
+
     # Delay before CTA
     await asyncio.sleep(0.8)
 
