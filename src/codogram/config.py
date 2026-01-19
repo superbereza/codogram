@@ -39,6 +39,13 @@ class Settings(BaseSettings):
         """Parse admin_ids string into set of ints."""
         return {int(x.strip()) for x in self.admin_ids.split(",") if x.strip()}
 
+    def get_bot_owner_id(self) -> int:
+        """First admin is considered bot owner for sticker pack ownership."""
+        admin_ids = self.get_admin_ids()
+        if not admin_ids:
+            raise ValueError("No admin IDs configured")
+        return min(admin_ids)  # First by ID for consistency
+
 settings = Settings()
 
 # Config file path - in ~/.codogram/ to avoid worktree issues

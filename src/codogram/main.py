@@ -85,7 +85,7 @@ async def main():
 
     # Start Telegram polling
     try:
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, allowed_updates=["message", "callback_query", "chat_member"])
     finally:
         if telegram_queue:
             await telegram_queue.shutdown()

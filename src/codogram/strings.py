@@ -570,3 +570,31 @@ BTN_DIFFERENT_NAME = "Different name"
 
 # Stale button debounce (5 minutes per design)
 STALE_BUTTON_SECONDS = 300
+
+
+# --- Emoji Pack ---
+
+EMOJI_PACK_CREATED = """`[v]` Gift unlocked
+
+✨ [Avatar pack]({pack_link}) ✨
+
+Personalize topic with your photo → [get pack]({pack_link})"""
+
+EMOJI_PACK_DISABLE_PROMPT = """`[?]` Disable avatar pack?
+
+Pack will be deleted."""
+EMOJI_PACK_BTN_DISABLE = "Yes, disable"
+EMOJI_PACK_BTN_KEEP = "Keep it"
+
+EMOJI_PACK_CREATE_PROMPT = """`[?]` Create avatar pack?
+
+Will generate emoji from member avatars."""
+EMOJI_PACK_BTN_CREATE = "Yes, create"
+EMOJI_PACK_BTN_NOT_NOW = "Not now"
+
+EMOJI_PACK_DELETED = "`[v]` Avatar pack disabled"
+EMOJI_PACK_CREATING = "`[~]` Creating avatar pack..."
+EMOJI_PACK_ERROR = "`[x]` Failed to create avatar pack: {error}"
+
+# Hint in topic launch message (if feat_avatar_pack ON)
+EMOJI_PACK_TOPIC_HINT = "→ Check this [pack]({pack_link}) to personalize your topic"

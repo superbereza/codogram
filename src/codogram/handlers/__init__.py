@@ -1,7 +1,7 @@
 """Handlers layer - thin routers delegating to services."""
 from aiogram import Dispatcher
 
-from . import permissions, start, threads, branches, sessions, settings, shift_tab, finish, create_flow, common, messages, migration, audio
+from . import permissions, start, threads, branches, sessions, settings, shift_tab, finish, create_flow, common, messages, migration, audio, members
 from .setup import setup_router
 
 
@@ -27,6 +27,7 @@ def register_handlers(dp: Dispatcher):
     dp.include_router(shift_tab.router)     # /shift_tab
     dp.include_router(finish.router)        # /finish
     dp.include_router(create_flow.router)   # Create flow name selection
+    dp.include_router(members.router)       # Member join/leave for emoji pack
     dp.include_router(common.router)        # cb_cancel
     dp.include_router(audio.router)         # Voice/audio transcription via Whisper
     dp.include_router(messages.router)      # Catch-all for tmux routing (LAST!)
