@@ -67,3 +67,27 @@ def save_config(config: dict) -> None:
     """Save config to ~/.codogram/config.json."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(json.dumps(config, indent=2))
+
+
+def get_allowed_groups() -> set[int]:
+    """Get set of allowed group IDs."""
+    config = load_config()
+    return set(config.get("allowed_groups", []))
+
+
+def add_allowed_group(group_id: int) -> None:
+    """Add group to allowed list."""
+    config = load_config()
+    groups = set(config.get("allowed_groups", []))
+    groups.add(group_id)
+    config["allowed_groups"] = list(groups)
+    save_config(config)
+
+
+def remove_allowed_group(group_id: int) -> None:
+    """Remove group from allowed list."""
+    config = load_config()
+    groups = set(config.get("allowed_groups", []))
+    groups.discard(group_id)
+    config["allowed_groups"] = list(groups)
+    save_config(config)
