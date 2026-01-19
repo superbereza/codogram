@@ -527,11 +527,13 @@ git commit -m "feat(strings): add group authorization messages"
 
 ---
 
-### Task 4: Members handler for chat_member events
+### Task 4: Extend members handler for group authorization
 
 **Files:**
-- Create: `src/codogram/handlers/members.py`
+- Modify: `src/codogram/handlers/members.py` (extend existing emoji pack handler)
 - Create: `tests/test_handlers_members.py`
+
+**Note:** `handlers/members.py` already exists for emoji pack functionality. We extend it with group authorization logic.
 
 **Step 1: Write the failing tests**
 
@@ -756,28 +758,44 @@ class TestOnMemberUpdate:
 **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/test_handlers_members.py -v`
-Expected: FAIL with "No module named 'codogram.handlers.members'"
+Expected: FAIL with "cannot import name '_is_leave_or_demotion'" or "on_bot_status_changed"
 
-**Step 3: Write minimal implementation**
+**Step 3: Extend existing members.py**
 
-Create `src/codogram/handlers/members.py`:
+The file already exists with emoji pack logic. Add group authorization handlers.
+
+**Add imports** (at top of file, after existing imports):
 
 ```python
-"""Handler for member join/leave and bot status events."""
-from aiogram import Router
-from aiogram.types import ChatMemberUpdated
-
 from ..services.group_auth import GroupAuthService
 from ..telegram_queue import TelegramQueue
-from ..logging_config import logger
 from .. import strings
+```
 
-router = Router(name="members")
+**Add helper function** (after existing `_is_leave`):
 
+```python
+def _is_leave_or_demotion(event: ChatMemberUpdated) -> bool:
+    """Check if user left, was kicked, or was demoted from admin."""
+    old_status = event.old_chat_member.status
+    new_status = event.new_chat_member.status
 
-# --- Bot status events (my_chat_member) ---
+    # Left or kicked
+    if new_status in ("left", "kicked"):
+        return True
 
+    # Demoted from admin/creator to regular member
+    old_is_admin = old_status in ("administrator", "creator")
+    new_is_admin = new_status in ("administrator", "creator")
+    if old_is_admin and not new_is_admin:
+        return True
 
+    return False
+```
+
+**Add bot status handler** (new handler for my_chat_member):
+
+```python
 @router.my_chat_member()
 async def on_bot_status_changed(
     event: ChatMemberUpdated,
@@ -799,50 +817,46 @@ async def on_bot_status_changed(
         # Bot removed from group
         logger.info(f"bot_removed_from_group: chat_id={event.chat.id}")
         group_auth.on_bot_removed(event.chat.id)
+```
 
+**Extend existing on_member_update** — add group_auth parameters and logic:
 
-# --- Member events (chat_member) ---
-
-
+```python
 @router.chat_member()
 async def on_member_update(
     event: ChatMemberUpdated,
     telegram_queue: TelegramQueue,
     group_auth: GroupAuthService,
 ) -> None:
-    """Handle member leaving or being demoted.
-
-    If admin from ADMIN_IDS left/demoted — re-check group validity.
-    Note: event.new_chat_member.user is the affected user, not event.from_user (who performed the action).
-    """
-    if not _is_leave_or_demotion(event):
+    """Handle member join/leave for emoji pack and group authorization."""
+    user = event.new_chat_member.user
+    if user.is_bot:
         return
 
-    deactivated = await group_auth.on_admin_left(
-        event.bot, event.chat.id, event.new_chat_member.user.id
-    )
+    # --- Group authorization: check if admin left/demoted ---
+    if _is_leave_or_demotion(event):
+        deactivated = await group_auth.on_admin_left(
+            event.bot, event.chat.id, user.id
+        )
+        if deactivated:
+            logger.info(f"group_deactivated: chat_id={event.chat.id}")
+            await telegram_queue.send(event.chat.id, strings.GROUP_DEACTIVATED)
 
-    if deactivated:
-        logger.info(f"group_deactivated: chat_id={event.chat.id}")
-        await telegram_queue.send(event.chat.id, strings.GROUP_DEACTIVATED)
+    # --- Emoji pack: update stickers ---
+    project = project_manager.get_by_chat(event.chat.id)
+    if not project or not project.feat_avatar_pack:
+        return
 
+    adapter = StickerAdapter(event.bot)
+    service = EmojiPackService(adapter)
 
-def _is_leave_or_demotion(event: ChatMemberUpdated) -> bool:
-    """Check if user left, was kicked, or was demoted from admin."""
-    old_status = event.old_chat_member.status
-    new_status = event.new_chat_member.status
+    if _is_join(event):
+        logger.info(f"Member joined, adding to emoji pack: {user.id}")
+        await service.add_member(event.chat.id, user)
 
-    # Left or kicked
-    if new_status in ("left", "kicked"):
-        return True
-
-    # Demoted from admin/creator to regular member
-    old_is_admin = old_status in ("administrator", "creator")
-    new_is_admin = new_status in ("administrator", "creator")
-    if old_is_admin and not new_is_admin:
-        return True
-
-    return False
+    elif _is_leave(event):
+        logger.info(f"Member left, removing from emoji pack: {user.id}")
+        await service.remove_member(event.chat.id, user.id)
 ```
 
 **Step 4: Run tests to verify they pass**
@@ -1259,8 +1273,9 @@ git commit -m "feat(middleware): add group authorization to AdminMiddleware"
 ### Task 6: Integrate in main.py
 
 **Files:**
-- Modify: `src/codogram/main.py` (lines 14, 36-41, 88)
-- Modify: `src/codogram/handlers/__init__.py` (lines 4, 17)
+- Modify: `src/codogram/main.py` (lines 14, 37, 40-41, 88)
+
+**Note:** `handlers/__init__.py` already has `members.router` registered (from emoji pack feature). No changes needed there.
 
 **Step 1: Update main.py imports**
 
@@ -1272,7 +1287,7 @@ from .services.group_auth import GroupAuthService
 
 **Step 2: Update main.py - GroupAuthService initialization**
 
-After line 36 (`dp = Dispatcher()`), add:
+After line 37 (`dp["telegram_queue"] = telegram_queue`), add:
 
 ```python
     # Group authorization service
@@ -1301,7 +1316,7 @@ to:
 Change line 88 from:
 
 ```python
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, allowed_updates=["message", "callback_query", "chat_member"])
 ```
 
 to:
@@ -1313,31 +1328,17 @@ to:
         )
 ```
 
-**Step 5: Register members router in handlers/__init__.py**
+**Note:** `my_chat_member` is required to receive events when bot is added/removed from groups.
 
-At line 4, update imports to include members:
-
-```python
-from . import permissions, start, threads, branches, sessions, settings, shift_tab, finish, create_flow, common, messages, migration, audio, members
-```
-
-At line 17 (before `dp.include_router(messages.router)`), add:
-
-```python
-    dp.include_router(members.router)       # Member join/leave events - MUST be before messages
-```
-
-**Note:** `messages.router` must remain LAST because it catches all text messages.
-
-**Step 6: Test manually**
+**Step 5: Test manually**
 
 Run: `./kill-instance-and-start-from-worktree.sh`
 Test: Add bot to a test group where you are admin
 
-**Step 7: Commit**
+**Step 6: Commit**
 
 ```bash
-git add src/codogram/main.py src/codogram/handlers/__init__.py
+git add src/codogram/main.py
 git commit -m "feat(main): integrate group authorization"
 ```
 
@@ -1408,9 +1409,11 @@ git commit -m "docs(e2e): add group authorization test cases"
 | 1 | Config functions | config.py, test_config.py | 6 |
 | 2 | GroupAuthService | services/group_auth.py, tests/services/test_group_auth.py | 15 |
 | 3 | Strings | strings.py, test_strings.py | 1 |
-| 4 | Members handler | handlers/members.py, tests/test_handlers_members.py | 14 |
+| 4 | Extend members handler | handlers/members.py (modify), tests/test_handlers_members.py | 14 |
 | 5 | AdminMiddleware | middleware/admin.py, test_admin_middleware.py | 8 |
-| 6 | Integration | main.py, handlers/__init__.py | manual |
+| 6 | Integration | main.py only (handlers/__init__.py already done) | manual |
 | 7 | E2E docs | docs/e2e/commands/group-auth.md | E2E |
 
 **Total new tests:** 44
+
+**Note:** Task 4 extends existing `handlers/members.py` from emoji pack feature rather than creating new file.
