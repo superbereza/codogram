@@ -71,7 +71,15 @@ async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> 
         return False
 
     create_type_str = state.get("create_type")
+    prompt_message_id = state.get("prompt_message_id")
     clear_flow_state(chat_id, thread_id)
+
+    # Delete the prompt message
+    if prompt_message_id:
+        try:
+            await message.bot.delete_message(chat_id, prompt_message_id)
+        except Exception:
+            pass  # Ignore if already deleted
 
     project = project_manager.get_by_chat(chat_id)
     if not project:

@@ -12,6 +12,7 @@ from aiogram import Bot
 from .config import settings
 from .logging_config import logger
 from .utils.truncate import truncate_body
+from . import strings
 
 class ContentType(Enum):
     TEXT = "text"
@@ -38,9 +39,12 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
             if not isinstance(item, dict):
                 continue
             if item.get("type") == "tool_result":
+                content = str(item.get("content", ""))
+                if len(content) > 500:
+                    content = content[:500] + "\nstrings.SNIP"
                 return ParsedEntry(
                     content_type=ContentType.TOOL_RESULT,
-                    text=str(item.get("content", ""))[:500]
+                    text=content
                 )
         return None
 
@@ -68,9 +72,12 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
                 tool_input=item.get("input")
             )
         elif item_type == "thinking":
+            thinking = item.get("thinking", "")
+            if len(thinking) > 100:
+                thinking = thinking[:100] + " strings.SNIP"
             return ParsedEntry(
                 content_type=ContentType.THINKING,
-                text=item.get("thinking", "")[:100] + "..."
+                text=thinking
             )
 
     return None
@@ -84,9 +91,12 @@ def format_tool_use(tool_name: str, tool_input: dict | None, verbose: bool = Fal
         cmd = tool_input.get("command", "")
         # Safety limits to prevent Telegram API errors
         char_limit = 3500 if verbose else 500
+        was_truncated = len(cmd) > char_limit
         cmd = cmd[:char_limit]
         desc = tool_input.get("description", "")
         cmd_display = truncate_body(cmd, verbose=verbose) or cmd
+        if was_truncated and "strings.SNIP" not in cmd_display:
+            cmd_display += "\nstrings.SNIP"
         if desc:
             return f"● **Bash**: {desc}\n`{cmd_display}`"
         return f"● **Bash**\n`{cmd_display}`"
@@ -111,8 +121,12 @@ def format_tool_use(tool_name: str, tool_input: dict | None, verbose: bool = Fal
     elif tool_name == "TodoWrite":
         return f"● **TodoWrite**"
     else:
-        preview = str(tool_input)[:200]
+        preview_raw = str(tool_input)
+        was_truncated = len(preview_raw) > 200
+        preview = preview_raw[:200]
         preview = truncate_body(preview, verbose=verbose) or preview
+        if was_truncated and "strings.SNIP" not in preview:
+            preview += "\nstrings.SNIP"
         return f"● **{tool_name}**\n`{preview}`"
 
 class JsonlWatcher:

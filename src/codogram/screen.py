@@ -369,10 +369,11 @@ def detect_compacting(output: str) -> bool:
 
     Looks for spinner + "compacting" in the area above input box.
     Uses broader spinner set than thinking status (includes · which is common during compact).
-    """
-    # All possible spinners Claude uses (including · for compact)
-    compact_spinners = "·✶✻✽✢*"
 
+    Note: We don't detect "Conversation compacted" banner because it stays in scrollback
+    and would trigger false notifications on bot restart.
+    """
+    compact_spinners = "·✶✻✽✢*"
     lines = output.split("\n")
 
     # Find first ──── separator (top of input box)
@@ -394,7 +395,10 @@ def detect_compacting(output: str) -> bool:
         if stripped and stripped[0] in compact_spinners:
             if "compacting" in stripped.lower():
                 return True
+
     return False
+
+    return None
 
 
 def parse_input_suggestion(output: str) -> str | None:

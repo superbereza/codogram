@@ -68,23 +68,25 @@ async def cmd_branch_create(message: Message, telegram_queue: TelegramQueue):
 
     # Show name prompt if not provided
     if create_flow_service.should_show_prompt(branch_name):
-        set_flow_state(message.chat.id, message.message_thread_id, {
-            "type": "awaiting_create_name",
-            "create_type": "branch",
-        })
         if stale_worktree:
             # Show warning with name prompt
-            await telegram_queue.reply(
+            prompt_ids = await telegram_queue.reply(
                 message,
                 strings.BRANCH_WORKTREE_NOT_FOUND_BASE.format(default_branch=default_branch),
                 reply_markup=build_name_prompt_keyboard(CreateType.BRANCH),
             )
         else:
-            await telegram_queue.reply(
+            prompt_ids = await telegram_queue.reply(
                 message,
                 "Branch name?\n\nSend name or pick random",
                 reply_markup=build_name_prompt_keyboard(CreateType.BRANCH),
             )
+        # Save state with prompt message_id for cleanup
+        set_flow_state(message.chat.id, message.message_thread_id, {
+            "type": "awaiting_create_name",
+            "create_type": "branch",
+            "prompt_message_id": prompt_ids[0] if prompt_ids else None,
+        })
         return
 
     # Validate and sanitize name

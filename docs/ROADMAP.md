@@ -323,6 +323,13 @@ Custom emoji pack from group members' avatars:
 
 ## Backlog
 
+### Role model & chat registration
+Minimal permission system for multi-user access:
+- `/register_chat` — allow everyone in chat to message the bot (not just admins)
+- Admin-only settings commands
+- Roles: admin (full control) vs user (can send messages)
+- Per-chat configuration
+
 ### Merge thread and branch commands
 Simplify by removing separate /thread command:
 - Thread is essentially a branch for main
@@ -342,13 +349,6 @@ When replying to message, send context to tmux:
 - Quote piece of message being replied to
 - Format: `> quote\n\nresponse text`
 
-### Role model & chat registration
-Minimal permission system for multi-user access:
-- `/register_chat` — allow everyone in chat to message the bot (not just admins)
-- Admin-only settings commands
-- Roles: admin (full control) vs user (can send messages)
-- Per-chat configuration
-
 ### Interface simplification settings
 Admin commands to enable/disable features:
 - Toggle `/thread` command visibility
@@ -363,19 +363,11 @@ Auto-launch Claude when user sends message but tmux doesn't exist:
 - Queue all messages (text + files) while launching
 - Send queued messages after Claude ready
 
-### Telegram safety context
-Inject safety guidelines when starting thread/branch/project:
-- Tell Claude what's safe to do in Telegram environment
-- Warn about dangerous operations (don't kill tmux, etc.)
-- Project-specific constraints
-- Need to design the exact guidelines
-
-### Protected environment for non-devs
-Allow product managers to use Claude without breaking environment:
-- Rollback mechanism after session
-- Or sandboxed/isolated execution
-- Easy recovery if something breaks
-- Need R&D on best approach
+### Tables and diagrams rendering
+Render tables and diagrams from text to images:
+- Convert ASCII/markdown tables to images
+- Convert mermaid/plantuml diagrams to images
+- Better readability in Telegram
 
 ### Permission poller refactoring
 Refactor god-function into handler classes:
@@ -410,6 +402,20 @@ Detect when Claude Code exits with error (API errors, network issues, etc.):
 - Parse tmux capture-pane for error patterns
 - Send error text to user: "⚠️ Claude error: <error text>. Figure it out and /start"
 - Detect shell prompt appearing after Claude was active
+
+### Telegram safety context
+Inject safety guidelines when starting thread/branch/project:
+- Tell Claude what's safe to do in Telegram environment
+- Warn about dangerous operations (don't kill tmux, etc.)
+- Project-specific constraints
+- Need to design the exact guidelines
+
+### Protected environment for non-devs
+Allow product managers to use Claude without breaking environment:
+- Rollback mechanism after session
+- Or sandboxed/isolated execution
+- Easy recovery if something breaks
+- Need R&D on best approach
 
 ### Message queue until session ready
 Cache user messages while session is binding, send when ready:
