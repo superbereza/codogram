@@ -79,7 +79,7 @@ def _should_skip_by_response_mode(
 async def on_unknown_command(
     message: Message,
     telegram_queue: TelegramQueue,
-    response_mode_service: ResponseModeService = None,
+    response_mode_service: ResponseModeService | None = None,
 ):
     """Forward unregistered commands to Claude as text."""
     if response_mode_service and _should_skip_by_response_mode(message, response_mode_service):
@@ -92,7 +92,7 @@ async def on_unknown_command(
 async def on_message(
     message: Message,
     telegram_queue: TelegramQueue,
-    response_mode_service: ResponseModeService = None,
+    response_mode_service: ResponseModeService | None = None,
 ):
     """Route regular messages to tmux sessions.
 
