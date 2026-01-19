@@ -55,14 +55,13 @@ run_with_progress() {
     fi
 }
 
-# Interactive multi-select using bash select (works everywhere)
-# Usage: multiselect "prompt" result_array options_array descriptions_array
+# Interactive multi-select using bash select (works on bash 3.x macOS)
+# Usage: multiselect "prompt"
+# Reads from global: MISSING, DESCRIPTIONS
+# Writes to global: TO_INSTALL
 multiselect() {
     local prompt="$1"
-    local -n _result=$2
-    local -n _options=$3
-    local -n _descriptions=$4
-    local count=${#_options[@]}
+    local count=${#MISSING[@]}
 
     echo -e "\n${BLUE}==>${NC} $prompt"
     echo -e "${DIM}    Enter numbers to toggle, 'a' for all, 'n' for none, Enter when done${NC}\n"
@@ -76,9 +75,9 @@ multiselect() {
     # Show initial state
     for ((i=0; i<count; i++)); do
         if [[ "${selected[$i]}" == "true" ]]; then
-            echo -e "  ${GREEN}[✓]${NC} $((i+1))) ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
+            echo -e "  ${GREEN}[✓]${NC} $((i+1))) ${MISSING[$i]} ${DIM}— ${DESCRIPTIONS[$i]}${NC}"
         else
-            echo -e "  [ ] $((i+1))) ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
+            echo -e "  [ ] $((i+1))) ${MISSING[$i]} ${DIM}— ${DESCRIPTIONS[$i]}${NC}"
         fi
     done
 
@@ -118,7 +117,7 @@ multiselect() {
 
         for ((i=0; i<count; i++)); do
             # Approximate line length (without ANSI codes)
-            local line_text="  [x] $((i+1))) ${_options[$i]} — ${_descriptions[$i]}"
+            local line_text="  [x] $((i+1))) ${MISSING[$i]} — ${DESCRIPTIONS[$i]}"
             local line_len=${#line_text}
             # Ceiling division: how many terminal rows this line takes
             local rows=$(( (line_len + cols - 1) / cols ))
@@ -133,18 +132,18 @@ multiselect() {
         # Redraw options
         for ((i=0; i<count; i++)); do
             if [[ "${selected[$i]}" == "true" ]]; then
-                echo -e "  ${GREEN}[✓]${NC} $((i+1))) ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
+                echo -e "  ${GREEN}[✓]${NC} $((i+1))) ${MISSING[$i]} ${DIM}— ${DESCRIPTIONS[$i]}${NC}"
             else
-                echo -e "  [ ] $((i+1))) ${_options[$i]} ${DIM}— ${_descriptions[$i]}${NC}"
+                echo -e "  [ ] $((i+1))) ${MISSING[$i]} ${DIM}— ${DESCRIPTIONS[$i]}${NC}"
             fi
         done
     done
 
-    # Build result
-    _result=()
+    # Build result into global TO_INSTALL
+    TO_INSTALL=()
     for ((i=0; i<count; i++)); do
         if [[ "${selected[$i]}" == "true" ]]; then
-            _result+=("${_options[$i]}")
+            TO_INSTALL+=("${MISSING[$i]}")
         fi
     done
 }
@@ -201,27 +200,42 @@ print_step "Checking dependencies..."
 MISSING=()
 DESCRIPTIONS=()
 
-# Check Python >= 3.10
-check_python_version() {
+# Check Python >= 3.10 (checks python3, then python3.12/3.11/3.10)
+# Sets PYTHON_CMD to the best available python
+PYTHON_CMD=""
+
+find_python() {
+    # First try default python3
     if command -v python3 &> /dev/null; then
         local version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-        local major=$(echo "$version" | cut -d. -f1)
         local minor=$(echo "$version" | cut -d. -f2)
-        # major > 3 OR (major == 3 AND minor >= 10)
-        if [[ $major -gt 3 ]] || ([[ $major -eq 3 ]] && [[ $minor -ge 10 ]]); then
+        if [[ $minor -ge 10 ]]; then
+            PYTHON_CMD="python3"
+            echo "$version"
             return 0
         fi
     fi
+
+    # Try versioned pythons (Homebrew, pyenv, etc.)
+    for py_cmd in python3.12 python3.11 python3.10; do
+        if command -v "$py_cmd" &> /dev/null; then
+            local version=$($py_cmd -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+            PYTHON_CMD="$py_cmd"
+            echo "$version"
+            return 0
+        fi
+    done
+
     return 1
 }
 
-if check_python_version; then
-    PY_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    print_success "python3 found ($PY_VERSION)"
+PY_VERSION=$(find_python)
+if [[ -n "$PYTHON_CMD" ]]; then
+    print_success "python found: $PYTHON_CMD ($PY_VERSION)"
 else
     if command -v python3 &> /dev/null; then
-        PY_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-        print_warning "python3 found ($PY_VERSION) but need >= 3.10"
+        OLD_PY=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+        print_warning "python3 found ($OLD_PY) but need >= 3.10"
     else
         print_warning "python3 not found"
     fi
@@ -302,8 +316,7 @@ if [[ ${#MISSING[@]} -eq 0 ]]; then
 fi
 
 if [[ ${#MISSING[@]} -gt 0 ]]; then
-    TO_INSTALL=()
-    multiselect "Select what to install:" TO_INSTALL MISSING DESCRIPTIONS
+    multiselect "Select what to install:"
 
     echo ""
 
@@ -553,17 +566,11 @@ fi
 # Create virtual environment
 print_step "Setting up Python virtual environment..."
 
-# Find suitable Python (3.10+)
-PYTHON_CMD=""
-for cmd in python3.12 python3.11 python3.10 python3; do
-    if command -v "$cmd" &> /dev/null; then
-        version=$($cmd -c 'import sys; print(f"{sys.version_info.minor}")')
-        if [[ $version -ge 10 ]]; then
-            PYTHON_CMD="$cmd"
-            break
-        fi
-    fi
-done
+# Re-check PYTHON_CMD (might have been installed above)
+if [[ -z "$PYTHON_CMD" ]]; then
+    # Try to find again after installation
+    PY_VERSION=$(find_python)
+fi
 
 if [[ -z "$PYTHON_CMD" ]]; then
     print_error "Python >= 3.10 not found. Please install it first."
