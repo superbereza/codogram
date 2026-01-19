@@ -11,7 +11,7 @@ from ...config import settings
 from ...domain.states import SetupFlow
 from ...domain.validators import sanitize_project_name
 from ...keyboards.setup import setup_type_keyboard, go_back_keyboard
-from ...keyboards.setup.git_choice import git_choice_keyboard
+from ...keyboards.setup.git_choice import git_choice_keyboard, visibility_keyboard
 from ...keyboards.setup.common import folder_exists_keyboard
 from ... import strings
 
@@ -222,15 +222,11 @@ async def on_git_init(callback: CallbackQuery, state: FSMContext):
     F.data == "git:gh"
 )
 async def on_git_gh(callback: CallbackQuery, state: FSMContext):
-    """Git init + gh repo create."""
+    """Git init + gh repo create - ask for visibility first."""
     await callback.answer()
 
-    data = await state.get_data()
-    target_dir = Path(data["target_dir"])
-    project_name = data["project_name"]
-
     # Check gh first
-    from ...services.setup.git_operations import check_gh_cli, git_init, gh_repo_create
+    from ...services.setup.git_operations import check_gh_cli
 
     check = await check_gh_cli()
     if not check.success:
@@ -241,6 +237,45 @@ async def on_git_gh(callback: CallbackQuery, state: FSMContext):
         )
         return
 
+    # Ask for visibility
+    await state.set_state(SetupFlow.awaiting_gh_visibility)
+    await callback.message.edit_text(
+        strings.SETUP_GH_VISIBILITY,
+        reply_markup=visibility_keyboard(),
+        parse_mode="MarkdownV2",
+    )
+
+
+@router.callback_query(
+    SetupFlow.awaiting_gh_visibility,
+    F.data.startswith("visibility:")
+)
+async def on_visibility_choice(callback: CallbackQuery, state: FSMContext):
+    """Handle visibility choice for gh repo create."""
+    await callback.answer()
+
+    choice = callback.data.split(":", 1)[-1]
+
+    if choice == "back":
+        # Back to git choice
+        data = await state.get_data()
+        await state.set_state(SetupFlow.awaiting_git_choice)
+        await callback.message.edit_text(
+            strings.SETUP_GIT_CHOICE.format(folder=data["project_name"]),
+            reply_markup=git_choice_keyboard(),
+            parse_mode="MarkdownV2",
+        )
+        return
+
+    # choice is "private" or "public"
+    is_private = choice == "private"
+
+    data = await state.get_data()
+    target_dir = Path(data["target_dir"])
+    project_name = data["project_name"]
+
+    from ...services.setup.git_operations import git_init, gh_repo_create
+
     # Create directory
     if not target_dir.exists():
         target_dir.mkdir(parents=True)
@@ -250,17 +285,17 @@ async def on_git_gh(callback: CallbackQuery, state: FSMContext):
     if not init_result.success:
         await callback.message.edit_text(
             f"{strings.STATUS_ERR} git init failed: {init_result.error}",
-            reply_markup=go_back_keyboard("git:back"),
+            reply_markup=go_back_keyboard("visibility:back"),
             parse_mode="MarkdownV2",
         )
         return
 
-    # Create GitHub repo
-    gh_result = await gh_repo_create(target_dir, project_name)
+    # Create GitHub repo with visibility
+    gh_result = await gh_repo_create(target_dir, project_name, private=is_private)
     if not gh_result.success:
         await callback.message.edit_text(
             f"{strings.STATUS_ERR} gh repo create failed: {gh_result.error}",
-            reply_markup=go_back_keyboard("git:back"),
+            reply_markup=go_back_keyboard("visibility:back"),
             parse_mode="MarkdownV2",
         )
         return
