@@ -216,6 +216,52 @@ async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, f"Verbose output: {status}")
 
 
+@router.message(Command("response_mode", ignore_case=True))
+async def cmd_response_mode(message: Message, telegram_queue: TelegramQueue):
+    """Cycle response mode: all -> polite -> mentions -> all."""
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    thread = None
+    if project.threads:
+        thread = project.threads.get(thread_id)
+
+    # Cycle through modes
+    modes = ["all", "polite", "mentions"]
+    explanations = {
+        "all": strings.RESPONSE_MODE_ALL,
+        "polite": strings.RESPONSE_MODE_POLITE,
+        "mentions": strings.RESPONSE_MODE_MENTIONS,
+    }
+
+    if thread:
+        current = thread.response_mode
+        try:
+            next_idx = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_idx = 0  # Invalid mode, reset to "all"
+        thread.response_mode = modes[next_idx]
+        new_mode = thread.response_mode
+    else:
+        current = project.response_mode
+        try:
+            next_idx = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_idx = 0  # Invalid mode, reset to "all"
+        project.response_mode = modes[next_idx]
+        new_mode = project.response_mode
+
+    project_manager._save()
+
+    explanation = explanations.get(new_mode, "")
+    await telegram_queue.reply(message, f"response mode: {new_mode}\n_{explanation}_")
+
+
 @router.message(Command("exp_thinking_status", ignore_case=True))
 async def cmd_exp_thinking_status(message: Message, telegram_queue: TelegramQueue):
     """Toggle thinking status feature."""

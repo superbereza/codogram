@@ -242,6 +242,13 @@ FLAVOR_RANDOM = [
 ]
 
 
+# --- Response Mode ---
+
+RESPONSE_MODE_ALL = "responds to all messages"
+RESPONSE_MODE_POLITE = "doesn't reply others' mentions"
+RESPONSE_MODE_MENTIONS = "only when mentioned"
+
+
 # --- Buttons ---
 
 BTN_YES_LAUNCH = "Yes, launch"
