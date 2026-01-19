@@ -14,13 +14,13 @@ from ..git_utils import has_uncommitted_changes, get_default_branch, branch_exis
 from ..worktree import merge_branch, push_branch, remove_worktree
 from ..tmux import TmuxSession
 
-router = Router(name="finish")
+router = Router(name="finish_chat")
 
 
 # ===== /finish command =====
 
-@router.message(Command("finish", ignore_case=True))
-async def cmd_finish(message: Message, telegram_queue: TelegramQueue):
+@router.message(Command("finish_chat", "finish", "archive", "fc", ignore_case=True))
+async def cmd_finish_chat(message: Message, telegram_queue: TelegramQueue):
     """Unified finish command: archive topic or merge branch."""
     # Note: We don't require Claude running - archive/merge works without it
     from .common import normalize_thread_id
