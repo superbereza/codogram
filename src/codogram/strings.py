@@ -27,8 +27,8 @@ LAUNCH_RESUMING = f"{STATUS_PENDING} Resuming session..."
 LAUNCH_WAITING = f"{STATUS_PENDING} Waiting for Claude..."
 LAUNCH_TIMEOUT = f"{STATUS_ERR} Timeout: Claude didn't start in 2 minutes"
 LAUNCH_ERROR = f"{STATUS_ERR} Launch error: {{error}}"
-LAUNCH_READY = f"{STATUS_OK} Claude ready"
-LAUNCH_READY_WITH_ATTACH = f"{STATUS_OK} Claude ready\n\nTo see Claude UI: `tmux attach -t {{tmux_name}}`"
+LAUNCH_READY = f"{STATUS_PENDING} Claude ready, binding session..."
+LAUNCH_READY_WITH_ATTACH = f"{STATUS_PENDING} Claude ready, binding session...\n\nTo see Claude UI: `tmux attach -t {{tmux_name}}`"
 LAUNCH_PROJECT_CWD_NOT_SET = f"{STATUS_ERR} Project cwd not set. Re-register with /start"
 
 # Launch service (worktree creation)
@@ -39,7 +39,7 @@ LAUNCH_WORKTREE_CREATED = f"{STATUS_OK} Worktree: `{{path}}`"
 
 # --- Session management ---
 
-SESSION_BOUND = f"{STATUS_OK} New session bound"
+SESSION_BOUND = f"{STATUS_OK} New session bound. Ready to go"
 SESSION_CLOSED = f"{STATUS_WARN} Claude session closed: {{name}}"
 SESSION_NOT_FOUND = f"{STATUS_WARN} Session not found. Try /start"
 SESSION_EXPIRED = "Session expired"
@@ -474,7 +474,7 @@ Bot needs admin rights to manage topics\\.
 
 Open chat settings → Administrators → Add bot"""
 
-SETUP_ADMIN_CHECK_FAILED = f"{STATUS_WARN} Still missing admin rights"
+SETUP_ADMIN_CHECK_FAILED = "Still missing admin rights"  # Plain text for callback popup
 
 # Migration messages
 MIGRATION_SUCCESS = f"""`[v]` Topics enabled
@@ -744,12 +744,14 @@ EMOJI_PACK_TOPIC_HINT = "→ Check this [pack]({pack_link}) to personalize your 
 # --- New Chat Flow ---
 
 NEW_CHAT_CONTEXT = f"""{STATUS_QUESTION} Creating chat from:
+
 📁 `{{directory}}`
 🌿 `{{branch}}`
 
 To branch from main, run /new\\_chat in General"""
 
 NEW_CHAT_CONTEXT_MAIN = f"""{STATUS_QUESTION} Creating chat from:
+
 📁 `{{directory}}`
 🌿 `{{branch}}`"""
 
@@ -758,6 +760,7 @@ NEW_CHAT_NAME_PROMPT = "Chat name?\n\nSend name or pick random"
 NEW_CHAT_CREATING = f"{STATUS_PENDING} Creating chat `{{name}}`..."
 NEW_CHAT_CREATED = f"{STATUS_OK} Chat `{{name}}` created"
 NEW_CHAT_ERROR = f"{STATUS_ERR} Error creating chat"
+NEW_CHAT_NO_TOPIC_RIGHTS = f"{STATUS_ERR} Bot needs *Manage Topics* admin right to create chats"
 
 BTN_CREATE_HERE = "Create here"
 BTN_CREATE_ISOLATED = "Create isolated"

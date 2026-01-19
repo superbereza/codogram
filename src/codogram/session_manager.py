@@ -183,7 +183,7 @@ class ProjectState:
     feat_suggestions: bool = True
 
     # Avatar emoji pack:
-    feat_avatar_pack: bool = False
+    feat_avatar_pack: bool = True
     emoji_pack_name: str | None = None
     emoji_map: dict[int, str] = field(default_factory=dict)  # {user_id: custom_emoji_id}
 
@@ -236,7 +236,7 @@ class ProjectManager:
                 project.verbose = data.get("verbose", False)
                 project.feat_thinking_status = data.get("feat_thinking_status", False)
                 project.feat_suggestions = data.get("feat_suggestions", False)
-                project.feat_avatar_pack = data.get("feat_avatar_pack", False)
+                project.feat_avatar_pack = data.get("feat_avatar_pack", True)
                 project.emoji_pack_name = data.get("emoji_pack_name")
                 # Convert string keys back to int (JSON serialization converts int keys to strings)
                 emoji_map_raw = data.get("emoji_map", {})

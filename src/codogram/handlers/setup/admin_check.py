@@ -28,8 +28,6 @@ async def on_check_rights(callback: CallbackQuery, state: FSMContext):
         await callback.answer("Button expired, use /start")
         return
 
-    await callback.answer()  # Acknowledge callback
-
     chat_id = callback.message.chat.id
     bot = callback.bot
 
@@ -42,6 +40,7 @@ async def on_check_rights(callback: CallbackQuery, state: FSMContext):
             strings.SETUP_CHOOSE_TYPE,
             reply_markup=setup_type_keyboard(),
         )
+        await callback.answer()
     else:
         # Still no rights - show toast notification
         await callback.answer(strings.SETUP_ADMIN_CHECK_FAILED, show_alert=True)

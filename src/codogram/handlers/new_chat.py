@@ -13,6 +13,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 
 from .. import strings
+from ..config import settings
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
 from .common import (
@@ -35,6 +36,18 @@ from ..git_utils import (
 from ..tmux import TmuxSession
 
 router = Router(name="new_chat")
+
+
+def _relative_to_base(path: str) -> str:
+    """Make path relative to base_dir for display."""
+    try:
+        base = Path(settings.base_dir).resolve()
+        full = Path(path).resolve()
+        if full.is_relative_to(base):
+            return "./" + str(full.relative_to(base))
+    except (ValueError, RuntimeError):
+        pass
+    return path
 
 
 # ===== Keyboards =====
@@ -123,10 +136,11 @@ async def cmd_new_chat(message: Message, telegram_queue: TelegramQueue):
         return
 
     # Show context + choice
+    display_dir = _relative_to_base(directory)
     if branch == get_default_branch(Path(project.cwd)):
-        context_text = strings.NEW_CHAT_CONTEXT_MAIN.format(directory=directory, branch=branch)
+        context_text = strings.NEW_CHAT_CONTEXT_MAIN.format(directory=display_dir, branch=branch)
     else:
-        context_text = strings.NEW_CHAT_CONTEXT.format(directory=directory, branch=branch)
+        context_text = strings.NEW_CHAT_CONTEXT.format(directory=display_dir, branch=branch)
 
     set_flow_state(chat_id, thread_id, {
         "type": "nc_context",
@@ -350,7 +364,8 @@ async def _do_create(bot, chat_id: int, thread_id: int | None, project, name: st
             name=name,
         )
 
-    if result:
+    if result.success:
         await telegram_queue.send(chat_id, strings.NEW_CHAT_CREATED.format(name=name), thread_id=thread_id)
     else:
-        await telegram_queue.send(chat_id, strings.NEW_CHAT_ERROR, thread_id=thread_id)
+        error_msg = result.error or strings.NEW_CHAT_ERROR
+        await telegram_queue.send(chat_id, error_msg, thread_id=thread_id, parse_mode="MarkdownV2")

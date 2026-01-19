@@ -297,9 +297,8 @@ async def cmd_dashboard(message: Message, telegram_queue: TelegramQueue, bot: Bo
     await show_dashboard(message.chat.id, telegram_queue, bot)
 
 
-async def show_dashboard(chat_id: int, telegram_queue: TelegramQueue, bot: Bot):
-    """Render and send dashboard."""
-    # Gather project info
+async def gather_project_info(bot: Bot) -> list[ProjectInfo]:
+    """Gather info about all projects for dashboard."""
     projects_list = []
     for project in project_manager.projects.values():
         if not project.chat_id:
@@ -308,17 +307,14 @@ async def show_dashboard(chat_id: int, telegram_queue: TelegramQueue, bot: Bot):
         try:
             chat = await bot.get_chat(project.chat_id)
             member_count = await bot.get_chat_member_count(project.chat_id)
-            # Subtract 1 to exclude the bot itself
             member_count = max(0, member_count - 1)
 
-            # Count active tmux sessions for this project
             active = 0
             for t in project.threads.values():
                 tmux_name = t.get_tmux_session(project.project_name)
                 if is_tmux_session_exists(tmux_name):
                     active += 1
 
-            # Get creator from chat administrators
             creator = "unknown"
             try:
                 admins = await bot.get_chat_administrators(project.chat_id)
@@ -337,9 +333,14 @@ async def show_dashboard(chat_id: int, telegram_queue: TelegramQueue, bot: Bot):
                 active_sessions=active,
             ))
         except Exception:
-            # Skip projects we can't access
             continue
 
+    return projects_list
+
+
+async def show_dashboard(chat_id: int, telegram_queue: TelegramQueue, bot: Bot):
+    """Render and send dashboard."""
+    projects_list = await gather_project_info(bot)
     text = format_dashboard(projects_list)
     keyboard = dashboard_keyboard()
     await telegram_queue.send(chat_id, text, reply_markup=keyboard)
@@ -347,12 +348,15 @@ async def show_dashboard(chat_id: int, telegram_queue: TelegramQueue, bot: Bot):
 
 @router.callback_query(F.data == "dash:refresh")
 async def on_dash_refresh(callback: CallbackQuery, telegram_queue: TelegramQueue, bot: Bot):
-    """Handle dashboard refresh."""
+    """Handle dashboard refresh - edit existing message instead of sending new."""
     if not callback.message:
         await callback.answer()
         return
 
-    await show_dashboard(callback.message.chat.id, telegram_queue, bot)
+    projects_list = await gather_project_info(bot)
+    text = format_dashboard(projects_list)
+    keyboard = dashboard_keyboard()
+    await telegram_queue.edit(callback.message, text, reply_markup=keyboard)
     await callback.answer("Refreshed")
 
 

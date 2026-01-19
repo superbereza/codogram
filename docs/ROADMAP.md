@@ -344,6 +344,13 @@ Technical debt reduction in phases:
 
 ## Backlog
 
+### Persistent setup state
+Save FSM state to config file to survive bot restarts:
+- Save state and data on each `state.set_state()` / `state.update_data()`
+- Restore FSM state from config on bot startup
+- Clear saved state when setup completes
+- Prevents "restart during setup = start over" problem
+
 ### Merge thread and branch commands
 Simplify by removing separate /thread command:
 - Thread is essentially a branch for main

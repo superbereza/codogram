@@ -58,15 +58,15 @@ async def do_branch_create(
     project: ProjectState,
     branch_name: str,
     base_branch: str,
-) -> ThreadInfo | None:
+):
     """Create topic + worktree + launch Claude.
 
     Returns:
-        ThreadInfo if successful, None otherwise
+        CreateThreadResult with success/thread or error
     """
     from .launch import create_thread_with_session
 
-    thread = await create_thread_with_session(
+    return await create_thread_with_session(
         bot=bot,
         chat_id=chat_id,
         project=project,
@@ -74,8 +74,6 @@ async def do_branch_create(
         create_worktree=True,
         base_branch=base_branch,
     )
-
-    return thread
 
 
 def create_worktree(project_cwd: Path, branch_name: str) -> tuple[bool, str]:

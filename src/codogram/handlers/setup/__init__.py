@@ -53,14 +53,26 @@ setup_router.include_router(triggers.router)
 
 # --- Fallback for stale callbacks (bot restarted, FSM state lost) ---
 
+from aiogram.filters import BaseFilter
+from aiogram.fsm.context import FSMContext
+
 from ...logging_config import logger
 
-@setup_router.callback_query(F.data.regexp(SETUP_CALLBACK_PATTERN))
+
+class NoSetupFlowState(BaseFilter):
+    """Filter that passes only if NOT in any SetupFlow state."""
+
+    async def __call__(self, callback: CallbackQuery, state: FSMContext) -> bool:
+        current_state = await state.get_state()
+        # Pass only if no state or state is not SetupFlow
+        return not (current_state and current_state.startswith("SetupFlow:"))
+
+
+@setup_router.callback_query(F.data.regexp(SETUP_CALLBACK_PATTERN), NoSetupFlowState())
 async def on_stale_setup_callback(callback: CallbackQuery):
     """Handle setup callbacks when FSM state is lost (e.g., after bot restart).
 
-    This handler has no state filter, so it catches callbacks that weren't
-    handled by state-specific handlers above.
+    Only triggers when there's no active SetupFlow state.
     """
     logger.info(f"Stale setup callback: {callback.data}")
 
