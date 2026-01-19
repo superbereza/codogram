@@ -11,6 +11,7 @@ Telegram bot for managing Claude Code sessions from your phone.
 - **Tool calls** — see what Claude is doing in real-time
 - **Multi-session** — multiple projects, each in its own topic
 - **Git worktrees** — isolated branches with separate directories
+- **Voice messages** — transcribed via Whisper (optional)
 
 ## How it works
 
@@ -41,6 +42,8 @@ The script will:
 - Create virtual environment
 - Ask for your Telegram bot token ([@BotFather](https://t.me/BotFather))
 - Ask for your Telegram ID ([@userinfobot](https://t.me/userinfobot))
+- Ask for your working directory (where your git projects are)
+- Optionally configure Whisper for voice transcription
 - Create `.env` file
 
 ### Option 2: Manual setup
@@ -65,9 +68,7 @@ cp .env.example .env
 
 ### Use
 
-1. Open tmux and start Claude Code in your project
-2. Send `/start` or `/start project_name` to the bot in Telegram
-3. Done! Permission prompts will appear in the chat
+Send `/start` to your bot — it will guide you through the setup.
 
 ### Update
 

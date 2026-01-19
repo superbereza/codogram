@@ -601,8 +601,46 @@ if [[ -z "$SKIP_ENV" ]]; then
         exit 1
     fi
 
-    # Base directory is parent of codogram
-    BASE_DIR="$(cd .. && pwd)"
+    # Working directory
+    DEFAULT_BASE_DIR="$(cd .. && pwd)"
+    print_step "Working directory"
+    echo "Select the directory where you store your git projects."
+    echo ""
+    read -p "Is it the parent directory ($DEFAULT_BASE_DIR)? [Y/n]: " -n 1 -r
+    echo ""
+
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        echo ""
+        read -p "Enter path: " BASE_DIR
+        # Expand ~ if used
+        BASE_DIR="${BASE_DIR/#\~/$HOME}"
+
+        if [[ ! -d "$BASE_DIR" ]]; then
+            print_warning "Directory doesn't exist: $BASE_DIR"
+            read -p "Create it? [Y/n]: " -n 1 -r
+            echo ""
+            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                mkdir -p "$BASE_DIR"
+                print_success "Created $BASE_DIR"
+            fi
+        fi
+    else
+        BASE_DIR="$DEFAULT_BASE_DIR"
+    fi
+
+    # Configure integrations
+    print_step "Configure integrations"
+    echo "Voice transcription via OpenAI Whisper is available (bring your own API key)."
+    echo ""
+    read -p "Set up Whisper? [y/N]: " -n 1 -r
+    echo ""
+    OPENAI_API_KEY=""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "Get your API key at: https://platform.openai.com/api-keys"
+        echo ""
+        read -p "Enter OpenAI API key: " OPENAI_API_KEY
+    fi
 
     # Create .env
     cat > .env << EOF
@@ -611,6 +649,16 @@ ADMIN_IDS=$ADMIN_ID
 BASE_DIR=$BASE_DIR
 LOG_LEVEL=INFO
 EOF
+
+    # Add Whisper config if key provided
+    if [[ -n "$OPENAI_API_KEY" ]]; then
+        cat >> .env << EOF
+
+# Whisper (voice transcription)
+OPENAI_API_KEY=$OPENAI_API_KEY
+EOF
+        print_success "Whisper configured"
+    fi
 
     print_success ".env file created"
 fi
@@ -630,8 +678,11 @@ echo ""
 echo "To start the bot:"
 echo -e "  ${YELLOW}./stop-and-restart.sh${NC}"
 echo ""
-echo "Then in Telegram:"
-echo "  1. Open chat with your bot (or create a group with it)"
-echo "  2. Send /start"
+echo "Then send /start to your bot in Telegram."
+echo ""
+echo -e "${DIM}Don't forget to configure git (if not done):${NC}"
+echo -e "${DIM}  git config --global user.name \"Your Name\"${NC}"
+echo -e "${DIM}  git config --global user.email \"you@example.com\"${NC}"
+echo -e "${DIM}  gh auth login${NC}"
 echo ""
 echo "See docs/setup.md for more information."
