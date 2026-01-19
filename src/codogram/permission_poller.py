@@ -203,19 +203,14 @@ async def permission_poller(
         thinking_text = parse_thinking_status(screen)
 
         # Compact detection (independent of thinking status, uses broader spinner set)
-        compact_state = detect_compacting(screen)
-        if compact_state:
+        is_compacting = detect_compacting(screen)
+        if is_compacting:
             if not compacting_notified:
-                if compact_state == "in_progress":
-                    logger.info(f"{log_prefix}: compact in progress, sending notification")
-                    msg_text = strings.COMPACTING_STARTED
-                else:
-                    logger.info(f"{log_prefix}: compact completed (detected from banner)")
-                    msg_text = strings.COMPACTING_COMPLETED
+                logger.info(f"{log_prefix}: compact detected, sending notification")
                 batch = OutgoingBatch(
                     chat_id=project.chat_id,
                     thread_id=thread_id,
-                    messages=[{"text": msg_text, "parse_mode": "MarkdownV2"}],
+                    messages=[{"text": strings.COMPACTING_STARTED, "parse_mode": "MarkdownV2"}],
                 )
                 await telegram_queue.enqueue_nowait(batch)
                 compacting_notified = True

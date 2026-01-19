@@ -54,7 +54,6 @@ CLAUDE_CRASHED = f"{STATUS_WARN} Claude crashed: {{reason}}\nUse /restart to res
 CLAUDE_AUTO_RESTARTED = f"{STATUS_INFO} Claude exited, auto\\-restarting\\.\\.\\."
 
 COMPACTING_STARTED = f"{STATUS_INFO} Claude is compacting conversation\\.\\.\\."
-COMPACTING_COMPLETED = f"{STATUS_INFO} Conversation compacted"
 
 
 # --- Project/Thread ---
