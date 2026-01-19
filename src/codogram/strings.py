@@ -421,6 +421,14 @@ Add your ID to ADMIN_IDS in .env"""
 ERR_NOT_ADMIN_POPUP = "[x] Not admin. Your ID: {user_id}"
 
 
+# --- Group Authorization ---
+
+ERR_GROUP_NOT_ALLOWED = f"{STATUS_ERR} Bot not active in this group"
+ERR_GROUP_NOT_ALLOWED_POPUP = "[x] Bot not active in this group"  # Plain text for callback popup
+GROUP_REGISTERED = f"{STATUS_OK} Group registered"
+GROUP_DEACTIVATED = f"{STATUS_WARN} Admin left\\. Bot deactivated"
+
+
 # --- Branch Operations ---
 
 BRANCH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first"
