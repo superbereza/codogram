@@ -151,7 +151,7 @@ async def _do_clone(message: Message, state: FSMContext):
     # Import git_clone from existing service
     from ...services.start_flow import git_clone
 
-    result = await git_clone(url, target_dir)
+    result = git_clone(target_dir, url)
 
     if not result.success:
         error_msg = result.error or "Unknown error"
