@@ -104,6 +104,12 @@ git pull
 - [Установка](docs/setup.ru.md) — подробная инструкция
 - [CLAUDE.md](CLAUDE.md) — контекст для Claude сессий
 
+## Решение проблем
+
+**Бот игнорирует сообщения (но команды работают)?**
+
+Отключи privacy mode: [@BotFather](https://t.me/BotFather) → `/setprivacy` → выбери бота → `Disable`
+
 ## Ограничения
 
 - Один Claude на tmux сессию (split panes не поддерживаются)

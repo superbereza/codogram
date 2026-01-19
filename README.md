@@ -105,6 +105,12 @@ git pull
 - [Installation Guide](docs/setup.md) — detailed setup instructions
 - [CLAUDE.md](CLAUDE.md) — context for Claude sessions
 
+## Troubleshooting
+
+**Bot ignores messages (but commands work)?**
+
+Disable privacy mode: [@BotFather](https://t.me/BotFather) → `/setprivacy` → your bot → `Disable`
+
 ## Limitations
 
 - One Claude per tmux session (split panes not supported)

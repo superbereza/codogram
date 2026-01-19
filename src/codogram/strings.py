@@ -776,6 +776,9 @@ NC_UNCOMMITTED_COMMIT = "Commit first"
 
 HELP_TEXT = """Troubleshoot
 
+If bot ignores messages \\(but commands work\\):
+[@BotFather](https://t.me/BotFather) → /setprivacy → Disable
+
 If bot isn't responding, try /reset\\_chat — it's safe for context\\.
 
 To wipe project and start fresh: /hard\\_reset\\. 🚨 Dangerous zone\\!
