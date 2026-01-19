@@ -265,6 +265,18 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Отдельное меню команд для DM
 - См. [docs/designs/done/2025-01-18-dm-onboarding.md](designs/done/2025-01-18-dm-onboarding.md)
 
+### Групповая авторизация
+Разрешаем использование бота в группах, где хотя бы один админ группы есть в ADMIN_IDS:
+- Личка: только пользователи из ADMIN_IDS
+- Группа с админом из ADMIN_IDS: любой участник может использовать бота
+- Группа без админа из ADMIN_IDS: заблокировано
+- Event-driven: события добавления/удаления бота, ухода/понижения админа
+- Persistence: allowed_groups хранится в config.json
+- Re-validation после перезапуска бота
+- Обычные группы: пропускаем проверку админских прав (топики не поддерживаются)
+- Супергруппы: проверяем админские права для функций топиков/переименования
+- См. [docs/plans/done/2026-01-18-group-authorization-design.md](plans/done/2026-01-18-group-authorization-design.md)
+
 ## Beta Test
 
 ### Редизайн set up flow + robust start

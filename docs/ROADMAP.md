@@ -265,6 +265,18 @@ Interactive onboarding in direct messages with bot:
 - DM-specific command menu
 - See [docs/designs/done/2025-01-18-dm-onboarding.md](designs/done/2025-01-18-dm-onboarding.md)
 
+### Group authorization
+Allow bot usage in groups where at least one group admin is in ADMIN_IDS:
+- Private chat: only ADMIN_IDS users allowed
+- Group with admin from ADMIN_IDS: any group member can use bot
+- Group without admin from ADMIN_IDS: blocked
+- Event-driven: bot added/removed events, admin left/demoted events
+- Persistence: allowed_groups stored in config.json
+- Re-validation after bot restart
+- Regular groups: skip admin rights check (topics not supported)
+- Supergroups: check admin rights for topics/rename features
+- See [docs/plans/done/2026-01-18-group-authorization-design.md](plans/done/2026-01-18-group-authorization-design.md)
+
 ## Beta Test
 
 ### Avatar emoji pack
