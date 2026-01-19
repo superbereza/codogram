@@ -292,7 +292,7 @@ Use General or /thread for new session."""
 
 # --- Finish/Archive ---
 
-FINISH_NOTHING_IN_GENERAL = f"{STATUS_INFO} Nothing to finish in General. Use /clear to reset session"
+FINISH_NOTHING_IN_GENERAL = f"{STATUS_INFO} Nothing to finish in General. Use /clear_context to reset session"
 FINISH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first"
 FINISH_THREAD_NOT_FOUND = f"{STATUS_WARN} Thread not found"
 
@@ -468,6 +468,12 @@ Set BASE_DIR in \\.env file:
 Then restart the bot\\."""
 
 # Admin rights (used for migration and check button)
+SETUP_ADMIN_REQUIRED = f"""{STATUS_WARN} Admin rights required
+
+Bot needs admin rights to manage topics\\.
+
+Open chat settings → Administrators → Add bot"""
+
 SETUP_ADMIN_CHECK_FAILED = f"{STATUS_WARN} Still missing admin rights"
 
 # Migration messages
@@ -567,7 +573,7 @@ SETUP_LAUNCH_SUCCESS = f"""{STATUS_OK} Project `{{project}}` ready
 
 Commands available:
 • /esc — cancel operation
-• /clear — clear context
+• /clear\\_context — clear context
 • /auto_accept — toggle auto\\-accept
 • /thread — new topic
 

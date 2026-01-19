@@ -35,14 +35,13 @@ def build_announcement(project_name: str, tmux_name: str, is_forum: bool) -> str
     """
     commands = [
         "• /esc — cancel operation",
-        "• /clear — clear context",
+        "• /clear_context — clear context",
         "• /auto_accept — toggle auto-accept",
     ]
     if is_forum:
         commands.extend([
-            "• /thread — new topic",
-            "• /branch — new branch + topic",
-            "• /finish — merge and archive",
+            "• /new_chat — new topic or branch",
+            "• /finish_chat — merge and archive",
         ])
 
     return f"""`[v]` Project `{project_name}` ready
