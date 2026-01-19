@@ -732,3 +732,58 @@ EMOJI_PACK_ERROR = "`[x]` Failed to create avatar pack: {error}"
 
 # Hint in topic launch message (if feat_avatar_pack ON)
 EMOJI_PACK_TOPIC_HINT = "→ Check this [pack]({pack_link}) to personalize your topic"
+
+
+# --- New Chat Flow ---
+
+NEW_CHAT_CONTEXT = f"""{STATUS_QUESTION} Creating chat from:
+📁 `{{directory}}`
+🌿 `{{branch}}`
+
+To branch from main, run /new\\_chat in General"""
+
+NEW_CHAT_CONTEXT_MAIN = f"""{STATUS_QUESTION} Creating chat from:
+📁 `{{directory}}`
+🌿 `{{branch}}`"""
+
+NEW_CHAT_CHOOSE = "Where to create?"
+NEW_CHAT_NAME_PROMPT = "Chat name?\n\nSend name or pick random"
+NEW_CHAT_CREATING = f"{STATUS_PENDING} Creating chat `{{name}}`..."
+NEW_CHAT_CREATED = f"{STATUS_OK} Chat `{{name}}` created"
+NEW_CHAT_ERROR = f"{STATUS_ERR} Error creating chat"
+
+BTN_CREATE_HERE = "Create here"
+BTN_CREATE_ISOLATED = "Create isolated"
+
+# Uncommitted changes (reuse existing or add)
+NC_UNCOMMITTED = f"{STATUS_WARN} Uncommitted changes detected"
+NC_UNCOMMITTED_CLEAN = "Create from last commit"
+NC_UNCOMMITTED_COMMIT = "Commit first"
+
+# --- Help ---
+
+HELP_TEXT = """Troubleshoot
+
+If bot isn't responding, try /reset\\_chat — it's safe for context\\.
+
+To wipe project and start fresh: /hard\\_reset\\. 🚨 Dangerous zone\\!
+
+─────────────────
+
+Chats
+/new\\_chat — create new chat: topic \\& Claude session
+/finish\\_chat — archive chat and stop Claude
+/start — connect or resume
+/reset\\_chat — restart Claude process
+
+Context
+/clear\\_context — clear current Claude context
+
+Operations
+/esc — send Esc, stop current operation
+/shift\\_tab — cycle Claude approval mode
+/auto\\_accept — accept every Claude permission 🚧
+
+Settings
+/settings — show settings
+/get\\_debug\\_ids — debug info"""
