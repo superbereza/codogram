@@ -56,10 +56,8 @@ def _context_keyboard(has_git: bool) -> InlineKeyboardMarkup:
     """Build keyboard for context step."""
     if has_git:
         return InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(text=strings.BTN_CREATE_HERE, callback_data="nc_here"),
-                InlineKeyboardButton(text=strings.BTN_CREATE_ISOLATED, callback_data="nc_isolated"),
-            ],
+            [InlineKeyboardButton(text=strings.BTN_CREATE_ISOLATED, callback_data="nc_isolated")],
+            [InlineKeyboardButton(text=strings.BTN_CREATE_HERE, callback_data="nc_here")],
             [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data="nc_cancel")],
         ])
     else:
@@ -67,12 +65,14 @@ def _context_keyboard(has_git: bool) -> InlineKeyboardMarkup:
         return None
 
 
-def _name_keyboard(create_type: str) -> InlineKeyboardMarkup:
+def _name_keyboard(create_type: str, first_name: str | None = None) -> InlineKeyboardMarkup:
     """Build keyboard for name prompt."""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=strings.BTN_MAGIC_NAME, callback_data="nc_magic")],
-        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=f"nc_back:{create_type}")],
-    ])
+    buttons = []
+    if first_name:
+        buttons.append([InlineKeyboardButton(text=first_name, callback_data="nc_myname")])
+    buttons.append([InlineKeyboardButton(text=strings.BTN_MAGIC_NAME, callback_data="nc_magic")])
+    buttons.append([InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=f"nc_back:{create_type}")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def _uncommitted_keyboard(name: str) -> InlineKeyboardMarkup:
@@ -123,10 +123,12 @@ async def cmd_new_chat(message: Message, telegram_queue: TelegramQueue):
 
     if not has_git:
         # No git - skip to name prompt directly
+        first_name = message.from_user.first_name if message.from_user else None
+        prompt = strings.NEW_CHAT_NAME_PROMPT if first_name else strings.NEW_CHAT_NAME_PROMPT_NO_NAME
         prompt_ids = await telegram_queue.reply(
             message,
-            strings.NEW_CHAT_NAME_PROMPT,
-            reply_markup=_name_keyboard("thread"),
+            prompt,
+            reply_markup=_name_keyboard("thread", first_name),
         )
         set_flow_state(chat_id, thread_id, {
             "type": "nc_awaiting_name",
@@ -165,10 +167,12 @@ async def on_nc_here(callback: CallbackQuery, telegram_queue: TelegramQueue):
     clear_flow_state(chat_id, thread_id)
 
     # Show name prompt
+    first_name = callback.from_user.first_name if callback.from_user else None
+    prompt = strings.NEW_CHAT_NAME_PROMPT if first_name else strings.NEW_CHAT_NAME_PROMPT_NO_NAME
     await telegram_queue.edit(
         callback.message,
-        strings.NEW_CHAT_NAME_PROMPT,
-        reply_markup=_name_keyboard("thread"),
+        prompt,
+        reply_markup=_name_keyboard("thread", first_name),
     )
     await callback.answer()
 
@@ -187,10 +191,12 @@ async def on_nc_isolated(callback: CallbackQuery, telegram_queue: TelegramQueue)
     clear_flow_state(chat_id, thread_id)
 
     # Show name prompt for branch
+    first_name = callback.from_user.first_name if callback.from_user else None
+    prompt = strings.NEW_CHAT_NAME_PROMPT if first_name else strings.NEW_CHAT_NAME_PROMPT_NO_NAME
     await telegram_queue.edit(
         callback.message,
-        strings.NEW_CHAT_NAME_PROMPT,
-        reply_markup=_name_keyboard("branch"),
+        prompt,
+        reply_markup=_name_keyboard("branch", first_name),
     )
     await callback.answer()
 
@@ -260,6 +266,55 @@ async def on_nc_back(callback: CallbackQuery, telegram_queue: TelegramQueue):
 
 
 # ===== Step 2/3: Name handling =====
+
+@router.callback_query(F.data == "nc_myname")
+async def on_nc_myname(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Use user's first name."""
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+    state = get_flow_state(chat_id, thread_id)
+
+    if not state or state.get("type") != "nc_awaiting_name":
+        await callback.answer(strings.SESSION_EXPIRED)
+        return
+
+    # Get and sanitize first_name
+    first_name = callback.from_user.first_name if callback.from_user else None
+    if not first_name:
+        await callback.answer("Name not available")
+        return
+
+    create_type = state.get("create_type")
+    clear_flow_state(chat_id, thread_id)
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await callback.answer(strings.PROJECT_NOT_FOUND)
+        return
+
+    name, error = create_flow_service.validate_name(first_name, project)
+    if error:
+        await telegram_queue.edit(callback.message, error)
+        await callback.answer()
+        return
+
+    # For branch: check uncommitted first
+    if create_type == "branch":
+        if has_uncommitted_changes(Path(project.cwd)):
+            await telegram_queue.edit(
+                callback.message,
+                strings.NC_UNCOMMITTED,
+                reply_markup=_uncommitted_keyboard(name),
+            )
+            await callback.answer()
+            return
+
+    # Create directly
+    await telegram_queue.edit(callback.message, strings.NEW_CHAT_CREATING.format(name=name))
+    await callback.answer()
+
+    await _do_create(callback.bot, chat_id, thread_id, project, name, create_type, telegram_queue)
+
 
 @router.callback_query(F.data == "nc_magic")
 async def on_nc_magic(callback: CallbackQuery, telegram_queue: TelegramQueue):

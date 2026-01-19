@@ -756,7 +756,8 @@ NEW_CHAT_CONTEXT_MAIN = f"""{STATUS_QUESTION} Creating chat from:
 🌿 `{{branch}}`"""
 
 NEW_CHAT_CHOOSE = "Where to create?"
-NEW_CHAT_NAME_PROMPT = "Chat name?\n\nSend name or pick random"
+NEW_CHAT_NAME_PROMPT = "Chat name?"
+NEW_CHAT_NAME_PROMPT_NO_NAME = "Chat name?\n\nCouldn't get your name — send one or pick random"
 NEW_CHAT_CREATING = f"{STATUS_PENDING} Creating chat `{{name}}`..."
 NEW_CHAT_CREATED = f"{STATUS_OK} Chat `{{name}}` created"
 NEW_CHAT_ERROR = f"{STATUS_ERR} Error creating chat"
