@@ -864,9 +864,9 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
 
 # ===== Reset Flow =====
 
-@router.message(Command("reset_all", ignore_case=True))
-async def cmd_reset_all(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
-    """Handle /reset_all command."""
+@router.message(Command("hard_reset", "reset_all", ignore_case=True))
+async def cmd_hard_reset(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
+    """Handle /hard_reset command (full project reset)."""
     # Check if start flow is in progress (e.g., clone running)
     current_state = await state.get_state()
     if current_state and str(current_state).startswith("StartFlow:"):
