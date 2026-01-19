@@ -28,21 +28,23 @@ def get_total_slides() -> int:
     return len(SLIDES)
 
 
-def format_validation_errors(results: list) -> str:
-    """Format validation errors for display.
+def format_validation_checks(results: list) -> str:
+    """Format all validation checks with status indicators.
 
     Args:
-        results: List of ValidationResult with ok=False
+        results: List of ValidationResult (both ok and not ok)
 
     Returns:
-        Formatted string with errors and fix hints
+        Formatted string with [v] or [x] for each check
     """
     lines = []
     for r in results:
-        if not r.ok:
-            lines.append(f"• {r.message}")
+        if r.ok:
+            lines.append(f"`[v]` {r.name}")
+        else:
+            lines.append(f"`[x]` {r.message}")
             if r.fix_hint:
-                lines.append(f"  `{r.fix_hint}`")
+                lines.append(f"    `{r.fix_hint}`")
     return "\n".join(lines)
 
 
@@ -53,10 +55,10 @@ def format_validation_warnings(results: list) -> str:
         results: List of ValidationResult with ok=False
 
     Returns:
-        Formatted string with warnings
+        Formatted string with warnings (using [!] indicator)
     """
     lines = []
     for r in results:
         if not r.ok:
-            lines.append(f"• {r.message}")
+            lines.append(f"`[!]` {r.message}")
     return "\n".join(lines)

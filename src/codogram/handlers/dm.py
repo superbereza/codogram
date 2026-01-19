@@ -14,13 +14,13 @@ from ..keyboards.dm_onboarding import (
 from ..services.dm_onboarding import (
     get_slide_content,
     get_total_slides,
-    format_validation_errors,
-    format_validation_warnings,
+    format_validation_checks,
     run_critical_checks,
     run_warning_checks,
 )
 from ..services.dashboard import format_dashboard, ProjectInfo
 from ..session_manager import project_manager
+from ..project_launcher import is_tmux_session_exists
 from ..telegram_queue import TelegramQueue
 
 router = Router(name="dm")
@@ -61,15 +61,16 @@ async def handle_dm_start(message: Message, telegram_queue: TelegramQueue):
 
 async def show_mini_status(message: Message, telegram_queue: TelegramQueue):
     """Show mini status for returning users."""
-    # Count projects and sessions
+    # Count projects and active tmux sessions
     projects = project_manager.projects
     project_count = len(projects)
-    session_count = sum(
-        1 for p in projects.values()
-        if any(
-            t.session_id for t in p.threads.values()
-        )
-    )
+
+    session_count = 0
+    for p in projects.values():
+        for t in p.threads.values():
+            tmux_name = t.get_tmux_session(p.project_name)
+            if is_tmux_session_exists(tmux_name):
+                session_count += 1
 
     text = strings.DM_MINI_STATUS.format(
         projects=project_count,
@@ -134,43 +135,54 @@ async def on_carousel_slide(callback: CallbackQuery, telegram_queue: TelegramQue
     await callback.answer()
 
 
-async def show_validation(callback: CallbackQuery, telegram_queue: TelegramQueue):
-    """Show validation results after carousel."""
-    # Run critical checks
+async def show_validation(callback: CallbackQuery, telegram_queue: TelegramQueue, edit_existing: bool = False):
+    """Show validation results.
+
+    Args:
+        edit_existing: If True, edit callback.message. If False, send new messages (keeps carousel).
+    """
+    chat_id = callback.message.chat.id
+    msg_to_edit = callback.message if edit_existing else None
+
+    # 1. Show "checking" message
+    if msg_to_edit:
+        await telegram_queue.edit(msg_to_edit, strings.DM_VALIDATION_CHECKING)
+    else:
+        await telegram_queue.send(chat_id, strings.DM_VALIDATION_CHECKING)
+
+    # 2. Run critical checks
     critical_results = run_critical_checks()
     critical_errors = [r for r in critical_results if not r.ok]
 
+    # 3. Format all checks with [v] or [x]
+    checks_text = format_validation_checks(critical_results)
+
     if critical_errors:
         # Show errors with recheck button
-        error_text = format_validation_errors(critical_errors)
-        text = strings.DM_VALIDATION_ERROR.format(errors=error_text)
+        text = strings.DM_VALIDATION_ERROR.format(checks=checks_text)
         keyboard = validation_recheck_keyboard()
-        await telegram_queue.edit(
-            callback.message,
-            text,
-            reply_markup=keyboard,
-        )
+        if msg_to_edit:
+            await telegram_queue.edit(msg_to_edit, text, reply_markup=keyboard)
+        else:
+            await telegram_queue.send(chat_id, text, reply_markup=keyboard)
         return
 
-    # Run warning checks
+    # 4. Run warning checks and add to checks display
     warning_results = run_warning_checks()
-    warnings = [r for r in warning_results if not r.ok]
+    all_checks_text = checks_text + "\n" + format_validation_checks(warning_results)
 
-    # Show success + optional warnings + CTA
+    # 5. Show success with all checks (critical + warnings)
+    full_text = strings.DM_VALIDATION_OK.format(checks=all_checks_text)
+
+    if msg_to_edit:
+        await telegram_queue.edit(msg_to_edit, full_text)
+    else:
+        await telegram_queue.send(chat_id, full_text)
+
+    # 6. Send SEPARATE CTA message
     bot_info = await callback.bot.get_me()
     cta_text = strings.DM_CTA.format(bot_username=bot_info.username)
-
-    if warnings:
-        warning_text = format_validation_warnings(warnings)
-        full_text = f"{strings.DM_VALIDATION_OK}\n\n{strings.DM_VALIDATION_WARNINGS.format(warnings=warning_text)}\n\n{cta_text}"
-    else:
-        full_text = f"{strings.DM_VALIDATION_OK}\n\n{cta_text}"
-
-    await telegram_queue.edit(
-        callback.message,
-        full_text,
-        parse_mode="Markdown",
-    )
+    await telegram_queue.send(chat_id, cta_text)
 
     # Mark user as onboarded
     set_user_onboarded(callback.from_user.id)
@@ -183,7 +195,7 @@ async def on_recheck(callback: CallbackQuery, telegram_queue: TelegramQueue):
         await callback.answer()
         return
 
-    await show_validation(callback, telegram_queue)
+    await show_validation(callback, telegram_queue, edit_existing=True)
     await callback.answer()
 
 
@@ -221,14 +233,23 @@ async def show_dashboard(chat_id: int, telegram_queue: TelegramQueue, bot: Bot):
             chat = await bot.get_chat(project.chat_id)
             member_count = await bot.get_chat_member_count(project.chat_id)
 
-            # Count active sessions for this project
-            active = sum(
-                1 for t in project.threads.values()
-                if t.session_id
-            )
+            # Count active tmux sessions for this project
+            active = 0
+            for t in project.threads.values():
+                tmux_name = t.get_tmux_session(project.project_name)
+                if is_tmux_session_exists(tmux_name):
+                    active += 1
 
-            # Get creator - might not always be available
+            # Get creator from chat administrators
             creator = "unknown"
+            try:
+                admins = await bot.get_chat_administrators(project.chat_id)
+                for admin in admins:
+                    if admin.status == "creator":
+                        creator = admin.user.username or str(admin.user.id)
+                        break
+            except Exception:
+                pass
 
             projects_list.append(ProjectInfo(
                 chat_name=chat.title or "Untitled",
@@ -298,3 +319,14 @@ async def on_bot_added_to_chat(event: ChatMemberUpdated, bot: Bot):
         except Exception:
             # Admin might have blocked bot or never started DM
             pass
+
+
+# ===== Catch-all for other DM commands =====
+
+@router.message(F.chat.type == ChatType.PRIVATE, F.text.startswith("/"))
+async def cmd_dm_fallback(message: Message, telegram_queue: TelegramQueue):
+    """Handle unknown commands in DM."""
+    if not is_admin(message):
+        return
+
+    await telegram_queue.send(message.chat.id, strings.DM_UNKNOWN_COMMAND)

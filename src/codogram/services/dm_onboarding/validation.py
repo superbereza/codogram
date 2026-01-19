@@ -22,8 +22,8 @@ def check_base_dir_configured() -> ValidationResult:
         return ValidationResult(
             ok=False,
             name="BASE_DIR configured",
-            message="BASE_DIR не указан в .env",
-            fix_hint="Добавь BASE_DIR=/path/to/projects в .env"
+            message="BASE_DIR not set in .env",
+            fix_hint="Add BASE_DIR=/path/to/projects to .env"
         )
     return ValidationResult(ok=True, name="BASE_DIR configured", message="")
 
@@ -34,7 +34,7 @@ def check_base_dir_exists() -> ValidationResult:
         return ValidationResult(
             ok=False,
             name="BASE_DIR exists",
-            message="BASE_DIR не указан",
+            message="BASE_DIR not set",
             fix_hint=""
         )
 
@@ -43,7 +43,7 @@ def check_base_dir_exists() -> ValidationResult:
         return ValidationResult(
             ok=False,
             name="BASE_DIR exists",
-            message=f"Директория {settings.base_dir} не существует",
+            message=f"Directory {settings.base_dir} doesn't exist",
             fix_hint=f"mkdir -p {settings.base_dir}"
         )
     return ValidationResult(ok=True, name="BASE_DIR exists", message="")
@@ -55,8 +55,8 @@ def check_binary_available(binary: str) -> ValidationResult:
         return ValidationResult(
             ok=False,
             name=f"{binary} available",
-            message=f"`{binary}` не найден в PATH",
-            fix_hint=f"Установи {binary} и добавь в PATH"
+            message=f"`{binary}` not found in PATH",
+            fix_hint=f"Install {binary} and add to PATH"
         )
     return ValidationResult(ok=True, name=f"{binary} available", message="")
 
@@ -86,14 +86,14 @@ def check_git_configured() -> ValidationResult:
             return ValidationResult(
                 ok=False,
                 name="git configured",
-                message="git user.name или user.email не настроен",
-                fix_hint="git config --global user.name 'Your Name'\ngit config --global user.email 'you@example.com'"
+                message="git user.name or user.email not set",
+                fix_hint="git config --global user.name 'Your Name'"
             )
     except Exception:
         return ValidationResult(
             ok=False,
             name="git configured",
-            message="Не удалось проверить git config",
+            message="Could not check git config",
             fix_hint=""
         )
     return ValidationResult(ok=True, name="git configured", message="")
@@ -110,41 +110,24 @@ def check_gh_auth() -> ValidationResult:
             return ValidationResult(
                 ok=False,
                 name="gh auth",
-                message="GitHub CLI не авторизован",
+                message="GitHub CLI not authenticated",
                 fix_hint="gh auth login"
             )
     except FileNotFoundError:
         return ValidationResult(
             ok=False,
             name="gh auth",
-            message="gh CLI не установлен",
-            fix_hint="Установи GitHub CLI: https://cli.github.com/"
+            message="gh CLI not installed",
+            fix_hint="https://cli.github.com/"
         )
     except Exception:
         return ValidationResult(
             ok=False,
             name="gh auth",
-            message="Не удалось проверить gh auth",
+            message="Could not check gh auth",
             fix_hint=""
         )
     return ValidationResult(ok=True, name="gh auth", message="")
-
-
-def check_ssh_keys() -> ValidationResult:
-    """Check if SSH keys exist."""
-    ssh_dir = Path.home() / ".ssh"
-    key_patterns = ["id_rsa", "id_ed25519", "id_ecdsa"]
-
-    for pattern in key_patterns:
-        if (ssh_dir / pattern).exists():
-            return ValidationResult(ok=True, name="SSH keys", message="")
-
-    return ValidationResult(
-        ok=False,
-        name="SSH keys",
-        message="SSH ключи не найдены",
-        fix_hint="ssh-keygen -t ed25519"
-    )
 
 
 def run_warning_checks() -> list[ValidationResult]:
@@ -152,5 +135,4 @@ def run_warning_checks() -> list[ValidationResult]:
     return [
         check_git_configured(),
         check_gh_auth(),
-        check_ssh_keys(),
     ]

@@ -12,23 +12,34 @@ def carousel_keyboard(current_slide: int, total_slides: int) -> InlineKeyboardMa
         total_slides: Total number of slides
 
     Returns:
-        Keyboard with Prev/Next buttons based on position
+        Keyboard with Prev/Next buttons based on position, plus "How to use" at bottom
     """
-    buttons = []
+    nav_buttons = []
 
     if current_slide > 0:
-        buttons.append(InlineKeyboardButton(
+        nav_buttons.append(InlineKeyboardButton(
             text=strings.BTN_PREV,
             callback_data=f"onb:slide:{current_slide - 1}"
         ))
 
     if current_slide < total_slides - 1:
-        buttons.append(InlineKeyboardButton(
+        nav_buttons.append(InlineKeyboardButton(
             text=strings.BTN_NEXT,
             callback_data=f"onb:slide:{current_slide + 1}"
         ))
 
-    return InlineKeyboardMarkup(inline_keyboard=[buttons] if buttons else [])
+    # "How to use" button on second row - leads to validation
+    how_to_use = InlineKeyboardButton(
+        text=strings.BTN_HOW_TO_USE,
+        callback_data=f"onb:slide:{total_slides}"  # triggers validation
+    )
+
+    rows = []
+    if nav_buttons:
+        rows.append(nav_buttons)
+    rows.append([how_to_use])
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def validation_recheck_keyboard() -> InlineKeyboardMarkup:

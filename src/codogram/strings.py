@@ -574,91 +574,96 @@ STALE_BUTTON_SECONDS = 300
 
 # --- DM Onboarding ---
 
-DM_WELCOME = """👋 Привет!
+DM_WELCOME = """Hey there
 
-Я Codogram — бот для управления Claude Code через Telegram."""
+I'm Codogram — your Claude Code companion on Telegram"""
 
-DM_SLIDE_1 = """📱 *Мобильность*
+DM_SLIDE_1 = """📱 *Mobile*
 
-Запускай задачи с телефона, работай откуда угодно.
+Fire off tasks from your phone, work from anywhere
 
-Claude работает на сервере — тебе нужен только Telegram."""
+Claude runs on your server — all you need is Telegram"""
 
-DM_SLIDE_2 = """⏰ *Асинхронность*
+DM_SLIDE_2 = """⏰ *Async*
 
-Запустил задачу → занялся своим → получил уведомление.
+Start a task → do your thing → get notified when done
 
-Не нужно сидеть и смотреть в терминал."""
+No more staring at terminal output"""
 
-DM_SLIDE_3 = """👥 *Команда*
+DM_SLIDE_3 = """👥 *Team*
 
-Настрой один раз — работай с коллегами.
+Set up once — collaborate with teammates
 
-Каждый видит что делает Claude, может подтвердить действие."""
+Everyone sees what Claude does, can approve actions"""
 
-DM_VALIDATION_CHECKING = f"{STATUS_PENDING} Проверяю окружение..."
+# Validation - first message (will be edited)
+DM_VALIDATION_CHECKING = f"{STATUS_PENDING} Checking environment..."
 
-DM_VALIDATION_OK = f"""{STATUS_OK} Окружение готово
+# Validation - results with checkmarks
+DM_VALIDATION_OK = f"""{STATUS_OK} Environment ready
 
-Теперь создай группу в Telegram и добавь меня админом.
+{{checks}}"""
 
-Я автоматически подхвачу её."""
+DM_VALIDATION_ERROR = f"""{STATUS_ERR} Issues found
 
-DM_VALIDATION_ERROR = f"""{STATUS_ERR} Есть проблемы с окружением
+{{checks}}
 
-{{errors}}
+Fix and hit "Recheck\""""
 
-Исправь и нажми «Проверить снова»."""
+# Warnings shown after checks if any
+DM_VALIDATION_WARNINGS = """
+{warnings}"""
 
-DM_VALIDATION_WARNINGS = f"""{STATUS_WARN} Предупреждения (не критично):
+# CTA - separate message after validation passes
+DM_CTA = """Next steps:
+→ [Add me to a group](https://t.me/{bot_username}?startgroup=true)
+→ I'll handle the rest
 
-{{warnings}}"""
+/dash — view all projects"""
 
-DM_CTA = """✅ *Финальный шаг*
+DM_MINI_STATUS = """Welcome back
 
-Создай группу в Telegram и добавь @{bot_username} админом.
+Active projects: {projects}
+Claude sessions: {sessions}
 
-Бот автоматически подхватит её — /start в группе не нужен."""
+/dash — full project list
+/intro — see intro again"""
 
-DM_MINI_STATUS = """👋 С возвращением!
+DM_BOT_ADDED = """Added to "{chat_name}"
+By: @{creator}"""
 
-Активных проектов: {projects}
-Сессий Claude: {sessions}
-
-/dash — подробный список проектов
-/intro — посмотреть введение ещё раз"""
-
-DM_BOT_ADDED = """Меня добавили в «{chat_name}»
-Создатель: @{creator}"""
-
-DM_BOT_ADDED_WITH_LINK = """Меня добавили в «{chat_name}»
-Чат: {link}
-Создатель: @{creator}"""
+DM_BOT_ADDED_WITH_LINK = """Added to "{chat_name}"
+Chat: {link}
+By: @{creator}"""
 
 # --- Dashboard ---
 
-DASH_HEADER = "📊 Проекты"
+DASH_HEADER = "Projects"
 
 DASH_PROJECT = """{num}. {chat_name}
    📁 {directory}
-   👤 Создатель: @{creator}
-   👥 {members} участник(ов)
+   👤 Owner: @{creator}
+   👥 {members} members
    {status}"""
 
-DASH_STATUS_ACTIVE = "🤖 {count} сессий Claude"
-DASH_STATUS_INACTIVE = "💤 не активен"
+DASH_STATUS_ACTIVE = "🤖 {count} Claude sessions"
+DASH_STATUS_INACTIVE = "💤 inactive"
 
-DASH_FOOTER = "Всего: {total} проектов, {active} активных сессий"
+DASH_FOOTER = "Total: {total} projects, {active} active sessions"
 
-DASH_EMPTY = """📊 Проекты
+DASH_EMPTY = """Projects
 
-Пока нет подключённых проектов.
+No projects connected yet
 
-Создай группу и добавь меня — я подхвачу автоматически."""
+Create a group and add me — I'll pick it up automatically"""
 
 # --- DM Buttons ---
 
-BTN_NEXT = "Далее →"
-BTN_PREV = "← Назад"
-BTN_RECHECK = "Проверить снова"
-BTN_REFRESH = "Обновить"
+BTN_NEXT = "Next →"
+BTN_PREV = "← Back"
+BTN_HOW_TO_USE = "How to use?"
+BTN_RECHECK = "Recheck"
+BTN_REFRESH = "Refresh"
+
+# DM fallback for unknown commands
+DM_UNKNOWN_COMMAND = "`[◉_◉]` Can't wait to try? Add me to a group chat"

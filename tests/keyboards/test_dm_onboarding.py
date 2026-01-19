@@ -10,7 +10,7 @@ def test_carousel_keyboard_first_slide():
     buttons = kb.inline_keyboard[0]
 
     assert len(buttons) == 1
-    assert buttons[0].text == "Далее →"
+    assert buttons[0].text == "Next →"
     assert buttons[0].callback_data == "onb:slide:1"
 
 
@@ -22,9 +22,9 @@ def test_carousel_keyboard_middle_slide():
     buttons = kb.inline_keyboard[0]
 
     assert len(buttons) == 2
-    assert buttons[0].text == "← Назад"
+    assert buttons[0].text == "← Back"
     assert buttons[0].callback_data == "onb:slide:0"
-    assert buttons[1].text == "Далее →"
+    assert buttons[1].text == "Next →"
     assert buttons[1].callback_data == "onb:slide:2"
 
 
@@ -36,7 +36,7 @@ def test_carousel_keyboard_last_slide():
     buttons = kb.inline_keyboard[0]
 
     assert len(buttons) == 1
-    assert buttons[0].text == "← Назад"
+    assert buttons[0].text == "← Back"
     assert buttons[0].callback_data == "onb:slide:1"
 
 

@@ -11,9 +11,9 @@ def test_get_slide_content_returns_slides():
     slide1 = get_slide_content(1)
     slide2 = get_slide_content(2)
 
-    assert "Мобильность" in slide0
-    assert "Асинхронность" in slide1
-    assert "Команда" in slide2
+    assert "Mobile" in slide0
+    assert "Async" in slide1
+    assert "Team" in slide2
 
 
 def test_get_slide_content_returns_none_for_invalid():
@@ -31,18 +31,22 @@ def test_get_total_slides():
     assert get_total_slides() == 3
 
 
-def test_format_validation_errors():
-    """Should format validation errors with fix hints."""
-    from codogram.services.dm_onboarding import format_validation_errors
+def test_format_validation_checks():
+    """Should format validation checks with status indicators."""
+    from codogram.services.dm_onboarding import format_validation_checks
     from codogram.services.dm_onboarding.validation import ValidationResult
 
     results = [
-        ValidationResult(ok=False, name="test1", message="Error 1", fix_hint="Fix 1"),
-        ValidationResult(ok=False, name="test2", message="Error 2", fix_hint=""),
+        ValidationResult(ok=True, name="check1 ok", message=""),
+        ValidationResult(ok=False, name="check2", message="Error 2", fix_hint="Fix 2"),
+        ValidationResult(ok=False, name="check3", message="Error 3", fix_hint=""),
     ]
 
-    formatted = format_validation_errors(results)
+    formatted = format_validation_checks(results)
 
-    assert "Error 1" in formatted
-    assert "Fix 1" in formatted
+    assert "[v]" in formatted
+    assert "check1 ok" in formatted
+    assert "[x]" in formatted
     assert "Error 2" in formatted
+    assert "Fix 2" in formatted
+    assert "Error 3" in formatted

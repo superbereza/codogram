@@ -10,7 +10,7 @@ from .validation import (
 from .onboarding import (
     get_slide_content,
     get_total_slides,
-    format_validation_errors,
+    format_validation_checks,
     format_validation_warnings,
 )
 
@@ -23,6 +23,6 @@ __all__ = [
     "run_warning_checks",
     "get_slide_content",
     "get_total_slides",
-    "format_validation_errors",
+    "format_validation_checks",
     "format_validation_warnings",
 ]
