@@ -6,6 +6,10 @@ from aiogram.filters import Command
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue
 from .. import strings
+from ..logging_config import logger
+from ..adapters.sticker import StickerAdapter
+from ..services.emoji_pack import EmojiPackService
+from ..keyboards import avatar_pack_create_keyboard, avatar_pack_disable_keyboard
 
 router = Router(name="settings")
 
@@ -78,6 +82,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     # Note: feat_suggestions is project-level only
     thinking_status = "● on" if feat_thinking else "○ off"
     suggestions_status = "● on" if project.feat_suggestions else "○ off"
+    avatar_pack_status = "● on" if project.feat_avatar_pack else "○ off"
 
     lines = [f"**{context_name}**", ""]
     lines.append("chat")
@@ -123,6 +128,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     lines.append("experimental features")
     lines.append(f"• /exp\\_thinking\\_status: {thinking_status}")
     lines.append(f"• /exp\\_suggestions: {suggestions_status}")
+    lines.append(f"• /exp\\_avatar\\_pack: {avatar_pack_status}")
 
     return "\n".join(lines)
 
@@ -264,6 +270,86 @@ async def cmd_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
 
     project_manager._save()
     await telegram_queue.reply(message, f"Suggestions (all topics): {status}")
+
+
+@router.message(Command("exp_avatar_pack", ignore_case=True))
+async def cmd_exp_avatar_pack(message: Message, telegram_queue: TelegramQueue):
+    """Toggle avatar pack feature."""
+    chat_id = message.chat.id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, strings.PROJECT_NOT_REGISTERED)
+        return
+
+    if project.feat_avatar_pack:
+        kb = avatar_pack_disable_keyboard()
+        await telegram_queue.reply(message, strings.EMOJI_PACK_DISABLE_PROMPT, reply_markup=kb)
+    else:
+        kb = avatar_pack_create_keyboard()
+        await telegram_queue.reply(message, strings.EMOJI_PACK_CREATE_PROMPT, reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("avatar_pack:"))
+async def callback_avatar_pack(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Handle avatar pack button presses."""
+    parts = callback.data.split(":")
+    if len(parts) < 2:
+        await callback.answer("Invalid callback")
+        return
+    action = parts[1]
+    chat_id = callback.message.chat.id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await callback.answer("Project not found")
+        return
+
+    if action == "cancel":
+        await telegram_queue.edit(callback.message, strings.CANCELLED)
+        await callback.answer()
+        return
+
+    # Create service with adapter (layered architecture)
+    adapter = StickerAdapter(callback.bot)
+    service = EmojiPackService(adapter)
+
+    if action == "create":
+        logger.info(f"Avatar pack creation started for chat {chat_id}")
+        await telegram_queue.edit(callback.message, strings.EMOJI_PACK_CREATING)
+        await callback.answer()
+
+        thread_id = callback.message.message_thread_id
+
+        # Get participants (admins for now, members added on join)
+        try:
+            admins = await callback.bot.get_chat_administrators(chat_id)
+            participants = [admin.user for admin in admins if not admin.user.is_bot]
+        except Exception as e:
+            await telegram_queue.send(
+                chat_id, strings.EMOJI_PACK_ERROR.format(error=str(e)), thread_id=thread_id
+            )
+            return
+
+        # Create pack
+        pack_name = await service.create_pack(chat_id, participants)
+        if pack_name:
+            pack_link = f"t.me/addemoji/{pack_name}"
+            await telegram_queue.send(
+                chat_id,
+                strings.EMOJI_PACK_CREATED.format(pack_link=pack_link),
+                thread_id=thread_id,
+            )
+        else:
+            await telegram_queue.send(
+                chat_id, strings.EMOJI_PACK_ERROR.format(error="Unknown error"), thread_id=thread_id
+            )
+
+    elif action == "disable":
+        logger.info(f"Avatar pack deletion requested for chat {chat_id}")
+        await telegram_queue.edit(callback.message, strings.EMOJI_PACK_DELETED)
+        await callback.answer()
+        await service.delete_pack(chat_id)
 
 
 @router.callback_query(F.data.startswith("set:"))

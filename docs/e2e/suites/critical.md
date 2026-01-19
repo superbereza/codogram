@@ -73,6 +73,17 @@
 | 37 | TC-SETTINGS-008 | /settings новый формат с inline кнопками | commands/settings.md |
 | 38 | TC-SETTINGS-009 | /verbose toggle | commands/settings.md |
 
+### Avatar Pack
+
+| # | ID | Название | Файл |
+|---|-----|----------|------|
+| 39 | TC-AVATAR-001 | /exp_avatar_pack create prompt (OFF) | commands/avatar_pack.md |
+| 40 | TC-AVATAR-002 | Create avatar pack via button | commands/avatar_pack.md |
+| 41 | TC-AVATAR-003 | /exp_avatar_pack disable prompt (ON) | commands/avatar_pack.md |
+| 42 | TC-AVATAR-005 | Disable avatar pack via button | commands/avatar_pack.md |
+| 43 | TC-AVATAR-006 | /settings shows avatar_pack status | commands/avatar_pack.md |
+| 44 | TC-AVATAR-007 | Topic launch shows emoji hint | commands/avatar_pack.md |
+
 ## Подготовка
 
 ```bash
@@ -91,4 +102,4 @@ cd /tmp/test-branch-repo && git status
 
 ## Критерий успеха
 
-Все 38 тестов PASS = основной функционал работает, регрессий нет.
+Все 44 теста PASS = основной функционал работает, регрессий нет.

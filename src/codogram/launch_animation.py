@@ -190,6 +190,10 @@ async def launch_with_animation(
         else:
             # Topic - short announcement
             announcement = build_thread_announcement(thread.name, tmux_name)
+            # Add emoji pack hint if feature enabled
+            if project.feat_avatar_pack and project.emoji_pack_name:
+                pack_link = f"https://t.me/addemoji/{project.emoji_pack_name}"
+                announcement += f"\n\n{strings.EMOJI_PACK_TOPIC_HINT.format(pack_link=pack_link)}"
         logger.info(f"launch_sending_announcement: project={project.project_name}")
         try:
             await queue.send(
