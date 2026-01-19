@@ -65,14 +65,21 @@ def _context_keyboard(has_git: bool) -> InlineKeyboardMarkup:
         return None
 
 
-def _name_keyboard(create_type: str, first_name: str | None = None) -> InlineKeyboardMarkup:
+def _name_keyboard(create_type: str) -> InlineKeyboardMarkup:
     """Build keyboard for name prompt."""
-    buttons = []
-    if first_name:
-        buttons.append([InlineKeyboardButton(text=first_name, callback_data="nc_myname")])
-    buttons.append([InlineKeyboardButton(text=strings.BTN_MAGIC_NAME, callback_data="nc_magic")])
-    buttons.append([InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=f"nc_back:{create_type}")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=strings.BTN_MY_NAME, callback_data=f"nc_myname:{create_type}")],
+        [InlineKeyboardButton(text=strings.BTN_MAGIC_NAME, callback_data="nc_magic")],
+        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=f"nc_back:{create_type}")],
+    ])
+
+
+def _name_fallback_keyboard(create_type: str) -> InlineKeyboardMarkup:
+    """Build keyboard for when name couldn't be retrieved."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=strings.BTN_MAGIC_NAME, callback_data="nc_magic")],
+        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=f"nc_back:{create_type}")],
+    ])
 
 
 def _uncommitted_keyboard(name: str) -> InlineKeyboardMarkup:
@@ -123,12 +130,10 @@ async def cmd_new_chat(message: Message, telegram_queue: TelegramQueue):
 
     if not has_git:
         # No git - skip to name prompt directly
-        first_name = message.from_user.first_name if message.from_user else None
-        prompt = strings.NEW_CHAT_NAME_PROMPT if first_name else strings.NEW_CHAT_NAME_PROMPT_NO_NAME
         prompt_ids = await telegram_queue.reply(
             message,
-            prompt,
-            reply_markup=_name_keyboard("thread", first_name),
+            strings.NEW_CHAT_NAME_PROMPT,
+            reply_markup=_name_keyboard("thread"),
         )
         set_flow_state(chat_id, thread_id, {
             "type": "nc_awaiting_name",
@@ -167,12 +172,10 @@ async def on_nc_here(callback: CallbackQuery, telegram_queue: TelegramQueue):
     clear_flow_state(chat_id, thread_id)
 
     # Show name prompt
-    first_name = callback.from_user.first_name if callback.from_user else None
-    prompt = strings.NEW_CHAT_NAME_PROMPT if first_name else strings.NEW_CHAT_NAME_PROMPT_NO_NAME
     await telegram_queue.edit(
         callback.message,
-        prompt,
-        reply_markup=_name_keyboard("thread", first_name),
+        strings.NEW_CHAT_NAME_PROMPT,
+        reply_markup=_name_keyboard("thread"),
     )
     await callback.answer()
 
@@ -191,12 +194,10 @@ async def on_nc_isolated(callback: CallbackQuery, telegram_queue: TelegramQueue)
     clear_flow_state(chat_id, thread_id)
 
     # Show name prompt for branch
-    first_name = callback.from_user.first_name if callback.from_user else None
-    prompt = strings.NEW_CHAT_NAME_PROMPT if first_name else strings.NEW_CHAT_NAME_PROMPT_NO_NAME
     await telegram_queue.edit(
         callback.message,
-        prompt,
-        reply_markup=_name_keyboard("branch", first_name),
+        strings.NEW_CHAT_NAME_PROMPT,
+        reply_markup=_name_keyboard("branch"),
     )
     await callback.answer()
 
@@ -267,24 +268,25 @@ async def on_nc_back(callback: CallbackQuery, telegram_queue: TelegramQueue):
 
 # ===== Step 2/3: Name handling =====
 
-@router.callback_query(F.data == "nc_myname")
+@router.callback_query(F.data.startswith("nc_myname:"))
 async def on_nc_myname(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Use user's first name."""
     chat_id = callback.message.chat.id
     thread_id = callback.message.message_thread_id
-    state = get_flow_state(chat_id, thread_id)
+    create_type = callback.data.split(":", 1)[1]  # thread or branch
 
-    if not state or state.get("type") != "nc_awaiting_name":
-        await callback.answer(strings.SESSION_EXPIRED)
-        return
-
-    # Get and sanitize first_name
+    # Get first_name
     first_name = callback.from_user.first_name if callback.from_user else None
     if not first_name:
-        await callback.answer("Name not available")
+        # Show fallback message
+        await telegram_queue.edit(
+            callback.message,
+            strings.NEW_CHAT_NAME_NO_NAME,
+            reply_markup=_name_fallback_keyboard(create_type),
+        )
+        await callback.answer()
         return
 
-    create_type = state.get("create_type")
     clear_flow_state(chat_id, thread_id)
 
     project = project_manager.get_by_chat(chat_id)
