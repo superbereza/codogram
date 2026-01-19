@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 from aiogram import Bot, Router, F
+from aiogram.enums import ChatType
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -454,6 +455,10 @@ async def _connect_to_session_from_callback(callback: CallbackQuery, result: Flo
 @router.message(Command("start", ignore_case=True))
 async def cmd_start(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /start command."""
+    # Skip DM - handled by dm.py
+    if message.chat.type == ChatType.PRIVATE:
+        return
+
     from .common import normalize_thread_id
     thread_id = normalize_thread_id(message.chat, message.message_thread_id)
 

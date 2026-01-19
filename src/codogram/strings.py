@@ -580,6 +580,111 @@ BTN_DIFFERENT_NAME = "Different name"
 STALE_BUTTON_SECONDS = 300
 
 
+# --- DM Onboarding ---
+
+DM_WELCOME = """Hey there
+
+I'm Codogram — your Claude Code companion on Telegram"""
+
+DM_SLIDE_1 = """📱 *Mobile*
+
+Fire off tasks from your phone, work from anywhere
+
+Claude runs on your server — all you need is Telegram"""
+
+DM_SLIDE_2 = """⏰ *Async*
+
+Start a task → do your thing → get notified when done
+
+No more staring at terminal output"""
+
+DM_SLIDE_3 = """👥 *Team*
+
+Set up once — collaborate with teammates
+
+Everyone sees what Claude does, can approve actions"""
+
+# Validation - first message (will be edited)
+DM_VALIDATION_CHECKING = f"{STATUS_PENDING} Checking environment..."
+
+# Validation - results with checkmarks
+DM_VALIDATION_OK = f"""{STATUS_OK} Environment ready
+
+*Required:*
+{{critical_checks}}
+
+*Optional:*
+{{optional_checks}}"""
+
+DM_VALIDATION_ERROR = f"""{STATUS_ERR} Issues found
+
+{{checks}}
+
+Fix and hit "Recheck\""""
+
+# Warnings shown after checks if any
+DM_VALIDATION_WARNINGS = """
+{warnings}"""
+
+# CTA - separate message after validation passes
+DM_CTA = """`[>>]` Next step
+
+1. Create a group
+2. Add bot with admin rights
+
+Or add to existing one ↓
+Bot will guide you from there
+
+/dashboard — your projects"""
+
+DM_MINI_STATUS = """Welcome back
+
+Active projects: {projects}
+Claude sessions: {sessions}
+
+/dashboard — your projects
+/intro — see intro again"""
+
+DM_BOT_ADDED = """Added to "{chat_name}"
+By: @{creator}"""
+
+DM_BOT_ADDED_WITH_LINK = """Added to "{chat_name}"
+Chat: {link}
+By: @{creator}"""
+
+# --- Dashboard ---
+
+DASH_HEADER = "Projects"
+
+DASH_PROJECT = """{num}. {chat_name}
+   📁 {directory}
+   👤 Owner: @{creator}
+   👥 {members} members
+   {status}"""
+
+DASH_STATUS_ACTIVE = "🤖 {count} Claude sessions"
+DASH_STATUS_INACTIVE = "💤 inactive"
+
+DASH_FOOTER = "Total: {total} projects, {active} active sessions"
+
+DASH_EMPTY = """Projects
+
+No projects connected yet
+
+Create a group and add me — I'll pick it up automatically"""
+
+# --- DM Buttons ---
+
+BTN_NEXT = "Next →"
+BTN_PREV = "← Back"
+BTN_HOW_TO_USE = "How to use?"
+BTN_RECHECK = "Recheck"
+BTN_REFRESH = "Refresh"
+BTN_ADD_TO_GROUP = "Add to group"
+
+# DM fallback for unknown commands
+DM_UNKNOWN_COMMAND = "`[◉_◉]` Can't wait to try? Add me to a group chat"
+
 # --- Emoji Pack ---
 
 EMOJI_PACK_CREATED = """`[v]` Gift unlocked

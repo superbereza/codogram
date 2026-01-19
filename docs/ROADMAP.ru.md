@@ -253,6 +253,18 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Кнопка close удаляет сообщение с настройками
 - См. [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
+### DM онбординг
+Интерактивный онбординг в директ чате с ботом:
+- Welcome карусель с обзором возможностей бота
+- Валидация окружения (BASE_DIR, tmux, claude, git, gh, whisper)
+- Critical проверки блокируют прогресс, optional показывают warnings
+- `/check_env` команда для повторной валидации
+- `/dashboard` показывает все проекты с количеством активных сессий
+- `/intro` для повтора онбординга
+- Push-уведомление когда бот добавлен в группу
+- Отдельное меню команд для DM
+- См. [docs/designs/done/2025-01-18-dm-onboarding.md](designs/done/2025-01-18-dm-onboarding.md)
+
 ## Beta Test
 
 ### Редизайн set up flow + robust start
@@ -307,11 +319,6 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - **Phase 3 (backlog):** LaunchService extraction, DEPRECATED поля, ThreadInfo refactoring
 - См. [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
 
-### Онбординг в боте
-Интерактивный онбординг в директ чате с ботом:
-- Welcome flow с объяснением возможностей бота
-- Пошаговое руководство для новых пользователей
-
 ### Avatar emoji pack
 Emoji pack из аватарок участников группы:
 - Создание pack при миграции группа → супергруппа (async)
@@ -321,14 +328,14 @@ Emoji pack из аватарок участников группы:
 - Ограничение: Premium нужен для установки custom emoji как иконки топика
 - См. [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
 
-## Backlog
-
 ### Ролевая модель и регистрация чата
 Минимальная система прав для многопользовательского доступа:
 - `/register_chat` — разрешить всем в чате писать боту (не только админам)
 - Настройки доступны только админам
 - Роли: admin (полный контроль) vs user (может отправлять сообщения)
 - Per-chat конфигурация
+
+## Backlog
 
 ### Объединить команды thread и branch
 Упростить, убрав отдельную команду /thread:
