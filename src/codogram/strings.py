@@ -91,7 +91,7 @@ GIT_SETUP_PROMPT = """{dir_created}
 • `git init` — local repository
 • `git init + gh repo create` — create on GitHub
 • `git clone` — clone existing
-• No git — empty folder"""
+• no git — empty folder"""
 
 GIT_INIT_OK = "Git initialized. Launching Claude..."
 GIT_INIT_ERROR = "Error git init: {error}"
@@ -252,7 +252,7 @@ BTN_CANCEL = "Cancel"
 BTN_CANCEL_X = "[x] Cancel"
 BTN_CREATE = "Create"
 BTN_DIFFERENT_PATH = "Different path"
-BTN_NO_GIT = "No git"
+BTN_NO_GIT = "no git"
 BTN_CONTINUE = "Continue"
 BTN_KEEP_DIR = "Keep directory"
 BTN_DELETE_DIR = "Delete"
@@ -589,7 +589,7 @@ BTN_RENAME_NO = "No"
 BTN_GIT_INIT = "git init"
 BTN_GIT_GH = "git init + gh repo create"
 BTN_GIT_CLONE = "git clone"
-BTN_GIT_NONE = "No git"
+BTN_GIT_NONE = "no git"
 BTN_RETRY = "Retry"
 BTN_CHANGE_URL = "Change URL"
 BTN_USE_EXISTING = "Use existing"
