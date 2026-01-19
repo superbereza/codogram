@@ -1,4 +1,5 @@
 """DM-specific handlers for onboarding and dashboard."""
+import asyncio
 from aiogram import Bot, Router, F
 from aiogram.types import Message, CallbackQuery, ChatMemberUpdated
 from aiogram.filters import Command, ChatMemberUpdatedFilter, IS_NOT_MEMBER, ADMINISTRATOR, MEMBER
@@ -10,11 +11,11 @@ from ..keyboards.dm_onboarding import (
     carousel_keyboard,
     validation_recheck_keyboard,
     dashboard_keyboard,
+    cta_keyboard,
 )
 from ..services.dm_onboarding import (
     get_slide_content,
     get_total_slides,
-    format_validation_checks,
     run_critical_checks,
     run_warning_checks,
 )
@@ -84,6 +85,9 @@ async def run_onboarding(message: Message, telegram_queue: TelegramQueue):
     # 1. Welcome message
     await telegram_queue.send(message.chat.id, strings.DM_WELCOME)
 
+    # Small delay before carousel
+    await asyncio.sleep(0.3)
+
     # 2. First slide of carousel
     slide_content = get_slide_content(0)
     keyboard = carousel_keyboard(0, get_total_slides())
@@ -142,50 +146,88 @@ async def show_validation(callback: CallbackQuery, telegram_queue: TelegramQueue
         edit_existing: If True, edit callback.message. If False, send new messages (keeps carousel).
     """
     chat_id = callback.message.chat.id
-    msg_to_edit = callback.message if edit_existing else None
+    user_id = callback.from_user.id
+    bot = callback.bot
 
-    # 1. Show "checking" message
-    if msg_to_edit:
-        await telegram_queue.edit(msg_to_edit, strings.DM_VALIDATION_CHECKING)
-    else:
-        await telegram_queue.send(chat_id, strings.DM_VALIDATION_CHECKING)
+    # Run validation
+    success = await run_validation_check(
+        chat_id=chat_id,
+        telegram_queue=telegram_queue,
+        bot=bot,
+    )
 
-    # 2. Run critical checks
+    # Mark user as onboarded if validation passed
+    if success:
+        set_user_onboarded(user_id)
+
+
+async def run_validation_check(
+    chat_id: int,
+    telegram_queue: TelegramQueue,
+    bot: Bot,
+) -> bool:
+    """Run validation checks synchronously.
+
+    Returns True if all critical checks passed.
+    """
+    # Run all critical checks
     critical_results = run_critical_checks()
     critical_errors = [r for r in critical_results if not r.ok]
 
-    # 3. Format all checks with [v] or [x]
-    checks_text = format_validation_checks(critical_results)
+    # Build result text
+    lines = []
 
     if critical_errors:
-        # Show errors with recheck button
-        text = strings.DM_VALIDATION_ERROR.format(checks=checks_text)
-        keyboard = validation_recheck_keyboard()
-        if msg_to_edit:
-            await telegram_queue.edit(msg_to_edit, text, reply_markup=keyboard)
-        else:
-            await telegram_queue.send(chat_id, text, reply_markup=keyboard)
-        return
-
-    # 4. Run warning checks and add to checks display
-    warning_results = run_warning_checks()
-    all_checks_text = checks_text + "\n" + format_validation_checks(warning_results)
-
-    # 5. Show success with all checks (critical + warnings)
-    full_text = strings.DM_VALIDATION_OK.format(checks=all_checks_text)
-
-    if msg_to_edit:
-        await telegram_queue.edit(msg_to_edit, full_text)
+        lines.append("`[x]` Issues found")
     else:
-        await telegram_queue.send(chat_id, full_text)
+        lines.append("`[v]` Environment ready")
 
-    # 6. Send SEPARATE CTA message
-    bot_info = await callback.bot.get_me()
-    cta_text = strings.DM_CTA.format(bot_username=bot_info.username)
-    await telegram_queue.send(chat_id, cta_text)
+    lines.append("")
+    lines.append("Critical:")
 
-    # Mark user as onboarded
-    set_user_onboarded(callback.from_user.id)
+    for r in critical_results:
+        icon = "`[v]`" if r.ok else "`[x]`"
+        lines.append(f"{icon} {r.name}")
+
+    # If critical errors, show error with hints and recheck button
+    if critical_errors:
+        lines.append("")
+        for r in critical_errors:
+            lines.append(f"`[x]` {r.message}")
+            if r.fix_hint:
+                lines.append(f"`{r.fix_hint}`")
+
+        lines.append("")
+        lines.append("Fix issues and recheck.")
+
+        text = "\n".join(lines)
+        keyboard = validation_recheck_keyboard()
+        await telegram_queue.send(chat_id, text, reply_markup=keyboard)
+        return False
+
+    # Run optional checks
+    optional_results = run_warning_checks()
+
+    lines.append("")
+    lines.append("Optional:")
+
+    for r in optional_results:
+        icon = "`[v]`" if r.ok else "`[-]`"
+        lines.append(f"{icon} {r.name}")
+
+    text = "\n".join(lines)
+    await telegram_queue.send(chat_id, text)
+
+    # Delay before CTA
+    await asyncio.sleep(0.8)
+
+    # Send CTA as separate message with button
+    bot_info = await bot.get_me()
+    cta_text = strings.DM_CTA
+    keyboard = cta_keyboard(bot_info.username)
+    await telegram_queue.send(chat_id, cta_text, reply_markup=keyboard)
+
+    return True
 
 
 @router.callback_query(F.data == "onb:recheck")
@@ -195,7 +237,26 @@ async def on_recheck(callback: CallbackQuery, telegram_queue: TelegramQueue):
         await callback.answer()
         return
 
-    await show_validation(callback, telegram_queue, edit_existing=True)
+    chat_id = callback.message.chat.id
+    user_id = callback.from_user.id
+    bot = callback.bot
+
+    # Delete the error message with the button
+    try:
+        await bot.delete_message(chat_id, callback.message.message_id)
+    except Exception:
+        pass
+
+    # Run validation
+    success = await run_validation_check(
+        chat_id=chat_id,
+        telegram_queue=telegram_queue,
+        bot=bot,
+    )
+
+    if success:
+        set_user_onboarded(user_id)
+
     await callback.answer()
 
 
@@ -210,10 +271,25 @@ async def cmd_intro(message: Message, telegram_queue: TelegramQueue):
     await run_onboarding(message, telegram_queue)
 
 
-# ===== /dash =====
+# ===== /check_env =====
 
-@router.message(Command("dash"), F.chat.type == ChatType.PRIVATE)
-async def cmd_dash(message: Message, telegram_queue: TelegramQueue, bot: Bot):
+@router.message(Command("check_env"), F.chat.type == ChatType.PRIVATE)
+async def cmd_check_env(message: Message, telegram_queue: TelegramQueue, bot: Bot):
+    """Run environment validation check."""
+    if not is_admin(message):
+        return
+
+    await run_validation_check(
+        chat_id=message.chat.id,
+        telegram_queue=telegram_queue,
+        bot=bot,
+    )
+
+
+# ===== /dashboard =====
+
+@router.message(Command("dashboard"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dashboard(message: Message, telegram_queue: TelegramQueue, bot: Bot):
     """Show dashboard with all projects."""
     if not is_admin(message):
         return
@@ -232,6 +308,8 @@ async def show_dashboard(chat_id: int, telegram_queue: TelegramQueue, bot: Bot):
         try:
             chat = await bot.get_chat(project.chat_id)
             member_count = await bot.get_chat_member_count(project.chat_id)
+            # Subtract 1 to exclude the bot itself
+            member_count = max(0, member_count - 1)
 
             # Count active tmux sessions for this project
             active = 0
@@ -276,6 +354,17 @@ async def on_dash_refresh(callback: CallbackQuery, telegram_queue: TelegramQueue
 
     await show_dashboard(callback.message.chat.id, telegram_queue, bot)
     await callback.answer("Refreshed")
+
+
+@router.callback_query(F.data == "dash:close")
+async def on_dash_close(callback: CallbackQuery):
+    """Handle dashboard close - delete message."""
+    if callback.message:
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+    await callback.answer()
 
 
 # ===== Bot added to chat =====

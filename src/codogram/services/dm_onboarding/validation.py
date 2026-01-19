@@ -66,8 +66,8 @@ def run_critical_checks() -> list[ValidationResult]:
     return [
         check_base_dir_configured(),
         check_base_dir_exists(),
-        check_binary_available("claude"),
         check_binary_available("tmux"),
+        check_binary_available("claude"),
     ]
 
 
@@ -109,25 +109,37 @@ def check_gh_auth() -> ValidationResult:
         if result.returncode != 0:
             return ValidationResult(
                 ok=False,
-                name="gh auth",
+                name="gh auth configured",
                 message="GitHub CLI not authenticated",
                 fix_hint="gh auth login"
             )
     except FileNotFoundError:
         return ValidationResult(
             ok=False,
-            name="gh auth",
+            name="gh auth configured",
             message="gh CLI not installed",
             fix_hint="https://cli.github.com/"
         )
     except Exception:
         return ValidationResult(
             ok=False,
-            name="gh auth",
+            name="gh auth configured",
             message="Could not check gh auth",
             fix_hint=""
         )
-    return ValidationResult(ok=True, name="gh auth", message="")
+    return ValidationResult(ok=True, name="gh auth configured", message="")
+
+
+def check_whisper_api_key() -> ValidationResult:
+    """Check if OpenAI API key is configured (used for Whisper)."""
+    if not settings.openai_api_key or settings.openai_api_key.strip() == "":
+        return ValidationResult(
+            ok=False,
+            name="voice transcription",
+            message="OpenAI API key not configured (for voice transcription)",
+            fix_hint="Add OPENAI_API_KEY to .env"
+        )
+    return ValidationResult(ok=True, name="voice transcription", message="")
 
 
 def run_warning_checks() -> list[ValidationResult]:
@@ -135,4 +147,5 @@ def run_warning_checks() -> list[ValidationResult]:
     return [
         check_git_configured(),
         check_gh_auth(),
+        check_whisper_api_key(),
     ]

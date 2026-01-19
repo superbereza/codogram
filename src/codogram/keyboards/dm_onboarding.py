@@ -53,10 +53,26 @@ def validation_recheck_keyboard() -> InlineKeyboardMarkup:
 
 
 def dashboard_keyboard() -> InlineKeyboardMarkup:
-    """Build dashboard keyboard with refresh button."""
+    """Build dashboard keyboard with refresh and close buttons."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=strings.BTN_REFRESH,
+                callback_data="dash:refresh"
+            ),
+            InlineKeyboardButton(
+                text=strings.BTN_CLOSE,
+                callback_data="dash:close"
+            ),
+        ]
+    ])
+
+
+def cta_keyboard(bot_username: str) -> InlineKeyboardMarkup:
+    """Build CTA keyboard with 'Add to group' button."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text=strings.BTN_REFRESH,
-            callback_data="dash:refresh"
+            text=strings.BTN_ADD_TO_GROUP,
+            url=f"https://t.me/{bot_username}?startgroup=true"
         )]
     ])

@@ -11,6 +11,8 @@ from .onboarding import (
     get_slide_content,
     get_total_slides,
     format_validation_checks,
+    format_optional_checks,
+    format_validation_errors,
     format_validation_warnings,
 )
 
@@ -24,5 +26,7 @@ __all__ = [
     "get_slide_content",
     "get_total_slides",
     "format_validation_checks",
+    "format_optional_checks",
+    "format_validation_errors",
     "format_validation_warnings",
 ]

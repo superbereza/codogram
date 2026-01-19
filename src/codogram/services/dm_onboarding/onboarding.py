@@ -28,23 +28,60 @@ def get_total_slides() -> int:
     return len(SLIDES)
 
 
-def format_validation_checks(results: list) -> str:
-    """Format all validation checks with status indicators.
+def format_validation_checks(results: list, indent: str = "  ") -> str:
+    """Format validation checks with icons, one per line.
 
     Args:
-        results: List of ValidationResult (both ok and not ok)
+        results: List of ValidationResult
+        indent: Prefix for each line (default: 2 spaces)
 
     Returns:
-        Formatted string with [v] or [x] for each check
+        Formatted string with each check on its own line
     """
     lines = []
     for r in results:
         if r.ok:
-            lines.append(f"`[v]` {r.name}")
+            lines.append(f"{indent}✓ {r.name}")
         else:
-            lines.append(f"`[x]` {r.message}")
+            lines.append(f"{indent}✗ {r.name}")
+    return "\n".join(lines)
+
+
+def format_optional_checks(results: list, indent: str = "  ") -> str:
+    """Format optional checks with icons, using ○ for not configured.
+
+    Args:
+        results: List of ValidationResult
+        indent: Prefix for each line (default: 2 spaces)
+
+    Returns:
+        Formatted string with each check on its own line
+    """
+    lines = []
+    for r in results:
+        if r.ok:
+            lines.append(f"{indent}✓ {r.name}")
+        else:
+            # Use ○ for optional items that aren't configured
+            lines.append(f"{indent}○ {r.name}")
+    return "\n".join(lines)
+
+
+def format_validation_errors(results: list) -> str:
+    """Format failed checks with fix hints.
+
+    Args:
+        results: List of ValidationResult (only failed ones)
+
+    Returns:
+        Formatted string with errors and hints
+    """
+    lines = []
+    for r in results:
+        if not r.ok:
+            lines.append(f"✗ {r.message}")
             if r.fix_hint:
-                lines.append(f"    `{r.fix_hint}`")
+                lines.append(f"  `{r.fix_hint}`")
     return "\n".join(lines)
 
 

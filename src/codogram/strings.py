@@ -602,7 +602,11 @@ DM_VALIDATION_CHECKING = f"{STATUS_PENDING} Checking environment..."
 # Validation - results with checkmarks
 DM_VALIDATION_OK = f"""{STATUS_OK} Environment ready
 
-{{checks}}"""
+*Required:*
+{{critical_checks}}
+
+*Optional:*
+{{optional_checks}}"""
 
 DM_VALIDATION_ERROR = f"""{STATUS_ERR} Issues found
 
@@ -615,18 +619,22 @@ DM_VALIDATION_WARNINGS = """
 {warnings}"""
 
 # CTA - separate message after validation passes
-DM_CTA = """Next steps:
-→ [Add me to a group](https://t.me/{bot_username}?startgroup=true)
-→ I'll handle the rest
+DM_CTA = """`[>>]` Next step
 
-/dash — view all projects"""
+1. Create a group
+2. Add bot with admin rights
+
+Or add to existing one ↓
+Bot will guide you from there
+
+/dashboard — your projects"""
 
 DM_MINI_STATUS = """Welcome back
 
 Active projects: {projects}
 Claude sessions: {sessions}
 
-/dash — full project list
+/dashboard — your projects
 /intro — see intro again"""
 
 DM_BOT_ADDED = """Added to "{chat_name}"
@@ -664,6 +672,7 @@ BTN_PREV = "← Back"
 BTN_HOW_TO_USE = "How to use?"
 BTN_RECHECK = "Recheck"
 BTN_REFRESH = "Refresh"
+BTN_ADD_TO_GROUP = "Add to group"
 
 # DM fallback for unknown commands
 DM_UNKNOWN_COMMAND = "`[◉_◉]` Can't wait to try? Add me to a group chat"
