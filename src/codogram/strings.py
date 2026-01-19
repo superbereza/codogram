@@ -780,6 +780,8 @@ If bot isn't responding, try /reset\\_chat — it's safe for context\\.
 
 To wipe project and start fresh: /hard\\_reset\\. 🚨 Dangerous zone\\!
 
+Looking to turn on/off extra features — /settings
+
 ─────────────────
 
 Chats
