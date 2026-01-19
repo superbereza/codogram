@@ -67,11 +67,11 @@ def _context_keyboard(has_git: bool) -> InlineKeyboardMarkup:
         return None
 
 
-def _name_keyboard() -> InlineKeyboardMarkup:
+def _name_keyboard(create_type: str) -> InlineKeyboardMarkup:
     """Build keyboard for name prompt."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=strings.BTN_MAGIC_NAME, callback_data="nc_magic")],
-        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data="nc_cancel")],
+        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=f"nc_back:{create_type}")],
     ])
 
 
@@ -126,7 +126,7 @@ async def cmd_new_chat(message: Message, telegram_queue: TelegramQueue):
         prompt_ids = await telegram_queue.reply(
             message,
             strings.NEW_CHAT_NAME_PROMPT,
-            reply_markup=_name_keyboard(),
+            reply_markup=_name_keyboard("thread"),
         )
         set_flow_state(chat_id, thread_id, {
             "type": "nc_awaiting_name",
@@ -168,7 +168,7 @@ async def on_nc_here(callback: CallbackQuery, telegram_queue: TelegramQueue):
     await telegram_queue.edit(
         callback.message,
         strings.NEW_CHAT_NAME_PROMPT,
-        reply_markup=_name_keyboard(),
+        reply_markup=_name_keyboard("thread"),
     )
     await callback.answer()
 
@@ -190,7 +190,7 @@ async def on_nc_isolated(callback: CallbackQuery, telegram_queue: TelegramQueue)
     await telegram_queue.edit(
         callback.message,
         strings.NEW_CHAT_NAME_PROMPT,
-        reply_markup=_name_keyboard(),
+        reply_markup=_name_keyboard("branch"),
     )
     await callback.answer()
 
@@ -206,6 +206,56 @@ async def on_nc_cancel(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Cancel new chat creation."""
     clear_flow_state(callback.message.chat.id, callback.message.message_thread_id)
     await callback.message.delete()
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("nc_back:"))
+async def on_nc_back(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Go back from name prompt to context selection."""
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+    clear_flow_state(chat_id, thread_id)
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await callback.answer(strings.PROJECT_NOT_FOUND)
+        return
+
+    # Check if git repo - if not, just cancel (no context to go back to)
+    if not is_git_repo(Path(project.cwd)):
+        await callback.message.delete()
+        await callback.answer()
+        return
+
+    # Determine current context
+    current_thread = project.threads.get(thread_id)
+    directory = project.cwd
+    branch = get_default_branch(Path(project.cwd))
+
+    if current_thread and current_thread.worktree_path:
+        state = get_worktree_state(current_thread, Path(project.cwd))
+        if state == WorktreeState.OK:
+            directory = current_thread.worktree_path
+            branch = current_thread.name
+
+    # Show context + choice
+    display_dir = _relative_to_base(directory)
+    if branch == get_default_branch(Path(project.cwd)):
+        context_text = strings.NEW_CHAT_CONTEXT_MAIN.format(directory=display_dir, branch=branch)
+    else:
+        context_text = strings.NEW_CHAT_CONTEXT.format(directory=display_dir, branch=branch)
+
+    set_flow_state(chat_id, thread_id, {
+        "type": "nc_context",
+        "directory": directory,
+        "branch": branch,
+    })
+
+    await telegram_queue.edit(
+        callback.message,
+        f"{context_text}\n\n{strings.NEW_CHAT_CHOOSE}",
+        reply_markup=_context_keyboard(True),
+    )
     await callback.answer()
 
 

@@ -763,7 +763,7 @@ NEW_CHAT_ERROR = f"{STATUS_ERR} Error creating chat"
 NEW_CHAT_NO_TOPIC_RIGHTS = f"{STATUS_ERR} Bot needs *Manage Topics* admin right to create chats"
 
 BTN_CREATE_HERE = "Create here"
-BTN_CREATE_ISOLATED = "Create isolated"
+BTN_CREATE_ISOLATED = "🪴 Create isolated"
 
 # Uncommitted changes (reuse existing or add)
 NC_UNCOMMITTED = f"{STATUS_WARN} Uncommitted changes detected"
