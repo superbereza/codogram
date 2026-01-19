@@ -71,7 +71,7 @@ async def on_exists_use(callback: CallbackQuery, state: FSMContext):
     # Use existing folder - proceed to rename check or launch
     data = await state.get_data()
     project_name = data["project_name"]
-    chat_title = callback.message.chat.title or ""
+    chat_title = data.get("chat_title", "")
 
     if chat_title != project_name:
         await state.set_state(SetupFlow.awaiting_rename_confirm)
@@ -187,7 +187,7 @@ async def _do_clone(message: Message, state: FSMContext):
         return
 
     # Clone successful - check if rename needed
-    chat_title = message.chat.title or ""
+    chat_title = data.get("chat_title", "")
 
     if chat_title != project_name:
         await state.set_state(SetupFlow.awaiting_rename_confirm)

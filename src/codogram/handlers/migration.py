@@ -2,10 +2,10 @@
 import asyncio
 
 from aiogram import Bot, Router, F
-from aiogram.types import ChatMemberUpdated, Message
+from aiogram.types import CallbackQuery, ChatMemberUpdated, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from ..session_manager import project_manager
-from ..telegram_queue import TelegramQueue, OutgoingBatch
+from ..telegram_queue import TelegramQueue, OutgoingBatch, DeleteBatch
 from ..services.menu import register_menu_for_chat
 from ..services.setup import check_bot_admin_rights
 from ..adapters.sticker import StickerAdapter
@@ -14,6 +14,23 @@ from ..logging_config import logger
 from .. import strings
 
 router = Router(name="migration")
+
+
+def _migration_check_keyboard() -> InlineKeyboardMarkup:
+    """Create keyboard with Check rights button for migration."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=strings.BTN_CHECK_RIGHTS, callback_data="migration:check_admin")],
+    ])
+
+
+def _rename_confirm_keyboard() -> InlineKeyboardMarkup:
+    """Create keyboard for rename confirmation after migration."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Yes", callback_data="migration:rename_yes"),
+            InlineKeyboardButton(text="Skip", callback_data="migration:rename_skip"),
+        ],
+    ])
 
 
 async def _create_emoji_pack_background(bot: Bot, chat_id: int, telegram_queue: TelegramQueue) -> None:
@@ -43,12 +60,27 @@ async def _create_emoji_pack_background(bot: Bot, chat_id: int, telegram_queue: 
             batch = OutgoingBatch(
                 chat_id=chat_id,
                 thread_id=None,
-                messages=[{"text": strings.EMOJI_PACK_CREATED.format(pack_link=pack_link)}],
+                messages=[{"text": strings.EMOJI_PACK_CREATED.format(pack_link=pack_link), "parse_mode": "MarkdownV2"}],
             )
             await telegram_queue.enqueue(batch)
             logger.info(f"Emoji pack created on migration: {pack_name}")
     except Exception as e:
         logger.exception(f"Failed to create emoji pack on migration: {e}")
+
+
+async def _send_migration_success(bot: Bot, chat_id: int, telegram_queue: TelegramQueue) -> None:
+    """Send migration success message and create emoji pack."""
+    batch = OutgoingBatch(
+        chat_id=chat_id,
+        thread_id=None,
+        messages=[{"text": strings.MIGRATION_SUCCESS, "parse_mode": "MarkdownV2"}],
+    )
+    await telegram_queue.enqueue(batch)
+
+    # Create emoji pack asynchronously
+    asyncio.create_task(
+        _create_emoji_pack_background(bot, chat_id, telegram_queue)
+    )
 
 
 @router.message(F.migrate_to_chat_id)
@@ -87,7 +119,9 @@ async def on_chat_migration(message: Message, telegram_queue: TelegramQueue) -> 
         batch = OutgoingBatch(
             chat_id=new_chat_id,
             thread_id=None,
-            messages=[{"text": strings.MIGRATION_ADMIN_REQUIRED}],
+            messages=[{"text": strings.MIGRATION_ADMIN_REQUIRED, "parse_mode": "MarkdownV2"}],
+            reply_markup=_migration_check_keyboard(),
+            replace_key=f"migration_admin:{new_chat_id}",
         )
         await telegram_queue.enqueue(batch)
         return
@@ -98,7 +132,7 @@ async def on_chat_migration(message: Message, telegram_queue: TelegramQueue) -> 
     batch = OutgoingBatch(
         chat_id=new_chat_id,
         thread_id=None,
-        messages=[{"text": strings.MIGRATION_SUCCESS}],
+        messages=[{"text": strings.MIGRATION_SUCCESS, "parse_mode": "MarkdownV2"}],
     )
     await telegram_queue.enqueue(batch)
 
@@ -143,15 +177,118 @@ async def on_admin_rights_granted(event: ChatMemberUpdated, telegram_queue: Tele
     # Register extended menu
     await register_menu_for_chat(event.bot, chat.id, is_forum=True)
 
-    # Send success notification
-    batch = OutgoingBatch(
+    # Delete the "admin required" message
+    delete_batch = DeleteBatch(
         chat_id=chat.id,
-        thread_id=None,
-        messages=[{"text": strings.ADMIN_RIGHTS_GRANTED}],
+        message_id=0,
+        replace_key=f"migration_admin:{chat.id}",
     )
-    await telegram_queue.enqueue(batch)
+    await telegram_queue.enqueue(delete_batch)
 
-    # Create emoji pack asynchronously (now that we have rights)
-    asyncio.create_task(
-        _create_emoji_pack_background(event.bot, chat.id, telegram_queue)
-    )
+    # Check if rename needed (chat title differs from project name)
+    chat_title = chat.title or ""
+    if chat_title != project.project_name:
+        # Ask for confirmation
+        batch = OutgoingBatch(
+            chat_id=chat.id,
+            thread_id=None,
+            messages=[{"text": strings.SETUP_RENAME_PROMPT.format(name=project.project_name), "parse_mode": "MarkdownV2"}],
+            reply_markup=_rename_confirm_keyboard(),
+        )
+        await telegram_queue.enqueue(batch)
+        return
+
+    # No rename needed - send success and create emoji pack
+    await _send_migration_success(event.bot, chat.id, telegram_queue)
+
+
+@router.callback_query(F.data == "migration:check_admin")
+async def on_check_admin_rights(callback: CallbackQuery, telegram_queue: TelegramQueue) -> None:
+    """Handle Check rights button press after migration."""
+    chat = callback.message.chat
+    project = project_manager.get_by_chat(chat.id)
+
+    if not project:
+        await callback.answer("No project found")
+        return
+
+    if not project.awaiting_admin_rights:
+        await callback.answer("Already configured")
+        return
+
+    # Check if rights were granted
+    has_rights = await check_bot_admin_rights(callback.bot, chat.id)
+
+    if not has_rights:
+        await callback.answer(strings.SETUP_ADMIN_CHECK_FAILED, show_alert=True)
+        return
+
+    await callback.answer()
+
+    # Clear the flag
+    project.awaiting_admin_rights = False
+    project_manager._save()
+    logger.info(f"Admin rights granted via check button: {project.project_name}")
+
+    # Register extended menu
+    await register_menu_for_chat(callback.bot, chat.id, is_forum=True)
+
+    # Delete the admin required message
+    await callback.message.delete()
+
+    # Check if rename needed (chat title differs from project name)
+    chat_title = chat.title or ""
+    if chat_title != project.project_name:
+        # Ask for confirmation
+        batch = OutgoingBatch(
+            chat_id=chat.id,
+            thread_id=None,
+            messages=[{"text": strings.SETUP_RENAME_PROMPT.format(name=project.project_name), "parse_mode": "MarkdownV2"}],
+            reply_markup=_rename_confirm_keyboard(),
+        )
+        await telegram_queue.enqueue(batch)
+        return
+
+    # No rename needed - send success and create emoji pack
+    await _send_migration_success(callback.bot, chat.id, telegram_queue)
+
+
+@router.callback_query(F.data == "migration:rename_yes")
+async def on_rename_yes(callback: CallbackQuery, telegram_queue: TelegramQueue) -> None:
+    """Handle rename confirmation after migration."""
+    chat = callback.message.chat
+    project = project_manager.get_by_chat(chat.id)
+
+    if not project:
+        await callback.answer("No project found")
+        return
+
+    await callback.answer()
+
+    # Try to rename
+    try:
+        await callback.bot.set_chat_title(chat.id, project.project_name)
+        logger.info(f"Chat renamed after migration: {chat.title} -> {project.project_name}")
+        await callback.message.delete()
+    except Exception as e:
+        logger.warning(f"Failed to rename chat after migration: {e}")
+        await callback.message.edit_text(
+            strings.SETUP_RENAME_FAILED,
+            reply_markup=None,
+            parse_mode="MarkdownV2",
+        )
+
+    # Send success and create emoji pack
+    await _send_migration_success(callback.bot, chat.id, telegram_queue)
+
+
+@router.callback_query(F.data == "migration:rename_skip")
+async def on_rename_skip(callback: CallbackQuery, telegram_queue: TelegramQueue) -> None:
+    """Handle rename skip after migration."""
+    chat = callback.message.chat
+
+    await callback.answer()
+    await callback.message.delete()
+
+    # Send success and create emoji pack
+    await _send_migration_success(callback.bot, chat.id, telegram_queue)

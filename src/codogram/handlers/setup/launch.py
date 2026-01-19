@@ -46,6 +46,13 @@ async def do_launch(message: Message, state: FSMContext):
     await state.set_state(SetupFlow.launching)
 
     data = await state.get_data()
+
+    # Delete previous bot message (git choice, etc.)
+    if prev_msg_id := data.get("bot_message_id"):
+        try:
+            await message.bot.delete_message(message.chat.id, prev_msg_id)
+        except Exception:
+            pass  # Message might already be deleted
     project_name = data["project_name"]
     target_dir = Path(data["target_dir"])
 

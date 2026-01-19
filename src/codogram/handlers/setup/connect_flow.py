@@ -99,7 +99,8 @@ async def on_folder_selected(callback: CallbackQuery, state: FSMContext):
     )
 
     # Check if rename needed
-    chat_title = callback.message.chat.title or ""
+    data = await state.get_data()
+    chat_title = data.get("chat_title", "")
 
     if chat_title != folder_name:
         await state.set_state(SetupFlow.awaiting_rename_confirm)

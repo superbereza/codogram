@@ -23,7 +23,8 @@ router = Router(name="setup_new_project")
 
 async def show_project_name_prompt(message: Message, state: FSMContext):
     """Show project name prompt with suggested name."""
-    chat_title = message.chat.title or ""
+    data = await state.get_data()
+    chat_title = data.get("chat_title", "")
     suggested = sanitize_project_name(chat_title)
 
     if suggested:
@@ -38,6 +39,8 @@ async def show_project_name_prompt(message: Message, state: FSMContext):
         kb = go_back_keyboard("name:back")
 
     await message.edit_text(text, reply_markup=kb)
+    # Track bot message for cleanup when user types custom name
+    await state.update_data(bot_message_id=message.message_id)
 
 
 @router.callback_query(
@@ -71,9 +74,9 @@ async def on_project_name_input(message: Message, state: FSMContext):
     """Handle custom project name input."""
     name = message.text.strip()
 
-    # Validate name
+    # Sanitize name (convert spaces, remove invalid chars)
     sanitized = sanitize_project_name(name)
-    if not sanitized or sanitized != name:
+    if not sanitized:
         await message.answer(
             strings.SETUP_PROJECT_NAME_INVALID,
             reply_markup=go_back_keyboard("name:back"),
@@ -81,7 +84,7 @@ async def on_project_name_input(message: Message, state: FSMContext):
         )
         return
 
-    await _process_project_name(message, state, name, is_suggested=False)
+    await _process_project_name(message, state, sanitized, is_suggested=False)
 
 
 async def _process_project_name(
@@ -99,30 +102,45 @@ async def _process_project_name(
         target_dir=str(target_dir),
     )
 
+    # Helper to send/edit message based on context
+    async def reply(text: str, reply_markup=None, parse_mode="MarkdownV2"):
+        if is_suggested:
+            await message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+        else:
+            # Delete previous bot message before sending new one
+            data = await state.get_data()
+            if prev_msg_id := data.get("bot_message_id"):
+                try:
+                    await message.bot.delete_message(message.chat.id, prev_msg_id)
+                except Exception:
+                    pass  # Message might already be deleted
+
+            sent = await message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
+            await state.update_data(bot_message_id=sent.message_id)
+
     # Check if folder exists
     if target_dir.exists():
-        await message.edit_text(
+        await reply(
             strings.SETUP_PROJECT_EXISTS.format(name=name),
             reply_markup=folder_exists_keyboard("new"),
-            parse_mode="MarkdownV2",
         )
         return
 
-    # Custom name → ask for rename
-    if not is_suggested:
-        chat_title = message.chat.title or ""
-        if chat_title != name:
-            await state.set_state(SetupFlow.awaiting_rename_confirm)
-            await state.update_data(rename_to=name)
-            await message.edit_text(
-                strings.SETUP_RENAME_PROMPT.format(name=name),
-                reply_markup=rename_confirm_keyboard(),
-            )
-            return
+    # Ask for rename if chat title differs from project name
+    data = await state.get_data()
+    chat_title = data.get("chat_title", "")
+    if chat_title != name:
+        await state.set_state(SetupFlow.awaiting_rename_confirm)
+        await state.update_data(rename_to=name)
+        await reply(
+            strings.SETUP_RENAME_PROMPT.format(name=name),
+            reply_markup=rename_confirm_keyboard(),
+        )
+        return
 
     # Proceed to git choice
     await state.set_state(SetupFlow.awaiting_git_choice)
-    await message.edit_text(
+    await reply(
         strings.SETUP_GIT_CHOICE.format(folder=name),
         reply_markup=git_choice_keyboard(),
     )
@@ -150,6 +168,7 @@ async def on_use_existing(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             strings.SETUP_GIT_CHOICE.format(folder=data["project_name"]),
             reply_markup=git_choice_keyboard(),
+            parse_mode="MarkdownV2",
         )
 
 
@@ -332,7 +351,7 @@ async def on_git_back(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     setup_type = data.get("setup_type")
     project_name = data.get("project_name")
-    chat_title = callback.message.chat.title or ""
+    chat_title = data.get("chat_title", "")
 
     # Check if rename step was/should be shown
     # (chat title differs from project name)
