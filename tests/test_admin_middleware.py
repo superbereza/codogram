@@ -29,11 +29,15 @@ class TestAdminMiddleware:
 
     @pytest.mark.asyncio
     async def test_admin_allowed(self):
-        """Admin users can access handlers."""
+        """Admin users can access handlers in private chat."""
         middleware = AdminMiddleware()
         handler = AsyncMock(return_value="result")
         event = Mock()
-        data = {"event_from_user": Mock(id=123, is_bot=False)}
+        chat = Mock(type="private", id=123)
+        data = {
+            "event_from_user": Mock(id=123, is_bot=False),
+            "event_chat": chat,
+        }
 
         with patch("codogram.middleware.admin.get_admin_ids", return_value={123}):
             result = await middleware(handler, event, data)
@@ -52,8 +56,10 @@ class TestAdminMiddleware:
         event = Mock(spec=Message)
         telegram_queue = AsyncMock()
         telegram_queue.reply = AsyncMock()
+        chat = Mock(type="private", id=999)
         data = {
             "event_from_user": Mock(id=999, is_bot=False),
+            "event_chat": chat,
             "telegram_queue": telegram_queue,
         }
 
@@ -71,11 +77,17 @@ class TestAdminMiddleware:
     @pytest.mark.asyncio
     async def test_non_admin_callback_gets_alert(self):
         """Non-admin CallbackQuery gets show_alert popup with ID."""
+        from aiogram.types import CallbackQuery
+
         middleware = AdminMiddleware()
         handler = AsyncMock()
-        event = Mock(spec=['answer'])  # CallbackQuery-like
+        event = Mock(spec=CallbackQuery)
         event.answer = AsyncMock()
-        data = {"event_from_user": Mock(id=999, is_bot=False)}
+        chat = Mock(type="private", id=999)
+        data = {
+            "event_from_user": Mock(id=999, is_bot=False),
+            "event_chat": chat,
+        }
 
         with patch("codogram.middleware.admin.get_admin_ids", return_value={123}):
             result = await middleware(handler, event, data)
@@ -122,3 +134,228 @@ class TestAdminMiddleware:
 
         handler.assert_not_called()
         assert result is None
+
+
+class TestAdminMiddlewareGroups:
+    """Tests for group authorization in AdminMiddleware."""
+
+    @pytest.mark.asyncio
+    async def test_group_allowed_passes(self):
+        """Allowed group members can access handlers."""
+        from codogram.middleware.admin import AdminMiddleware
+        from codogram.services.group_auth import GroupAuthService
+        from aiogram.types import Message
+
+        group_auth = Mock(spec=GroupAuthService)
+        group_auth.is_allowed = Mock(return_value=True)
+        group_auth.needs_revalidation = Mock(return_value=False)
+
+        middleware = AdminMiddleware(group_auth)
+        handler = AsyncMock(return_value="result")
+        event = Mock(spec=Message)
+        event.text = "hello"
+        chat = Mock(type="supergroup", id=123)
+        data = {
+            "event_from_user": Mock(id=999, is_bot=False),
+            "event_chat": chat,
+        }
+
+        with patch("codogram.middleware.admin.is_admin", return_value=False):
+            result = await middleware(handler, event, data)
+
+        handler.assert_called_once()
+        assert result == "result"
+
+    @pytest.mark.asyncio
+    async def test_group_not_allowed_registers(self):
+        """Unknown group triggers check_and_register."""
+        from codogram.middleware.admin import AdminMiddleware
+        from codogram.services.group_auth import GroupAuthService
+        from aiogram.types import Message
+
+        group_auth = Mock(spec=GroupAuthService)
+        group_auth.is_allowed = Mock(return_value=False)
+        group_auth.needs_revalidation = Mock(return_value=False)
+        group_auth.check_and_register = AsyncMock(return_value=True)
+
+        middleware = AdminMiddleware(group_auth)
+        handler = AsyncMock(return_value="result")
+        event = Mock(spec=Message)
+        event.text = "hello"
+        chat = Mock(type="supergroup", id=123)
+        bot = Mock()
+        data = {
+            "event_from_user": Mock(id=999, is_bot=False),
+            "event_chat": chat,
+            "bot": bot,
+        }
+
+        with patch("codogram.middleware.admin.is_admin", return_value=False):
+            result = await middleware(handler, event, data)
+
+        group_auth.check_and_register.assert_called_once_with(bot, 123)
+        handler.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_group_rejected_sends_message(self):
+        """Unauthorized group gets rejection message."""
+        from codogram.middleware.admin import AdminMiddleware
+        from codogram.services.group_auth import GroupAuthService
+        from aiogram.types import Message
+
+        group_auth = Mock(spec=GroupAuthService)
+        group_auth.is_allowed = Mock(return_value=False)
+        group_auth.needs_revalidation = Mock(return_value=False)
+        group_auth.check_and_register = AsyncMock(return_value=False)
+
+        middleware = AdminMiddleware(group_auth)
+        handler = AsyncMock()
+        event = Mock(spec=Message)
+        event.text = "hello"
+        chat = Mock(type="supergroup", id=123)
+        telegram_queue = AsyncMock()
+        data = {
+            "event_from_user": Mock(id=999, is_bot=False),
+            "event_chat": chat,
+            "bot": Mock(),
+            "telegram_queue": telegram_queue,
+        }
+
+        with patch("codogram.middleware.admin.is_admin", return_value=False):
+            result = await middleware(handler, event, data)
+
+        handler.assert_not_called()
+        telegram_queue.reply.assert_called_once()
+        assert "not active" in telegram_queue.reply.call_args[0][1].lower()
+
+    @pytest.mark.asyncio
+    async def test_group_media_ignored(self):
+        """Non-text messages in groups are ignored."""
+        from codogram.middleware.admin import AdminMiddleware
+        from codogram.services.group_auth import GroupAuthService
+        from aiogram.types import Message
+
+        group_auth = Mock(spec=GroupAuthService)
+        middleware = AdminMiddleware(group_auth)
+        handler = AsyncMock()
+        event = Mock(spec=Message)
+        event.text = None  # Media message
+        chat = Mock(type="supergroup", id=123)
+        data = {
+            "event_from_user": Mock(id=999, is_bot=False),
+            "event_chat": chat,
+        }
+
+        result = await middleware(handler, event, data)
+
+        handler.assert_not_called()
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_group_revalidation_triggered(self):
+        """Re-validation is triggered after restart."""
+        from codogram.middleware.admin import AdminMiddleware
+        from codogram.services.group_auth import GroupAuthService
+        from aiogram.types import Message
+
+        group_auth = Mock(spec=GroupAuthService)
+        group_auth.needs_revalidation = Mock(return_value=True)
+        group_auth.revalidate = AsyncMock(return_value=True)
+
+        middleware = AdminMiddleware(group_auth)
+        handler = AsyncMock(return_value="result")
+        event = Mock(spec=Message)
+        event.text = "hello"
+        chat = Mock(type="supergroup", id=123)
+        data = {
+            "event_from_user": Mock(id=999, is_bot=False),
+            "event_chat": chat,
+            "bot": Mock(),
+        }
+
+        with patch("codogram.middleware.admin.is_admin", return_value=False):
+            result = await middleware(handler, event, data)
+
+        group_auth.revalidate.assert_called_once()
+        handler.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_chat_none_ignored(self):
+        """Events with chat=None are ignored."""
+        from codogram.middleware.admin import AdminMiddleware
+        from codogram.services.group_auth import GroupAuthService
+
+        group_auth = Mock(spec=GroupAuthService)
+        middleware = AdminMiddleware(group_auth)
+        handler = AsyncMock()
+        event = Mock()
+        data = {
+            "event_from_user": Mock(id=123, is_bot=False),
+            "event_chat": None,
+        }
+
+        result = await middleware(handler, event, data)
+
+        handler.assert_not_called()
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_group_revalidation_fails_sends_rejection(self):
+        """Re-validation failure sends rejection message."""
+        from codogram.middleware.admin import AdminMiddleware
+        from codogram.services.group_auth import GroupAuthService
+        from aiogram.types import Message
+
+        group_auth = Mock(spec=GroupAuthService)
+        group_auth.needs_revalidation = Mock(return_value=True)
+        group_auth.revalidate = AsyncMock(return_value=False)
+
+        middleware = AdminMiddleware(group_auth)
+        handler = AsyncMock()
+        event = Mock(spec=Message)
+        event.text = "hello"
+        chat = Mock(type="supergroup", id=123)
+        telegram_queue = AsyncMock()
+        data = {
+            "event_from_user": Mock(id=999, is_bot=False),
+            "event_chat": chat,
+            "bot": Mock(),
+            "telegram_queue": telegram_queue,
+        }
+
+        with patch("codogram.middleware.admin.is_admin", return_value=False):
+            result = await middleware(handler, event, data)
+
+        handler.assert_not_called()
+        telegram_queue.reply.assert_called_once()
+        assert "not active" in telegram_queue.reply.call_args[0][1].lower()
+
+    @pytest.mark.asyncio
+    async def test_callback_query_rejected_in_group(self):
+        """CallbackQuery in unauthorized group gets popup."""
+        from codogram.middleware.admin import AdminMiddleware
+        from codogram.services.group_auth import GroupAuthService
+        from aiogram.types import CallbackQuery
+
+        group_auth = Mock(spec=GroupAuthService)
+        group_auth.is_allowed = Mock(return_value=False)
+        group_auth.needs_revalidation = Mock(return_value=False)
+        group_auth.check_and_register = AsyncMock(return_value=False)
+
+        middleware = AdminMiddleware(group_auth)
+        handler = AsyncMock()
+        event = Mock(spec=CallbackQuery)
+        event.answer = AsyncMock()
+        chat = Mock(type="supergroup", id=123)
+        data = {
+            "event_from_user": Mock(id=999, is_bot=False),
+            "event_chat": chat,
+            "bot": Mock(),
+        }
+
+        with patch("codogram.middleware.admin.is_admin", return_value=False):
+            result = await middleware(handler, event, data)
+
+        handler.assert_not_called()
+        event.answer.assert_called_once()
+        assert event.answer.call_args[1].get('show_alert') is True
