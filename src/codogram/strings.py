@@ -573,9 +573,9 @@ STALE_BUTTON_SECONDS = 300
 
 EMOJI_PACK_CREATED = """`[v]` Gift unlocked
 
-Avatar pack — set members as topic icons: {pack_link}
+✨ [Avatar pack]({pack_link}) ✨
 
-*(requires Premium)*"""
+Personalize topic with your photo → [get pack]({pack_link})"""
 
 EMOJI_PACK_DISABLE_PROMPT = """`[?]` Disable avatar pack?
 

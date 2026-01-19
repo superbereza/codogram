@@ -34,6 +34,7 @@ class StickerAdapter:
         try:
             photos = await self._bot.get_user_profile_photos(user_id, limit=1)
             if not photos.photos:
+                logger.debug(f"No photos available for user {user_id} (privacy or no avatar)")
                 return None
 
             photo = photos.photos[0][-1]  # Largest size

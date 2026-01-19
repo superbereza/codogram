@@ -1,6 +1,7 @@
 """Service for creating and managing avatar emoji packs."""
 import asyncio
 import io
+import random
 from pathlib import Path
 
 from aiogram.types import User
@@ -10,6 +11,21 @@ from ..adapters.sticker import StickerAdapter
 from ..config import settings
 from ..session_manager import project_manager
 from ..logging_config import logger
+
+# Fun adjectives and nouns for pack titles
+PACK_ADJECTIVES = [
+    "Cosmic", "Epic", "Legendary", "Mighty", "Radical",
+    "Supreme", "Turbo", "Ultra", "Galactic", "Atomic",
+    "Quantum", "Stellar", "Thunder", "Hyper", "Mega",
+    "Noble", "Royal", "Phantom", "Shadow", "Crystal",
+]
+
+PACK_NOUNS = [
+    "Dolphins", "Wizards", "Titans", "Dragons", "Phoenix",
+    "Panthers", "Wolves", "Eagles", "Lions", "Falcons",
+    "Ninjas", "Samurai", "Vikings", "Spartans", "Knights",
+    "Rockets", "Comets", "Stars", "Storms", "Legends",
+]
 
 # Telegram-style colors for placeholder avatars
 TELEGRAM_COLORS = [
@@ -95,11 +111,25 @@ class EmojiPackService:
             return self._process_image(avatar)
         return self._generate_placeholder(user)
 
-    async def _generate_pack_name(self, chat_id: int) -> str:
-        """Generate sticker pack name."""
+    def _generate_pack_title(self) -> str:
+        """Generate fun pack title like 'Cosmic Dolphins'."""
+        adj = random.choice(PACK_ADJECTIVES)
+        noun = random.choice(PACK_NOUNS)
+        return f"{adj} {noun}"
+
+    async def _generate_pack_name(self, chat_id: int) -> tuple[str, str]:
+        """Generate sticker pack name and title.
+
+        Returns (name, title) where:
+        - name: technical ID for Telegram API (unique each time)
+        - title: fun human-readable title like 'Cosmic Dolphins'
+        """
         chat_id_str = str(abs(chat_id))
         bot_username = await self.adapter.get_bot_username()
-        return f"chat_{chat_id_str}_avatars_by_{bot_username}"
+        suffix = random.randint(1000, 9999)
+        name = f"team_{chat_id_str}_{suffix}_by_{bot_username}"
+        title = self._generate_pack_title()
+        return name, title
 
     async def create_pack(self, chat_id: int, participants: list[User]) -> str | None:
         """Create emoji pack with all participants' avatars.
@@ -115,7 +145,7 @@ class EmojiPackService:
             logger.warning(f"Project not found for chat {chat_id}")
             return None
 
-        pack_name = await self._generate_pack_name(chat_id)
+        pack_name, pack_title = await self._generate_pack_name(chat_id)
         owner_id = settings.get_bot_owner_id()
 
         try:
@@ -126,11 +156,11 @@ class EmojiPackService:
             await self.adapter.create_emoji_pack(
                 owner_id=owner_id,
                 name=pack_name,
-                title="Avatars",
+                title=pack_title,
                 sticker_bytes=avatar_bytes,
                 emoji="👤",
             )
-            logger.info(f"Created emoji pack: {pack_name}")
+            logger.info(f"Created emoji pack: {pack_name} ({pack_title})")
 
             # Get emoji_id from created sticker
             stickers = await self.adapter.get_pack_stickers(pack_name)

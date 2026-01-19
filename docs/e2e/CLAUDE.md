@@ -147,5 +147,6 @@ docs/e2e/
     ├── permissions.md  # Permission buttons
     ├── watcher.md      # Tool call output
     ├── messages.md     # Message forwarding
-    └── activity.md     # Thinking status, suggestions (ASK USER)
+    ├── activity.md     # Thinking status, suggestions (ASK USER)
+    └── avatar_pack.md  # /exp_avatar_pack, emoji pack (ASK USER)
 ```
