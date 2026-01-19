@@ -42,6 +42,15 @@ async def main():
     group_auth = GroupAuthService()
     dp["group_auth"] = group_auth  # Register for aiogram DI
 
+    # Get bot info for response mode filtering
+    bot_info = await bot.get_me()
+    from .services.response_mode import ResponseModeService
+    response_mode_service = ResponseModeService(
+        bot_id=bot_info.id,
+        bot_username=bot_info.username,
+    )
+    dp["response_mode_service"] = response_mode_service
+
     # Global admin check - protects ALL routers
     dp.message.middleware(AdminMiddleware(group_auth))
     dp.callback_query.middleware(AdminMiddleware(group_auth))
