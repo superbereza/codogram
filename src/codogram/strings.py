@@ -508,6 +508,7 @@ SETUP_PRIVATE_CHAT = f"{STATUS_ERR} Add bot to a group chat"
 SETUP_CHANNEL_NOT_SUPPORTED = f"{STATUS_ERR} Channels not supported"
 SETUP_CANCELLED = f"{STATUS_INFO} Setup cancelled\\. Use /start to begin again\\."
 SETUP_ALREADY_IN_PROGRESS = f"{STATUS_INFO} Setup already in progress"
+SETUP_BOT_RESTARTED = f"{STATUS_INFO} Bot was restarted\\. Use /start to continue setup\\."
 
 # Command blocking during setup
 SETUP_COMMAND_BLOCKED = f"""{STATUS_WARN} Complete project setup first

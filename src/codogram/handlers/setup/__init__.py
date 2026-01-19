@@ -8,10 +8,19 @@ This module provides the new onboarding flow (v2) that triggers when:
 
 See docs/designs/2026-01-18-start-flow-v2.md for flow diagrams.
 """
+import re
+
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
+from ... import strings
+
 setup_router = Router(name="setup")
+
+# Callback prefixes used in setup flow
+SETUP_CALLBACK_PATTERN = re.compile(
+    r"^(setup|folder|git|clone|rename|admin|error|name|exists):"
+)
 
 
 # --- Common handlers ---
@@ -40,3 +49,30 @@ setup_router.include_router(new_project_flow.router)
 setup_router.include_router(launch.router)
 # triggers.router has on_any_message catch-all, must be LAST
 setup_router.include_router(triggers.router)
+
+
+# --- Fallback for stale callbacks (bot restarted, FSM state lost) ---
+
+from ...logging_config import logger
+
+@setup_router.callback_query(F.data.regexp(SETUP_CALLBACK_PATTERN))
+async def on_stale_setup_callback(callback: CallbackQuery):
+    """Handle setup callbacks when FSM state is lost (e.g., after bot restart).
+
+    This handler has no state filter, so it catches callbacks that weren't
+    handled by state-specific handlers above.
+    """
+    logger.info(f"Stale setup callback: {callback.data}")
+
+    # Delete stale message with buttons
+    try:
+        await callback.message.delete()
+    except Exception as e:
+        logger.warning(f"Failed to delete stale message: {e}")
+
+    # Send restart notice
+    await callback.message.answer(
+        strings.SETUP_BOT_RESTARTED,
+        parse_mode="MarkdownV2",
+    )
+    await callback.answer()
