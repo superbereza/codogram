@@ -21,6 +21,7 @@ def settings_keyboard(tmux_session: str) -> InlineKeyboardMarkup:
         InlineKeyboardMarkup with vertical buttons:
         - /auto_accept
         - /verbose
+        - /response_mode
         - /shift_tab
     """
     sid = _short_id(tmux_session)
@@ -32,6 +33,10 @@ def settings_keyboard(tmux_session: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(
             text="/verbose",
             callback_data=f"set:v:{sid}"
+        )],
+        [InlineKeyboardButton(
+            text="/response_mode",
+            callback_data=f"set:rm:{sid}"
         )],
         [InlineKeyboardButton(
             text="/shift_tab",
