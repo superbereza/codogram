@@ -454,6 +454,31 @@ Open chat settings → Administrators → Add bot as admin"""
 
 SETUP_ADMIN_CHECK_FAILED = f"{STATUS_WARN} Still missing admin rights"
 
+# Migration messages
+MIGRATION_SUCCESS = f"""`[v]` Topics enabled
+
+Multi\\-session mode unlocked:
+/thread \\- new topic, same directory
+/branch \\- isolated feature branch \\+ topic
+/finish \\- merge and archive"""
+
+MIGRATION_ADMIN_REQUIRED = f"""{STATUS_WARN} Grant admin rights to continue
+
+Bot lost admin rights during migration\\.
+
+Open chat settings → Administrators → Add bot as admin"""
+
+ADMIN_RIGHTS_GRANTED = f"{STATUS_OK} Admin rights granted"
+
+# Bot blocked while awaiting admin rights
+BOT_ADMIN_RIGHTS_BLOCKED = f"""{STATUS_WARN} Bot needs admin rights
+
+Grant admin rights to continue using the bot\\.
+
+Open chat settings → Administrators → Add bot as admin"""
+
+BOT_ADMIN_RIGHTS_BLOCKED_POPUP = "Grant admin rights first"
+
 # Chat type errors
 SETUP_PRIVATE_CHAT = f"{STATUS_ERR} Add bot to a group chat"
 SETUP_CHANNEL_NOT_SUPPORTED = f"{STATUS_ERR} Channels not supported"

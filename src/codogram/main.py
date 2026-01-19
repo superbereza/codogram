@@ -12,6 +12,7 @@ from aiogram import Bot, Dispatcher
 
 from .config import settings
 from .middleware.admin import AdminMiddleware
+from .middleware.bot_admin_rights import BotAdminRightsMiddleware
 from .middleware.clear_create_state import ClearCreateStateMiddleware
 from .middleware.setup_blocker import SetupBlockerMiddleware
 from .handlers import register_handlers
@@ -39,6 +40,10 @@ async def main():
     # Global admin check - protects ALL routers
     dp.message.middleware(AdminMiddleware())
     dp.callback_query.middleware(AdminMiddleware())
+
+    # Block if bot awaiting admin rights (after migration)
+    dp.message.middleware(BotAdminRightsMiddleware())
+    dp.callback_query.middleware(BotAdminRightsMiddleware())
 
     # Clear create flow state when any command is sent
     dp.message.middleware(ClearCreateStateMiddleware())
