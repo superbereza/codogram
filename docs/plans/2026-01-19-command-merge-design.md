@@ -208,8 +208,3 @@ Pure delegation, zero logic, zero callbacks.
 11. **main.py** — register new_chat router, update finish import
 12. **E2E tests** — update docs/e2e/commands/ for new commands
 
-### Deprecation Approach
-
-- Aliases work silently (no warnings)
-- Old callback data is DROPPED (users mid-flow will see error, acceptable)
-- Docs and `/help` show only primary names
