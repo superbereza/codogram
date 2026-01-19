@@ -13,6 +13,7 @@ from aiogram import Bot, Dispatcher
 from .config import settings
 from .middleware.admin import AdminMiddleware
 from .services.group_auth import GroupAuthService
+from .middleware.bot_admin_rights import BotAdminRightsMiddleware
 from .middleware.clear_create_state import ClearCreateStateMiddleware
 from .middleware.setup_blocker import SetupBlockerMiddleware
 from .handlers import register_handlers
@@ -44,6 +45,10 @@ async def main():
     # Global admin check - protects ALL routers
     dp.message.middleware(AdminMiddleware(group_auth))
     dp.callback_query.middleware(AdminMiddleware(group_auth))
+
+    # Block if bot awaiting admin rights (after migration)
+    dp.message.middleware(BotAdminRightsMiddleware())
+    dp.callback_query.middleware(BotAdminRightsMiddleware())
 
     # Clear create flow state when any command is sent
     dp.message.middleware(ClearCreateStateMiddleware())
@@ -93,10 +98,7 @@ async def main():
 
     # Start Telegram polling
     try:
-        await dp.start_polling(
-            bot,
-            allowed_updates=["message", "callback_query", "chat_member", "my_chat_member"],
-        )
+        await dp.start_polling(bot, allowed_updates=["message", "callback_query", "chat_member", "my_chat_member"])
     finally:
         if telegram_queue:
             await telegram_queue.shutdown()

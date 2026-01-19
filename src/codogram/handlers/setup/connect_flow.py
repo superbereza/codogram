@@ -98,21 +98,8 @@ async def on_folder_selected(callback: CallbackQuery, state: FSMContext):
         target_dir=str(target_dir),
     )
 
-    # Check if rename needed
-    chat_title = callback.message.chat.title or ""
-
-    if chat_title != folder_name:
-        await state.set_state(SetupFlow.awaiting_rename_confirm)
-        await state.update_data(rename_to=folder_name)
-
-        from ...keyboards.setup.confirm import rename_confirm_keyboard
-        await callback.message.edit_text(
-            strings.SETUP_RENAME_PROMPT.format(name=folder_name),
-            reply_markup=rename_confirm_keyboard(),
-        )
-    else:
-        # Check git status
-        await _check_git_and_proceed(callback.message, state, target_dir)
+    # Check git status (rename offered after migration when admin rights available)
+    await _check_git_and_proceed(callback.message, state, target_dir)
 
 
 async def _check_git_and_proceed(message: Message, state: FSMContext, target_dir: Path):

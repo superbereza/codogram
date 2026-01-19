@@ -6,6 +6,7 @@ Entry points (per design):
 2. /start in chat without registered project
 3. Any message in chat without registered project
 """
+import asyncio
 import logging
 
 from aiogram import Bot, F, Router
@@ -14,14 +15,17 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Chat, ChatMemberUpdated, Message
 
 from ...domain.states import SetupFlow
-from ...session_manager import ProjectManager
+from ...session_manager import ProjectManager, ProjectState, project_manager
 from ...services.setup import check_bot_admin_rights, check_base_dir
-from ...keyboards.setup import admin_check_keyboard, setup_type_keyboard
+from ...keyboards.setup import setup_type_keyboard
 from ... import strings
 
 logger = logging.getLogger(__name__)
 
 router = Router(name="setup_triggers")
+
+# In-memory set to deduplicate concurrent my_chat_member events
+_setup_in_progress: set[int] = set()
 
 
 class ProjectNotRegistered(BaseFilter):
@@ -57,12 +61,34 @@ def _is_project_registered(chat_id: int) -> bool:
     return pm.get_by_chat(chat_id) is not None
 
 
+def _find_project_by_title(title: str) -> ProjectState | None:
+    """Find project where project_name matches chat title.
+
+    Used for migration detection when my_chat_member arrives before migrate_to_chat_id.
+    """
+    for p in project_manager.projects.values():
+        if p.project_name == title:
+            return p
+    return None
+
+
+def _find_project_by_old_chat_id(chat_id: int) -> ProjectState | None:
+    """Find project where old_chat_id matches.
+
+    Used for migration detection after migrate_to_chat_id already processed.
+    """
+    for p in project_manager.projects.values():
+        if p.old_chat_id == chat_id:
+            return p
+    return None
+
+
 # --- Entry Point 1: Bot added to chat ---
 
 @router.my_chat_member(
     F.new_chat_member.status.in_({"member", "administrator"})
 )
-async def on_bot_added(event: ChatMemberUpdated, state: FSMContext):
+async def on_bot_added(event: ChatMemberUpdated, state: FSMContext, telegram_queue):
     """Handle bot being added to chat or granted admin rights."""
     chat = event.chat
     old_status = event.old_chat_member.status if event.old_chat_member else None
@@ -83,18 +109,92 @@ async def on_bot_added(event: ChatMemberUpdated, state: FSMContext):
         await event.answer(strings.SETUP_CHANNEL_NOT_SUPPORTED)
         return
 
-    # Check if setup already in progress
-    current_state = await state.get_state()
-    if current_state and current_state.startswith("SetupFlow:"):
-        logger.debug(f"Setup already in progress for chat {chat.id}")
+    # Deduplicate concurrent events (race condition protection)
+    if chat.id in _setup_in_progress:
+        logger.debug(f"Setup already being processed for chat {chat.id}")
+        return
+    _setup_in_progress.add(chat.id)
+
+    try:
+        # Check if setup already in progress
+        current_state = await state.get_state()
+        if current_state and current_state.startswith("SetupFlow:"):
+            logger.debug(f"Setup already in progress for chat {chat.id}")
+            return
+
+        # Check if project already registered
+        if _is_project_registered(chat.id):
+            logger.debug(f"Project already registered for chat {chat.id}")
+            return
+
+        # --- Migration detection for supergroups ---
+        if chat.type == "supergroup":
+            # 1. Check by old_chat_id (if migrate_to_chat_id already processed)
+            project = _find_project_by_old_chat_id(chat.id)
+            if project:
+                logger.info(f"Migration detected by old_chat_id: {chat.id}")
+                await _handle_migrated_project(event.bot, chat, project, telegram_queue)
+                return
+
+            # 2. Check by title (if migrate_to_chat_id not yet processed)
+            project = _find_project_by_title(chat.title)
+            if project:
+                logger.info(f"Migration detected by title: {chat.title}")
+                project.old_chat_id = project.chat_id
+                project.chat_id = chat.id
+                project_manager._save()
+                await _handle_migrated_project(event.bot, chat, project, telegram_queue)
+                return
+
+            # 3. Delay fallback - wait for migrate_to_chat_id event
+            logger.debug(f"Supergroup without project, waiting 2s for migration event: {chat.id}")
+            await asyncio.sleep(2)
+
+            # Recheck after delay
+            if _is_project_registered(chat.id):
+                logger.info(f"Migration detected after delay for chat {chat.id}")
+                project = project_manager.get_by_chat(chat.id)
+                if project and project.awaiting_admin_rights:
+                    # Migration handler already set the flag, nothing more to do
+                    return
+                return
+
+        await _start_setup_flow(event.bot, chat, state)
+    finally:
+        _setup_in_progress.discard(chat.id)
+
+
+async def _handle_migrated_project(bot: Bot, chat: Chat, project: ProjectState, telegram_queue):
+    """Handle project after migration detected - check admin rights."""
+    from ...telegram_queue import OutgoingBatch
+    from ...services.menu import register_menu_for_chat
+
+    has_rights = await check_bot_admin_rights(bot, chat.id)
+
+    if not has_rights:
+        project.awaiting_admin_rights = True
+        project_manager._save()
+        logger.info(f"Migration awaiting admin: {project.project_name}")
+
+        batch = OutgoingBatch(
+            chat_id=chat.id,
+            thread_id=None,
+            messages=[{"text": strings.MIGRATION_ADMIN_REQUIRED}],
+        )
+        await telegram_queue.enqueue(batch)
         return
 
-    # Check if project already registered
-    if _is_project_registered(chat.id):
-        logger.debug(f"Project already registered for chat {chat.id}")
-        return
+    # Has rights - register menu
+    project.awaiting_admin_rights = False
+    project_manager._save()
+    await register_menu_for_chat(bot, chat.id, is_forum=True)
 
-    await _start_setup_flow(event.bot, chat, state)
+    batch = OutgoingBatch(
+        chat_id=chat.id,
+        thread_id=None,
+        messages=[{"text": strings.MIGRATION_SUCCESS}],
+    )
+    await telegram_queue.enqueue(batch)
 
 
 # --- Entry Point 2: /start in unregistered chat ---
@@ -142,7 +242,21 @@ async def on_any_message(message: Message, state: FSMContext):
 # --- Shared setup start logic ---
 
 async def _start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
-    """Start the setup flow - check base_dir first, then admin rights."""
+    """Start the setup flow - check base_dir first."""
+    # Deduplicate concurrent calls
+    if chat.id in _setup_in_progress:
+        logger.debug(f"Setup flow already in progress for chat {chat.id}")
+        return
+    _setup_in_progress.add(chat.id)
+
+    try:
+        await _do_start_setup_flow(bot, chat, state)
+    finally:
+        _setup_in_progress.discard(chat.id)
+
+
+async def _do_start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
+    """Actual setup flow logic."""
     # Check base_dir FIRST
     base_path = check_base_dir()
     if not base_path:
@@ -163,24 +277,13 @@ async def _start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
     except Exception as e:
         logger.warning(f"Failed to set setup menu: {e}")
 
-    # Check admin rights
-    has_rights = await check_bot_admin_rights(bot, chat.id)
-
-    if not has_rights:
-        # Ask for admin rights
-        await state.set_state(SetupFlow.awaiting_admin_rights)
-        await bot.send_message(
-            chat.id,
-            strings.SETUP_ADMIN_REQUIRED,
-            reply_markup=admin_check_keyboard(),
-            parse_mode="MarkdownV2",
-        )
-        return
-
-    # Has rights - show setup type selection
+    # Skip admin rights check - will be requested on migration to supergroup
+    # Show setup type selection directly
     await state.set_state(SetupFlow.awaiting_setup_type)
-    await bot.send_message(
+    sent = await bot.send_message(
         chat.id,
         strings.SETUP_CHOOSE_TYPE,
         reply_markup=setup_type_keyboard(),
     )
+    # Track message ID for cleanup and chat title for rename check
+    await state.update_data(bot_message_id=sent.message_id, chat_title=chat.title or "")

@@ -467,16 +467,35 @@ Set BASE_DIR in \\.env file:
 
 Then restart the bot\\."""
 
-# Admin rights
-SETUP_ADMIN_REQUIRED = f"""{STATUS_WARN} Grant admin rights to continue
+# Admin rights (used for migration and check button)
+SETUP_ADMIN_CHECK_FAILED = f"{STATUS_WARN} Still missing admin rights"
+
+# Migration messages
+MIGRATION_SUCCESS = f"""`[v]` Topics enabled
+
+Multi\\-session mode unlocked:
+/thread \\- new topic, same directory
+/branch \\- isolated feature branch \\+ topic
+/finish \\- merge and archive"""
+
+MIGRATION_ADMIN_REQUIRED = f"""{STATUS_WARN} Grant admin rights to continue
 
 Bot needs admin rights to:
 • Rename chat to match project
 • Manage topics for branches
 
-Open chat settings → Administrators → Add bot as admin"""
+Open chat settings → Edit → Administrators → Add bot as admin"""
 
-SETUP_ADMIN_CHECK_FAILED = f"{STATUS_WARN} Still missing admin rights"
+ADMIN_RIGHTS_GRANTED = f"{STATUS_OK} Admin rights granted"
+
+# Bot blocked while awaiting admin rights
+BOT_ADMIN_RIGHTS_BLOCKED = f"""{STATUS_WARN} Bot needs admin rights
+
+Grant admin rights to continue using the bot\\.
+
+Open chat settings → Edit → Administrators → Add bot as admin"""
+
+BOT_ADMIN_RIGHTS_BLOCKED_POPUP = "Grant admin rights first"
 
 # Chat type errors
 SETUP_PRIVATE_CHAT = f"{STATUS_ERR} Add bot to a group chat"
@@ -538,8 +557,8 @@ SETUP_GIT_GH_NOT_INSTALLED = f"{STATUS_ERR} `gh` CLI not installed\\. Install fr
 SETUP_GIT_GH_NOT_AUTH = f"{STATUS_ERR} `gh` not authenticated\\. Run `gh auth login` first"
 
 # Rename
-SETUP_RENAME_PROMPT = "Rename chat to `{name}`\\?"
-SETUP_RENAME_FAILED = f"{STATUS_WARN} Couldn't rename chat \\(missing permissions?\\)\\nContinuing with project setup\\.\\.\\."
+SETUP_RENAME_PROMPT = "Wow\\! You are setting up super chat\\!\n\nRename chat to `{name}` to align with project name\\?"
+SETUP_RENAME_FAILED = f"{STATUS_WARN} Couldn't rename chat \\(missing permissions?\\)\nContinuing with project setup\\.\\.\\."
 
 # Launch
 SETUP_LAUNCH_PROGRESS = f"{STATUS_PENDING} Setting up project\\.\\.\\."
@@ -691,7 +710,9 @@ EMOJI_PACK_CREATED = """`[v]` Gift unlocked
 
 ✨ [Avatar pack]({pack_link}) ✨
 
-Personalize topic with your photo → [get pack]({pack_link})"""
+Personalize topics with participant photos → [get pack]({pack_link})
+
+New members will be added automatically\\."""
 
 EMOJI_PACK_DISABLE_PROMPT = """`[?]` Disable avatar pack?
 

@@ -43,5 +43,4 @@ class SetupFlow(StatesGroup):
     viewing_connected_projects = State()
     awaiting_project_name = State()
     awaiting_git_choice = State()
-    awaiting_rename_confirm = State()
     launching = State()                   # Blocking state during launch

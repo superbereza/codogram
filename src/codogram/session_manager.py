@@ -165,6 +165,10 @@ class ProjectState:
     chat_id: int | None = None
     cwd: str | None = None
 
+    # Migration support:
+    old_chat_id: int | None = None        # Previous chat_id before group→supergroup migration
+    awaiting_admin_rights: bool = False   # Block until bot gets admin rights
+
     # Multi-thread support: thread_id -> ThreadInfo
     threads: dict[int | None, ThreadInfo] = field(default_factory=dict)
 
@@ -226,6 +230,8 @@ class ProjectManager:
                 # New format: dict with chat_id and cwd
                 project.chat_id = data.get("chat_id")
                 project.cwd = data.get("cwd")
+                project.old_chat_id = data.get("old_chat_id")
+                project.awaiting_admin_rights = data.get("awaiting_admin_rights", False)
                 project.auto_accept = data.get("auto_accept", False)
                 project.verbose = data.get("verbose", False)
                 project.feat_thinking_status = data.get("feat_thinking_status", False)
@@ -300,6 +306,8 @@ class ProjectManager:
                     project_data = {
                         "chat_id": p.chat_id,
                         "cwd": p.cwd,
+                        "old_chat_id": p.old_chat_id,
+                        "awaiting_admin_rights": p.awaiting_admin_rights,
                         "auto_accept": p.auto_accept,
                         "verbose": p.verbose,
                         "feat_thinking_status": p.feat_thinking_status,
