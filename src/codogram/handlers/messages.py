@@ -1,7 +1,7 @@
 """Message routing handler - routes messages to tmux sessions."""
 import asyncio
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.types import Message
 
 from ..services.message_router import MessageRouterService, RouteAction
@@ -27,6 +27,12 @@ _FILE_ERROR_MESSAGES = {
 }
 
 
+@router.message(F.text.startswith("/"))
+async def on_unknown_command(message: Message, telegram_queue: TelegramQueue):
+    """Forward unregistered commands to Claude as text."""
+    await _route_message(message, telegram_queue)
+
+
 @router.message()
 async def on_message(message: Message, telegram_queue: TelegramQueue):
     """Route regular messages to tmux sessions.
@@ -34,12 +40,17 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
     This is the catch-all handler - registered last so commands
     and FSM states are handled first by other routers.
     """
+    await _route_message(message, telegram_queue)
+
+
+async def _route_message(message: Message, telegram_queue: TelegramQueue):
+    """Common routing logic for all messages."""
     text = message.text
     has_file = bool(message.photo or message.document)
 
-    # Block video/audio
-    if message.video or message.video_note or message.audio or message.voice:
-        await telegram_queue.reply(message, strings.FILE_AUDIO_VIDEO_NOT_SUPPORTED)
+    # Block video files (not video_note - those are handled by audio router)
+    if message.video:
+        await telegram_queue.reply(message, strings.FILE_VIDEO_NOT_SUPPORTED)
         return
 
     # Skip empty messages (no text and no file)
@@ -85,7 +96,7 @@ async def on_message(message: Message, telegram_queue: TelegramQueue):
 
         case RouteAction.START_BINDING:
             # Need to bind session - start binding task
-            await _start_binding(message, result)
+            await _start_binding(message, result, telegram_queue)
             # Still try to send to tmux (supports files too)
             await _send_content(message, result, telegram_queue)
             return
@@ -158,10 +169,9 @@ def _try_send_to_tmux(result, text: str) -> bool:
     return False
 
 
-async def _start_binding(message: Message, result):
+async def _start_binding(message: Message, result, telegram_queue: TelegramQueue):
     """Start session binding for unbound thread."""
     from ..history_watcher import poll_for_session_thread
-    from .. import main
 
     thread = result.thread
     project = result.project
@@ -173,15 +183,15 @@ async def _start_binding(message: Message, result):
 
         async def start_poller(p):
             from ..permission_poller import create_poller_task
-            return await create_poller_task(message.bot, p, main.telegram_queue)
+            return await create_poller_task(message.bot, p, telegram_queue)
 
         async def start_watcher(p, send_missed=False):
             from ..watcher import create_watcher_task
-            return await create_watcher_task(message.bot, p, main.telegram_queue, send_missed)
+            return await create_watcher_task(message.bot, p, telegram_queue, send_missed)
 
         thread.binding_task = asyncio.create_task(
             poll_for_session_thread(
                 project, thread, message.bot,
-                start_poller, start_watcher, main.telegram_queue
+                start_poller, start_watcher, telegram_queue
             )
         )

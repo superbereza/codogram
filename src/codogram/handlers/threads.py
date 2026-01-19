@@ -15,13 +15,13 @@ from ..services.launch import create_thread_with_session
 router = Router(name="threads")
 
 
-@router.message(Command("thread"))
+@router.message(Command("thread", ignore_case=True))
 async def cmd_thread(message: Message, telegram_queue: TelegramQueue):
     """Alias for /thread_create."""
     await cmd_thread_create(message, telegram_queue)
 
 
-@router.message(Command("thread_delete"))
+@router.message(Command("thread_delete", ignore_case=True))
 async def cmd_thread_delete(message: Message, telegram_queue: TelegramQueue):
     """Deprecated: redirect to /finish."""
     await telegram_queue.reply(message, "`[i]` Use /finish to archive topics")
@@ -29,7 +29,7 @@ async def cmd_thread_delete(message: Message, telegram_queue: TelegramQueue):
 
 # ===== /thread_create =====
 
-@router.message(Command("thread_create"))
+@router.message(Command("thread_create", ignore_case=True))
 async def cmd_thread_create(message: Message, telegram_queue: TelegramQueue):
     """Create a new thread (topic) with its own Claude session."""
     if not await require_forum_group(message, telegram_queue):
@@ -48,15 +48,17 @@ async def cmd_thread_create(message: Message, telegram_queue: TelegramQueue):
     name_arg = args[1].strip() if len(args) > 1 else None
 
     if create_flow_service.should_show_prompt(name_arg):
-        set_flow_state(chat_id, message.message_thread_id, {
-            "type": "awaiting_create_name",
-            "create_type": "thread",
-        })
-        await telegram_queue.reply(
+        prompt_ids = await telegram_queue.reply(
             message,
             "Thread name?\n\nSend name or pick random",
             reply_markup=build_name_prompt_keyboard(CreateType.THREAD),
         )
+        # Save state with prompt message_id for cleanup
+        set_flow_state(chat_id, message.message_thread_id, {
+            "type": "awaiting_create_name",
+            "create_type": "thread",
+            "prompt_message_id": prompt_ids[0] if prompt_ids else None,
+        })
         return
 
     # Validate name

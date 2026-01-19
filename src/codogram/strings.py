@@ -15,6 +15,9 @@ STATUS_INFO = "`[i]`"
 STATUS_ON = "`● on`"
 STATUS_OFF = "`○ off`"
 
+# Truncation marker (ASCII scissors)
+SNIP = "[--- 8< ---]"
+
 
 # --- Launch animation ---
 
@@ -109,7 +112,7 @@ DIR_PATH_PROMPT = "Send project directory path:"
 
 CLAUDE_ACTIVE = "Claude active in `{tmux_name}`"
 CLAUDE_ATTACH = "To see Claude UI: `tmux attach -t {tmux_name}`"
-CLAUDE_NOT_RUNNING = "Claude not running in `{cwd}`.\n\nLaunch?"
+CLAUDE_NOT_RUNNING = f"{STATUS_INFO} Claude not running in `{{cwd}}`\\.\n\nUse /start to launch\\."
 CLAUDE_CONNECTED = "Connected to tmux: `{tmux_session}`"
 CLAUDE_NO_SESSION = "No active Claude session. Use /start to launch"
 CLAUDE_TMUX_NOT_FOUND = "tmux session not found. Start Claude in terminal"
@@ -185,8 +188,21 @@ TOPIC_DELETE_ERROR = "Error deleting topic: {error}"
 
 # --- File input ---
 
-FILE_AUDIO_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video and audio not supported yet. Coming soon with Whisper!"
+FILE_VIDEO_NOT_SUPPORTED = f"{STATUS_WARN} Video files are not supported"
 FILE_TYPE_NOT_SUPPORTED = "This file type is not supported"
+
+
+# --- Audio/Whisper ---
+
+AUDIO_TRANSCRIBING = f"{STATUS_PENDING} Transcribing..."
+AUDIO_SENT = f"{STATUS_OK} «{{text}}» → Claude"
+
+AUDIO_ERR_TOO_LARGE = f"{STATUS_ERR} Transcription failed: file too large"
+AUDIO_ERR_FORMAT = f"{STATUS_ERR} Transcription failed: unsupported format"
+AUDIO_ERR_TIMEOUT = f"{STATUS_ERR} Transcription failed: timeout, try again"
+AUDIO_ERR_GENERIC = f"{STATUS_ERR} Transcription failed: {{error}}"
+AUDIO_ERR_NO_SPEECH = f"{STATUS_ERR} No speech detected"
+AUDIO_ERR_NOT_CONFIGURED = f"{STATUS_INFO} Voice messages? Nice! But admin needs to set OPENAI_API_KEY first"
 FILE_TOO_LARGE = "File too large. Max 20MB"
 FILE_DOWNLOAD_FAILED = "Download failed. Try again"
 
@@ -323,9 +339,9 @@ FINISH_ARCHIVED_KEPT = f"""{STATUS_OK} Branch `{{branch}}` archived
 Worktree kept for potential resume
 Use /start to resume"""
 
-FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
+FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Asked Claude to commit\\. One moment\\.\\.\\.
 
-Run /finish again after commit"""
+Then run /finish"""
 
 
 # --- Start Flow ---
@@ -423,9 +439,9 @@ BRANCH_DIR_EXISTS = f"{STATUS_ERR} Directory already exists: `{{path}}`"
 BRANCH_UNCOMMITTED_CHANGES = f"{STATUS_WARN} Uncommitted changes detected"
 BRANCH_UNCOMMITTED_IN_BASE = f"{STATUS_WARN} Uncommitted changes in {{base_branch}}"
 
-BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
+BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Asked Claude to commit\\. One moment\\.\\.\\.
 
-Run `/branch_create {{branch_name}}` again after commit"""
+Then run `/branch_create {{branch_name}}`"""
 
 BRANCH_CREATING = f"{STATUS_PENDING} Creating branch `{{name}}`..."
 BRANCH_CREATED = f"{STATUS_OK} Branch `{{name}}` created"
@@ -579,3 +595,136 @@ BTN_DIFFERENT_NAME = "Different name"
 
 # Stale button debounce (5 minutes per design)
 STALE_BUTTON_SECONDS = 300
+
+
+# --- DM Onboarding ---
+
+DM_WELCOME = """Hey there
+
+I'm Codogram — your Claude Code companion on Telegram"""
+
+DM_SLIDE_1 = """📱 *Mobile*
+
+Fire off tasks from your phone, work from anywhere
+
+Claude runs on your server — all you need is Telegram"""
+
+DM_SLIDE_2 = """⏰ *Async*
+
+Start a task → do your thing → get notified when done
+
+No more staring at terminal output"""
+
+DM_SLIDE_3 = """👥 *Team*
+
+Set up once — collaborate with teammates
+
+Everyone sees what Claude does, can approve actions"""
+
+# Validation - first message (will be edited)
+DM_VALIDATION_CHECKING = f"{STATUS_PENDING} Checking environment..."
+
+# Validation - results with checkmarks
+DM_VALIDATION_OK = f"""{STATUS_OK} Environment ready
+
+*Required:*
+{{critical_checks}}
+
+*Optional:*
+{{optional_checks}}"""
+
+DM_VALIDATION_ERROR = f"""{STATUS_ERR} Issues found
+
+{{checks}}
+
+Fix and hit "Recheck\""""
+
+# Warnings shown after checks if any
+DM_VALIDATION_WARNINGS = """
+{warnings}"""
+
+# CTA - separate message after validation passes
+DM_CTA = """`[>>]` Next step
+
+1. Create a group
+2. Add bot with admin rights
+
+Or add to existing one ↓
+Bot will guide you from there
+
+/dashboard — your projects"""
+
+DM_MINI_STATUS = """Welcome back
+
+Active projects: {projects}
+Claude sessions: {sessions}
+
+/dashboard — your projects
+/intro — see intro again"""
+
+DM_BOT_ADDED = """Added to "{chat_name}"
+By: @{creator}"""
+
+DM_BOT_ADDED_WITH_LINK = """Added to "{chat_name}"
+Chat: {link}
+By: @{creator}"""
+
+# --- Dashboard ---
+
+DASH_HEADER = "Projects"
+
+DASH_PROJECT = """{num}. {chat_name}
+   📁 {directory}
+   👤 Owner: @{creator}
+   👥 {members} members
+   {status}"""
+
+DASH_STATUS_ACTIVE = "🤖 {count} Claude sessions"
+DASH_STATUS_INACTIVE = "💤 inactive"
+
+DASH_FOOTER = "Total: {total} projects, {active} active sessions"
+
+DASH_EMPTY = """Projects
+
+No projects connected yet
+
+Create a group and add me — I'll pick it up automatically"""
+
+# --- DM Buttons ---
+
+BTN_NEXT = "Next →"
+BTN_PREV = "← Back"
+BTN_HOW_TO_USE = "How to use?"
+BTN_RECHECK = "Recheck"
+BTN_REFRESH = "Refresh"
+BTN_ADD_TO_GROUP = "Add to group"
+
+# DM fallback for unknown commands
+DM_UNKNOWN_COMMAND = "`[◉_◉]` Can't wait to try? Add me to a group chat"
+
+# --- Emoji Pack ---
+
+EMOJI_PACK_CREATED = """`[v]` Gift unlocked
+
+✨ [Avatar pack]({pack_link}) ✨
+
+Personalize topic with your photo → [get pack]({pack_link})"""
+
+EMOJI_PACK_DISABLE_PROMPT = """`[?]` Disable avatar pack?
+
+Pack will be deleted."""
+EMOJI_PACK_BTN_DISABLE = "Yes, disable"
+EMOJI_PACK_BTN_KEEP = "Keep it"
+
+EMOJI_PACK_CREATE_PROMPT = """`[?]` Create avatar pack?
+
+Will generate emoji from member avatars."""
+EMOJI_PACK_BTN_CREATE = "Yes, create"
+EMOJI_PACK_BTN_NOT_NOW = "Not now"
+
+EMOJI_PACK_DELETED = "`[v]` Avatar pack disabled"
+EMOJI_PACK_CREATING = "`[~]` Creating avatar pack..."
+EMOJI_PACK_ERROR = "`[x]` Failed to create avatar pack: {error}"
+
+# Hint in topic launch message (if feat_avatar_pack ON)
+EMOJI_PACK_TOPIC_HINT = "→ Check this [pack]({pack_link}) to personalize your topic"

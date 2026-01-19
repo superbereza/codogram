@@ -1,15 +1,54 @@
 """Handler for group -> supergroup migration event."""
-from aiogram import Router, F
+import asyncio
+
+from aiogram import Bot, Router, F
 from aiogram.types import ChatMemberUpdated, Message
 
 from ..session_manager import project_manager
 from ..telegram_queue import TelegramQueue, OutgoingBatch
 from ..services.menu import register_menu_for_chat
 from ..services.setup import check_bot_admin_rights
+from ..adapters.sticker import StickerAdapter
+from ..services.emoji_pack import EmojiPackService
 from ..logging_config import logger
 from .. import strings
 
 router = Router(name="migration")
+
+
+async def _create_emoji_pack_background(bot: Bot, chat_id: int, telegram_queue: TelegramQueue) -> None:
+    """Create emoji pack in background after migration.
+
+    Only called when bot has admin rights.
+    """
+    try:
+        # Wait a bit for migration to complete
+        await asyncio.sleep(2)
+
+        # Get participants (admins for now)
+        admins = await bot.get_chat_administrators(chat_id)
+        participants = [admin.user for admin in admins if not admin.user.is_bot]
+
+        if not participants:
+            logger.warning(f"No participants for emoji pack in chat {chat_id}")
+            return
+
+        # Create service with adapter (layered architecture)
+        adapter = StickerAdapter(bot)
+        service = EmojiPackService(adapter)
+        pack_name = await service.create_pack(chat_id, participants)
+
+        if pack_name:
+            pack_link = f"t.me/addemoji/{pack_name}"
+            batch = OutgoingBatch(
+                chat_id=chat_id,
+                thread_id=None,
+                messages=[{"text": strings.EMOJI_PACK_CREATED.format(pack_link=pack_link)}],
+            )
+            await telegram_queue.enqueue(batch)
+            logger.info(f"Emoji pack created on migration: {pack_name}")
+    except Exception as e:
+        logger.exception(f"Failed to create emoji pack on migration: {e}")
 
 
 @router.message(F.migrate_to_chat_id)
@@ -63,6 +102,11 @@ async def on_chat_migration(message: Message, telegram_queue: TelegramQueue) -> 
     )
     await telegram_queue.enqueue(batch)
 
+    # Create emoji pack asynchronously (only if has rights)
+    asyncio.create_task(
+        _create_emoji_pack_background(message.bot, new_chat_id, telegram_queue)
+    )
+
 
 @router.my_chat_member(F.new_chat_member.status == "administrator")
 async def on_admin_rights_granted(event: ChatMemberUpdated, telegram_queue: TelegramQueue) -> None:
@@ -106,3 +150,8 @@ async def on_admin_rights_granted(event: ChatMemberUpdated, telegram_queue: Tele
         messages=[{"text": strings.ADMIN_RIGHTS_GRANTED}],
     )
     await telegram_queue.enqueue(batch)
+
+    # Create emoji pack asynchronously (now that we have rights)
+    asyncio.create_task(
+        _create_emoji_pack_background(event.bot, chat.id, telegram_queue)
+    )

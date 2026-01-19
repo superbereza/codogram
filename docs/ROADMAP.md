@@ -239,7 +239,7 @@ Send images and files from Telegram to Claude:
 - Photos saved to `tmp/input-files/{thread}/` with timestamped names
 - Documents (PDF, txt, md, etc.) supported with extension whitelist
 - Format: `See file: ./path/to/file` for Claude to read
-- Video/audio/voice rejected with "Coming soon with Whisper" message
+- Video files rejected (audio/voice handled by Whisper transcription)
 - Path traversal protection and 20MB size limit
 - See [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
 
@@ -253,7 +253,30 @@ Per-thread/per-project verbose output toggle and /settings UX:
 - Close button deletes settings message
 - See [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
+### DM onboarding
+Interactive onboarding in direct messages with bot:
+- Welcome carousel with bot features overview
+- Environment validation (BASE_DIR, tmux, claude, git, gh, whisper)
+- Critical checks block progress, optional checks show warnings
+- `/check_env` command to rerun validation anytime
+- `/dashboard` shows all projects with active sessions count
+- `/intro` to replay onboarding
+- Push notification when bot is added to a group
+- DM-specific command menu
+- See [docs/designs/done/2025-01-18-dm-onboarding.md](designs/done/2025-01-18-dm-onboarding.md)
+
 ## Beta Test
+
+### Avatar emoji pack
+Custom emoji pack from group members' avatars:
+- `/exp_avatar_pack` — toggle on/off, create or delete pack
+- Create pack on group → supergroup migration (async)
+- Add avatar when member joins, remove when leaves
+- Generate placeholder (letter + color) for users without avatar
+- Fun random names: "Cosmic Dolphins", "Epic Titans", etc.
+- Topic launch hint with pack link when feature enabled
+- Limitation: Premium required to set custom emoji as topic icon
+- See [docs/designs/done/2026-01-18-emoji-pack-design.md](designs/done/2026-01-18-emoji-pack-design.md)
 
 ### Set up flow redesign + robust start
 Full redesign of /start flow with robust error handling and intuitive setup UX:
@@ -263,6 +286,14 @@ Full redesign of /start flow with robust error handling and intuitive setup UX:
 - Cancel button and /reset_all to abort setup
 - Proper navigation with Go back buttons
 - See [docs/designs/done/2026-01-18-start-flow-v2.md](designs/done/2026-01-18-start-flow-v2.md)
+
+### Voice → Whisper transcription
+Voice messages and audio files transcribed via OpenAI Whisper:
+- Voice messages (.ogg), audio files (.mp3, etc.), and video notes (круглые видео)
+- "Transcribing..." status, then "«text» → Claude" on success
+- Friendly error messages for API errors (too large, timeout, no speech, etc.)
+- Configurable via OPENAI_API_KEY, OPENAI_BASE_URL, WHISPER_TIMEOUT
+- See [docs/designs/done/2026-01-18-whisper-transcription-design.md](designs/done/2026-01-18-whisper-transcription-design.md)
 
 ### Compacting detection
 Detect when Claude compacts conversation and notify user:
@@ -292,28 +323,21 @@ Auto-detect and resend messages stuck in Claude's input:
 
 ## In Progress
 
-### Bot onboarding
-Interactive onboarding in direct messages with bot:
-- Welcome flow explaining bot features
-- Step-by-step guidance for first-time users
+### Code cleanup
+Technical debt reduction in phases:
+- **Phase 1 (done):** Circular dependency fix, magic numbers → constants
+- **Phase 2 (backlog):** @require_state() decorator for handlers
+- **Phase 3 (backlog):** LaunchService extraction, DEPRECATED fields, ThreadInfo refactoring
+- See [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
 
-### Avatar emoji pack
-Custom emoji pack from group members' avatars:
-- Create pack on group → supergroup migration (async)
-- Add avatar when member joins, remove when leaves
-- Generate placeholder (letter + color) for users without avatar
-- Notification: "`[v]` Gift unlocked — avatar pack for topic icons"
-- Limitation: Premium required to set custom emoji as topic icon
-- See [docs/plans/2026-01-18-emoji-pack-design.md](plans/2026-01-18-emoji-pack-design.md)
+### Role model & chat registration
+Minimal permission system for multi-user access:
+- `/register_chat` — allow everyone in chat to message the bot (not just admins)
+- Admin-only settings commands
+- Roles: admin (full control) vs user (can send messages)
+- Per-chat configuration
 
 ## Backlog
-
-### Auto-resume on message
-Auto-launch Claude when user sends message but tmux doesn't exist:
-- Show: `` `[~]` Tmux session not found, launching... ``
-- If `session_id` exists → `claude --resume`, else `claude`
-- Queue all messages (text + files) while launching
-- Send queued messages after Claude ready
 
 ### Merge thread and branch commands
 Simplify by removing separate /thread command:
@@ -334,13 +358,6 @@ When replying to message, send context to tmux:
 - Quote piece of message being replied to
 - Format: `> quote\n\nresponse text`
 
-### Role model & chat registration
-Minimal permission system for multi-user access:
-- `/register_chat` — allow everyone in chat to message the bot (not just admins)
-- Admin-only settings commands
-- Roles: admin (full control) vs user (can send messages)
-- Per-chat configuration
-
 ### Interface simplification settings
 Admin commands to enable/disable features:
 - Toggle `/thread` command visibility
@@ -348,19 +365,18 @@ Admin commands to enable/disable features:
 - Simplify menu for non-power-users
 - Store in per-project settings
 
-### Telegram safety context
-Inject safety guidelines when starting thread/branch/project:
-- Tell Claude what's safe to do in Telegram environment
-- Warn about dangerous operations (don't kill tmux, etc.)
-- Project-specific constraints
-- Need to design the exact guidelines
+### Auto-resume on message
+Auto-launch Claude when user sends message but tmux doesn't exist:
+- Show: `` `[~]` Tmux session not found, launching... ``
+- If `session_id` exists → `claude --resume`, else `claude`
+- Queue all messages (text + files) while launching
+- Send queued messages after Claude ready
 
-### Protected environment for non-devs
-Allow product managers to use Claude without breaking environment:
-- Rollback mechanism after session
-- Or sandboxed/isolated execution
-- Easy recovery if something breaks
-- Need R&D on best approach
+### Tables and diagrams rendering
+Render tables and diagrams from text to images:
+- Convert ASCII/markdown tables to images
+- Convert mermaid/plantuml diagrams to images
+- Better readability in Telegram
 
 ### Permission poller refactoring
 Refactor god-function into handler classes:
@@ -395,6 +411,20 @@ Detect when Claude Code exits with error (API errors, network issues, etc.):
 - Parse tmux capture-pane for error patterns
 - Send error text to user: "⚠️ Claude error: <error text>. Figure it out and /start"
 - Detect shell prompt appearing after Claude was active
+
+### Telegram safety context
+Inject safety guidelines when starting thread/branch/project:
+- Tell Claude what's safe to do in Telegram environment
+- Warn about dangerous operations (don't kill tmux, etc.)
+- Project-specific constraints
+- Need to design the exact guidelines
+
+### Protected environment for non-devs
+Allow product managers to use Claude without breaking environment:
+- Rollback mechanism after session
+- Or sandboxed/isolated execution
+- Easy recovery if something breaks
+- Need R&D on best approach
 
 ### Message queue until session ready
 Cache user messages while session is binding, send when ready:
@@ -437,11 +467,6 @@ Explicit deletion of archived branches when disk space or git cleanup needed:
 ### GitHub Actions CI
 - Workflow for running tests on PR
 - pytest + type checking
-
-### Voice → Whisper
-Voice messages via Whisper transcription:
-- Use existing code from bz-merch-assistant
-- `ai_bot_core/services/whisper.py`
 
 ### Pin startup message
 Pin message on session start:

@@ -42,7 +42,7 @@ def _format_mode(mode: str | None) -> str:
         return "default mode on"
 
 
-@router.message(Command("shift_tab"))
+@router.message(Command("shift_tab", ignore_case=True))
 async def cmd_shift_tab(message: Message, telegram_queue: TelegramQueue):
     """Send Shift+Tab to cycle Claude approval mode."""
     chat_id = message.chat.id

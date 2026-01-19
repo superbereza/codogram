@@ -188,7 +188,7 @@ async def _handle_migrated_project(bot: Bot, chat: Chat, project: ProjectState, 
 # --- Entry Point 2: /start in unregistered chat ---
 
 @router.message(
-    Command("start"),
+    Command("start", ignore_case=True),
     F.chat.type.in_({"group", "supergroup"}),
     ProjectNotRegistered(),
 )

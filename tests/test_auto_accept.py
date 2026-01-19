@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from codogram.auto_accept import select_option, try_auto_accept, AUTO_ACCEPT_TYPES
 from codogram.screen import PromptType
+from codogram.strings import SNIP
 
 # Tests for select_option
 def test_select_option_picks_yes():
@@ -132,4 +133,4 @@ async def test_try_auto_accept_truncates_in_short_mode():
     assert result is True
     call_args = queue.enqueue_nowait.call_args[0][0]
     sent_text = call_args.messages[0]["text"]
-    assert "[truncated]" in sent_text
+    assert SNIP in sent_text

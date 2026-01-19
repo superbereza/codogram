@@ -20,7 +20,7 @@ from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 from .logging_config import setup_logging, logger
 from .telegram_queue import TelegramQueue
-from .services.menu import BASIC_COMMANDS, register_menu_for_chat
+from .services.menu import BASIC_COMMANDS, register_menu_for_chat, register_dm_commands
 from .handlers.worktree_recovery import WorktreeRecoveryHandler, register_worktree_recovery_handlers
 
 telegram_queue: TelegramQueue | None = None
@@ -61,6 +61,9 @@ async def main():
     # Set global default menu (for new chats)
     await bot.set_my_commands(BASIC_COMMANDS)
 
+    # Set commands for private chats (DM)
+    await register_dm_commands(bot)
+
     # Define task starters
     async def start_poller(project: ProjectState) -> asyncio.Task:
         from .permission_poller import create_poller_task
@@ -90,7 +93,7 @@ async def main():
 
     # Start Telegram polling
     try:
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, allowed_updates=["message", "callback_query", "chat_member"])
     finally:
         if telegram_queue:
             await telegram_queue.shutdown()
