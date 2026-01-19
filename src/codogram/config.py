@@ -1,5 +1,6 @@
 # src/codogram/config.py
 import json
+from datetime import datetime
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -60,10 +61,33 @@ def get_config_path() -> Path:
 def load_config() -> dict:
     """Load config.json or return default."""
     if CONFIG_PATH.exists():
-        return json.loads(CONFIG_PATH.read_text())
-    return {"projects": {}}
+        config = json.loads(CONFIG_PATH.read_text())
+        # Ensure users key exists for backward compatibility
+        if "users" not in config:
+            config["users"] = {}
+        return config
+    return {"projects": {}, "users": {}}
 
 def save_config(config: dict) -> None:
     """Save config to ~/.codogram/config.json."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(json.dumps(config, indent=2))
+
+
+def get_user_onboarded(user_id: int) -> bool:
+    """Check if user has completed onboarding."""
+    config = load_config()
+    user_data = config.get("users", {}).get(str(user_id), {})
+    return user_data.get("onboarded", False)
+
+
+def set_user_onboarded(user_id: int) -> None:
+    """Mark user as onboarded."""
+    config = load_config()
+    if "users" not in config:
+        config["users"] = {}
+    config["users"][str(user_id)] = {
+        "onboarded": True,
+        "onboarded_at": datetime.now().isoformat()
+    }
+    save_config(config)

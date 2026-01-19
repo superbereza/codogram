@@ -4,7 +4,7 @@ Single source of truth for command definitions.
 BASIC_COMMANDS and FORUM_COMMANDS are derived from _ALL_COMMANDS.
 """
 from aiogram import Bot
-from aiogram.types import BotCommand, BotCommandScopeChat
+from aiogram.types import BotCommand, BotCommandScopeChat, BotCommandScopeAllPrivateChats
 
 # Single source: (command, description, is_basic)
 # is_basic=True -> included in basic menu
@@ -43,6 +43,20 @@ SETUP_COMMANDS = [
     BotCommand(command="help", description="Get help"),
     BotCommand(command="get_debug_ids", description="Show debug IDs"),
 ]
+
+# Private chat (DM) commands
+DM_COMMANDS = [
+    BotCommand(command="start", description="Start or show status"),
+    BotCommand(command="dashboard", description="View all projects"),
+    BotCommand(command="check_env", description="Check environment"),
+    BotCommand(command="intro", description="Show intro again"),
+]
+
+
+async def register_dm_commands(bot: Bot) -> None:
+    """Register commands for all private chats."""
+    scope = BotCommandScopeAllPrivateChats()
+    await bot.set_my_commands(DM_COMMANDS, scope=scope)
 
 
 async def register_menu_for_chat(bot: Bot, chat_id: int, is_forum: bool) -> None:
