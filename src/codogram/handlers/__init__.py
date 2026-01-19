@@ -20,11 +20,11 @@ def register_handlers(dp: Dispatcher):
     dp.include_router(setup_router)          # Setup flow (my_chat_member, onboarding)
     dp.include_router(permissions.router)   # Permission callbacks
     dp.include_router(dm.router)            # DM onboarding (BEFORE start!)
-    dp.include_router(start.router)         # /start, /restart + FSM
+    dp.include_router(start.router)         # /start, /reset_chat + FSM
     dp.include_router(new_chat.router)      # /new_chat (unified)
     dp.include_router(threads.router)       # /thread aliases
     dp.include_router(branches.router)      # /branch aliases
-    dp.include_router(sessions.router)      # /new, /clear, /esc, /resume
+    dp.include_router(sessions.router)      # /clear_context, /esc
     dp.include_router(settings.router)      # /settings, /auto_accept, /help
     dp.include_router(shift_tab.router)     # /shift_tab
     dp.include_router(finish_chat.router)   # /finish_chat

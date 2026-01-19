@@ -1,4 +1,4 @@
-"""Session management: /new, /clear, /esc, /resume."""
+"""Session management: /clear_context, /esc."""
 import asyncio
 import time
 
@@ -84,19 +84,9 @@ async def _wait_for_claude_ready(
     # Timeout - don't send anything, user will see when they interact
 
 
-@router.message(Command("new", ignore_case=True))
-async def cmd_new(message: Message, telegram_queue: TelegramQueue):
-    """Start new Claude session in current thread."""
-    if not await require_claude_ready(message, telegram_queue):
-        return
-    tmux = await _send_session_command(message, telegram_queue, "/new", strings.NEW_SESSION)
-    if tmux:
-        await _wait_for_claude_ready(tmux, telegram_queue, message.chat.id, message.message_thread_id)
-
-
-@router.message(Command("clear", ignore_case=True))
-async def cmd_clear(message: Message, telegram_queue: TelegramQueue):
-    """Clear Claude session and start fresh."""
+@router.message(Command("clear_context", "clear", "new", ignore_case=True))
+async def cmd_clear_context(message: Message, telegram_queue: TelegramQueue):
+    """Clear Claude context and start fresh."""
     if not await require_tmux_exists(message, telegram_queue):
         return
     tmux = await _send_session_command(message, telegram_queue, "/clear", strings.CLEAR_SESSION)

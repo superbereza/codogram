@@ -714,9 +714,9 @@ async def on_tmux_selected(callback: CallbackQuery, state: FSMContext, telegram_
 
 # ===== Restart Flow =====
 
-@router.message(Command("restart", ignore_case=True))
-async def cmd_restart(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
-    """Handle /restart command."""
+@router.message(Command("reset_chat", "restart", ignore_case=True))
+async def cmd_reset_chat(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
+    """Handle /reset_chat command (restart Claude process)."""
     from .common import normalize_thread_id
     start_flow = StartFlowService(project_manager, None)
 
