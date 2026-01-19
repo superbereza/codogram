@@ -253,6 +253,8 @@ Per-thread/per-project verbose output toggle and /settings UX:
 - Close button deletes settings message
 - See [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
+## Beta Test
+
 ### Avatar emoji pack
 Custom emoji pack from group members' avatars:
 - `/exp_avatar_pack` — toggle on/off, create or delete pack
@@ -263,8 +265,6 @@ Custom emoji pack from group members' avatars:
 - Topic launch hint with pack link when feature enabled
 - Limitation: Premium required to set custom emoji as topic icon
 - See [docs/designs/done/2026-01-18-emoji-pack-design.md](designs/done/2026-01-18-emoji-pack-design.md)
-
-## Beta Test
 
 ### Set up flow redesign + robust start
 Full redesign of /start flow with robust error handling and intuitive setup UX:
