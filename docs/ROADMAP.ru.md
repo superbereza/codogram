@@ -277,6 +277,17 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Супергруппы: проверяем админские права для функций топиков/переименования
 - См. [docs/plans/done/2026-01-18-group-authorization-design.md](plans/done/2026-01-18-group-authorization-design.md)
 
+### Объединение команд thread/branch и упрощение меню
+Единые команды вместо отдельных thread/branch/finish:
+- `/new_chat` — создать новый чат (thread или branch с worktree)
+- `/finish_chat` — завершить чат (архивировать топик)
+- `/clear_context` — сбросить контекст Claude (новая сессия)
+- `/hard_reset` — полный сброс проекта
+- Интуитивные названия без технической терминологии
+- Контекстное поведение: из main → thread, из branch → nested branch
+- Относительные пути в UI (`./project` вместо полного пути)
+- См. [docs/designs/done/2026-01-19-command-merge-design.md](designs/done/2026-01-19-command-merge-design.md)
+
 ## Beta Test
 
 ### Редизайн set up flow + robust start
@@ -348,20 +359,6 @@ Emoji pack из аватарок участников группы:
 - Восстанавливать FSM state из config при старте бота
 - Очищать сохранённое состояние после завершения setup
 - Решает проблему "рестарт во время setup = начинай сначала"
-
-### Объединить команды thread и branch
-Упростить, убрав отдельную команду /thread:
-- Thread по сути это branch от main
-- Одна команда `/branch` для всех случаев
-- Без аргумента = branch от main (текущее поведение /thread)
-- С аргументом = branch от текущей ветки
-- Меньше когнитивной нагрузки для пользователей
-
-### Упрощение названий в меню
-Сделать названия команд более понятными:
-- Прояснить терминологию thread/branch/topic
-- Понятные названия в меню
-- Консистентное именование во всех командах
 
 ### Reply support
 При реплае на сообщение отправлять контекст в tmux:

@@ -277,6 +277,17 @@ Allow bot usage in groups where at least one group admin is in ADMIN_IDS:
 - Supergroups: check admin rights for topics/rename features
 - See [docs/plans/done/2026-01-18-group-authorization-design.md](plans/done/2026-01-18-group-authorization-design.md)
 
+### Thread/branch command merge and menu simplification
+Unified commands instead of separate thread/branch/finish:
+- `/new_chat` — create new chat (thread or branch with worktree)
+- `/finish_chat` — finish chat (archive topic)
+- `/clear_context` — reset Claude context (new session)
+- `/hard_reset` — full project reset
+- Intuitive names without technical terminology
+- Context-aware behavior: from main → thread, from branch → nested branch
+- Relative paths in UI (`./project` instead of full path)
+- See [docs/designs/done/2026-01-19-command-merge-design.md](designs/done/2026-01-19-command-merge-design.md)
+
 ## Beta Test
 
 ### Avatar emoji pack
@@ -350,20 +361,6 @@ Save FSM state to config file to survive bot restarts:
 - Restore FSM state from config on bot startup
 - Clear saved state when setup completes
 - Prevents "restart during setup = start over" problem
-
-### Merge thread and branch commands
-Simplify by removing separate /thread command:
-- Thread is essentially a branch for main
-- Single `/branch` command for all cases
-- No argument = branch from main (current /thread behavior)
-- With argument = branch from current branch
-- Reduces cognitive load for users
-
-### Menu naming simplification
-Make command names more intuitive:
-- Clarify thread/branch/topic terminology
-- User-friendly labels in menu
-- Consistent naming across all commands
 
 ### Reply support
 When replying to message, send context to tmux:
