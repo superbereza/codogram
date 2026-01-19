@@ -549,7 +549,7 @@ SETUP_GIT_GH_NOT_INSTALLED = f"{STATUS_ERR} `gh` CLI not installed\\. Install fr
 SETUP_GIT_GH_NOT_AUTH = f"{STATUS_ERR} `gh` not authenticated\\. Run `gh auth login` first"
 
 # Rename
-SETUP_RENAME_PROMPT = "Rename chat to `{name}` to align with project name\\?"
+SETUP_RENAME_PROMPT = "Wow\\! You are setting up super chat\\!\n\nRename chat to `{name}` to align with project name\\?"
 SETUP_RENAME_FAILED = f"{STATUS_WARN} Couldn't rename chat \\(missing permissions?\\)\nContinuing with project setup\\.\\.\\."
 
 # Launch

@@ -12,7 +12,6 @@ from ...domain.states import SetupFlow
 from ...domain.validators import sanitize_project_name
 from ...keyboards.setup import setup_type_keyboard, go_back_keyboard
 from ...keyboards.setup.git_choice import git_choice_keyboard
-from ...keyboards.setup.confirm import rename_confirm_keyboard
 from ...keyboards.setup.common import folder_exists_keyboard
 from ... import strings
 
@@ -126,19 +125,7 @@ async def _process_project_name(
         )
         return
 
-    # Ask for rename if chat title differs from project name
-    data = await state.get_data()
-    chat_title = data.get("chat_title", "")
-    if chat_title != name:
-        await state.set_state(SetupFlow.awaiting_rename_confirm)
-        await state.update_data(rename_to=name)
-        await reply(
-            strings.SETUP_RENAME_PROMPT.format(name=name),
-            reply_markup=rename_confirm_keyboard(),
-        )
-        return
-
-    # Proceed to git choice
+    # Proceed to git choice (rename offered after migration when admin rights available)
     await state.set_state(SetupFlow.awaiting_git_choice)
     await reply(
         strings.SETUP_GIT_CHOICE.format(folder=name),
@@ -340,35 +327,18 @@ async def on_git_none(callback: CallbackQuery, state: FSMContext):
     F.data == "git:back"
 )
 async def on_git_back(callback: CallbackQuery, state: FSMContext):
-    """Go back from git choice.
-
-    Per design navigation:
-    - If rename was shown, go back to ASK_RENAME_CONFIRM
-    - Otherwise go back to previous step (folder select or project name)
-    """
+    """Go back from git choice to previous step."""
     await callback.answer()
 
     data = await state.get_data()
     setup_type = data.get("setup_type")
-    project_name = data.get("project_name")
-    chat_title = data.get("chat_title", "")
 
-    # Check if rename step was/should be shown
-    # (chat title differs from project name)
-    if chat_title != project_name:
-        # Go back to rename confirm
-        await state.set_state(SetupFlow.awaiting_rename_confirm)
-        await state.update_data(rename_to=project_name)
-        await callback.message.edit_text(
-            strings.SETUP_RENAME_PROMPT.format(name=project_name),
-            reply_markup=rename_confirm_keyboard(),
-        )
-    elif setup_type == "connect":
-        # Back to folder selection (rename was skipped)
+    if setup_type == "connect":
+        # Back to folder selection
         await state.set_state(SetupFlow.awaiting_folder_select)
         from .connect_flow import show_folder_selection
         await show_folder_selection(callback.message, state)
     else:
-        # Back to project name (for "new" flow, rename was skipped)
+        # Back to project name (for "new" flow)
         await state.set_state(SetupFlow.awaiting_project_name)
         await show_project_name_prompt(callback.message, state)

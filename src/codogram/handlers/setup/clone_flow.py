@@ -68,23 +68,8 @@ async def on_exists_use(callback: CallbackQuery, state: FSMContext):
     """Handle Use existing folder button."""
     await callback.answer()
 
-    # Use existing folder - proceed to rename check or launch
-    data = await state.get_data()
-    project_name = data["project_name"]
-    chat_title = data.get("chat_title", "")
-
-    if chat_title != project_name:
-        await state.set_state(SetupFlow.awaiting_rename_confirm)
-        await state.update_data(rename_to=project_name)
-
-        from ...keyboards.setup.confirm import rename_confirm_keyboard
-        await callback.message.edit_text(
-            strings.SETUP_RENAME_PROMPT.format(name=project_name),
-            reply_markup=rename_confirm_keyboard(),
-        )
-    else:
-        # Proceed to launch
-        await _proceed_to_launch(callback.message, state)
+    # Proceed to launch (rename offered after migration when admin rights available)
+    await _proceed_to_launch(callback.message, state)
 
 
 @router.callback_query(
@@ -186,21 +171,8 @@ async def _do_clone(message: Message, state: FSMContext):
         )
         return
 
-    # Clone successful - check if rename needed
-    chat_title = data.get("chat_title", "")
-
-    if chat_title != project_name:
-        await state.set_state(SetupFlow.awaiting_rename_confirm)
-        await state.update_data(rename_to=project_name)
-
-        from ...keyboards.setup.confirm import rename_confirm_keyboard
-        await progress_msg.edit_text(
-            strings.SETUP_RENAME_PROMPT.format(name=project_name),
-            reply_markup=rename_confirm_keyboard(),
-        )
-    else:
-        # No rename needed - proceed to launch
-        await _proceed_to_launch(progress_msg, state)
+    # Clone successful - proceed to launch (rename offered after migration)
+    await _proceed_to_launch(progress_msg, state)
 
 
 async def _proceed_to_launch(message: Message, state: FSMContext):
