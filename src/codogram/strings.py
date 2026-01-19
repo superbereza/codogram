@@ -16,7 +16,7 @@ STATUS_ON = "`● on`"
 STATUS_OFF = "`○ off`"
 
 # Truncation marker (ASCII scissors)
-SNIP = "[--- 8< ---]"
+SNIP = "[--- 8< cut ---]"
 
 
 # --- Launch animation ---
