@@ -1,7 +1,7 @@
 """Handlers layer - thin routers delegating to services."""
 from aiogram import Dispatcher
 
-from . import permissions, start, threads, branches, sessions, settings, shift_tab, finish, create_flow, common, messages, migration, audio, dm, members
+from . import permissions, start, new_chat, threads, branches, sessions, settings, shift_tab, finish, create_flow, common, messages, migration, audio, dm, members
 from .setup import setup_router
 
 
@@ -21,8 +21,9 @@ def register_handlers(dp: Dispatcher):
     dp.include_router(permissions.router)   # Permission callbacks
     dp.include_router(dm.router)            # DM onboarding (BEFORE start!)
     dp.include_router(start.router)         # /start, /restart + FSM
-    dp.include_router(threads.router)       # /thread_create, /thread_delete
-    dp.include_router(branches.router)      # /branch_create, /branch_finish
+    dp.include_router(new_chat.router)      # /new_chat (unified)
+    dp.include_router(threads.router)       # /thread aliases
+    dp.include_router(branches.router)      # /branch aliases
     dp.include_router(sessions.router)      # /new, /clear, /esc, /resume
     dp.include_router(settings.router)      # /settings, /auto_accept, /help
     dp.include_router(shift_tab.router)     # /shift_tab
