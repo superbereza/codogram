@@ -715,6 +715,7 @@ BTN_PREV = "← Back"
 BTN_HOW_TO_USE = "How to use?"
 BTN_RECHECK = "Recheck"
 BTN_REFRESH = "Refresh"
+BTN_DONE = "Done ✓"
 BTN_ADD_TO_GROUP = "Add to group"
 
 # DM fallback for unknown commands
