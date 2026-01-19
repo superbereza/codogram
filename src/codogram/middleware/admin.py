@@ -71,9 +71,6 @@ class AdminMiddleware(BaseMiddleware):
 
         # Group/supergroup - check allowed_groups (if group_auth configured)
         if chat.type in ("group", "supergroup") and self.group_auth:
-            # Ignore non-text messages (files, media)
-            if isinstance(event, Message) and not event.text:
-                return None
 
             # Re-validate after restart if needed
             if self.group_auth.needs_revalidation(chat.id):
