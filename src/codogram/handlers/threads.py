@@ -48,15 +48,17 @@ async def cmd_thread_create(message: Message, telegram_queue: TelegramQueue):
     name_arg = args[1].strip() if len(args) > 1 else None
 
     if create_flow_service.should_show_prompt(name_arg):
-        set_flow_state(chat_id, message.message_thread_id, {
-            "type": "awaiting_create_name",
-            "create_type": "thread",
-        })
-        await telegram_queue.reply(
+        prompt_ids = await telegram_queue.reply(
             message,
             "Thread name?\n\nSend name or pick random",
             reply_markup=build_name_prompt_keyboard(CreateType.THREAD),
         )
+        # Save state with prompt message_id for cleanup
+        set_flow_state(chat_id, message.message_thread_id, {
+            "type": "awaiting_create_name",
+            "create_type": "thread",
+            "prompt_message_id": prompt_ids[0] if prompt_ids else None,
+        })
         return
 
     # Validate name
