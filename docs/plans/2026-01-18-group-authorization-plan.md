@@ -328,6 +328,23 @@ class TestGroupAuthService:
 
         mock_remove.assert_called_once_with(999)
         assert 999 not in service._validated_this_run
+
+    @pytest.mark.asyncio
+    async def test_check_and_register_handles_api_error(self):
+        """Returns False when API call fails."""
+        from codogram.services.group_auth import GroupAuthService
+        service = GroupAuthService()
+
+        bot = AsyncMock()
+        bot.get_chat_administrators = AsyncMock(side_effect=Exception("Forbidden"))
+
+        with patch("codogram.services.group_auth.get_admin_ids", return_value={123}), \
+             patch("codogram.services.group_auth.add_allowed_group") as mock_add, \
+             patch("codogram.services.group_auth.get_allowed_groups", return_value=set()):
+            result = await service.check_and_register(bot, 999)
+
+        assert result is False
+        mock_add.assert_not_called()
 ```
 
 **Step 2: Run tests to verify they fail**
@@ -442,7 +459,7 @@ class GroupAuthService:
 **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/services/test_group_auth.py -v`
-Expected: PASS (14 tests)
+Expected: PASS (15 tests)
 
 **Step 5: Commit**
 
@@ -469,10 +486,12 @@ def test_group_authorization_strings_exist():
     from codogram import strings
     assert hasattr(strings, "ERR_GROUP_NOT_ALLOWED")
     assert hasattr(strings, "ERR_GROUP_NOT_ALLOWED_POPUP")
+    assert hasattr(strings, "GROUP_REGISTERED")
     assert hasattr(strings, "GROUP_DEACTIVATED")
     # Check tone-of-voice: status prefix
     assert "`[x]`" in strings.ERR_GROUP_NOT_ALLOWED
     assert "[x]" in strings.ERR_GROUP_NOT_ALLOWED_POPUP
+    assert "`[v]`" in strings.GROUP_REGISTERED
     assert "`[!]`" in strings.GROUP_DEACTIVATED
 ```
 
@@ -490,6 +509,7 @@ Add to `src/codogram/strings.py` in the `# --- Errors ---` section:
 
 ERR_GROUP_NOT_ALLOWED = f"{STATUS_ERR} Bot not active in this group"
 ERR_GROUP_NOT_ALLOWED_POPUP = "[x] Bot not active in this group"  # Plain text for callback popup
+GROUP_REGISTERED = f"{STATUS_OK} Group registered"
 GROUP_DEACTIVATED = f"{STATUS_WARN} Admin left\\. Bot deactivated"
 ```
 
@@ -511,11 +531,11 @@ git commit -m "feat(strings): add group authorization messages"
 
 **Files:**
 - Create: `src/codogram/handlers/members.py`
-- Create: `tests/handlers/test_members.py`
+- Create: `tests/test_handlers_members.py`
 
 **Step 1: Write the failing tests**
 
-Create `tests/handlers/test_members.py`:
+Create `tests/test_handlers_members.py`:
 
 ```python
 """Tests for members handler."""
@@ -684,10 +704,9 @@ class TestOnMemberUpdate:
 
         event = Mock()
         event.chat.id = 123
-        event.from_user.id = 456
         event.bot = Mock()
         event.old_chat_member.status = "administrator"
-        event.new_chat_member.status = "left"
+        event.new_chat_member = Mock(status="left", user=Mock(id=456))
         telegram_queue = AsyncMock()
         group_auth = AsyncMock()
         group_auth.on_admin_left = AsyncMock(return_value=False)
@@ -704,10 +723,9 @@ class TestOnMemberUpdate:
 
         event = Mock()
         event.chat.id = 123
-        event.from_user.id = 456
         event.bot = Mock()
         event.old_chat_member.status = "administrator"
-        event.new_chat_member.status = "left"
+        event.new_chat_member = Mock(status="left", user=Mock(id=456))
         telegram_queue = AsyncMock()
         group_auth = AsyncMock()
         group_auth.on_admin_left = AsyncMock(return_value=True)
@@ -723,10 +741,9 @@ class TestOnMemberUpdate:
 
         event = Mock()
         event.chat.id = 123
-        event.from_user.id = 456
         event.bot = Mock()
         event.old_chat_member.status = "administrator"
-        event.new_chat_member.status = "left"
+        event.new_chat_member = Mock(status="left", user=Mock(id=456))
         telegram_queue = AsyncMock()
         group_auth = AsyncMock()
         group_auth.on_admin_left = AsyncMock(return_value=False)
@@ -738,7 +755,7 @@ class TestOnMemberUpdate:
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pytest tests/handlers/test_members.py -v`
+Run: `pytest tests/test_handlers_members.py -v`
 Expected: FAIL with "No module named 'codogram.handlers.members'"
 
 **Step 3: Write minimal implementation**
@@ -796,12 +813,13 @@ async def on_member_update(
     """Handle member leaving or being demoted.
 
     If admin from ADMIN_IDS left/demoted — re-check group validity.
+    Note: event.new_chat_member.user is the affected user, not event.from_user (who performed the action).
     """
     if not _is_leave_or_demotion(event):
         return
 
     deactivated = await group_auth.on_admin_left(
-        event.bot, event.chat.id, event.from_user.id
+        event.bot, event.chat.id, event.new_chat_member.user.id
     )
 
     if deactivated:
@@ -829,13 +847,13 @@ def _is_leave_or_demotion(event: ChatMemberUpdated) -> bool:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `pytest tests/handlers/test_members.py -v`
+Run: `pytest tests/test_handlers_members.py -v`
 Expected: PASS (14 tests)
 
 **Step 5: Commit**
 
 ```bash
-git add src/codogram/handlers/members.py tests/handlers/test_members.py
+git add src/codogram/handlers/members.py tests/test_handlers_members.py
 git commit -m "feat(handlers): add members handler for chat_member events"
 ```
 
@@ -852,6 +870,9 @@ git commit -m "feat(handlers): add members handler for chat_member events"
 Add to `tests/test_admin_middleware.py`:
 
 ```python
+from aiogram.types import Message, CallbackQuery
+
+
 class TestAdminMiddlewareGroups:
     """Tests for group authorization in AdminMiddleware."""
 
@@ -1011,9 +1032,38 @@ class TestAdminMiddlewareGroups:
         assert result is None
 
     @pytest.mark.asyncio
+    async def test_group_revalidation_fails_sends_rejection(self):
+        """Re-validation failure sends rejection message."""
+        from codogram.middleware.admin import AdminMiddleware
+        from codogram.services.group_auth import GroupAuthService
+
+        group_auth = Mock(spec=GroupAuthService)
+        group_auth.needs_revalidation = Mock(return_value=True)
+        group_auth.revalidate = AsyncMock(return_value=False)
+
+        middleware = AdminMiddleware(group_auth)
+        handler = AsyncMock()
+        event = Mock(spec=Message)
+        event.text = "hello"
+        chat = Mock(type="supergroup", id=123)
+        telegram_queue = AsyncMock()
+        data = {
+            "event_from_user": Mock(id=999, is_bot=False),
+            "event_chat": chat,
+            "bot": Mock(),
+            "telegram_queue": telegram_queue,
+        }
+
+        with patch("codogram.middleware.admin.is_admin", return_value=False):
+            result = await middleware(handler, event, data)
+
+        handler.assert_not_called()
+        telegram_queue.reply.assert_called_once()
+        assert "not active" in telegram_queue.reply.call_args[0][1].lower()
+
+    @pytest.mark.asyncio
     async def test_callback_query_rejected_in_group(self):
         """CallbackQuery in unauthorized group gets popup."""
-        from aiogram.types import CallbackQuery
         from codogram.middleware.admin import AdminMiddleware
         from codogram.services.group_auth import GroupAuthService
 
@@ -1209,55 +1259,82 @@ git commit -m "feat(middleware): add group authorization to AdminMiddleware"
 ### Task 6: Integrate in main.py
 
 **Files:**
-- Modify: `src/codogram/main.py`
-- Modify: `src/codogram/handlers/__init__.py`
+- Modify: `src/codogram/main.py` (lines 14, 36-41, 88)
+- Modify: `src/codogram/handlers/__init__.py` (lines 4, 17)
 
-**Step 1: Update main.py**
+**Step 1: Update main.py imports**
 
-Add GroupAuthService initialization and injection:
+At line 14 (after `from .middleware.admin import AdminMiddleware`), add:
 
 ```python
-# In imports section, add:
 from .services.group_auth import GroupAuthService
-
-# In main() function, before middleware registration:
-group_auth = GroupAuthService()
-dp["group_auth"] = group_auth  # Register for aiogram DI
-
-# Update middleware registration:
-dp.message.middleware(AdminMiddleware(group_auth))
-dp.callback_query.middleware(AdminMiddleware(group_auth))
 ```
 
-**Step 2: Register members router**
+**Step 2: Update main.py - GroupAuthService initialization**
 
-Add to `src/codogram/handlers/__init__.py`:
+After line 36 (`dp = Dispatcher()`), add:
 
 ```python
-from .members import router as members_router
-
-def register_handlers(dp: Dispatcher) -> None:
-    # ... existing routers ...
-    dp.include_router(members_router)
+    # Group authorization service
+    group_auth = GroupAuthService()
+    dp["group_auth"] = group_auth  # Register for aiogram DI
 ```
 
-**Step 3: Update start_polling for chat_member events**
+**Step 3: Update main.py - middleware registration**
 
-In `main.py`, update the start_polling call:
+Change lines 40-41 from:
 
 ```python
-await dp.start_polling(
-    bot,
-    allowed_updates=["message", "callback_query", "chat_member", "my_chat_member"],
-)
+    dp.message.middleware(AdminMiddleware())
+    dp.callback_query.middleware(AdminMiddleware())
 ```
 
-**Step 4: Test manually**
+to:
+
+```python
+    dp.message.middleware(AdminMiddleware(group_auth))
+    dp.callback_query.middleware(AdminMiddleware(group_auth))
+```
+
+**Step 4: Update main.py - start_polling**
+
+Change line 88 from:
+
+```python
+        await dp.start_polling(bot)
+```
+
+to:
+
+```python
+        await dp.start_polling(
+            bot,
+            allowed_updates=["message", "callback_query", "chat_member", "my_chat_member"],
+        )
+```
+
+**Step 5: Register members router in handlers/__init__.py**
+
+At line 4, update imports to include members:
+
+```python
+from . import permissions, start, threads, branches, sessions, settings, shift_tab, finish, create_flow, common, messages, migration, audio, members
+```
+
+At line 17 (before `dp.include_router(messages.router)`), add:
+
+```python
+    dp.include_router(members.router)       # Member join/leave events - MUST be before messages
+```
+
+**Note:** `messages.router` must remain LAST because it catches all text messages.
+
+**Step 6: Test manually**
 
 Run: `./kill-instance-and-start-from-worktree.sh`
 Test: Add bot to a test group where you are admin
 
-**Step 5: Commit**
+**Step 7: Commit**
 
 ```bash
 git add src/codogram/main.py src/codogram/handlers/__init__.py
@@ -1326,12 +1403,14 @@ git commit -m "docs(e2e): add group authorization test cases"
 
 ## Summary
 
-| Task | Description | Files |
-|------|-------------|-------|
-| 1 | Config functions | config.py, test_config.py |
-| 2 | GroupAuthService | services/group_auth.py, test_group_auth.py |
-| 3 | Strings | strings.py, test_strings.py |
-| 4 | Members handler | handlers/members.py, test_members.py |
-| 5 | AdminMiddleware | middleware/admin.py, test_admin_middleware.py |
-| 6 | Integration | main.py, handlers/__init__.py |
-| 7 | E2E docs | docs/e2e/commands/group-auth.md |
+| Task | Description | Files | Tests |
+|------|-------------|-------|-------|
+| 1 | Config functions | config.py, test_config.py | 6 |
+| 2 | GroupAuthService | services/group_auth.py, tests/services/test_group_auth.py | 15 |
+| 3 | Strings | strings.py, test_strings.py | 1 |
+| 4 | Members handler | handlers/members.py, tests/test_handlers_members.py | 14 |
+| 5 | AdminMiddleware | middleware/admin.py, test_admin_middleware.py | 8 |
+| 6 | Integration | main.py, handlers/__init__.py | manual |
+| 7 | E2E docs | docs/e2e/commands/group-auth.md | E2E |
+
+**Total new tests:** 44
