@@ -546,6 +546,14 @@ Emoji pack из аватарок участников группы:
 
 ## PoC / Research
 
+### Подключение к существующей сессии Claude
+Подключить Telegram к Claude сессии, запущенной из терминала:
+- Юзер запускает `claude` в tmux на ноуте
+- Отправляет `/connect` или `/attach` в Telegram
+- Бот находит существующие tmux сессии с Claude
+- Показывает список для выбора (или авто-подключение если одна)
+- Начинает мониторить сессию на prompts/tool calls
+
 ### codogram-tmux-only
 Эксперимент: использовать только tmux capture-pane без jsonl.
 - См. `docs/designs/2025-12-23-telegram-bridge-tmux-only.md`

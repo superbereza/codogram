@@ -548,6 +548,14 @@ Replace large dot `•` with dot in code block:
 
 ## PoC / Research
 
+### Attach to existing Claude session
+Connect Telegram to a Claude session started from terminal:
+- User starts `claude` in tmux on laptop
+- Sends `/connect` or `/attach` in Telegram
+- Bot discovers existing tmux sessions with Claude
+- Shows list to pick from (or auto-connect if only one)
+- Starts monitoring the session for prompts/tool calls
+
 ### codogram-tmux-only
 Experiment: use only tmux capture-pane without jsonl.
 - See `docs/designs/2025-12-23-telegram-bridge-tmux-only.md`
