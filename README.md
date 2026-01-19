@@ -1,6 +1,7 @@
 # Codogram
 
 Telegram bot for managing Claude Code sessions from your phone.
+(bring your own claude code)
 
 **[Русская версия](README.ru.md)**
 
