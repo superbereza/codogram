@@ -11,3 +11,4 @@ tmp/
 logs/
 .worktrees/
 .mcp.json
+.DS_Store
