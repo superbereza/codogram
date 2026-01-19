@@ -10,19 +10,18 @@ from aiogram.types import BotCommand, BotCommandScopeChat, BotCommandScopeAllPri
 # is_basic=True -> included in basic menu
 # All commands included in forum menu
 _ALL_COMMANDS = [
-    ("esc", "Cancel current operation", True),
-    ("auto_accept", "Toggle auto-accept mode", True),
+    ("esc", "Send Esc, stop current operation", True),
     ("shift_tab", "Cycle Claude approval mode", True),
-    ("thread", "New topic in project directory", True),
-    ("branch", "New isolated feature branch + topic", False),  # forum only
-    ("clear", "Clear context, start fresh", True),
-    ("finish", "Merge branch, archive topic", False),  # forum only
-    ("start", "Connect Claude or show status", True),
-    ("settings", "View current settings", True),
-    ("restart", "Force restart Claude", True),
-    ("get_debug_ids", "Show chat and thread IDs", True),
-    ("help", "List all commands", True),
-    ("reset_all", "Reset project completely", True),
+    ("auto_accept", "Accept every Claude permission 🚧", True),
+    ("new_chat", "Create new chat: topic & Claude session", True),
+    ("finish_chat", "Archive chat and stop Claude", False),  # forum only
+    ("start", "Connect or resume", True),
+    ("settings", "Show settings", True),
+    ("clear_context", "Clear current Claude context", True),
+    ("reset_chat", "Restart Claude process", True),
+    ("get_debug_ids", "Debug info", True),
+    ("help", "Show help", True),
+    ("hard_reset", "Full project reset", True),
 ]
 
 # Derived lists (no duplication)
