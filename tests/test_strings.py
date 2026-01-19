@@ -38,3 +38,17 @@ def test_project_state_strings_exist():
     assert hasattr(strings, 'BTN_DELETE_DIR')
     assert hasattr(strings, 'BTN_DELETE_ANYWAY')
     assert hasattr(strings, 'BTN_GO_BACK')
+
+
+def test_group_authorization_strings_exist():
+    """Group authorization strings are defined."""
+    from codogram import strings
+    assert hasattr(strings, "ERR_GROUP_NOT_ALLOWED")
+    assert hasattr(strings, "ERR_GROUP_NOT_ALLOWED_POPUP")
+    assert hasattr(strings, "GROUP_REGISTERED")
+    assert hasattr(strings, "GROUP_DEACTIVATED")
+    # Check tone-of-voice: status prefix
+    assert "`[x]`" in strings.ERR_GROUP_NOT_ALLOWED
+    assert "[x]" in strings.ERR_GROUP_NOT_ALLOWED_POPUP
+    assert "`[v]`" in strings.GROUP_REGISTERED
+    assert "`[!]`" in strings.GROUP_DEACTIVATED

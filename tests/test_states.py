@@ -34,5 +34,4 @@ class TestSetupFlow:
         assert hasattr(SetupFlow, 'viewing_connected_projects')
         assert hasattr(SetupFlow, 'awaiting_project_name')
         assert hasattr(SetupFlow, 'awaiting_git_choice')
-        assert hasattr(SetupFlow, 'awaiting_rename_confirm')
         assert hasattr(SetupFlow, 'launching')

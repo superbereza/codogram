@@ -12,6 +12,7 @@ from aiogram import Bot, Dispatcher
 
 from .config import settings
 from .middleware.admin import AdminMiddleware
+from .services.group_auth import GroupAuthService
 from .middleware.bot_admin_rights import BotAdminRightsMiddleware
 from .middleware.clear_create_state import ClearCreateStateMiddleware
 from .middleware.setup_blocker import SetupBlockerMiddleware
@@ -37,9 +38,13 @@ async def main():
     dp = Dispatcher()
     dp["telegram_queue"] = telegram_queue  # Register for aiogram DI
 
+    # Group authorization service
+    group_auth = GroupAuthService()
+    dp["group_auth"] = group_auth  # Register for aiogram DI
+
     # Global admin check - protects ALL routers
-    dp.message.middleware(AdminMiddleware())
-    dp.callback_query.middleware(AdminMiddleware())
+    dp.message.middleware(AdminMiddleware(group_auth))
+    dp.callback_query.middleware(AdminMiddleware(group_auth))
 
     # Block if bot awaiting admin rights (after migration)
     dp.message.middleware(BotAdminRightsMiddleware())
