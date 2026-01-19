@@ -1,5 +1,7 @@
 # Migration Admin Rights Handling
 
+**Status:** Implemented
+
 ## Problem
 
 При миграции group → supergroup:
@@ -17,6 +19,8 @@
 ## Solution
 
 Добавить флаг `awaiting_admin_rights` в ProjectState и middleware для блокировки.
+
+**Важное UX решение:** Admin rights НЕ запрашиваются при начальном setup в обычном чате. Только при миграции (включение topics). Это избегает двойного запроса прав.
 
 ### Data Model Changes
 
@@ -220,3 +224,58 @@ async def on_bot_added(event, state):
 
     await _start_setup_flow(...)
 ```
+
+## Additional Implementation (2026-01-18)
+
+### Setup Flow UX Changes
+
+1. **No admin rights at initial setup** — права не запрашиваются при добавлении бота в обычный чат. Setup flow идёт напрямую к выбору типа (Clone/Connect/New).
+
+2. **chat_title в FSM state** — сохраняем `chat.title` в state при старте setup flow, так как в callbacks `message.chat.title` может быть пустым.
+
+3. **Auto-sanitize input** — вместо ошибки "Invalid name" автоматически санитизируем ввод пользователя (пробелы → дефисы, кириллица → транслит).
+
+4. **Message cleanup** — удаляем предыдущие сообщения бота с кнопками при переходе на следующий шаг (`bot_message_id` в state).
+
+### Rename Flow After Migration
+
+После получения admin прав показываем подтверждение:
+
+```
+Rename chat to `{name}` to align with project name?
+[Yes] [Skip]
+```
+
+**Хендлеры:**
+- `migration:rename_yes` — переименовать, показать success + emoji pack
+- `migration:rename_skip` — пропустить, показать success + emoji pack
+
+**Код:**
+```python
+@router.callback_query(F.data == "migration:rename_yes")
+async def on_rename_yes(callback, telegram_queue):
+    project = project_manager.get_by_chat(chat.id)
+    try:
+        await callback.bot.set_chat_title(chat.id, project.project_name)
+        await callback.message.delete()
+    except Exception:
+        await callback.message.edit_text(SETUP_RENAME_FAILED)
+    await _send_migration_success(...)
+
+@router.callback_query(F.data == "migration:rename_skip")
+async def on_rename_skip(callback, telegram_queue):
+    await callback.message.delete()
+    await _send_migration_success(...)
+```
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `handlers/setup/triggers.py` | Убран admin check, добавлен `chat_title` в state |
+| `handlers/setup/new_project_flow.py` | Auto-sanitize, message cleanup, `chat_title` из state |
+| `handlers/setup/launch.py` | Удаление предыдущего сообщения |
+| `handlers/setup/clone_flow.py` | `chat_title` из state |
+| `handlers/setup/connect_flow.py` | `chat_title` из state |
+| `handlers/migration.py` | Rename confirmation (Yes/Skip), `_send_migration_success` helper |
+| `strings.py` | Updated `SETUP_RENAME_PROMPT`, fixed `\n` in `SETUP_RENAME_FAILED` |
