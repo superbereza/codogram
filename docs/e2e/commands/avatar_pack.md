@@ -147,7 +147,7 @@ mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
 
 ## TC-AVATAR-007: Topic launch shows emoji hint when pack enabled
 
-**Tags:** critical, avatar_pack, threads
+**Tags:** critical, avatar_pack, new_chat
 **Preconditions:** Pack enabled (feat_avatar_pack=true)
 
 **Setup:**
@@ -158,7 +158,12 @@ mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
 
 **Steps:**
 ```python
-mcp__telegram__send_message(chat_id=-1003356094635, message="/thread_create avatar_test")
+# Create topic via /new_chat → Create here → send name
+mcp__telegram__send_message(chat_id=-1003356094635, message="/new_chat")
+# Wait 2s
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="Create here")
+# Wait 2s
+mcp__telegram__send_message(chat_id=-1003356094635, message="avatar_test")
 # Wait 10s (Claude launch)
 # Find the new topic and read messages
 mcp__telegram__list_topics(chat_id=-1003356094635)
@@ -172,19 +177,26 @@ mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=TOPIC_ID, limit=5)
 
 **Cleanup:**
 ```python
-mcp__telegram__send_message(chat_id=-1003356094635, message="/thread_delete avatar_test")
+# Archive topic via /finish_chat
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=TOPIC_ID, text="/finish_chat")
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="Archive")
 ```
 
 ---
 
 ## TC-AVATAR-008: Topic launch has NO hint when pack disabled
 
-**Tags:** full, avatar_pack, threads
+**Tags:** full, avatar_pack, new_chat
 **Preconditions:** Pack disabled (feat_avatar_pack=false)
 
 **Steps:**
 ```python
-mcp__telegram__send_message(chat_id=-1003356094635, message="/thread_create no_hint_test")
+# Create topic via /new_chat → Create here → send name
+mcp__telegram__send_message(chat_id=-1003356094635, message="/new_chat")
+# Wait 2s
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="Create here")
+# Wait 2s
+mcp__telegram__send_message(chat_id=-1003356094635, message="no_hint_test")
 # Wait 10s
 mcp__telegram__list_topics(chat_id=-1003356094635)
 mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=TOPIC_ID, limit=5)
@@ -196,7 +208,9 @@ mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=TOPIC_ID, limit=5)
 
 **Cleanup:**
 ```python
-mcp__telegram__send_message(chat_id=-1003356094635, message="/thread_delete no_hint_test")
+# Archive topic via /finish_chat
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=TOPIC_ID, text="/finish_chat")
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="Archive")
 ```
 
 ---

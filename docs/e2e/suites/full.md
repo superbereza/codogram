@@ -10,7 +10,7 @@
 ### Start Edge Cases
 | ID | Название | Файл |
 |----|----------|------|
-| TC-START-008 | /restart перезапуск | commands/start.md |
+| TC-START-008 | /start in forum shows extended menu | commands/start.md |
 | TC-START-009 | /start no directory | commands/start.md |
 | TC-START-010 | /start git clone flow | commands/start.md |
 | TC-START-011 | /start multiple tmux choice | commands/start.md |
@@ -18,8 +18,8 @@
 ### Sessions Extended
 | ID | Название | Файл |
 |----|----------|------|
-| TC-SESSIONS-003 | /clear resets session | commands/sessions.md |
-| TC-SESSIONS-004 | /resume explicit resume | commands/sessions.md |
+| TC-SESSIONS-003 | /new alias works | commands/sessions.md |
+| TC-SESSIONS-004 | /reset_chat restarts Claude | commands/sessions.md |
 
 ### Settings
 | ID | Название | Файл |

@@ -1,4 +1,4 @@
-# /start, /restart Tests
+# /start, /reset_chat Tests
 
 ## TC-START-001: /start connects to existing tmux
 
@@ -203,7 +203,7 @@ mcp__telegram__send_message(chat_id=FORUM_CHAT_ID, message="/start")
 ```
 
 **Expected:**
-- ASK USER: "Can you see /branch and /finish in bot menu?"
+- ASK USER: "Can you see /new_chat and /finish_chat in bot menu?"
 
 ---
 
@@ -219,7 +219,7 @@ mcp__telegram__send_message(chat_id=REGULAR_GROUP_ID, message="/start")
 ```
 
 **Expected:**
-- ASK USER: "Confirm that /branch and /finish are NOT in bot menu"
+- ASK USER: "Confirm that /new_chat and /finish_chat are NOT in bot menu"
 
 ---
 
@@ -252,7 +252,7 @@ mcp__telegram__list_messages(chat_id=NEW_CHAT_ID, limit=5)
 **Expected:**
 - chat_id changed in config
 - Notification: "[v] Topics enabled..." in new chat
-- ASK USER: "Can you see /branch and /finish in bot menu?"
+- ASK USER: "Can you see /new_chat and /finish_chat in bot menu?"
 
 ---
 
@@ -298,12 +298,9 @@ mcp__telegram__list_messages(chat_id=NEW_CHAT_ID, limit=10)
 
 **Setup:**
 ```bash
-# Create branch topic with worktree
-mcp__telegram__send_message(chat_id=-1003356094635, message="/branch stale-test")
-# Wait 30s for session to bind
-# Kill tmux
+# Create branch topic with worktree via /new_chat → Create isolated flow
+# Then kill tmux and delete worktree directory
 tmux kill-session -t claude-codogram-testing-area-stale-test 2>/dev/null || true
-# Delete worktree directory
 rm -rf /home/superbereza/dev/codogram/.worktrees/stale-test
 ```
 
@@ -409,7 +406,7 @@ mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=TOPIC_ID, limit=3)
 ```
 
 **Expected:**
-- UI: "[v] Topic archived. Use General or /thread for new session."
+- UI: "[v] Topic archived. Use General or /new_chat for new session."
 - State: Topic closed (archived icon 📁)
 - State: No new Claude session started
 
