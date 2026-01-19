@@ -180,6 +180,7 @@ async def _start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
         if not has_rights:
             # Ask for admin rights
             await state.set_state(SetupFlow.awaiting_admin_rights)
+            await state.update_data(chat_title=chat.title or "")
             await bot.send_message(
                 chat.id,
                 strings.SETUP_ADMIN_REQUIRED,
@@ -190,6 +191,7 @@ async def _start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
 
     # Has rights (supergroup) or regular group - show setup type selection
     await state.set_state(SetupFlow.awaiting_setup_type)
+    await state.update_data(chat_title=chat.title or "")
     await bot.send_message(
         chat.id,
         strings.SETUP_CHOOSE_TYPE,
