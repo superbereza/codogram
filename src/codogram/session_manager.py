@@ -123,6 +123,9 @@ class ThreadInfo:
     feat_thinking_status: bool = False  # Show Claude's thinking status
     # Note: feat_suggestions is project-level only (in ProjectState)
 
+    # Response mode: "all", "polite", "mentions"
+    response_mode: str = "all"
+
     # Persisted message IDs (for cleanup after restart):
     last_suggestion_msg_id: int | None = None  # Last 💡 message ID
 
@@ -181,6 +184,9 @@ class ProjectState:
     # Experimental features (project-wide default):
     feat_thinking_status: bool = False
     feat_suggestions: bool = True
+
+    # Response mode: "all", "polite", "mentions"
+    response_mode: str = "all"
 
     # Avatar emoji pack:
     feat_avatar_pack: bool = True
