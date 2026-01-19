@@ -201,17 +201,20 @@ MISSING=()
 DESCRIPTIONS=()
 
 # Check Python >= 3.10 (checks python3, then python3.12/3.11/3.10)
-# Sets PYTHON_CMD to the best available python
+# Sets PYTHON_CMD and PY_VERSION globals
 PYTHON_CMD=""
+PY_VERSION=""
 
 find_python() {
+    PYTHON_CMD=""
+    PY_VERSION=""
+
     # First try default python3
     if command -v python3 &> /dev/null; then
-        local version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-        local minor=$(echo "$version" | cut -d. -f2)
+        PY_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+        local minor=$(echo "$PY_VERSION" | cut -d. -f2)
         if [[ $minor -ge 10 ]]; then
             PYTHON_CMD="python3"
-            echo "$version"
             return 0
         fi
     fi
@@ -219,9 +222,8 @@ find_python() {
     # Try versioned pythons (Homebrew, pyenv, etc.)
     for py_cmd in python3.12 python3.11 python3.10; do
         if command -v "$py_cmd" &> /dev/null; then
-            local version=$($py_cmd -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+            PY_VERSION=$($py_cmd -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
             PYTHON_CMD="$py_cmd"
-            echo "$version"
             return 0
         fi
     done
@@ -229,7 +231,7 @@ find_python() {
     return 1
 }
 
-PY_VERSION=$(find_python)
+find_python
 if [[ -n "$PYTHON_CMD" ]]; then
     print_success "python found: $PYTHON_CMD ($PY_VERSION)"
 else
@@ -569,7 +571,7 @@ print_step "Setting up Python virtual environment..."
 # Re-check PYTHON_CMD (might have been installed above)
 if [[ -z "$PYTHON_CMD" ]]; then
     # Try to find again after installation
-    PY_VERSION=$(find_python)
+    find_python
 fi
 
 if [[ -z "$PYTHON_CMD" ]]; then
