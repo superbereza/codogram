@@ -111,6 +111,14 @@ git pull
 - cwd is fixed at `/start` (cd not tracked)
 - Session detection delay up to 15 seconds
 
+## Uninstall
+
+Just delete the codogram folder — everything (including venv) is inside:
+
+```bash
+rm -rf codogram
+```
+
 ## Contact
 
 Questions, ideas, bugs? Write to [@superbereza](https://t.me/superbereza) on Telegram.

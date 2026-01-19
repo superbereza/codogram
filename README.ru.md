@@ -110,6 +110,14 @@ git pull
 - cwd фиксируется при `/start` (cd не отслеживается)
 - Обнаружение сессий с задержкой до 15 сек
 
+## Удаление
+
+Просто удали папку codogram — всё (включая venv) внутри:
+
+```bash
+rm -rf codogram
+```
+
 ## Контакт
 
 Вопросы, идеи, баги? Пиши [@superbereza](https://t.me/superbereza) в Telegram.

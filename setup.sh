@@ -250,8 +250,17 @@ else
 fi
 
 # Check git
+GIT_CONFIGURED=false
 if command -v git &> /dev/null; then
-    print_success "git found"
+    # Check if git is configured
+    if git config --global user.name &> /dev/null && git config --global user.email &> /dev/null; then
+        GIT_NAME=$(git config --global user.name)
+        GIT_EMAIL=$(git config --global user.email)
+        print_success "git found and configured ($GIT_NAME <$GIT_EMAIL>)"
+        GIT_CONFIGURED=true
+    else
+        print_success "git found (not configured yet)"
+    fi
 else
     print_warning "git not found"
     MISSING+=("git")
@@ -259,8 +268,15 @@ else
 fi
 
 # Check gh
+GH_AUTHENTICATED=false
 if command -v gh &> /dev/null; then
-    print_success "gh found"
+    # Check if gh is authenticated
+    if gh auth status &> /dev/null; then
+        print_success "gh found and authenticated"
+        GH_AUTHENTICATED=true
+    else
+        print_success "gh found (not logged in yet)"
+    fi
 else
     print_warning "gh not found"
     MISSING+=("gh")
@@ -379,21 +395,35 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
                         sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
                     fi
                 else
-                    # macOS - don't auto-install, show warning once
-                    echo ""
-                    print_warning "Python >= 3.10 required. Please install manually:"
-                    echo ""
-                    echo "  Via Homebrew:"
-                    echo -e "    ${YELLOW}brew install python${NC}"
-                    echo ""
-                    echo "  Or via pyenv:"
-                    echo -e "    ${YELLOW}brew install pyenv${NC}"
-                    echo -e "    ${YELLOW}pyenv install 3.12${NC}"
-                    echo ""
-                    echo "  Guide: https://docs.python-guide.org/starting/install3/osx/"
-                    echo ""
-                    # Mark as not installed (will be excluded from SKIPPED since it's in TO_INSTALL)
-                    MACOS_PYTHON_SHOWN=true
+                    # macOS - check if higher Python version is available
+                    FOUND_PYTHON=""
+                    for py_cmd in python3.12 python3.11 python3.10; do
+                        if command -v "$py_cmd" &> /dev/null; then
+                            FOUND_PYTHON="$py_cmd"
+                            break
+                        fi
+                    done
+
+                    if [[ -n "$FOUND_PYTHON" ]]; then
+                        PY_VER=$($FOUND_PYTHON -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+                        print_success "Found $FOUND_PYTHON ($PY_VER) — will use it for venv"
+                    else
+                        echo ""
+                        print_warning "Python >= 3.10 required. Please install:"
+                        echo ""
+                        echo "  Via Homebrew:"
+                        echo -e "    ${YELLOW}brew install python@3.12${NC}"
+                        echo ""
+                        echo "  Or via pyenv:"
+                        echo -e "    ${YELLOW}brew install pyenv${NC}"
+                        echo -e "    ${YELLOW}pyenv install 3.12${NC}"
+                        echo -e "    ${YELLOW}pyenv global 3.12${NC}"
+                        echo ""
+                        echo "  Then run ./setup.sh again"
+                        echo ""
+                        # Mark as not installed
+                        MACOS_PYTHON_SHOWN=true
+                    fi
                 fi
                 ;;
             tmux)
@@ -679,10 +709,18 @@ echo "To start the bot:"
 echo -e "  ${YELLOW}./stop-and-restart.sh${NC}"
 echo ""
 echo "Then send /start to your bot in Telegram."
-echo ""
-echo -e "${DIM}Don't forget to configure git (if not done):${NC}"
-echo -e "${DIM}  git config --global user.name \"Your Name\"${NC}"
-echo -e "${DIM}  git config --global user.email \"you@example.com\"${NC}"
-echo -e "${DIM}  gh auth login${NC}"
+
+# Show git/gh hints only if not configured
+if [[ "$GIT_CONFIGURED" != true ]] || [[ "$GH_AUTHENTICATED" != true ]]; then
+    echo ""
+    echo -e "${DIM}Don't forget to configure (if not done):${NC}"
+    if [[ "$GIT_CONFIGURED" != true ]]; then
+        echo -e "${DIM}  git config --global user.name \"Your Name\"${NC}"
+        echo -e "${DIM}  git config --global user.email \"you@example.com\"${NC}"
+    fi
+    if [[ "$GH_AUTHENTICATED" != true ]]; then
+        echo -e "${DIM}  gh auth login${NC}"
+    fi
+fi
 echo ""
 echo "See docs/setup.md for more information."
