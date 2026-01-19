@@ -58,5 +58,6 @@ def test_dashboard_keyboard():
     kb = dashboard_keyboard()
     buttons = kb.inline_keyboard[0]
 
-    assert len(buttons) == 1
+    assert len(buttons) == 2
     assert buttons[0].callback_data == "dash:refresh"
+    assert buttons[1].callback_data == "dash:close"

@@ -9,7 +9,7 @@ def test_format_dashboard_empty():
 
     result = format_dashboard([])
 
-    assert "Пока нет подключённых проектов" in result
+    assert "No projects connected yet" in result
 
 
 def test_format_dashboard_with_projects():
@@ -31,8 +31,8 @@ def test_format_dashboard_with_projects():
     assert "codogram" in result
     assert "/home/user/dev/codogram" in result
     assert "superbereza" in result
-    assert "3 участник" in result
-    assert "2 сессий" in result
+    assert "3 members" in result
+    assert "2 Claude sessions" in result
 
 
 def test_count_active_sessions():

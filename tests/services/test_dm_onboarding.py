@@ -44,9 +44,8 @@ def test_format_validation_checks():
 
     formatted = format_validation_checks(results)
 
-    assert "[v]" in formatted
+    assert "✓" in formatted
     assert "check1 ok" in formatted
-    assert "[x]" in formatted
-    assert "Error 2" in formatted
-    assert "Fix 2" in formatted
-    assert "Error 3" in formatted
+    assert "✗" in formatted
+    assert "check2" in formatted
+    assert "check3" in formatted
