@@ -12,6 +12,10 @@ Read the current state from:
 Generate a formatted list in this exact format:
 
 ```
+**Done** (only if items moved to Done since last review):
+- **Item name** — was Beta Test
+- **Item name** — new
+
 **Beta Test** (count):
 1. Item name
 2. Item name
@@ -58,3 +62,7 @@ Rules:
 - Get bug date from filename (YYYY-MM-DD prefix)
 - Count items in each section and show in parentheses
 - Use simple list format, no tables
+- Mark changes since last review in this conversation:
+  - Make changed item **bold**
+  - Add comment after `—`: `**Item name** — was In Progress` or `**Item name** — new`
+  - Examples: `**Avatar emoji pack** — was In Progress`, `**Tables rendering** — new`

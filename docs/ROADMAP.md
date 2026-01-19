@@ -342,13 +342,6 @@ Technical debt reduction in phases:
 - **Phase 3 (backlog):** LaunchService extraction, DEPRECATED fields, ThreadInfo refactoring
 - See [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
 
-### Role model & chat registration
-Minimal permission system for multi-user access:
-- `/register_chat` — allow everyone in chat to message the bot (not just admins)
-- Admin-only settings commands
-- Roles: admin (full control) vs user (can send messages)
-- Per-chat configuration
-
 ## Backlog
 
 ### Merge thread and branch commands
