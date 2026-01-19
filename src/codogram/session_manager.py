@@ -176,7 +176,7 @@ class ProjectState:
 
     # Experimental features (project-wide default):
     feat_thinking_status: bool = False
-    feat_suggestions: bool = False
+    feat_suggestions: bool = True
 
     # Avatar emoji pack:
     feat_avatar_pack: bool = False
