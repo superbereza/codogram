@@ -77,12 +77,12 @@ async def create_thread_with_session(
     # 2. Create worktree if requested
     worktree_path: str | None = None
     if create_worktree:
-        worktree_path = await _create_worktree_with_status(
+        worktree_path, worktree_error = await _create_worktree_with_status(
             telegram_queue, chat_id, thread_id, project, name, base_branch
         )
         if worktree_path is None:
             # Failed - topic exists but no worktree/claude
-            return CreateThreadResult(success=False, error="Failed to create worktree")
+            return CreateThreadResult(success=False, error=worktree_error or "Failed to create worktree")
         thread.worktree_path = worktree_path
         project_manager._save()
 
@@ -115,11 +115,11 @@ async def _create_worktree_with_status(
     project: ProjectState,
     branch_name: str,
     base_branch: str | None,
-) -> str | None:
+) -> tuple[str | None, str | None]:
     """
     Create git worktree with status messages in the topic.
 
-    Returns worktree path on success, None on failure.
+    Returns (worktree_path, error) - path on success, error message on failure.
     """
     from ..worktree import create_worktree
 
@@ -148,7 +148,7 @@ async def _create_worktree_with_status(
             thread_id=thread_id,
             parse_mode="MarkdownV2"
         )
-        return None
+        return None, result.error
 
     # Status: worktree created
     await telegram_queue.send(
@@ -158,4 +158,4 @@ async def _create_worktree_with_status(
         parse_mode="MarkdownV2"
     )
 
-    return str(worktree_path)
+    return str(worktree_path), None

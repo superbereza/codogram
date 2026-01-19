@@ -57,7 +57,7 @@ def create_project_directory(path: str) -> LaunchResult:
 
 
 def git_init(path: str) -> LaunchResult:
-    """Initialize git repository."""
+    """Initialize git repository with initial empty commit."""
     try:
         result = subprocess.run(
             ["git", "init"],
@@ -67,6 +67,17 @@ def git_init(path: str) -> LaunchResult:
         )
         if result.returncode != 0:
             return LaunchResult(success=False, error=result.stderr)
+
+        # Create initial empty commit (required for worktrees)
+        result = subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "Initial commit"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return LaunchResult(success=False, error=result.stderr)
+
         return LaunchResult(success=True)
     except Exception as e:
         return LaunchResult(success=False, error=str(e))

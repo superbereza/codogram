@@ -89,6 +89,16 @@ def is_git_repo(path: Path) -> bool:
     return result.returncode == 0
 
 
+def has_any_commits(repo_path: Path) -> bool:
+    """Check if repo has at least one commit."""
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_path,
+        capture_output=True
+    )
+    return result.returncode == 0
+
+
 def max_branch_name_length(project_name: str) -> int:
     """Calculate max branch name length for project."""
     return 45 - len(project_name)

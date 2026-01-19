@@ -52,7 +52,7 @@ def _relative_to_base(path: str) -> str:
 
 # ===== Keyboards =====
 
-def _context_keyboard(has_git: bool) -> InlineKeyboardMarkup:
+def _context_keyboard(has_git: bool) -> InlineKeyboardMarkup | None:
     """Build keyboard for context step."""
     if has_git:
         return InlineKeyboardMarkup(inline_keyboard=[
