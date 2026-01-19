@@ -253,6 +253,18 @@ Per-thread/per-project verbose output toggle and /settings UX:
 - Close button deletes settings message
 - See [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
+### DM onboarding
+Interactive onboarding in direct messages with bot:
+- Welcome carousel with bot features overview
+- Environment validation (BASE_DIR, tmux, claude, git, gh, whisper)
+- Critical checks block progress, optional checks show warnings
+- `/check_env` command to rerun validation anytime
+- `/dashboard` shows all projects with active sessions count
+- `/intro` to replay onboarding
+- Push notification when bot is added to a group
+- DM-specific command menu
+- See [docs/designs/done/2025-01-18-dm-onboarding.md](designs/done/2025-01-18-dm-onboarding.md)
+
 ## Beta Test
 
 ### Avatar emoji pack
@@ -318,19 +330,14 @@ Technical debt reduction in phases:
 - **Phase 3 (backlog):** LaunchService extraction, DEPRECATED fields, ThreadInfo refactoring
 - See [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
 
-### Bot onboarding
-Interactive onboarding in direct messages with bot:
-- Welcome flow explaining bot features
-- Step-by-step guidance for first-time users
-
-## Backlog
-
 ### Role model & chat registration
 Minimal permission system for multi-user access:
 - `/register_chat` — allow everyone in chat to message the bot (not just admins)
 - Admin-only settings commands
 - Roles: admin (full control) vs user (can send messages)
 - Per-chat configuration
+
+## Backlog
 
 ### Merge thread and branch commands
 Simplify by removing separate /thread command:
