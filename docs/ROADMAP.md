@@ -253,6 +253,17 @@ Per-thread/per-project verbose output toggle and /settings UX:
 - Close button deletes settings message
 - See [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
+### Avatar emoji pack
+Custom emoji pack from group members' avatars:
+- `/exp_avatar_pack` — toggle on/off, create or delete pack
+- Create pack on group → supergroup migration (async)
+- Add avatar when member joins, remove when leaves
+- Generate placeholder (letter + color) for users without avatar
+- Fun random names: "Cosmic Dolphins", "Epic Titans", etc.
+- Topic launch hint with pack link when feature enabled
+- Limitation: Premium required to set custom emoji as topic icon
+- See [docs/designs/done/2026-01-18-emoji-pack-design.md](designs/done/2026-01-18-emoji-pack-design.md)
+
 ## Beta Test
 
 ### Set up flow redesign + robust start
@@ -311,15 +322,6 @@ Technical debt reduction in phases:
 Interactive onboarding in direct messages with bot:
 - Welcome flow explaining bot features
 - Step-by-step guidance for first-time users
-
-### Avatar emoji pack
-Custom emoji pack from group members' avatars:
-- Create pack on group → supergroup migration (async)
-- Add avatar when member joins, remove when leaves
-- Generate placeholder (letter + color) for users without avatar
-- Notification: "`[v]` Gift unlocked — avatar pack for topic icons"
-- Limitation: Premium required to set custom emoji as topic icon
-- See [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
 
 ## Backlog
 
