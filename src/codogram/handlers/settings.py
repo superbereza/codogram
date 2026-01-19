@@ -98,6 +98,9 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     auto_status = "● on" if auto_accept else "○ off"
     verbose_status = "● on" if verbose else "○ off"
 
+    # Response mode
+    response_mode = thread.response_mode if thread else project.response_mode
+
     # Experimental features
     feat_thinking = thread.feat_thinking_status if thread else project.feat_thinking_status
     # Note: feat_suggestions is project-level only
@@ -109,6 +112,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     lines.append("chat")
     lines.append(f"• auto-accept: {auto_status}")
     lines.append(f"• verbose: {verbose_status}")
+    lines.append(f"• response\\_mode: {response_mode}")
     lines.append("")
     lines.append("claude")
 
