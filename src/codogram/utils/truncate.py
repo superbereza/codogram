@@ -25,4 +25,9 @@ def truncate_body(text: str | None, verbose: bool) -> str | None:
     if len(lines) <= MAX_LINES:
         return text
 
-    return "\n".join(lines[:MAX_LINES]) + f"\n{strings.SNIP}"
+    truncated = lines[:MAX_LINES]
+    # Remove trailing empty lines before ellipsis
+    while truncated and not truncated[-1].strip():
+        truncated.pop()
+
+    return "\n".join(truncated) + f"\n{strings.SNIP}"
