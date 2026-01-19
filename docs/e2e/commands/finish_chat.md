@@ -1,10 +1,12 @@
-# /finish Tests
+# /finish_chat Tests
 
 Topic archiving and branch merging.
 
-## TC-FINISH-001: /finish archives topic
+Aliases: `/finish`, `/archive`, `/fc`
 
-**Tags:** critical, finish
+## TC-FINISHCHAT-001: /finish_chat archives topic
+
+**Tags:** critical, finish_chat
 **Preconditions:** Regular topic (not a branch)
 
 **Setup:**
@@ -16,7 +18,7 @@ cat .config.json | jq '.projects["codogram-testing-area"].threads | to_entries |
 **Steps:**
 ```python
 # In regular topic (e.g., 303)
-mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=303, text="/finish")
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=303, text="/finish_chat")
 # Wait 3s
 mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
 # Select archive option
@@ -31,9 +33,9 @@ mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=303, limit=3)
 
 ---
 
-## TC-FINISH-002: /finish merges branch
+## TC-FINISHCHAT-002: /finish_chat merges branch
 
-**Tags:** critical, finish, branches
+**Tags:** critical, finish_chat, branches
 **Preconditions:** Branch topic with worktree
 
 **Setup:**
@@ -49,7 +51,7 @@ git add . && git commit -m "test commit"
 **Steps:**
 ```python
 # In branch topic (e.g., 222)
-mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=222, text="/finish")
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=222, text="/finish_chat")
 # Wait 3s
 mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
 # Select merge option
@@ -65,3 +67,35 @@ mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=222, limit=5)
   - Worktree removed
   - Topic archived
   - `archived: true` in config
+
+---
+
+## TC-FINISHCHAT-003: /finish alias works
+
+**Tags:** finish_chat, aliases
+**Preconditions:** In a topic
+
+**Steps:**
+```python
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=303, text="/finish")
+# Wait 2s
+mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
+```
+
+**Expected:**
+- Shows same archive/merge options as /finish_chat
+
+## TC-FINISHCHAT-004: /fc alias works
+
+**Tags:** finish_chat, aliases
+**Preconditions:** In a topic
+
+**Steps:**
+```python
+mcp__telegram__reply_to_message(chat_id=-1003356094635, message_id=303, text="/fc")
+# Wait 2s
+mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
+```
+
+**Expected:**
+- Shows same archive/merge options as /finish_chat

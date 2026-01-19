@@ -57,12 +57,12 @@
 
 | # | ID | Название | Файл |
 |---|-----|----------|------|
-| 29 | TC-SESSIONS-001 | /new создаёт новую сессию | commands/sessions.md |
+| 29 | TC-SESSIONS-001 | /clear_context создаёт новую сессию | commands/sessions.md |
 | 30 | TC-SESSIONS-002 | /esc отменяет запрос | commands/sessions.md |
-| 31 | TC-THREADS-001 | /thread создаёт topic | commands/threads.md |
-| 32 | TC-BRANCHES-001 | /branch создаёт worktree + topic | commands/branches.md |
-| 33 | TC-FINISH-001 | /finish archive topic | commands/finish.md |
-| 34 | TC-FINISH-002 | /finish merge branch | commands/finish.md |
+| 31 | TC-NEWCHAT-001 | /new_chat shows context + choice | commands/new_chat.md |
+| 32 | TC-NEWCHAT-004 | Magic name creates chat | commands/new_chat.md |
+| 33 | TC-FINISHCHAT-001 | /finish_chat archives topic | commands/finish_chat.md |
+| 34 | TC-FINISHCHAT-002 | /finish_chat merges branch | commands/finish_chat.md |
 
 ### Settings
 
