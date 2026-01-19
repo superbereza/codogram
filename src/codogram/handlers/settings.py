@@ -28,32 +28,19 @@ async def cmd_get_debug_ids(message: Message, telegram_queue: TelegramQueue):
 
 @router.message(Command("help", ignore_case=True))
 async def cmd_help(message: Message, telegram_queue: TelegramQueue):
-    """Show available commands."""
-    text = """*Everyday:*
-/esc — Cancel current operation
-/auto\\_accept — Toggle auto\\-accept mode
+    """Show help with Close button."""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Close", callback_data="help_close")]
+    ])
+    await telegram_queue.reply(message, strings.HELP_TEXT, reply_markup=keyboard)
 
-*Create:*
-/thread — New topic in project directory
-/branch — New feature branch \\+ topic ⁽¹⁾
 
-*Complete:*
-/clear — Clear context, start fresh
-/finish — Merge branch, archive topic ⁽¹⁾
-
-*Settings:*
-/start — Connect Claude or show status
-/settings — View current settings
-/shift\\_tab — Cycle Claude approval mode
-/restart — Force restart Claude
-/get\\_debug\\_ids — Show chat and thread IDs
-
-*Help:*
-/help — This message
-
-⁽¹⁾ _Only in chats with Topics enabled_"""
-
-    await telegram_queue.reply(message, text)
+@router.callback_query(F.data == "help_close")
+async def on_help_close(callback: CallbackQuery):
+    """Close help message."""
+    await callback.message.delete()
+    await callback.answer()
 
 
 def _build_settings_text(project, thread, tmux_name: str) -> str:
