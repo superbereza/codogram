@@ -26,6 +26,18 @@
 - "Create avatar pack? Will generate emoji from member avatars."
 - Кнопки: [Yes, create] / [Not now]
 
+### При создании топика
+
+Если `feat_avatar_pack` включён, в сообщение `LAUNCH_READY_WITH_ATTACH` добавляется ссылка на pack:
+
+```
+`[v]` Claude ready
+
+To see Claude UI: `tmux attach -t {tmux_name}`
+
+→ Check this [pack](https://t.me/addemoji/{pack_name}) to personalize your topic
+```
+
 ### В `/settings`
 
 ```
@@ -45,18 +57,60 @@ experimental features
 
 | Файл | Назначение |
 |------|------------|
-| `services/emoji_pack.py` | Основная логика: create/add/remove/delete |
+| `adapters/sticker.py` | Adapter для Telegram Sticker API |
+| `services/emoji_pack.py` | Бизнес-логика: create/add/remove/delete |
 | `handlers/migration.py` | Триггер при включении topics |
 | `handlers/members.py` | Триггер при join/leave |
 | `handlers/settings.py` | Команда `/exp_avatar_pack` |
 | `keyboards/avatar_pack.py` | Клавиатуры для create/disable prompts |
 | `domain/project.py` | Поля `feat_avatar_pack`, `emoji_pack_name`, `emoji_map` |
 | `strings.py` | Все сообщения для emoji pack |
+| `launch_animation.py` | Подсказка про pack при создании топика |
+
+## Adapter (Telegram Sticker API)
+
+```python
+class StickerAdapter:
+    """Adapter для работы с Telegram Sticker API.
+
+    Изолирует Bot API от бизнес-логики для тестируемости.
+    """
+    def __init__(self, bot: Bot):
+        self.bot = bot
+
+    async def get_bot_username(self) -> str:
+        """Получить username бота."""
+
+    async def download_user_avatar(self, user_id: int) -> bytes | None:
+        """Скачать аватарку пользователя."""
+
+    async def create_emoji_pack(
+        self, owner_id: int, name: str, title: str, first_sticker: bytes, emoji: str
+    ) -> None:
+        """Создать emoji pack с первым стикером."""
+
+    async def add_sticker(self, owner_id: int, pack_name: str, sticker: bytes, emoji: str) -> str:
+        """Добавить стикер в pack. Возвращает custom_emoji_id."""
+
+    async def remove_sticker(self, pack_name: str, custom_emoji_id: str) -> None:
+        """Удалить стикер из pack по emoji_id."""
+
+    async def delete_pack(self, pack_name: str) -> None:
+        """Удалить весь pack."""
+
+    async def get_pack_stickers(self, pack_name: str) -> list[StickerInfo]:
+        """Получить список стикеров в pack'е."""
+```
 
 ## Структура сервиса
 
 ```python
 class EmojiPackService:
+    """Бизнес-логика emoji pack. Использует StickerAdapter, не Bot напрямую."""
+
+    def __init__(self, adapter: StickerAdapter):
+        self.adapter = adapter
+
     async def create_pack(self, chat_id: int, participants: list[User]) -> str:
         """Создать pack со всеми участниками. Возвращает pack name."""
 
@@ -72,8 +126,7 @@ class EmojiPackService:
     async def get_emoji_id(self, chat_id: int, user_id: int) -> str | None:
         """Получить custom_emoji_id по user_id."""
 
-    # Private
-    async def _download_avatar(self, user: User) -> bytes | None
+    # Private - image processing (не зависит от Telegram API)
     def _generate_placeholder(self, user: User) -> bytes
     def _process_image(self, image_bytes: bytes) -> bytes
     def _get_font(self, size: int) -> ImageFont.FreeTypeFont
@@ -197,9 +250,12 @@ async def cmd_exp_avatar_pack(message: Message, telegram_queue: TelegramQueue):
 
 ```python
 # config.py
-@property
-def bot_owner_id(self) -> int:
-    return self.admin_ids[0]
+def get_bot_owner_id(self) -> int:
+    """First admin (by ID) is considered bot owner for sticker pack ownership."""
+    admin_ids = self.get_admin_ids()
+    if not admin_ids:
+        raise ValueError("No admin IDs configured")
+    return min(admin_ids)  # Smallest ID for consistency
 ```
 
 **Pack naming:**
@@ -237,6 +293,9 @@ EMOJI_PACK_DELETED = "`[v]` Avatar pack disabled"
 
 # Во время создания (опционально)
 EMOJI_PACK_CREATING = "`[~]` Creating avatar pack..."
+
+# Подсказка при создании топика (если feat_avatar_pack ON)
+EMOJI_PACK_TOPIC_HINT = "→ Check this [pack]({pack_link}) to personalize your topic"
 ```
 
 ## API методы Telegram
