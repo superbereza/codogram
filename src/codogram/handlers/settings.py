@@ -492,6 +492,11 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
                 mode_text = "default"
             await callback.answer(f"Mode: {mode_text}")
 
+    elif action == "rm":  # response_mode
+        new_mode, _ = _cycle_response_mode(project, thread)
+        project_manager._save()
+        await callback.answer(f"Response: {new_mode}")
+
     # Update the settings message using shared helper
     text = _build_settings_text(project, thread, tmux_name)
     kb = settings_keyboard(tmux_name)
