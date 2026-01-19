@@ -355,6 +355,20 @@ Technical debt reduction in phases:
 
 ## Backlog
 
+### Team mode: user avatar and name for topics
+In team mode, personalize topics with user identity:
+- Topic icon = user's avatar (from emoji pack)
+- Topic name includes user's name
+- Easy to see who's working on what branch
+- Requires avatar emoji pack feature
+
+### Message response mode
+Per-chat setting for when bot should respond:
+- **All messages** — respond to everything (current behavior)
+- **Skip mentions** — don't respond when someone else is @mentioned
+- **Bot mention only** — respond only when bot is @mentioned
+- Toggle via `/settings` or inline buttons
+
 ### Persistent setup state
 Save FSM state to config file to survive bot restarts:
 - Save state and data on each `state.set_state()` / `state.update_data()`
