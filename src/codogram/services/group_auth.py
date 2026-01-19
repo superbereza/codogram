@@ -1,4 +1,6 @@
 """Group authorization service."""
+import asyncio
+
 from aiogram import Bot
 
 from ..config import (
@@ -8,6 +10,10 @@ from ..config import (
 )
 from ..middleware.admin import get_admin_ids
 from ..logging_config import logger
+
+# Retry settings for race condition
+CHECK_RETRY_DELAY = 0.3  # seconds
+CHECK_RETRY_MAX = 3  # attempts
 
 
 class GroupAuthService:
@@ -31,9 +37,20 @@ class GroupAuthService:
         Returns True if group was registered (or already was).
         Returns False if no admin from ADMIN_IDS found.
 
-        Race condition protection: if already checking this group, returns False.
+        Race condition handling: if already checking this group, wait and retry.
         """
-        if chat_id in self._checking:
+        # If already checking, wait for it to complete
+        for attempt in range(CHECK_RETRY_MAX):
+            if chat_id not in self._checking:
+                break
+            logger.debug(f"group_check_waiting: chat_id={chat_id} attempt={attempt + 1}")
+            await asyncio.sleep(CHECK_RETRY_DELAY)
+            # After waiting, check if group was registered
+            if self.is_allowed(chat_id):
+                return True
+        else:
+            # Still checking after max retries - reject
+            logger.warning(f"group_check_timeout: chat_id={chat_id}")
             return False
 
         self._checking.add(chat_id)
