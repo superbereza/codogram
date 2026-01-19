@@ -10,7 +10,7 @@ from ..session_manager import project_manager, ThreadInfo
 from ..telegram_queue import TelegramQueue
 from ..logging_config import logger
 from .. import strings
-from .create_flow import handle_name_input
+from .new_chat import handle_name_input
 from .common import normalize_thread_id
 
 router = Router(name="messages")
