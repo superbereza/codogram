@@ -9,9 +9,43 @@ from .. import strings
 from ..logging_config import logger
 from ..adapters.sticker import StickerAdapter
 from ..services.emoji_pack import EmojiPackService
+from ..services.response_mode import ResponseModeService
 from ..keyboards import avatar_pack_create_keyboard, avatar_pack_disable_keyboard
 
 router = Router(name="settings")
+
+
+def _cycle_response_mode(project, thread) -> tuple[str, str]:
+    """Cycle response mode and return (new_mode, explanation).
+
+    Returns:
+        Tuple of (mode_name, explanation_string)
+    """
+    modes = list(ResponseModeService.VALID_MODES)
+    explanations = {
+        "all": strings.RESPONSE_MODE_ALL,
+        "polite": strings.RESPONSE_MODE_POLITE,
+        "mentions": strings.RESPONSE_MODE_MENTIONS,
+    }
+
+    if thread:
+        current = thread.response_mode
+        try:
+            next_idx = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_idx = 0
+        thread.response_mode = modes[next_idx]
+        new_mode = thread.response_mode
+    else:
+        current = project.response_mode
+        try:
+            next_idx = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_idx = 0
+        project.response_mode = modes[next_idx]
+        new_mode = project.response_mode
+
+    return new_mode, explanations.get(new_mode, "")
 
 
 @router.message(Command("get_debug_ids", ignore_case=True))
@@ -231,34 +265,9 @@ async def cmd_response_mode(message: Message, telegram_queue: TelegramQueue):
     if project.threads:
         thread = project.threads.get(thread_id)
 
-    # Cycle through modes
-    modes = ["all", "polite", "mentions"]
-    explanations = {
-        "all": strings.RESPONSE_MODE_ALL,
-        "polite": strings.RESPONSE_MODE_POLITE,
-        "mentions": strings.RESPONSE_MODE_MENTIONS,
-    }
-
-    if thread:
-        current = thread.response_mode
-        try:
-            next_idx = (modes.index(current) + 1) % len(modes)
-        except ValueError:
-            next_idx = 0  # Invalid mode, reset to "all"
-        thread.response_mode = modes[next_idx]
-        new_mode = thread.response_mode
-    else:
-        current = project.response_mode
-        try:
-            next_idx = (modes.index(current) + 1) % len(modes)
-        except ValueError:
-            next_idx = 0  # Invalid mode, reset to "all"
-        project.response_mode = modes[next_idx]
-        new_mode = project.response_mode
-
+    new_mode, explanation = _cycle_response_mode(project, thread)
     project_manager._save()
 
-    explanation = explanations.get(new_mode, "")
     await telegram_queue.reply(message, f"response mode: {new_mode}\n_{explanation}_")
 
 
