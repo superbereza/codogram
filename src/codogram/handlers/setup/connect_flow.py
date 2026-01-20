@@ -57,6 +57,7 @@ async def show_folder_selection(message: Message, state: FSMContext, page: int =
         strings.SETUP_FOLDER_SELECT,
         reply_markup=folder_select_keyboard(page_folders, page, total_pages),
     )
+    await state.update_data(bot_message_id=message.message_id)
 
 
 @router.callback_query(
