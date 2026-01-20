@@ -1,6 +1,7 @@
 # Codogram
 
 Telegram bot for managing Claude Code sessions from your phone.
+(bring your own claude code)
 
 **[Русская версия](README.ru.md)**
 
@@ -104,11 +105,25 @@ git pull
 - [Installation Guide](docs/setup.md) — detailed setup instructions
 - [CLAUDE.md](CLAUDE.md) — context for Claude sessions
 
+## Troubleshooting
+
+**Bot ignores messages (but commands work)?**
+
+Disable privacy mode: [@BotFather](https://t.me/BotFather) → `/setprivacy` → your bot → `Disable`
+
 ## Limitations
 
 - One Claude per tmux session (split panes not supported)
 - cwd is fixed at `/start` (cd not tracked)
 - Session detection delay up to 15 seconds
+
+## Uninstall
+
+Just delete the codogram folder — everything (including venv) is inside:
+
+```bash
+rm -rf codogram
+```
 
 ## Contact
 

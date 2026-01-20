@@ -43,5 +43,6 @@ class SetupFlow(StatesGroup):
     viewing_connected_projects = State()
     awaiting_project_name = State()
     awaiting_git_choice = State()
+    awaiting_gh_visibility = State()     # Private/Public repo choice
     awaiting_rename_confirm = State()    # Offer to rename chat
     launching = State()                   # Blocking state during launch

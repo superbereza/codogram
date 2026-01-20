@@ -14,3 +14,14 @@ def git_choice_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=strings.BTN_GIT_NONE, callback_data="git:none")],
         [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data="git:back")],
     ])
+
+
+def visibility_keyboard() -> InlineKeyboardMarkup:
+    """Create keyboard for repository visibility choice."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text=strings.BTN_VISIBILITY_PRIVATE, callback_data="visibility:private"),
+            InlineKeyboardButton(text=strings.BTN_VISIBILITY_PUBLIC, callback_data="visibility:public"),
+        ],
+        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data="visibility:back")],
+    ])

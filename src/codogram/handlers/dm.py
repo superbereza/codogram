@@ -12,6 +12,7 @@ from ..keyboards.dm_onboarding import (
     validation_recheck_keyboard,
     dashboard_keyboard,
     cta_keyboard,
+    privacy_hint_keyboard,
 )
 from ..services.dm_onboarding import (
     get_slide_content,
@@ -218,15 +219,14 @@ async def run_validation_check(
     text = "\n".join(lines)
     await telegram_queue.send(chat_id, text)
 
-    # Delay before CTA
-    await asyncio.sleep(0.8)
+    # Delay before manual check hint
+    await asyncio.sleep(0.5)
 
-    # Send CTA as separate message with button
-    bot_info = await bot.get_me()
-    cta_text = strings.DM_CTA
-    keyboard = cta_keyboard(bot_info.username)
-    await telegram_queue.send(chat_id, cta_text, reply_markup=keyboard)
+    # Send privacy mode hint with "Done" button
+    keyboard = privacy_hint_keyboard()
+    await telegram_queue.send(chat_id, strings.DM_MANUAL_CHECK, reply_markup=keyboard)
 
+    # CTA will be sent after user clicks "Done"
     return True
 
 
@@ -256,6 +256,31 @@ async def on_recheck(callback: CallbackQuery, telegram_queue: TelegramQueue):
 
     if success:
         set_user_onboarded(user_id)
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "onb:privacy_done")
+async def on_privacy_done(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Handle 'Done' button on privacy mode hint."""
+    if not callback.message:
+        await callback.answer()
+        return
+
+    chat_id = callback.message.chat.id
+    bot = callback.bot
+
+    # Remove keyboard from the hint message
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    # Send CTA
+    bot_info = await bot.get_me()
+    cta_text = strings.DM_CTA
+    keyboard = cta_keyboard(bot_info.username)
+    await telegram_queue.send(chat_id, cta_text, reply_markup=keyboard)
 
     await callback.answer()
 

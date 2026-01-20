@@ -25,7 +25,7 @@ LAUNCH_CREATING_TMUX = f"{STATUS_PENDING} Creating tmux session..."
 LAUNCH_STARTING = f"{STATUS_PENDING} Starting Claude..."
 LAUNCH_RESUMING = f"{STATUS_PENDING} Resuming session..."
 LAUNCH_WAITING = f"{STATUS_PENDING} Waiting for Claude..."
-LAUNCH_TIMEOUT = f"{STATUS_ERR} Timeout: Claude didn't start in 2 minutes"
+LAUNCH_TIMEOUT = f"{STATUS_ERR} Timeout: Claude didn't start in 2 minutes\\. Try /reset\\_chat"
 LAUNCH_ERROR = f"{STATUS_ERR} Launch error: {{error}}"
 LAUNCH_READY = f"{STATUS_PENDING} Claude ready, binding session..."
 LAUNCH_READY_WITH_ATTACH = f"{STATUS_PENDING} Claude ready, binding session...\n\nTo see Claude UI: `tmux attach -t {{tmux_name}}`"
@@ -568,6 +568,7 @@ What to do\\?"""
 
 # Git choice
 SETUP_GIT_CHOICE = "Git setup for `{folder}`\\?"
+SETUP_GH_VISIBILITY = "Repository visibility\\?"
 SETUP_GIT_GH_NOT_INSTALLED = f"{STATUS_ERR} `gh` CLI not installed\\. Install from https://cli\\.github\\.com"
 SETUP_GIT_GH_NOT_AUTH = f"{STATUS_ERR} `gh` not authenticated\\. Run `gh auth login` first"
 
@@ -605,6 +606,8 @@ BTN_GIT_INIT = "git init"
 BTN_GIT_GH = "git init + gh repo create"
 BTN_GIT_CLONE = "git clone"
 BTN_GIT_NONE = "no git"
+BTN_VISIBILITY_PRIVATE = "🔒 Private"
+BTN_VISIBILITY_PUBLIC = "🌍 Public"
 BTN_RETRY = "Retry"
 BTN_CHANGE_URL = "Change URL"
 BTN_USE_EXISTING = "Use existing"
@@ -660,6 +663,14 @@ Fix and hit "Recheck\""""
 DM_VALIDATION_WARNINGS = """
 {warnings}"""
 
+# Manual check hint - shown after validation passes
+DM_MANUAL_CHECK = """`[!]` One more thing
+
+Disable privacy mode in [@BotFather](https://t.me/BotFather):
+/setprivacy → your bot → Disable
+
+Otherwise bot won't see your messages in groups"""
+
 # CTA - separate message after validation passes
 DM_CTA = """`[>>]` Next step
 
@@ -714,6 +725,7 @@ BTN_PREV = "← Back"
 BTN_HOW_TO_USE = "How to use?"
 BTN_RECHECK = "Recheck"
 BTN_REFRESH = "Refresh"
+BTN_DONE = "Done ✓"
 BTN_ADD_TO_GROUP = "Add to group"
 
 # DM fallback for unknown commands
@@ -783,9 +795,14 @@ NC_UNCOMMITTED_COMMIT = "Commit first"
 
 HELP_TEXT = """Troubleshoot
 
+If bot ignores messages \\(but commands work\\):
+[@BotFather](https://t.me/BotFather) → /setprivacy → Disable
+
 If bot isn't responding, try /reset\\_chat — it's safe for context\\.
 
 To wipe project and start fresh: /hard\\_reset\\. 🚨 Dangerous zone\\!
+
+Looking to turn on/off extra features — /settings
 
 ─────────────────
 

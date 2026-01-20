@@ -68,6 +68,16 @@ def dashboard_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
+def privacy_hint_keyboard() -> InlineKeyboardMarkup:
+    """Build keyboard with 'Done' button for privacy mode hint."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=strings.BTN_DONE,
+            callback_data="onb:privacy_done"
+        )]
+    ])
+
+
 def cta_keyboard(bot_username: str) -> InlineKeyboardMarkup:
     """Build CTA keyboard with 'Add to group' button."""
     return InlineKeyboardMarkup(inline_keyboard=[
