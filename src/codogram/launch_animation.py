@@ -9,6 +9,7 @@ from aiogram import Bot
 from . import strings
 from .config import settings
 from .logging_config import logger
+from .screen import parse_screen, PermissionPrompt
 from .services.start_flow import build_announcement, build_thread_announcement
 from .session_manager import ProjectState, ThreadInfo, project_manager
 from .telegram_queue import TelegramQueue, EditBatch
@@ -122,15 +123,25 @@ async def launch_with_animation(
         face_msg_id: int | None = None
         face_idx = 0
 
-        while not tmux.is_claude_ready():
+        while True:
+            # Check if Claude UI is fully loaded
+            if tmux.is_claude_ready():
+                break
+
+            # Also check if a prompt is showing (Claude is running, waiting for user)
+            pane_content = tmux.capture_pane()
+            parsed = parse_screen(pane_content)
+            if isinstance(parsed, PermissionPrompt):
+                logger.info(f"launch_ready_via_prompt: type={parsed.prompt_type.value}")
+                break
+
             elapsed = time.time() - start_time
 
             # Debug: log what we see in tmux every 10 seconds
             if int(elapsed) % 10 == 0 and int(elapsed) > 0:
-                pane_content = tmux.capture_pane()
                 logger.debug(f"launch_wait: elapsed={elapsed:.0f}s, pane_preview={pane_content[-200:] if pane_content else 'empty'}")
 
-            # Timeout check FIRST
+            # Timeout check
             if elapsed > settings.claude_launch_timeout:
                 if face_msg_id:
                     try:
