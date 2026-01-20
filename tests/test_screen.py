@@ -117,11 +117,11 @@ def test_parse_mcp_trust_prompt_basic():
     assert "Use this and all future" in result.options[0]
 
 def test_parse_mcp_trust_prompt_type():
-    """MCP prompt should have MCP_TRUST type."""
+    """MCP prompt should have TRUST_PROMPT type."""
     from codogram.screen import _parse_mcp_trust_prompt
     lines = MCP_TRUST_SCREEN.split("\n")
     result = _parse_mcp_trust_prompt(lines)
-    assert result.prompt_type == PromptType.MCP_TRUST
+    assert result.prompt_type == PromptType.TRUST_PROMPT
 
 def test_parse_mcp_trust_prompt_body():
     """MCP prompt body should contain server name."""
@@ -198,7 +198,7 @@ def test_parse_screen_detects_mcp_prompt():
     """parse_screen should detect MCP trust prompt."""
     result = parse_screen(MCP_TRUST_SCREEN)
     assert isinstance(result, PermissionPrompt)
-    assert result.prompt_type == PromptType.MCP_TRUST
+    assert result.prompt_type == PromptType.TRUST_PROMPT
     assert len(result.options) == 3
 
 def test_parse_screen_regular_still_works():
@@ -223,7 +223,7 @@ Some text after separator
 """
     result = parse_screen(mixed_screen)
     assert isinstance(result, PermissionPrompt)
-    assert result.prompt_type == PromptType.MCP_TRUST
+    assert result.prompt_type == PromptType.TRUST_PROMPT
 
 
 # StatusBar Tests
