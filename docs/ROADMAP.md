@@ -344,6 +344,14 @@ Auto-detect and resend messages stuck in Claude's input:
 - Prevents messages from getting lost due to race conditions
 - See [docs/designs/done/2026-01-17-stuck-message-recovery.md](designs/done/2026-01-17-stuck-message-recovery.md)
 
+### Message response mode
+Per-chat setting for when bot should respond:
+- **All messages** — respond to everything (default)
+- **Polite** — skip messages with @mentions to others
+- **Mentions only** — respond only when bot is @mentioned or replied to
+- Toggle via `/response_mode` or `/settings` button
+- Experimental: needs chat context features for full usefulness
+
 ## In Progress
 
 ### Code cleanup
@@ -362,12 +370,24 @@ In team mode, personalize topics with user identity:
 - Easy to see who's working on what branch
 - Requires avatar emoji pack feature
 
-### Message response mode
-Per-chat setting for when bot should respond:
-- **All messages** — respond to everything (current behavior)
-- **Skip mentions** — don't respond when someone else is @mentioned
-- **Bot mention only** — respond only when bot is @mentioned
-- Toggle via `/settings` or inline buttons
+### Chat context for response modes
+Pass recent chat messages to Claude in polite/mention modes:
+- Save last N messages from chat
+- Inject context when bot responds to mention/reply
+- Helps Claude understand conversation flow
+
+### Chat context exploration tool
+MCP tool for Claude to read Telegram chat history:
+- Query recent messages from current chat
+- Search by user, date, keywords
+- Useful for assistant-style interactions
+
+### Tool spam reduction
+Reduce noise from internal tool calls in assistant mode:
+- Hide TodoWrite, Read, Glob etc. from output
+- Show only user-relevant results
+- Related: Hidden tool calls (silent mode)
+- May need architecture changes for comfortable assistant UX
 
 ### Persistent setup state
 Save FSM state to config file to survive bot restarts:
