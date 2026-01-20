@@ -2,8 +2,18 @@
 # Run bot from current directory using PYTHONPATH (not pip install)
 # Works from main or any worktree
 # Config is always read from ~/.codogram/config.json
+#
+# Usage:
+#   ./kill-instance-and-start-from-worktree.sh        # foreground (blocks terminal)
+#   ./kill-instance-and-start-from-worktree.sh --bg   # background (like stop-and-restart.sh)
 
 cd "$(dirname "$0")"
+
+# Parse --bg flag
+RUN_IN_BG=false
+if [[ "$1" == "--bg" ]]; then
+    RUN_IN_BG=true
+fi
 
 # Find .env: current dir → main repo (for worktrees)
 if [ -f .env ]; then
@@ -33,4 +43,10 @@ mkdir -p ./logs
 # Run with local src (not installed package)
 echo "Starting bot from: $PWD/src"
 echo "Logs: ./logs/codogram.log"
-PYTHONPATH=src PYTHONUNBUFFERED=1 python -m codogram.main 2>&1 | tee -a ./logs/codogram.log
+
+if [[ "$RUN_IN_BG" == "true" ]]; then
+    PYTHONPATH=src PYTHONUNBUFFERED=1 nohup python -m codogram.main >> ./logs/codogram.log 2>&1 &
+    echo "Bot started in background (pid $!)"
+else
+    PYTHONPATH=src PYTHONUNBUFFERED=1 python -m codogram.main 2>&1 | tee -a ./logs/codogram.log
+fi
