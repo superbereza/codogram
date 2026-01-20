@@ -434,18 +434,26 @@ async def permission_poller(
                     # Check auto-accept (read dynamically - may have changed since poller started)
                     auto_accept_enabled = thread.auto_accept if thread else project.auto_accept
                     verbose_enabled = thread.verbose if thread else project.verbose
+                    logger.debug(
+                        f"{log_prefix} DEBOUNCING: auto_accept={auto_accept_enabled} "
+                        f"prompt_type={parsed.prompt_type.value} options={parsed.options}"
+                    )
                     if auto_accept_enabled:
-                        if await try_auto_accept(
+                        accepted = await try_auto_accept(
                             parsed.options, parsed.body, tmux,
                             telegram_queue, project.chat_id, thread_id, context_name,
                             prompt_type=parsed.prompt_type,
                             verbose=verbose_enabled,
-                        ):
+                        )
+                        if accepted:
+                            logger.info(f"{log_prefix} DEBOUNCING->SHOWING: auto-accepted successfully")
                             # Go to SHOWING to reuse existing dedup logic
                             # (wait for prompt to disappear before accepting new ones)
                             state = PollerState.SHOWING
                             last_body = parsed.body
                             continue
+                        else:
+                            logger.info(f"{log_prefix} DEBOUNCING: auto_accept returned False, falling through to manual")
 
                     logger.debug(f"{log_prefix} DEBOUNCING->SHOWING: sending to Telegram")
                     logger.debug(f"{log_prefix}: body preview: {parsed.body[:200]}...")
@@ -515,17 +523,24 @@ async def permission_poller(
                 # Check auto-accept first (race condition: prompt may change before tmux processes key)
                 auto_accept_enabled = thread.auto_accept if thread else project.auto_accept
                 verbose_enabled = thread.verbose if thread else project.verbose
+                logger.debug(
+                    f"{log_prefix} SHOWING: options/body changed! auto_accept={auto_accept_enabled} "
+                    f"prompt_type={parsed.prompt_type.value} new_options={parsed.options}"
+                )
                 if auto_accept_enabled:
-                    if await try_auto_accept(
+                    accepted = await try_auto_accept(
                         parsed.options, parsed.body, tmux,
                         telegram_queue, project.chat_id, thread_id, context_name,
                         prompt_type=parsed.prompt_type,
                         verbose=verbose_enabled,
-                    ):
-                        logger.debug(f"{log_prefix} SHOWING: body/options changed, auto-accepted again")
+                    )
+                    if accepted:
+                        logger.info(f"{log_prefix} SHOWING: options/body changed, auto-accepted again")
                         last_options = parsed.options
                         last_body = parsed.body
                         continue
+                    else:
+                        logger.info(f"{log_prefix} SHOWING: auto_accept returned False for changed prompt")
 
                 logger.debug(f"{log_prefix} SHOWING: body/options changed, resending")
                 try:

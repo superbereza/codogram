@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .config import SCREEN_SEPARATOR_MIN_DASHES
+from .logging_config import logger
 
 # Claude thinking status spinners (unique Unicode chars)
 # Excluded: * (too common in text) and · (middle dot, appears in bullet lists)
@@ -206,8 +207,10 @@ def parse_screen(output: str) -> ScreenState:
     # Detect trust-related prompts (should not be auto-accepted)
     body_lower = body.lower()
     if "trust" in body_lower or "folder" in body_lower:
+        logger.debug(f"parse_screen: trust/folder keyword -> MCP_TRUST. body={body[:100]!r}")
         return PermissionPrompt(options=options, body=body, prompt_type=PromptType.MCP_TRUST)
 
+    logger.debug(f"parse_screen: regular permission detected. options={options}")
     return PermissionPrompt(options=options, body=body)
 
 
@@ -226,8 +229,10 @@ def _parse_options_without_separator(lines: list[str]) -> PermissionPrompt | Non
     # Detect trust-related prompts (should not be auto-accepted)
     body_lower = body.lower()
     if "trust" in body_lower or "folder" in body_lower:
+        logger.debug(f"_parse_options_without_separator: trust/folder keyword -> MCP_TRUST. body={body[:100]!r}")
         return PermissionPrompt(options=options, body=body, prompt_type=PromptType.MCP_TRUST)
 
+    logger.debug(f"_parse_options_without_separator: regular permission. options={options}")
     return PermissionPrompt(options=options, body=body)
 
 
