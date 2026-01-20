@@ -153,6 +153,8 @@ class FilterResult:
 class ResponseModeService:
     """Service to determine if bot should respond based on response mode."""
 
+    VALID_MODES = ("all", "polite", "mentions")
+
     def __init__(self, bot_id: int, bot_username: str):
         self.bot_id = bot_id
         self.bot_username = bot_username.lower().lstrip("@")
@@ -168,8 +170,17 @@ class ResponseModeService:
         text = text or ""
         entities = entities or []
 
+        # Fallback for invalid mode
+        if mode not in self.VALID_MODES:
+            return FilterResult(True, "invalid mode, default allow")
+
         if mode == "all":
             return FilterResult(True, "mode=all")
+
+        # Media-only messages (no text, no entities) - always respond
+        # Can't contain mentions, so bypass filter
+        if not text and not entities:
+            return FilterResult(True, "media-only message")
 
         has_bot_mention = self._has_bot_mention(text, entities)
         is_reply_to_bot = reply_to_user_id == self.bot_id if reply_to_user_id else False
@@ -371,9 +382,61 @@ git commit -m "feat: initialize ResponseModeService in main.py"
 **Files:**
 - Modify: `src/codogram/handlers/messages.py`
 
-### Step 1: Update on_message handler
+### Step 1: Add helper function for response mode filtering
 
-Add `response_mode_service=None` parameter and filtering logic:
+Add at module level (before handlers):
+
+```python
+def _should_skip_by_response_mode(
+    message: Message,
+    response_mode_service,
+) -> bool:
+    """Check if message should be skipped based on response mode.
+
+    Returns True if message should be skipped, False if should process.
+    """
+    # Skip filter for private chats
+    if message.chat.type == "private":
+        return False
+
+    # Forwarded messages - always respond (user forwarded intentionally)
+    if message.forward_date or message.forward_from or message.forward_from_chat:
+        return False
+
+    chat_id = message.chat.id
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        return False  # No project = no filter
+
+    thread = project.threads.get(thread_id) if thread_id is not None else project.threads.get(None)
+    mode = thread.response_mode if thread else project.response_mode
+
+    reply_to_user_id = None
+    if message.reply_to_message and message.reply_to_message.from_user:
+        reply_to_user_id = message.reply_to_message.from_user.id
+
+    text = message.text or message.caption
+    entities = message.entities or message.caption_entities or []
+
+    result = response_mode_service.should_respond(
+        mode=mode,
+        text=text,
+        entities=entities,
+        reply_to_user_id=reply_to_user_id,
+    )
+
+    if not result.should_respond:
+        logger.info(f"Skipping message in {mode} mode: {result.reason}")
+        return True
+
+    return False
+```
+
+### Step 2: Update on_message handler
+
+Add `response_mode_service=None` parameter and use helper:
 
 ```python
 @router.message()
@@ -383,47 +446,40 @@ async def on_message(
     response_mode_service=None,
 ):
     """Route regular messages to tmux sessions."""
-    # Apply response mode filter
-    if response_mode_service and message.chat.type != "private":
-        chat_id = message.chat.id
-        thread_id = normalize_thread_id(message.chat, message.message_thread_id)
-
-        project = project_manager.get_by_chat(chat_id)
-        if project:
-            thread = project.threads.get(thread_id) if thread_id is not None else project.threads.get(None)
-            mode = thread.response_mode if thread else project.response_mode
-
-            reply_to_user_id = None
-            if message.reply_to_message and message.reply_to_message.from_user:
-                reply_to_user_id = message.reply_to_message.from_user.id
-
-            text = message.text or message.caption
-            entities = message.entities or message.caption_entities or []
-
-            result = response_mode_service.should_respond(
-                mode=mode,
-                text=text,
-                entities=entities,
-                reply_to_user_id=reply_to_user_id,
-            )
-
-            if not result.should_respond:
-                logger.info(f"Skipping message in {mode} mode: {result.reason}")
-                return
+    if response_mode_service and _should_skip_by_response_mode(message, response_mode_service):
+        return
 
     await _route_message(message, telegram_queue)
 ```
 
-### Step 2: Verify bot still works
+### Step 3: Update on_unknown_command handler
+
+Find `on_unknown_command` handler and add the same filter:
+
+```python
+@router.message(F.text.startswith("/"))
+async def on_unknown_command(
+    message: Message,
+    telegram_queue: TelegramQueue,
+    response_mode_service=None,
+):
+    """Handle unknown commands - treat as regular messages."""
+    if response_mode_service and _should_skip_by_response_mode(message, response_mode_service):
+        return
+
+    # ... existing logic
+```
+
+### Step 4: Verify bot still works
 
 Run: `./kill-instance-and-start-from-worktree.sh`
 Test: Send a message, verify it routes normally.
 
-### Step 3: Commit
+### Step 5: Commit
 
 ```bash
 git add src/codogram/handlers/messages.py
-git commit -m "feat: integrate ResponseModeService filter into message handler"
+git commit -m "feat: integrate ResponseModeService filter into message handlers"
 ```
 
 ---
@@ -476,12 +532,18 @@ async def cmd_response_mode(message: Message, telegram_queue: TelegramQueue):
 
     if thread:
         current = thread.response_mode
-        next_idx = (modes.index(current) + 1) % len(modes)
+        try:
+            next_idx = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_idx = 0  # Invalid mode, reset to "all"
         thread.response_mode = modes[next_idx]
         new_mode = thread.response_mode
     else:
         current = project.response_mode
-        next_idx = (modes.index(current) + 1) % len(modes)
+        try:
+            next_idx = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_idx = 0  # Invalid mode, reset to "all"
         project.response_mode = modes[next_idx]
         new_mode = project.response_mode
 
@@ -607,12 +669,18 @@ In `callback_settings`, after the `elif action == "m":` block, add:
         modes = ["all", "polite", "mentions"]
         if thread:
             current = thread.response_mode
-            next_idx = (modes.index(current) + 1) % len(modes)
+            try:
+                next_idx = (modes.index(current) + 1) % len(modes)
+            except ValueError:
+                next_idx = 0  # Invalid mode, reset to "all"
             thread.response_mode = modes[next_idx]
             new_mode = thread.response_mode
         else:
             current = project.response_mode
-            next_idx = (modes.index(current) + 1) % len(modes)
+            try:
+                next_idx = (modes.index(current) + 1) % len(modes)
+            except ValueError:
+                next_idx = 0  # Invalid mode, reset to "all"
             project.response_mode = modes[next_idx]
             new_mode = project.response_mode
         project_manager._save()
