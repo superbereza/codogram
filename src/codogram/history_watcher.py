@@ -160,6 +160,8 @@ class HistoryWatcher:
         for thread in project.threads.values():
             if not thread.awaiting_new_session:
                 continue
+            if thread.archived:
+                continue  # Archived threads should not auto-bind
 
             # Find a session created after start_requested_at
             for session_id, session_created in sessions:
