@@ -22,6 +22,10 @@ from ... import strings
 
 logger = logging.getLogger(__name__)
 
+# In-memory guard against concurrent setup flows
+# Python GIL makes set operations atomic
+_setup_in_progress: set[int] = set()
+
 router = Router(name="setup_triggers")
 
 
@@ -45,6 +49,13 @@ class NotInSetupFlow(BaseFilter):
     async def __call__(self, message: Message, state: FSMContext) -> bool:
         current_state = await state.get_state()
         return not (current_state and current_state.startswith("SetupFlow:"))
+
+
+class SetupNotInProgress(BaseFilter):
+    """Filter that passes only if chat is NOT currently starting setup."""
+
+    async def __call__(self, message: Message) -> bool:
+        return message.chat.id not in _setup_in_progress
 
 
 def _is_group_chat(chat_type: str) -> bool:
@@ -72,6 +83,11 @@ async def on_bot_added(event: ChatMemberUpdated, state: FSMContext, group_auth: 
     # Skip if this is just a promotion (member -> administrator)
     if old_status in {"member", "administrator"}:
         logger.debug(f"Bot status changed but not added: {old_status} -> {event.new_chat_member.status}")
+        return
+
+    # Guard against race with on_any_message
+    if chat.id in _setup_in_progress:
+        logger.debug(f"Setup already starting for chat {chat.id}")
         return
 
     # Block private chats
@@ -135,6 +151,7 @@ async def on_start_command(message: Message, state: FSMContext):
     F.chat.type.in_({"group", "supergroup"}),
     ProjectNotRegistered(),
     NotInSetupFlow(),
+    SetupNotInProgress(),  # Prevent race with on_bot_added
 )
 async def on_any_message(message: Message, state: FSMContext):
     """Handle any message in group chat without project.
@@ -152,48 +169,57 @@ async def on_any_message(message: Message, state: FSMContext):
 
 async def _start_setup_flow(bot: Bot, chat: Chat, state: FSMContext):
     """Start the setup flow - check base_dir first, then admin rights."""
-    # Check base_dir FIRST
-    base_path = check_base_dir()
-    if not base_path:
-        await bot.send_message(
-            chat.id,
-            strings.SETUP_BASE_DIR_MISSING,
-            parse_mode="MarkdownV2",
-        )
-        return  # Flow blocked
+    # Guard against concurrent calls
+    if chat.id in _setup_in_progress:
+        logger.debug(f"Setup already in progress for chat {chat.id}")
+        return
 
-    # Register SETUP_COMMANDS menu for this chat
-    from ...services.menu import SETUP_COMMANDS
-    from aiogram.types import BotCommandScopeChat
-
-    scope = BotCommandScopeChat(chat_id=chat.id)
+    _setup_in_progress.add(chat.id)
     try:
-        await bot.set_my_commands(SETUP_COMMANDS, scope=scope)
-    except Exception as e:
-        logger.warning(f"Failed to set setup menu: {e}")
-
-    # For supergroups, check admin rights (needed for rename chat, manage topics)
-    # For regular groups, skip - these features don't apply
-    if chat.type == "supergroup":
-        has_rights = await check_bot_admin_rights(bot, chat.id)
-
-        if not has_rights:
-            # Ask for admin rights
-            await state.set_state(SetupFlow.awaiting_admin_rights)
-            await state.update_data(chat_title=chat.title or "")
+        # Check base_dir FIRST
+        base_path = check_base_dir()
+        if not base_path:
             await bot.send_message(
                 chat.id,
-                strings.SETUP_ADMIN_REQUIRED,
-                reply_markup=admin_check_keyboard(),
+                strings.SETUP_BASE_DIR_MISSING,
                 parse_mode="MarkdownV2",
             )
-            return
+            return  # Flow blocked
 
-    # Has rights (supergroup) or regular group - show setup type selection
-    await state.set_state(SetupFlow.awaiting_setup_type)
-    await state.update_data(chat_title=chat.title or "")
-    await bot.send_message(
-        chat.id,
-        strings.SETUP_CHOOSE_TYPE,
-        reply_markup=setup_type_keyboard(),
-    )
+        # Register SETUP_COMMANDS menu for this chat
+        from ...services.menu import SETUP_COMMANDS
+        from aiogram.types import BotCommandScopeChat
+
+        scope = BotCommandScopeChat(chat_id=chat.id)
+        try:
+            await bot.set_my_commands(SETUP_COMMANDS, scope=scope)
+        except Exception as e:
+            logger.warning(f"Failed to set setup menu: {e}")
+
+        # For supergroups, check admin rights (needed for rename chat, manage topics)
+        # For regular groups, skip - these features don't apply
+        if chat.type == "supergroup":
+            has_rights = await check_bot_admin_rights(bot, chat.id)
+
+            if not has_rights:
+                # Ask for admin rights
+                await state.set_state(SetupFlow.awaiting_admin_rights)
+                await state.update_data(chat_title=chat.title or "")
+                await bot.send_message(
+                    chat.id,
+                    strings.SETUP_ADMIN_REQUIRED,
+                    reply_markup=admin_check_keyboard(),
+                    parse_mode="MarkdownV2",
+                )
+                return
+
+        # Has rights (supergroup) or regular group - show setup type selection
+        await state.set_state(SetupFlow.awaiting_setup_type)
+        await state.update_data(chat_title=chat.title or "")
+        await bot.send_message(
+            chat.id,
+            strings.SETUP_CHOOSE_TYPE,
+            reply_markup=setup_type_keyboard(),
+        )
+    finally:
+        _setup_in_progress.discard(chat.id)
