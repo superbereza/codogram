@@ -145,8 +145,9 @@ async def _do_clone(message: Message, state: FSMContext):
     target_dir = data["target_dir"]
     project_name = data["project_name"]
 
-    # Show progress
+    # Show progress and track message ID for cleanup
     progress_msg = await message.answer(strings.SETUP_CLONE_PROGRESS, parse_mode="MarkdownV2")
+    await state.update_data(bot_message_id=progress_msg.message_id)
 
     # Import git_clone from existing service
     from ...services.start_flow import git_clone

@@ -407,6 +407,41 @@ def test_verbose_persisted_in_config(tmp_path, monkeypatch):
     assert thread2.verbose is True
 
 
+def test_response_mode_persisted_in_config(tmp_path, monkeypatch):
+    """response_mode field should be saved and loaded from config."""
+    import json
+    from codogram.session_manager import ProjectManager
+    from codogram import config
+
+    # Use temp config
+    test_config = tmp_path / "config.json"
+    monkeypatch.setattr(config, "CONFIG_PATH", test_config)
+    monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(config, "get_config_path", lambda: test_config)
+
+    # Create manager and set response_mode
+    manager = ProjectManager()
+    project = manager.get_or_create("test-project")
+    project.chat_id = 123
+    project.cwd = "/tmp/test"
+    thread = project.get_or_create_thread(None, "main")
+    thread.response_mode = "polite"
+    project.response_mode = "polite"
+    manager._save()
+
+    # Reload and check saved data
+    saved = json.loads(test_config.read_text())
+    assert saved["projects"]["test-project"]["response_mode"] == "polite"
+    assert saved["projects"]["test-project"]["threads"]["null"]["response_mode"] == "polite"
+
+    # Create new manager (simulates restart) and check loaded values
+    manager2 = ProjectManager()
+    project2 = manager2.projects.get("test-project")
+    assert project2.response_mode == "polite"
+    thread2 = project2.get_thread(None)
+    assert thread2.response_mode == "polite"
+
+
 def test_save_is_thread_safe(tmp_path, monkeypatch):
     """Multiple saves should not corrupt config."""
     import threading

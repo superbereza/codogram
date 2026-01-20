@@ -6,6 +6,7 @@ from aiogram.types import Message
 
 from ..services.message_router import MessageRouterService, RouteAction
 from ..services.file_input import FileInputService
+from ..services.response_mode import ResponseModeService
 from ..session_manager import project_manager, ThreadInfo
 from ..telegram_queue import TelegramQueue
 from ..logging_config import logger
@@ -27,19 +28,80 @@ _FILE_ERROR_MESSAGES = {
 }
 
 
+def _should_skip_by_response_mode(
+    message: Message,
+    response_mode_service: ResponseModeService,
+) -> bool:
+    """Check if message should be skipped based on response mode.
+
+    Returns True if message should be skipped, False if should process.
+    """
+    # Skip filter for private chats
+    if message.chat.type == "private":
+        return False
+
+    # Forwarded messages - always respond (user forwarded intentionally)
+    if message.forward_date or message.forward_from or message.forward_from_chat:
+        return False
+
+    chat_id = message.chat.id
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        return False  # No project = no filter
+
+    thread = project.threads.get(thread_id) if thread_id is not None else project.threads.get(None)
+    mode = thread.response_mode if thread else project.response_mode
+
+    reply_to_user_id = None
+    if message.reply_to_message and message.reply_to_message.from_user:
+        reply_to_user_id = message.reply_to_message.from_user.id
+
+    text = message.text or message.caption
+    entities = message.entities or message.caption_entities or []
+
+    result = response_mode_service.should_respond(
+        mode=mode,
+        text=text,
+        entities=entities,
+        reply_to_user_id=reply_to_user_id,
+    )
+
+    if not result.should_respond:
+        logger.info(f"Skipping message in {mode} mode: {result.reason}")
+        return True
+
+    return False
+
+
 @router.message(F.text.startswith("/"))
-async def on_unknown_command(message: Message, telegram_queue: TelegramQueue):
+async def on_unknown_command(
+    message: Message,
+    telegram_queue: TelegramQueue,
+    response_mode_service: ResponseModeService | None = None,
+):
     """Forward unregistered commands to Claude as text."""
+    if response_mode_service and _should_skip_by_response_mode(message, response_mode_service):
+        return
+
     await _route_message(message, telegram_queue)
 
 
 @router.message()
-async def on_message(message: Message, telegram_queue: TelegramQueue):
+async def on_message(
+    message: Message,
+    telegram_queue: TelegramQueue,
+    response_mode_service: ResponseModeService | None = None,
+):
     """Route regular messages to tmux sessions.
 
     This is the catch-all handler - registered last so commands
     and FSM states are handled first by other routers.
     """
+    if response_mode_service and _should_skip_by_response_mode(message, response_mode_service):
+        return
+
     await _route_message(message, telegram_queue)
 
 

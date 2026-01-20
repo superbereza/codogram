@@ -32,7 +32,7 @@ def extract_input_text(screen: str) -> str | None:
 
 class PromptType(Enum):
     REGULAR = "regular"
-    MCP_TRUST = "mcp_trust"
+    TRUST_PROMPT = "trust_prompt"
 
 
 @dataclass
@@ -105,7 +105,7 @@ def _parse_mcp_trust_prompt(lines: list[str]) -> PermissionPrompt | None:
     ╰────────────────────────────────╯
        Enter to confirm · Esc to reject
 
-    Returns PermissionPrompt with MCP_TRUST type, or None if not MCP prompt.
+    Returns PermissionPrompt with TRUST_PROMPT type, or None if not MCP prompt.
     """
     # Find ALL complete boxes, then use the LAST one
     boxes = []  # List of (start_idx, end_idx) tuples
@@ -148,7 +148,7 @@ def _parse_mcp_trust_prompt(lines: list[str]) -> PermissionPrompt | None:
     return PermissionPrompt(
         options=options,
         body=body,
-        prompt_type=PromptType.MCP_TRUST
+        prompt_type=PromptType.TRUST_PROMPT
     )
 
 
@@ -207,8 +207,8 @@ def parse_screen(output: str) -> ScreenState:
     # Detect trust-related prompts (should not be auto-accepted)
     body_lower = body.lower()
     if "trust" in body_lower or "folder" in body_lower:
-        logger.debug(f"parse_screen: trust/folder keyword -> MCP_TRUST. body={body[:100]!r}")
-        return PermissionPrompt(options=options, body=body, prompt_type=PromptType.MCP_TRUST)
+        logger.debug(f"parse_screen: trust/folder keyword -> TRUST_PROMPT. body={body[:100]!r}")
+        return PermissionPrompt(options=options, body=body, prompt_type=PromptType.TRUST_PROMPT)
 
     logger.debug(f"parse_screen: regular permission detected. options={options}")
     return PermissionPrompt(options=options, body=body)
@@ -229,8 +229,8 @@ def _parse_options_without_separator(lines: list[str]) -> PermissionPrompt | Non
     # Detect trust-related prompts (should not be auto-accepted)
     body_lower = body.lower()
     if "trust" in body_lower or "folder" in body_lower:
-        logger.debug(f"_parse_options_without_separator: trust/folder keyword -> MCP_TRUST. body={body[:100]!r}")
-        return PermissionPrompt(options=options, body=body, prompt_type=PromptType.MCP_TRUST)
+        logger.debug(f"_parse_options_without_separator: trust/folder keyword -> TRUST_PROMPT. body={body[:100]!r}")
+        return PermissionPrompt(options=options, body=body, prompt_type=PromptType.TRUST_PROMPT)
 
     logger.debug(f"_parse_options_without_separator: regular permission. options={options}")
     return PermissionPrompt(options=options, body=body)

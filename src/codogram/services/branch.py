@@ -49,6 +49,8 @@ async def archive_thread(
     # Update thread state (keep worktree_path and session_id for resume!)
     thread.archived = True
     thread.notified_closed = True  # Prevent duplicate "session closed" from history_watcher
+    thread.awaiting_new_session = False  # Clear so archived thread doesn't participate in binding
+    thread.start_requested_at = None
     project_manager._save()
 
 

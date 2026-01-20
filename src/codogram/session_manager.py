@@ -123,6 +123,9 @@ class ThreadInfo:
     feat_thinking_status: bool = False  # Show Claude's thinking status
     # Note: feat_suggestions is project-level only (in ProjectState)
 
+    # Response mode: "all", "polite", "mentions"
+    response_mode: str = "all"
+
     # Persisted message IDs (for cleanup after restart):
     last_suggestion_msg_id: int | None = None  # Last 💡 message ID
 
@@ -181,6 +184,9 @@ class ProjectState:
     # Experimental features (project-wide default):
     feat_thinking_status: bool = False
     feat_suggestions: bool = True
+
+    # Response mode: "all", "polite", "mentions"
+    response_mode: str = "all"
 
     # Avatar emoji pack:
     feat_avatar_pack: bool = True
@@ -241,6 +247,7 @@ class ProjectManager:
                 # Convert string keys back to int (JSON serialization converts int keys to strings)
                 emoji_map_raw = data.get("emoji_map", {})
                 project.emoji_map = {int(k): v for k, v in emoji_map_raw.items()}
+                project.response_mode = data.get("response_mode", "all")
 
                 # Load explicit threads first
                 threads_data = data.get("threads", {})
@@ -263,6 +270,7 @@ class ProjectManager:
                         auto_accept=thread_data.get("auto_accept", False),
                         verbose=thread_data.get("verbose", False),
                         feat_thinking_status=thread_data.get("feat_thinking_status", False),
+                        response_mode=thread_data.get("response_mode", "all"),
                         last_suggestion_msg_id=thread_data.get("last_suggestion_msg_id"),
                         # Assume already notified if session exists but tmux likely dead
                         notified_closed=bool(thread_data.get("session_id")),
@@ -316,6 +324,8 @@ class ProjectManager:
                         "emoji_pack_name": p.emoji_pack_name,
                         "emoji_map": p.emoji_map,
                     }
+                    if p.response_mode != "all":
+                        project_data["response_mode"] = p.response_mode
 
                     # Backward compat: duplicate threads[None] to legacy fields
                     if None in p.threads:
@@ -348,6 +358,8 @@ class ProjectManager:
                                 thread_data["verbose"] = t.verbose
                             if t.feat_thinking_status:
                                 thread_data["feat_thinking_status"] = t.feat_thinking_status
+                            if t.response_mode != "all":
+                                thread_data["response_mode"] = t.response_mode
                             if t.last_suggestion_msg_id:
                                 thread_data["last_suggestion_msg_id"] = t.last_suggestion_msg_id
                             threads_dict[str(tid) if tid is not None else "null"] = thread_data

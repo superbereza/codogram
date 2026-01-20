@@ -133,12 +133,6 @@ async def _execute_launch(message: Message, state: FSMContext):
         except Exception:
             pass  # Message might already be deleted
 
-    # Also try to delete current message if it's from callback
-    try:
-        await message.delete()
-    except Exception:
-        pass
-
     project_name = data["project_name"]
     target_dir = Path(data["target_dir"])
 

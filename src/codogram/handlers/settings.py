@@ -9,9 +9,43 @@ from .. import strings
 from ..logging_config import logger
 from ..adapters.sticker import StickerAdapter
 from ..services.emoji_pack import EmojiPackService
+from ..services.response_mode import ResponseModeService
 from ..keyboards import avatar_pack_create_keyboard, avatar_pack_disable_keyboard
 
 router = Router(name="settings")
+
+
+def _cycle_response_mode(project, thread) -> tuple[str, str]:
+    """Cycle response mode and return (new_mode, explanation).
+
+    Returns:
+        Tuple of (mode_name, explanation_string)
+    """
+    modes = list(ResponseModeService.VALID_MODES)
+    explanations = {
+        "all": strings.RESPONSE_MODE_ALL,
+        "polite": strings.RESPONSE_MODE_POLITE,
+        "mentions": strings.RESPONSE_MODE_MENTIONS,
+    }
+
+    if thread:
+        current = thread.response_mode
+        try:
+            next_idx = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_idx = 0
+        thread.response_mode = modes[next_idx]
+        new_mode = thread.response_mode
+    else:
+        current = project.response_mode
+        try:
+            next_idx = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_idx = 0
+        project.response_mode = modes[next_idx]
+        new_mode = project.response_mode
+
+    return new_mode, explanations.get(new_mode, "")
 
 
 @router.message(Command("get_debug_ids", ignore_case=True))
@@ -64,6 +98,9 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     auto_status = "● on" if auto_accept else "○ off"
     verbose_status = "● on" if verbose else "○ off"
 
+    # Response mode
+    response_mode = thread.response_mode if thread else project.response_mode
+
     # Experimental features
     feat_thinking = thread.feat_thinking_status if thread else project.feat_thinking_status
     # Note: feat_suggestions is project-level only
@@ -75,6 +112,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     lines.append("chat")
     lines.append(f"• auto-accept: {auto_status}")
     lines.append(f"• verbose: {verbose_status}")
+    lines.append(f"• response\\_mode: {response_mode}")
     lines.append("")
     lines.append("claude")
 
@@ -214,6 +252,27 @@ async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
 
     project_manager._save()
     await telegram_queue.reply(message, f"Verbose output: {status}")
+
+
+@router.message(Command("response_mode", ignore_case=True))
+async def cmd_response_mode(message: Message, telegram_queue: TelegramQueue):
+    """Cycle response mode: all -> polite -> mentions -> all."""
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    thread = None
+    if project.threads:
+        thread = project.threads.get(thread_id)
+
+    new_mode, explanation = _cycle_response_mode(project, thread)
+    project_manager._save()
+
+    await telegram_queue.reply(message, f"response mode: {new_mode}\n_{explanation}_")
 
 
 @router.message(Command("exp_thinking_status", ignore_case=True))
@@ -432,6 +491,11 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
             else:
                 mode_text = "default"
             await callback.answer(f"Mode: {mode_text}")
+
+    elif action == "rm":  # response_mode
+        new_mode, _ = _cycle_response_mode(project, thread)
+        project_manager._save()
+        await callback.answer(f"Response: {new_mode}")
 
     # Update the settings message using shared helper
     text = _build_settings_text(project, thread, tmux_name)

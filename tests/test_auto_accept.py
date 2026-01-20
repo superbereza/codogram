@@ -86,7 +86,7 @@ async def test_try_auto_accept_empty_body():
 def test_auto_accept_types_whitelist():
     """Only REGULAR prompts should be auto-accepted."""
     assert PromptType.REGULAR in AUTO_ACCEPT_TYPES
-    assert PromptType.MCP_TRUST not in AUTO_ACCEPT_TYPES
+    assert PromptType.TRUST_PROMPT not in AUTO_ACCEPT_TYPES
 
 
 @pytest.mark.asyncio
@@ -103,7 +103,7 @@ async def test_try_auto_accept_skips_mcp_trust():
         chat_id=123,
         thread_id=None,
         context_name="test-project",
-        prompt_type=PromptType.MCP_TRUST,
+        prompt_type=PromptType.TRUST_PROMPT,
     )
 
     assert result is False
