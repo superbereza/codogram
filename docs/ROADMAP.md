@@ -354,12 +354,9 @@ Per-chat setting for when bot should respond:
 
 ## In Progress
 
-### Code cleanup
-Technical debt reduction in phases:
-- **Phase 1 (done):** Circular dependency fix, magic numbers → constants
-- **Phase 2 (backlog):** @require_state() decorator for handlers
-- **Phase 3 (backlog):** LaunchService extraction, DEPRECATED fields, ThreadInfo refactoring
-- See [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
+### Architecture review and clean up
+Ongoing architecture improvements and technical debt reduction.
+- Phase 1 done, new approach TBD
 
 ## Backlog
 
@@ -504,12 +501,6 @@ Explicit deletion of archived branches when disk space or git cleanup needed:
 - Workflow for running tests on PR
 - pytest + type checking
 
-### Pin startup message
-Pin message on session start:
-- `Claude started in claude-codogram-sublime`
-- `Connect: tmux attach -t claude-codogram-sublime`
-- Unpin previous on restart
-
 ### Hardware stats
 Display CPU/RAM usage:
 - Graph or text indicator in /settings
@@ -521,21 +512,6 @@ Beautiful tool results formatting:
 - Syntax highlighting for code
 - Collapsible for long outputs
 - File previews
-
-### Self-hosting: default chat = bot project
-Default private chat with bot linked to codogram folder:
-- Allows managing bot through itself
-- No need to create separate group for bot development
-
-### Forward unhandled commands
-`/commands` without handler forward to Claude as-is:
-- Currently added to tmux with double slashes, not sent
-- Need fallback in `on_message` or separate handler
-
-### Ultrathink mode
-`/ultrathink_mode` toggle, adds " ultrathink" to each message:
-- Store in per-project settings
-- Show status on /start
 
 ### Background process command
 `/ctrl_b` sends Ctrl+B twice to background running processes:

@@ -1,7 +1,8 @@
-# Code Cleanup Plan
+# Code Cleanup Plan — Phase 1
 
 **Date:** 2026-01-18
-**Status:** In Progress (Phase 1)
+**Status:** ✅ Complete (Phase 1)
+**Completed:** 2026-01-20
 
 ## Overview
 
@@ -12,10 +13,20 @@
 | Фаза | Риск | Scope | Статус |
 |------|------|-------|--------|
 | Phase 1 | Low | Circular dependency, magic numbers | ✅ Done |
-| Phase 2 | Medium | @require_state() decorator | Backlog |
-| Phase 3 | High | LaunchService, DEPRECATED fields, ThreadInfo | Backlog |
+| Phase 2 | Medium | @require_state() decorator | → Отдельная задача |
+| Phase 3 | High | LaunchService, DEPRECATED fields, ThreadInfo | → Отдельная задача |
 
 Принцип: каждая фаза — атомарная. Можно остановиться после любой фазы и код останется рабочим.
+
+## Resolution
+
+**Phase 1 завершён.** Выполнено:
+- Circular dependency fix в `handlers/messages.py`
+- Magic numbers вынесены в константы
+
+**Phase 2-3 не реализованы** — решено делать в рамках отдельного процесса рефакторинга:
+- Phase 2: `@require_state()` decorator
+- Phase 3: LaunchService + DEPRECATED fields + ThreadInfo refactoring
 
 ---
 

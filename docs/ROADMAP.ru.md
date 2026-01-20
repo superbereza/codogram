@@ -343,12 +343,9 @@ Per-chat настройка когда бот должен отвечать:
 
 ## In Progress
 
-### Code cleanup
-Уменьшение технического долга по фазам:
-- **Phase 1 (done):** Circular dependency fix, магические числа → константы
-- **Phase 2 (backlog):** @require_state() декоратор для handlers
-- **Phase 3 (backlog):** LaunchService extraction, DEPRECATED поля, ThreadInfo refactoring
-- См. [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
+### Architecture review and clean up
+Ревью архитектуры и уменьшение технического долга.
+- Phase 1 done, новый подход TBD
 
 ### Avatar emoji pack
 Emoji pack из аватарок участников группы:
@@ -502,12 +499,6 @@ MCP tool для Claude чтобы читать историю Telegram чата:
 - Workflow для запуска тестов на PR
 - pytest + type checking
 
-### Pin startup message
-Пинить сообщение при запуске сессии:
-- `Claude started in claude-codogram-sublime`
-- `Connect: tmux attach -t claude-codogram-sublime`
-- Анпинить предыдущее при рестарте
-
 ### Hardware stats
 Отображение CPU/RAM:
 - График или текстовый индикатор в /settings
@@ -519,21 +510,6 @@ MCP tool для Claude чтобы читать историю Telegram чата:
 - Syntax highlighting для кода
 - Collapsible для длинных выводов
 - Превью для файлов
-
-### Self-hosting: default chat = bot project
-Дефолтный личный чат с ботом связан с папкой codogram:
-- Позволяет управлять ботом через самого себя
-- Не нужно создавать отдельную группу для разработки бота
-
-### Forward unhandled commands
-`/команды` без хэндлера прокидывать в Claude как есть:
-- Сейчас добавляются в tmux с двумя слэшами, не отправляются
-- Нужен fallback в `on_message` или отдельный хэндлер
-
-### Ultrathink mode
-`/ultrathink_mode` toggle, добавляет " ultrathink" к каждому сообщению:
-- Хранить в per-project settings
-- Показывать статус при /start
 
 ### Background process command
 `/ctrl_b` отправляет Ctrl+B дважды для фонового запуска процессов:
