@@ -401,13 +401,6 @@ When replying to message, send context to tmux:
 - Quote piece of message being replied to
 - Format: `> quote\n\nresponse text`
 
-### Interface simplification settings
-Admin commands to enable/disable features:
-- Toggle `/thread` command visibility
-- Toggle `/branch` command visibility
-- Simplify menu for non-power-users
-- Store in per-project settings
-
 ### Auto-resume on message
 Auto-launch Claude when user sends message but tmux doesn't exist:
 - Show: `` `[~]` Tmux session not found, launching... ``

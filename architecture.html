@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codogram Architecture</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e4e4e4;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #00d4ff;
+            font-size: 2.5em;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .diagram {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .layer {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .layer:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(0, 212, 255, 0.3);
+        }
+
+        .layer-title {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .layer-title .icon {
+            font-size: 1.5em;
+        }
+
+        /* Layer colors */
+        .layer.entry .layer-title { border-color: #ff6b6b; color: #ff6b6b; }
+        .layer.middleware .layer-title { border-color: #feca57; color: #feca57; }
+        .layer.handlers .layer-title { border-color: #48dbfb; color: #48dbfb; }
+        .layer.services .layer-title { border-color: #1dd1a1; color: #1dd1a1; }
+        .layer.core .layer-title { border-color: #a29bfe; color: #a29bfe; }
+        .layer.external .layer-title { border-color: #fd79a8; color: #fd79a8; }
+        .layer.state .layer-title { border-color: #fdcb6e; color: #fdcb6e; }
+
+        .components {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .component {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+            position: relative;
+        }
+
+        .component:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .layer.entry .component:hover { border-color: #ff6b6b; background: rgba(255, 107, 107, 0.1); }
+        .layer.middleware .component:hover { border-color: #feca57; background: rgba(254, 202, 87, 0.1); }
+        .layer.handlers .component:hover { border-color: #48dbfb; background: rgba(72, 219, 251, 0.1); }
+        .layer.services .component:hover { border-color: #1dd1a1; background: rgba(29, 209, 161, 0.1); }
+        .layer.core .component:hover { border-color: #a29bfe; background: rgba(162, 155, 254, 0.1); }
+        .layer.external .component:hover { border-color: #fd79a8; background: rgba(253, 121, 168, 0.1); }
+        .layer.state .component:hover { border-color: #fdcb6e; background: rgba(253, 203, 110, 0.1); }
+
+        .component-name {
+            font-weight: 600;
+            font-size: 0.95em;
+            margin-bottom: 4px;
+        }
+
+        .component-file {
+            font-size: 0.75em;
+            color: #888;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .component.active {
+            border-color: #00d4ff !important;
+            background: rgba(0, 212, 255, 0.15) !important;
+        }
+
+        /* Details panel */
+        .details-panel {
+            position: fixed;
+            right: -450px;
+            top: 0;
+            width: 450px;
+            height: 100vh;
+            background: rgba(22, 33, 62, 0.98);
+            border-left: 1px solid rgba(0, 212, 255, 0.3);
+            padding: 30px;
+            overflow-y: auto;
+            transition: right 0.3s ease;
+            z-index: 1000;
+        }
+
+        .details-panel.open {
+            right: 0;
+        }
+
+        .details-panel h2 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .details-panel .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1.5em;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .details-panel .close-btn:hover {
+            color: #ff6b6b;
+        }
+
+        .detail-section {
+            margin-bottom: 20px;
+        }
+
+        .detail-section h3 {
+            color: #feca57;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .detail-section p, .detail-section ul {
+            color: #ccc;
+            line-height: 1.6;
+            font-size: 0.9em;
+        }
+
+        .detail-section ul {
+            padding-left: 20px;
+        }
+
+        .detail-section li {
+            margin-bottom: 5px;
+        }
+
+        .detail-section code {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em;
+            color: #1dd1a1;
+        }
+
+        /* Data flow arrows */
+        .flow-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+        }
+
+        .flow-section h2 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .flow-item {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 250px;
+        }
+
+        .flow-arrow {
+            color: #00d4ff;
+            font-size: 1.5em;
+        }
+
+        /* Legend */
+        .legend {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+        }
+
+        .legend h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+        }
+
+        .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .legend-color.entry { background: #ff6b6b; }
+        .legend-color.middleware { background: #feca57; }
+        .legend-color.handlers { background: #48dbfb; }
+        .legend-color.services { background: #1dd1a1; }
+        .legend-color.core { background: #a29bfe; }
+        .legend-color.external { background: #fd79a8; }
+        .legend-color.state { background: #fdcb6e; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .details-panel {
+                width: 100%;
+                right: -100%;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Codogram Architecture</h1>
+
+        <div class="diagram">
+            <!-- Entry Point -->
+            <div class="layer entry">
+                <div class="layer-title">
+                    <span class="icon">🚀</span>
+                    Entry Point
+                </div>
+                <div class="components">
+                    <div class="component" data-id="main">
+                        <div class="component-name">main.py</div>
+                        <div class="component-file">Bot entry, dispatcher setup</div>
+                    </div>
+                    <div class="component" data-id="config">
+                        <div class="component-name">config.py</div>
+                        <div class="component-file">Settings from .env</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middleware -->
+            <div class="layer middleware">
+                <div class="layer-title">
+                    <span class="icon">🛡️</span>
+                    Middleware Layer
+                </div>
+                <div class="components">
+                    <div class="component" data-id="admin_middleware">
+                        <div class="component-name">AdminMiddleware</div>
+                        <div class="component-file">middleware/admin.py</div>
+                    </div>
+                    <div class="component" data-id="bot_admin_rights">
+                        <div class="component-name">BotAdminRightsMiddleware</div>
+                        <div class="component-file">middleware/bot_admin_rights.py</div>
+                    </div>
+                    <div class="component" data-id="clear_create_state">
+                        <div class="component-name">ClearCreateStateMiddleware</div>
+                        <div class="component-file">middleware/clear_create_state.py</div>
+                    </div>
+                    <div class="component" data-id="setup_blocker">
+                        <div class="component-name">SetupBlockerMiddleware</div>
+                        <div class="component-file">middleware/setup_blocker.py</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Handlers -->
+            <div class="layer handlers">
+                <div class="layer-title">
+                    <span class="icon">📨</span>
+                    Handlers Layer (Thin Routers)
+                </div>
+                <div class="components">
+                    <div class="component" data-id="handler_start">
+                        <div class="component-name">start.py</div>
+                        <div class="component-file">/start, /restart, /hard_reset</div>
+                    </div>
+                    <div class="component" data-id="handler_messages">
+                        <div class="component-name">messages.py</div>
+                        <div class="component-file">Catch-all message router</div>
+                    </div>
+                    <div class="component" data-id="handler_permissions">
+                        <div class="component-name">permissions.py</div>
+                        <div class="component-file">Yes/No/Esc buttons</div>
+                    </div>
+                    <div class="component" data-id="handler_new_chat">
+                        <div class="component-name">new_chat.py</div>
+                        <div class="component-file">/new_chat command</div>
+                    </div>
+                    <div class="component" data-id="handler_threads">
+                        <div class="component-name">threads.py</div>
+                        <div class="component-file">/thread aliases</div>
+                    </div>
+                    <div class="component" data-id="handler_branches">
+                        <div class="component-name">branches.py</div>
+                        <div class="component-file">/branch aliases</div>
+                    </div>
+                    <div class="component" data-id="handler_sessions">
+                        <div class="component-name">sessions.py</div>
+                        <div class="component-file">/clear_context, /esc</div>
+                    </div>
+                    <div class="component" data-id="handler_settings">
+                        <div class="component-name">settings.py</div>
+                        <div class="component-file">/settings, /help</div>
+                    </div>
+                    <div class="component" data-id="handler_dm">
+                        <div class="component-name">dm.py</div>
+                        <div class="component-file">DM onboarding</div>
+                    </div>
+                    <div class="component" data-id="handler_finish">
+                        <div class="component-name">finish_chat.py</div>
+                        <div class="component-file">/finish_chat</div>
+                    </div>
+                    <div class="component" data-id="handler_audio">
+                        <div class="component-name">audio.py</div>
+                        <div class="component-file">Voice via Whisper</div>
+                    </div>
+                    <div class="component" data-id="handler_setup">
+                        <div class="component-name">setup/*</div>
+                        <div class="component-file">Onboarding v2 flow</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services -->
+            <div class="layer services">
+                <div class="layer-title">
+                    <span class="icon">⚙️</span>
+                    Services Layer (Business Logic)
+                </div>
+                <div class="components">
+                    <div class="component" data-id="start_flow_service">
+                        <div class="component-name">StartFlowService</div>
+                        <div class="component-file">services/start_flow.py</div>
+                    </div>
+                    <div class="component" data-id="message_router_service">
+                        <div class="component-name">MessageRouterService</div>
+                        <div class="component-file">services/message_router.py</div>
+                    </div>
+                    <div class="component" data-id="launch_service">
+                        <div class="component-name">LaunchService</div>
+                        <div class="component-file">services/launch.py</div>
+                    </div>
+                    <div class="component" data-id="branch_service">
+                        <div class="component-name">BranchService</div>
+                        <div class="component-file">services/branch.py</div>
+                    </div>
+                    <div class="component" data-id="group_auth_service">
+                        <div class="component-name">GroupAuthService</div>
+                        <div class="component-file">services/group_auth.py</div>
+                    </div>
+                    <div class="component" data-id="menu_service">
+                        <div class="component-name">MenuService</div>
+                        <div class="component-file">services/menu.py</div>
+                    </div>
+                    <div class="component" data-id="dm_onboarding">
+                        <div class="component-name">DmOnboarding</div>
+                        <div class="component-file">services/dm_onboarding/</div>
+                    </div>
+                    <div class="component" data-id="whisper_service">
+                        <div class="component-name">WhisperService</div>
+                        <div class="component-file">services/whisper.py</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Modules -->
+            <div class="layer core">
+                <div class="layer-title">
+                    <span class="icon">🔧</span>
+                    Core Modules
+                </div>
+                <div class="components">
+                    <div class="component" data-id="tmux">
+                        <div class="component-name">TmuxSession</div>
+                        <div class="component-file">tmux.py</div>
+                    </div>
+                    <div class="component" data-id="watcher">
+                        <div class="component-name">JsonlWatcher</div>
+                        <div class="component-file">watcher.py</div>
+                    </div>
+                    <div class="component" data-id="permission_poller">
+                        <div class="component-name">PermissionPoller</div>
+                        <div class="component-file">permission_poller.py</div>
+                    </div>
+                    <div class="component" data-id="history_reader">
+                        <div class="component-name">HistoryReader</div>
+                        <div class="component-file">history_reader.py</div>
+                    </div>
+                    <div class="component" data-id="history_watcher">
+                        <div class="component-name">HistoryWatcher</div>
+                        <div class="component-file">history_watcher.py</div>
+                    </div>
+                    <div class="component" data-id="screen">
+                        <div class="component-name">ScreenParser</div>
+                        <div class="component-file">screen.py</div>
+                    </div>
+                    <div class="component" data-id="telegram_queue">
+                        <div class="component-name">TelegramQueue</div>
+                        <div class="component-file">telegram_queue.py</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- State Management -->
+            <div class="layer state">
+                <div class="layer-title">
+                    <span class="icon">💾</span>
+                    State Management
+                </div>
+                <div class="components">
+                    <div class="component" data-id="project_manager">
+                        <div class="component-name">ProjectManager</div>
+                        <div class="component-file">session_manager.py</div>
+                    </div>
+                    <div class="component" data-id="project_state">
+                        <div class="component-name">ProjectState</div>
+                        <div class="component-file">session_manager.py</div>
+                    </div>
+                    <div class="component" data-id="thread_info">
+                        <div class="component-name">ThreadInfo</div>
+                        <div class="component-file">session_manager.py</div>
+                    </div>
+                    <div class="component" data-id="fsm_states">
+                        <div class="component-name">FSM States</div>
+                        <div class="component-file">domain/states.py</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- External Systems -->
+            <div class="layer external">
+                <div class="layer-title">
+                    <span class="icon">🌐</span>
+                    External Systems
+                </div>
+                <div class="components">
+                    <div class="component" data-id="telegram_api">
+                        <div class="component-name">Telegram API</div>
+                        <div class="component-file">via aiogram</div>
+                    </div>
+                    <div class="component" data-id="tmux_external">
+                        <div class="component-name">tmux</div>
+                        <div class="component-file">Terminal sessions</div>
+                    </div>
+                    <div class="component" data-id="claude_cli">
+                        <div class="component-name">Claude CLI</div>
+                        <div class="component-file">Running in tmux</div>
+                    </div>
+                    <div class="component" data-id="history_jsonl">
+                        <div class="component-name">history.jsonl</div>
+                        <div class="component-file">~/.claude/history.jsonl</div>
+                    </div>
+                    <div class="component" data-id="config_json">
+                        <div class="component-name">config.json</div>
+                        <div class="component-file">~/.codogram/config.json</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Flow -->
+        <div class="flow-section">
+            <h2>Data Flow</h2>
+            <div class="flow-diagram">
+                <div class="flow-item">👤 Telegram User</div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-item">🛡️ Middleware (auth, state)</div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-item">📨 Handler (thin router)</div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-item">⚙️ Service (business logic)</div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-item" style="display: flex; gap: 20px; justify-content: center;">
+                    <span>🖥️ tmux</span>
+                    <span>📄 history.jsonl</span>
+                    <span>💾 config.json</span>
+                </div>
+                <div class="flow-arrow">↓</div>
+                <div class="flow-item">🤖 Claude CLI</div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <h3>Legend</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-color entry"></div>
+                    <span>Entry Point</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color middleware"></div>
+                    <span>Middleware</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color handlers"></div>
+                    <span>Handlers</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color services"></div>
+                    <span>Services</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color core"></div>
+                    <span>Core Modules</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color state"></div>
+                    <span>State</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color external"></div>
+                    <span>External</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Details Panel -->
+    <div class="details-panel" id="detailsPanel">
+        <button class="close-btn" onclick="closeDetails()">×</button>
+        <h2 id="detailsTitle">Component Details</h2>
+        <div id="detailsContent"></div>
+    </div>
+
+    <script>
+        const componentDetails = {
+            main: {
+                title: "main.py",
+                description: "Entry point для бота. Инициализирует dispatcher, регистрирует middleware и handlers, запускает polling.",
+                responsibilities: [
+                    "Создание Bot и Dispatcher",
+                    "Регистрация middleware stack",
+                    "Регистрация всех handler routers",
+                    "Восстановление проектов из config.json",
+                    "Запуск history_watcher (15s polling)",
+                    "Запуск Telegram polling"
+                ],
+                dependencies: ["config", "session_manager", "telegram_queue", "all handlers"]
+            },
+            config: {
+                title: "config.py",
+                description: "Загрузка настроек из .env файла через pydantic Settings.",
+                responsibilities: [
+                    "TELEGRAM_TOKEN",
+                    "ADMIN_IDS",
+                    "BASE_DIR",
+                    "LOG_LEVEL"
+                ],
+                dependencies: []
+            },
+            admin_middleware: {
+                title: "AdminMiddleware",
+                description: "Глобальная авторизация. Проверяет ADMIN_IDS для личных чатов, интегрируется с GroupAuthService для групп.",
+                responsibilities: [
+                    "Проверка user_id в ADMIN_IDS",
+                    "Интеграция с GroupAuthService",
+                    "Отклонение неавторизованных пользователей"
+                ],
+                dependencies: ["config", "group_auth_service"]
+            },
+            bot_admin_rights: {
+                title: "BotAdminRightsMiddleware",
+                description: "Блокирует handlers если бот ожидает получения прав администратора (после миграции group→supergroup).",
+                responsibilities: [
+                    "Проверка awaiting_admin_rights флага",
+                    "Блокировка команд во время ожидания"
+                ],
+                dependencies: ["session_manager"]
+            },
+            clear_create_state: {
+                title: "ClearCreateStateMiddleware",
+                description: "Очищает FSM state при отправке /start команды. Предотвращает утечку state между чатами.",
+                responsibilities: [
+                    "Очистка create flow state",
+                    "Предотвращение state leakage"
+                ],
+                dependencies: ["aiogram FSM"]
+            },
+            setup_blocker: {
+                title: "SetupBlockerMiddleware",
+                description: "Блокирует не-setup команды во время SetupFlow. Изолирует процесс onboarding.",
+                responsibilities: [
+                    "Блокировка команд во время onboarding",
+                    "Пропуск setup-related команд"
+                ],
+                dependencies: ["domain/states"]
+            },
+            handler_start: {
+                title: "handlers/start.py",
+                description: "Обработчик /start команды. Включает FSM для setup flow проекта.",
+                responsibilities: [
+                    "/start - начало setup",
+                    "/restart - перезапуск сессии",
+                    "/hard_reset - полный сброс",
+                    "FSM states для project setup"
+                ],
+                dependencies: ["start_flow_service", "session_manager"]
+            },
+            handler_messages: {
+                title: "handlers/messages.py",
+                description: "Catch-all router для сообщений. Направляет текст в соответствующую tmux сессию.",
+                responsibilities: [
+                    "Роутинг сообщений в tmux",
+                    "Обработка неизвестных команд",
+                    "Создание pending threads"
+                ],
+                dependencies: ["message_router_service", "tmux"]
+            },
+            handler_permissions: {
+                title: "handlers/permissions.py",
+                description: "Обработчик callback кнопок Yes/No/Esc для permission prompts.",
+                responsibilities: [
+                    "Обработка perm:* callbacks",
+                    "Отправка ключей в tmux",
+                    "Удаление keyboard после нажатия"
+                ],
+                dependencies: ["tmux", "session_manager"]
+            },
+            handler_new_chat: {
+                title: "handlers/new_chat.py",
+                description: "Обработчик /new_chat для создания новых тредов/веток.",
+                responsibilities: [
+                    "/new_chat - унифицированное создание",
+                    "Create flow FSM",
+                    "Выбор thread vs branch"
+                ],
+                dependencies: ["launch_service", "branch_service"]
+            },
+            start_flow_service: {
+                title: "StartFlowService",
+                description: "Бизнес-логика /start команды. Обнаружение проекта, setup, launch.",
+                responsibilities: [
+                    "handle_start() - начало flow",
+                    "handle_project_name() - выбор имени",
+                    "handle_create_dir() - создание директории",
+                    "handle_git_init/clone() - git setup",
+                    "handle_tmux_selected() - выбор tmux"
+                ],
+                dependencies: ["session_manager", "tmux", "history_reader"]
+            },
+            message_router_service: {
+                title: "MessageRouterService",
+                description: "Роутинг сообщений в соответствующие tmux сессии.",
+                responsibilities: [
+                    "route() - определение целевой сессии",
+                    "send_to_tmux() - отправка в tmux",
+                    "Обработка pending/binding states"
+                ],
+                dependencies: ["session_manager", "tmux"]
+            },
+            launch_service: {
+                title: "LaunchService",
+                description: "Создание тредов с Claude сессиями.",
+                responsibilities: [
+                    "Создание Telegram topic",
+                    "Создание ThreadInfo",
+                    "Создание worktree (опционально)",
+                    "Launch Claude с анимацией"
+                ],
+                dependencies: ["session_manager", "tmux", "telegram_queue"]
+            },
+            branch_service: {
+                title: "BranchService",
+                description: "Операции с git worktrees.",
+                responsibilities: [
+                    "archive_thread() - архивация топика",
+                    "do_branch_create() - создание ветки",
+                    "create_worktree() - git worktree add"
+                ],
+                dependencies: ["session_manager", "git"]
+            },
+            tmux: {
+                title: "TmuxSession",
+                description: "Интеграция с tmux. Управление сессиями Claude CLI.",
+                responsibilities: [
+                    "send() - отправка текста + Enter",
+                    "send_key() - отправка raw ключей",
+                    "exists() - проверка сессии",
+                    "is_claude_ready() - проверка UI",
+                    "capture_pane() - захват экрана",
+                    "create_new_session() - создание сессии"
+                ],
+                dependencies: ["tmux binary"]
+            },
+            watcher: {
+                title: "JsonlWatcher",
+                description: "Polling history.jsonl для новых записей. Парсинг и отправка в Telegram.",
+                responsibilities: [
+                    "Инкрементальное чтение jsonl",
+                    "Парсинг tool_use, text, thinking",
+                    "Форматирование для Telegram",
+                    "Отправка через telegram_queue"
+                ],
+                dependencies: ["history.jsonl", "telegram_queue"]
+            },
+            permission_poller: {
+                title: "PermissionPoller",
+                description: "Polling tmux screen для permission prompts. State machine с debounce.",
+                responsibilities: [
+                    "Детекция permission prompts",
+                    "Debounce (0.5s)",
+                    "Детекция crash",
+                    "Auto-accept режим",
+                    "Thinking status"
+                ],
+                dependencies: ["tmux", "screen", "telegram_queue"]
+            },
+            history_reader: {
+                title: "HistoryReader",
+                description: "Инкрементальное чтение ~/.claude/history.jsonl.",
+                responsibilities: [
+                    "find_session_for_project() - поиск session_id",
+                    "Кэширование cwd → session_id",
+                    "Детекция truncation"
+                ],
+                dependencies: ["history.jsonl"]
+            },
+            history_watcher: {
+                title: "HistoryWatcher",
+                description: "15s polling для мониторинга здоровья сессий.",
+                responsibilities: [
+                    "Проверка здоровья tmux",
+                    "Детекция изменений session",
+                    "Cleanup неактивных проектов (30 дней)",
+                    "Binding pending threads"
+                ],
+                dependencies: ["session_manager", "history_reader", "tmux"]
+            },
+            screen: {
+                title: "ScreenParser",
+                description: "Парсинг Claude CLI UI из tmux capture.",
+                responsibilities: [
+                    "parse_screen() - ScreenState",
+                    "is_claude_ready() - проверка UI",
+                    "parse_thinking_status() - spinner",
+                    "parse_input_suggestion() - подсказки"
+                ],
+                dependencies: []
+            },
+            telegram_queue: {
+                title: "TelegramQueue",
+                description: "Rate-limited FIFO очередь сообщений.",
+                responsibilities: [
+                    "Per-chat FIFO ordering",
+                    "Rate limiting (30 msg/sec)",
+                    "Retry on TelegramRetryAfter",
+                    "Message chunking"
+                ],
+                dependencies: ["aiogram Bot"]
+            },
+            project_manager: {
+                title: "ProjectManager",
+                description: "Глобальный singleton для управления проектами.",
+                responsibilities: [
+                    "projects: dict[str, ProjectState]",
+                    "get_by_chat() - поиск по chat_id",
+                    "get_by_tmux() - поиск по tmux",
+                    "restore_projects() - восстановление",
+                    "_save() - персистенция в config.json"
+                ],
+                dependencies: ["config.json"]
+            },
+            project_state: {
+                title: "ProjectState",
+                description: "Состояние одного проекта.",
+                responsibilities: [
+                    "project_name, chat_id, cwd",
+                    "threads: dict[thread_id, ThreadInfo]",
+                    "Settings: auto_accept, verbose",
+                    "emoji_pack для аватаров"
+                ],
+                dependencies: ["ThreadInfo"]
+            },
+            thread_info: {
+                title: "ThreadInfo",
+                description: "Состояние одного треда/топика.",
+                responsibilities: [
+                    "thread_id, name, session_id",
+                    "Background tasks: watcher, poller",
+                    "Worktree support",
+                    "get_tmux_session() - имя tmux"
+                ],
+                dependencies: []
+            },
+            fsm_states: {
+                title: "FSM States",
+                description: "aiogram FSM state groups для complex flows.",
+                responsibilities: [
+                    "StartFlow - /start setup",
+                    "SetupFlow - onboarding v2",
+                    "RestartFlow - /reset_chat",
+                    "ResetFlow - /hard_reset"
+                ],
+                dependencies: ["aiogram FSM"]
+            }
+        };
+
+        document.querySelectorAll('.component').forEach(comp => {
+            comp.addEventListener('click', () => {
+                const id = comp.dataset.id;
+                const details = componentDetails[id];
+
+                if (details) {
+                    showDetails(details);
+
+                    document.querySelectorAll('.component').forEach(c => c.classList.remove('active'));
+                    comp.classList.add('active');
+                }
+            });
+        });
+
+        function showDetails(details) {
+            document.getElementById('detailsTitle').textContent = details.title;
+
+            let content = `
+                <div class="detail-section">
+                    <h3>Описание</h3>
+                    <p>${details.description}</p>
+                </div>
+                <div class="detail-section">
+                    <h3>Ответственности</h3>
+                    <ul>
+                        ${details.responsibilities.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+
+            if (details.dependencies && details.dependencies.length > 0) {
+                content += `
+                    <div class="detail-section">
+                        <h3>Зависимости</h3>
+                        <ul>
+                            ${details.dependencies.map(d => `<li><code>${d}</code></li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            document.getElementById('detailsContent').innerHTML = content;
+            document.getElementById('detailsPanel').classList.add('open');
+        }
+
+        function closeDetails() {
+            document.getElementById('detailsPanel').classList.remove('open');
+            document.querySelectorAll('.component').forEach(c => c.classList.remove('active'));
+        }
+
+        // Close on click outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.component') && !e.target.closest('.details-panel')) {
+                closeDetails();
+            }
+        });
+    </script>
+</body>
+</html>

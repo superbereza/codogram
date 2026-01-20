@@ -204,10 +204,10 @@ def parse_screen(output: str) -> ScreenState:
     body = re.sub(r'╌{10,}', SEPARATOR_DASHED, body)
     body = body.strip()
 
-    # Detect trust-related prompts (should not be auto-accepted)
-    body_lower = body.lower()
-    if "trust" in body_lower or "folder" in body_lower:
-        logger.debug(f"parse_screen: trust/folder keyword -> TRUST_PROMPT. body={body[:100]!r}")
+    # Detect trust folder prompt (should not be auto-accepted)
+    # Specific phrase from Claude's trust folder dialog
+    if "do you trust the files in this folder?" in body.lower():
+        logger.debug(f"parse_screen: trust folder prompt detected. body={body[:100]!r}")
         return PermissionPrompt(options=options, body=body, prompt_type=PromptType.TRUST_PROMPT)
 
     logger.debug(f"parse_screen: regular permission detected. options={options}")
@@ -226,10 +226,10 @@ def _parse_options_without_separator(lines: list[str]) -> PermissionPrompt | Non
 
     body = "\n".join(body_lines).strip()
 
-    # Detect trust-related prompts (should not be auto-accepted)
-    body_lower = body.lower()
-    if "trust" in body_lower or "folder" in body_lower:
-        logger.debug(f"_parse_options_without_separator: trust/folder keyword -> TRUST_PROMPT. body={body[:100]!r}")
+    # Detect trust folder prompt (should not be auto-accepted)
+    # Specific phrase from Claude's trust folder dialog
+    if "do you trust the files in this folder?" in body.lower():
+        logger.debug(f"_parse_options_without_separator: trust folder prompt detected. body={body[:100]!r}")
         return PermissionPrompt(options=options, body=body, prompt_type=PromptType.TRUST_PROMPT)
 
     logger.debug(f"_parse_options_without_separator: regular permission. options={options}")

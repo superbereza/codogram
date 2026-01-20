@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codogram Architecture - Detailed</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+            min-height: 100vh;
+            color: #e4e4e4;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #00d4ff;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .fragility-legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .fragility-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85em;
+        }
+
+        .fragility-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .fragility-dot.low { background: #1dd1a1; }
+        .fragility-dot.medium { background: #feca57; }
+        .fragility-dot.high { background: #ff6b6b; }
+        .fragility-dot.critical { background: #ee5a24; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .module {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .module-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #00d4ff;
+        }
+
+        .module-path {
+            font-size: 0.75em;
+            color: #666;
+            font-family: monospace;
+        }
+
+        .module-stats {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .lines {
+            background: rgba(0, 212, 255, 0.15);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            color: #00d4ff;
+        }
+
+        .fragility {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .fragility.low { background: #1dd1a1; box-shadow: 0 0 8px #1dd1a1; }
+        .fragility.medium { background: #feca57; box-shadow: 0 0 8px #feca57; }
+        .fragility.high { background: #ff6b6b; box-shadow: 0 0 8px #ff6b6b; }
+        .fragility.critical { background: #ee5a24; box-shadow: 0 0 8px #ee5a24; }
+
+        .module-desc {
+            font-size: 0.85em;
+            color: #aaa;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .module-details {
+            font-size: 0.8em;
+        }
+
+        .detail-section {
+            margin-bottom: 10px;
+        }
+
+        .detail-label {
+            color: #feca57;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .detail-list {
+            color: #999;
+            padding-left: 16px;
+        }
+
+        .detail-list li {
+            margin-bottom: 2px;
+        }
+
+        .deps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .dep {
+            background: rgba(162, 155, 254, 0.15);
+            color: #a29bfe;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-family: monospace;
+        }
+
+        .fragility-reason {
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 6px;
+            font-size: 0.8em;
+            color: #ff6b6b;
+            border-left: 3px solid #ff6b6b;
+        }
+
+        .fragility-reason.medium {
+            background: rgba(254, 202, 87, 0.1);
+            color: #feca57;
+            border-left-color: #feca57;
+        }
+
+        .section-title {
+            font-size: 1.4em;
+            color: #feca57;
+            margin: 40px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(254, 202, 87, 0.3);
+        }
+
+        .data-flow {
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+        }
+
+        .flow-title {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .flow-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .flow-box {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            padding: 10px 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .flow-arrow { color: #00d4ff; font-size: 1.2em; }
+
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+            .stats-bar { gap: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Codogram Architecture - Detailed View</h1>
+        <p class="subtitle">Low-level component diagram with metrics</p>
+
+        <div class="stats-bar">
+            <div class="stat">
+                <div class="stat-value">14,664</div>
+                <div class="stat-label">Lines of Code</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">58</div>
+                <div class="stat-label">Python Files</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">7</div>
+                <div class="stat-label">Layers</div>
+            </div>
+        </div>
+
+        <div class="fragility-legend">
+            <div class="fragility-item">
+                <div class="fragility-dot low"></div>
+                <span>Low - stable, simple logic</span>
+            </div>
+            <div class="fragility-item">
+                <div class="fragility-dot medium"></div>
+                <span>Medium - some complexity</span>
+            </div>
+            <div class="fragility-item">
+                <div class="fragility-dot high"></div>
+                <span>High - complex, many edge cases</span>
+            </div>
+            <div class="fragility-item">
+                <div class="fragility-dot critical"></div>
+                <span>Critical - very fragile, needs refactoring</span>
+            </div>
+        </div>
+
+        <!-- Entry & Config -->
+        <h2 class="section-title">Entry Point & Configuration</h2>
+        <div class="grid">
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">main.py</div>
+                        <div class="module-path">src/codogram/main.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">107 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Entry point. Creates Bot, Dispatcher, registers middleware/handlers, starts polling.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Key Functions</div>
+                        <ul class="detail-list">
+                            <li>main() - async entry point</li>
+                            <li>register_handlers(dp) - router setup</li>
+                        </ul>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-label">Dependencies</div>
+                        <div class="deps">
+                            <span class="dep">aiogram</span>
+                            <span class="dep">config</span>
+                            <span class="dep">session_manager</span>
+                            <span class="dep">telegram_queue</span>
+                            <span class="dep">all handlers</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">config.py</div>
+                        <div class="module-path">src/codogram/config.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">117 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Pydantic Settings for .env loading. Also config persistence to ~/.codogram/config.json.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Settings</div>
+                        <ul class="detail-list">
+                            <li>TELEGRAM_TOKEN</li>
+                            <li>ADMIN_IDS: list[int]</li>
+                            <li>BASE_DIR: Path</li>
+                            <li>LOG_LEVEL: str</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">strings.py</div>
+                        <div class="module-path">src/codogram/strings.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">818 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    All user-facing strings and messages. Centralized i18n-ready text.
+                </div>
+                <div class="fragility-reason medium">
+                    Large file with many string templates. Hard to maintain consistency.
+                </div>
+            </div>
+        </div>
+
+        <!-- State Management -->
+        <h2 class="section-title">State Management</h2>
+        <div class="grid">
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">session_manager.py</div>
+                        <div class="module-path">src/codogram/session_manager.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">502 LOC</span>
+                        <div class="fragility high"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Core state: ProjectManager (singleton), ProjectState, ThreadInfo. Persists to ~/.codogram/config.json.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Classes</div>
+                        <ul class="detail-list">
+                            <li><b>ThreadInfo</b> - thread state, tasks, worktree</li>
+                            <li><b>ProjectState</b> - project with threads dict</li>
+                            <li><b>ProjectManager</b> - global singleton</li>
+                        </ul>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-label">Key Methods</div>
+                        <ul class="detail-list">
+                            <li>get_by_chat(chat_id)</li>
+                            <li>get_by_tmux(tmux_name)</li>
+                            <li>restore_projects()</li>
+                            <li>_save() - persist to JSON</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="fragility-reason">
+                    Central state with many fields. Serialization/deserialization logic. Migration of old config formats. Many edge cases with thread lifecycle.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">domain/states.py</div>
+                        <div class="module-path">src/codogram/domain/states.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">~50 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    aiogram FSM state groups: StartFlow, SetupFlow, RestartFlow, ResetFlow.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">State Groups</div>
+                        <ul class="detail-list">
+                            <li>StartFlow (6 states)</li>
+                            <li>SetupFlow (9 states) - onboarding v2</li>
+                            <li>RestartFlow (1 state)</li>
+                            <li>ResetFlow (2 states)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">domain/validators.py</div>
+                        <div class="module-path">src/codogram/domain/validators.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">96 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Validation functions for project names, git URLs, paths.
+                </div>
+            </div>
+        </div>
+
+        <!-- Middleware -->
+        <h2 class="section-title">Middleware Layer</h2>
+        <div class="grid">
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">AdminMiddleware</div>
+                        <div class="module-path">middleware/admin.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">136 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Global auth. Checks ADMIN_IDS for DMs, integrates with GroupAuthService for groups.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Logic</div>
+                        <ul class="detail-list">
+                            <li>Check user_id in ADMIN_IDS</li>
+                            <li>For groups: GroupAuthService.is_allowed()</li>
+                            <li>Reject with ERR_NOT_ADMIN</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="fragility-reason medium">
+                    Complex auth logic with group/DM distinction. Race conditions during group registration.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">BotAdminRightsMiddleware</div>
+                        <div class="module-path">middleware/bot_admin_rights.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">~40 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Blocks handlers during admin rights acquisition (group→supergroup migration).
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">SetupBlockerMiddleware</div>
+                        <div class="module-path">middleware/setup_blocker.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">~40 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Blocks non-setup commands during SetupFlow to isolate onboarding.
+                </div>
+            </div>
+        </div>
+
+        <!-- Handlers -->
+        <h2 class="section-title">Handlers Layer (Thin Routers)</h2>
+        <div class="grid">
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">handlers/start.py</div>
+                        <div class="module-path">src/codogram/handlers/start.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">1047 LOC</span>
+                        <div class="fragility critical"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    /start, /restart, /hard_reset commands with complex FSM flow.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Commands</div>
+                        <ul class="detail-list">
+                            <li>/start [project] - setup flow</li>
+                            <li>/restart - restart Claude session</li>
+                            <li>/hard_reset - full project reset</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="fragility-reason">
+                    Largest file! Complex FSM with 6+ states. Many branches for git/dir/tmux choices. Should be split into smaller handlers.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">handlers/new_chat.py</div>
+                        <div class="module-path">src/codogram/handlers/new_chat.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">478 LOC</span>
+                        <div class="fragility high"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    /new_chat - unified thread/branch creation with FSM flow.
+                </div>
+                <div class="fragility-reason">
+                    Complex create flow FSM. Thread vs branch logic interleaved.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">handlers/dm.py</div>
+                        <div class="module-path">src/codogram/handlers/dm.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">450 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    /start in DM - onboarding slides, validation checks.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">handlers/settings.py</div>
+                        <div class="module-path">src/codogram/handlers/settings.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">439 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    /settings, /auto_accept, /help commands.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">handlers/messages.py</div>
+                        <div class="module-path">src/codogram/handlers/messages.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">197 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Catch-all router. Routes text messages to tmux via MessageRouterService.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Logic</div>
+                        <ul class="detail-list">
+                            <li>Route to correct tmux session</li>
+                            <li>Handle pending threads</li>
+                            <li>Start session binding</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">handlers/permissions.py</div>
+                        <div class="module-path">src/codogram/handlers/permissions.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">~86 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Yes/No/Esc button callbacks for permission prompts.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">handlers/finish_chat.py</div>
+                        <div class="module-path">src/codogram/handlers/finish_chat.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">356 LOC</span>
+                        <div class="fragility high"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    /finish_chat - archive thread, merge branch, cleanup.
+                </div>
+                <div class="fragility-reason">
+                    Complex cleanup logic: kill tmux, merge git, archive topic. Many failure modes.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">handlers/migration.py</div>
+                        <div class="module-path">src/codogram/handlers/migration.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">294 LOC</span>
+                        <div class="fragility high"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Group→supergroup migration handling.
+                </div>
+                <div class="fragility-reason">
+                    Telegram migration events are tricky. chat_id changes, admin rights timing issues.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">handlers/setup/*</div>
+                        <div class="module-path">src/codogram/handlers/setup/</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">~1000 LOC</span>
+                        <div class="fragility high"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Onboarding v2: triggers, admin_check, setup_type, clone_flow, connect_flow, new_project_flow, launch.
+                </div>
+                <div class="fragility-reason">
+                    9-state FSM across 7 files. Complex flow with many entry points.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">handlers/audio.py</div>
+                        <div class="module-path">src/codogram/handlers/audio.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">125 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Voice/audio message handling via Whisper API.
+                </div>
+            </div>
+        </div>
+
+        <!-- Services -->
+        <h2 class="section-title">Services Layer (Business Logic)</h2>
+        <div class="grid">
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">StartFlowService</div>
+                        <div class="module-path">services/start_flow.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">662 LOC</span>
+                        <div class="fragility high"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Business logic for /start flow: project discovery, dir creation, git setup, tmux selection.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Key Methods</div>
+                        <ul class="detail-list">
+                            <li>handle_start(chat_id, args)</li>
+                            <li>handle_project_name()</li>
+                            <li>handle_create_dir()</li>
+                            <li>handle_git_init/clone()</li>
+                            <li>handle_tmux_selected()</li>
+                        </ul>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-label">Returns</div>
+                        <ul class="detail-list">
+                            <li>FlowResult with FlowAction enum</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="fragility-reason">
+                    Complex state machine logic. Many FlowActions. Interacts with filesystem, git, tmux.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">MessageRouterService</div>
+                        <div class="module-path">services/message_router.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">106 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Routes messages to tmux sessions. Handles pending/binding states.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">RouteActions</div>
+                        <ul class="detail-list">
+                            <li>SEND_TO_TMUX</li>
+                            <li>CREATE_PENDING</li>
+                            <li>SKIP_PENDING</li>
+                            <li>START_BINDING</li>
+                            <li>NO_PROJECT / NO_TMUX</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">LaunchService</div>
+                        <div class="module-path">services/launch.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">161 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Creates threads with Claude sessions: topic creation, worktree, Claude launch.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">BranchService</div>
+                        <div class="module-path">services/branch.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">133 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Git worktree operations: create, archive, merge.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">GroupAuthService</div>
+                        <div class="module-path">services/group_auth.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">114 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Group-level authorization when bot added to group.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">EmojiPackService</div>
+                        <div class="module-path">services/emoji_pack.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">262 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Avatar emoji pack management for user avatars in messages.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">WhisperService</div>
+                        <div class="module-path">services/whisper.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">95 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Voice transcription via OpenAI Whisper API.
+                </div>
+            </div>
+        </div>
+
+        <!-- Core Modules -->
+        <h2 class="section-title">Core Modules (External Integration)</h2>
+        <div class="grid">
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">permission_poller.py</div>
+                        <div class="module-path">src/codogram/permission_poller.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">580 LOC</span>
+                        <div class="fragility critical"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Polls tmux screen for permission prompts. State machine with debounce, crash detection, auto-accept.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">State Machine</div>
+                        <ul class="detail-list">
+                            <li>IDLE → detect → DEBOUNCING</li>
+                            <li>DEBOUNCING → 0.5s → SHOWING</li>
+                            <li>SHOWING → button click → IDLE</li>
+                        </ul>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-label">Features</div>
+                        <ul class="detail-list">
+                            <li>Crash detection (panic, SIGSEGV)</li>
+                            <li>Auto-accept mode</li>
+                            <li>Thinking status spinner</li>
+                            <li>Input suggestions</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="fragility-reason">
+                    Complex async state machine. Screen parsing is fragile (Claude UI changes). Many edge cases with timing.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">telegram_queue.py</div>
+                        <div class="module-path">src/codogram/telegram_queue.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">510 LOC</span>
+                        <div class="fragility high"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Rate-limited FIFO message queue. Per-chat workers, retry logic, chunking.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Batch Types</div>
+                        <ul class="detail-list">
+                            <li>OutgoingBatch - new messages</li>
+                            <li>EditBatch - edit existing</li>
+                            <li>KeyboardBatch - inline keyboard</li>
+                            <li>DeleteBatch - delete message</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="fragility-reason">
+                    Complex async queue with per-chat workers. Rate limiting logic. Message ordering guarantees.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">screen.py</div>
+                        <div class="module-path">src/codogram/screen.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">437 LOC</span>
+                        <div class="fragility critical"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Parses Claude CLI UI from tmux capture. Permission prompts, thinking status, suggestions.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Parsing</div>
+                        <ul class="detail-list">
+                            <li>parse_screen() → ScreenState</li>
+                            <li>is_claude_ready()</li>
+                            <li>parse_thinking_status()</li>
+                            <li>parse_input_suggestion()</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="fragility-reason">
+                    VERY FRAGILE. Regex-based parsing of terminal UI. Breaks when Claude CLI updates. Box drawing chars, ANSI codes.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">history_watcher.py</div>
+                        <div class="module-path">src/codogram/history_watcher.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">382 LOC</span>
+                        <div class="fragility high"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    15s polling: tmux health, session changes, project cleanup (30 days inactive).
+                </div>
+                <div class="fragility-reason">
+                    Complex monitoring logic. Coordinates many subsystems. Race conditions possible.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">tmux.py</div>
+                        <div class="module-path">src/codogram/tmux.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">280 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    TmuxSession class: send text/keys, capture pane, create sessions.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Methods</div>
+                        <ul class="detail-list">
+                            <li>send(text) - text + Enter</li>
+                            <li>send_key(key) - raw key</li>
+                            <li>capture_pane() - screen capture</li>
+                            <li>create_new_session()</li>
+                            <li>exists() / is_claude_ready()</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">watcher.py</div>
+                        <div class="module-path">src/codogram/watcher.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">244 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    JsonlWatcher: polls history.jsonl, parses entries, sends to Telegram.
+                </div>
+                <div class="module-details">
+                    <div class="detail-section">
+                        <div class="detail-label">Entry Types</div>
+                        <ul class="detail-list">
+                            <li>TEXT - assistant messages</li>
+                            <li>TOOL_USE - Bash, Read, etc.</li>
+                            <li>TOOL_RESULT</li>
+                            <li>THINKING - extended thinking</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">history_reader.py</div>
+                        <div class="module-path">src/codogram/history_reader.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">245 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Incremental reading of ~/.claude/history.jsonl. Caches cwd→session_id mapping.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">launch_animation.py</div>
+                        <div class="module-path">src/codogram/launch_animation.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">227 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Animation loop while Claude starts. Edits message with progress.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">project_launcher.py</div>
+                        <div class="module-path">src/codogram/project_launcher.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">173 LOC</span>
+                        <div class="fragility medium"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Creates tmux session and starts Claude CLI.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">worktree.py</div>
+                        <div class="module-path">src/codogram/worktree.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">127 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Git worktree operations: create, remove, list.
+                </div>
+            </div>
+
+            <div class="module">
+                <div class="module-header">
+                    <div>
+                        <div class="module-title">git_utils.py</div>
+                        <div class="module-path">src/codogram/git_utils.py</div>
+                    </div>
+                    <div class="module-stats">
+                        <span class="lines">104 LOC</span>
+                        <div class="fragility low"></div>
+                    </div>
+                </div>
+                <div class="module-desc">
+                    Git helpers: current branch, remote URL, etc.
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Flow -->
+        <div class="data-flow">
+            <h2 class="flow-title">Complete Data Flow</h2>
+            <div class="flow-diagram">
+                <div class="flow-box">Telegram User sends message</div>
+                <div class="flow-arrow">|</div>
+                <div class="flow-box">aiogram Dispatcher (polling)</div>
+                <div class="flow-arrow">|</div>
+                <div class="flow-row">
+                    <div class="flow-box">AdminMiddleware</div>
+                    <div class="flow-box">SetupBlockerMiddleware</div>
+                </div>
+                <div class="flow-arrow">|</div>
+                <div class="flow-box">Handler (start.py, messages.py, ...)</div>
+                <div class="flow-arrow">|</div>
+                <div class="flow-box">Service (StartFlowService, MessageRouter)</div>
+                <div class="flow-arrow">|</div>
+                <div class="flow-row">
+                    <div class="flow-box">TmuxSession.send()</div>
+                    <div class="flow-box">ProjectManager._save()</div>
+                </div>
+                <div class="flow-arrow">|</div>
+                <div class="flow-box">Claude CLI in tmux</div>
+                <div class="flow-arrow">|</div>
+                <div class="flow-row">
+                    <div class="flow-box">history.jsonl</div>
+                    <div class="flow-box">tmux screen</div>
+                </div>
+                <div class="flow-arrow">|</div>
+                <div class="flow-row">
+                    <div class="flow-box">JsonlWatcher</div>
+                    <div class="flow-box">PermissionPoller</div>
+                </div>
+                <div class="flow-arrow">|</div>
+                <div class="flow-box">TelegramQueue.send()</div>
+                <div class="flow-arrow">|</div>
+                <div class="flow-box">Telegram User sees response</div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="data-flow" style="margin-top: 20px;">
+            <h2 class="flow-title">Fragility Summary</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; padding: 20px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 2em; color: #ee5a24;">3</div>
+                    <div style="color: #888;">Critical</div>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                        handlers/start.py<br>
+                        permission_poller.py<br>
+                        screen.py
+                    </div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2em; color: #ff6b6b;">8</div>
+                    <div style="color: #888;">High</div>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                        session_manager, telegram_queue,<br>
+                        new_chat, finish_chat, migration,<br>
+                        setup/*, history_watcher, start_flow
+                    </div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2em; color: #feca57;">12</div>
+                    <div style="color: #888;">Medium</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2em; color: #1dd1a1;">15+</div>
+                    <div style="color: #888;">Low</div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 20px; padding: 15px; background: rgba(238, 90, 36, 0.1); border-radius: 8px; color: #ee5a24;">
+                <b>Top refactoring candidates:</b> handlers/start.py (1047 LOC), screen.py (parsing fragility), permission_poller.py (state machine complexity)
+            </div>
+        </div>
+    </div>
+</body>
+</html>
