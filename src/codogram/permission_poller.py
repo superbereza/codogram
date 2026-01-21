@@ -374,9 +374,11 @@ async def permission_poller(
             last_msg = effective_thread.last_sent_message if effective_thread else None
 
             # Compare first line only (input_text is single line, last_msg may be multiline)
+            # Use startswith because tmux wraps long lines - input_text may be truncated
+            first_line = last_msg.split('\n')[0] if last_msg else None
             is_potentially_stuck = (
                 PASTED_PATTERN.match(input_text) is not None or
-                (last_msg is not None and input_text == last_msg.split('\n')[0])
+                (first_line is not None and first_line.startswith(input_text))
             )
 
             if is_potentially_stuck:
