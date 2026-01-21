@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 from .context import PollerContext
 from .crash import detect_crash
 from .processors import (
+    AskUserQuestionProcessor,
     CompactProcessor,
     ThinkingProcessor,
     SuggestionsProcessor,
@@ -95,6 +96,7 @@ async def permission_poller(
         SuggestionsProcessor(ctx),
         StuckProcessor(ctx),
         PermissionProcessor(ctx),
+        AskUserQuestionProcessor(ctx),
     ]
 
     poll_interval = settings.permission_poller_interval
