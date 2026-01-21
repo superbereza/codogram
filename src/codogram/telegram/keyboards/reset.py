@@ -1,7 +1,7 @@
 """Keyboards for /reset_all flow."""
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from .. import strings
+from ... import strings
 
 
 def reset_confirm_keyboard() -> InlineKeyboardMarkup:

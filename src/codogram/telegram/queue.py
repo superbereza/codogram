@@ -14,9 +14,9 @@ from aiogram.types import InlineKeyboardMarkup
 if TYPE_CHECKING:
     from aiogram.types import Message
 
-from .logging_config import logger
-from .chunker import chunk_message
-from .config import TELEGRAM_MESSAGE_MAX_LENGTH
+from ..logging_config import logger
+from ..chunker import chunk_message
+from ..config import TELEGRAM_MESSAGE_MAX_LENGTH
 
 
 class TelegramQueueTimeout(Exception):

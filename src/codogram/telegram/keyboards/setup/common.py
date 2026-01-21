@@ -1,7 +1,7 @@
 """Common keyboard helpers for setup flow."""
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from ... import strings
+from .... import strings
 
 
 def go_back_keyboard(callback_data: str) -> InlineKeyboardMarkup:

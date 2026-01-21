@@ -2,7 +2,7 @@
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from .. import strings
+from ... import strings
 
 
 def permission_keyboard(options: list[str], tmux_session: str) -> InlineKeyboardMarkup:

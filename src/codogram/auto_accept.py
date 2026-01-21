@@ -3,13 +3,13 @@ import re
 from typing import TYPE_CHECKING
 
 from .screen import PromptType
-from .telegram_queue import OutgoingBatch
+from .telegram.queue import OutgoingBatch
 from .tmux import TmuxSession
 from .logging_config import logger
 from .utils.truncate import truncate_body
 
 if TYPE_CHECKING:
-    from .telegram_queue import TelegramQueue
+    from .telegram.queue import TelegramQueue
 
 AUTO_ACCEPT_PHRASES = ["yes", "allow"]
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from aiogram.types import User
 from PIL import Image, ImageDraw, ImageFont
 
-from ..adapters.sticker import StickerAdapter
+from ..telegram.sticker import StickerAdapter
 from ..config import settings
 from ..session_manager import project_manager
 from ..logging_config import logger

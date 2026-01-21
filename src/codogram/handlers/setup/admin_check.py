@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, ChatMemberUpdated
 
 from ...domain.states import SetupFlow
 from ...services.setup import check_bot_admin_rights
-from ...keyboards.setup import admin_check_keyboard, setup_type_keyboard
+from ...telegram.keyboards.setup import admin_check_keyboard, setup_type_keyboard
 from ...utils import is_stale_callback
 from ... import strings
 

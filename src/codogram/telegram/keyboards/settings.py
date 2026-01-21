@@ -3,7 +3,7 @@
 import hashlib
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from .. import strings
+from ... import strings
 
 
 def _short_id(tmux_session: str) -> str:

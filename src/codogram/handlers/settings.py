@@ -4,13 +4,13 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
 from ..session_manager import project_manager
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from .. import strings
 from ..logging_config import logger
-from ..adapters.sticker import StickerAdapter
+from ..telegram.sticker import StickerAdapter
 from ..services.emoji_pack import EmojiPackService
 from ..services.response_mode import ResponseModeService
-from ..keyboards import avatar_pack_create_keyboard, avatar_pack_disable_keyboard
+from ..telegram.keyboards import avatar_pack_create_keyboard, avatar_pack_disable_keyboard
 
 router = Router(name="settings")
 
@@ -161,7 +161,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
 @router.message(Command("settings", ignore_case=True))
 async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     """Show current settings including Claude session state."""
-    from ..keyboards import settings_keyboard
+    from ..telegram.keyboards import settings_keyboard
 
     chat_id = message.chat.id
     thread_id = message.message_thread_id
@@ -401,8 +401,8 @@ async def callback_avatar_pack(callback: CallbackQuery, telegram_queue: Telegram
 @router.callback_query(F.data.startswith("set:"))
 async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle settings keyboard button presses."""
-    from ..keyboards.settings import _short_id
-    from ..keyboards import settings_keyboard
+    from ..telegram.keyboards.settings import _short_id
+    from ..telegram.keyboards import settings_keyboard
 
     data = callback.data
     parts = data.split(":")

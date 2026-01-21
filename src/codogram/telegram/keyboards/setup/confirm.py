@@ -2,7 +2,7 @@
 """Confirmation keyboards for setup flow."""
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from ... import strings
+from .... import strings
 
 
 def rename_confirm_keyboard() -> InlineKeyboardMarkup:

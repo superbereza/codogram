@@ -10,9 +10,9 @@ from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKe
 from ...config import settings
 from ...domain.states import SetupFlow
 from ...domain.validators import sanitize_project_name
-from ...keyboards.setup import setup_type_keyboard, go_back_keyboard
-from ...keyboards.setup.git_choice import git_choice_keyboard, visibility_keyboard
-from ...keyboards.setup.common import folder_exists_keyboard
+from ...telegram.keyboards.setup import setup_type_keyboard, go_back_keyboard
+from ...telegram.keyboards.setup.git_choice import git_choice_keyboard, visibility_keyboard
+from ...telegram.keyboards.setup.common import folder_exists_keyboard
 from ... import strings
 
 logger = logging.getLogger(__name__)

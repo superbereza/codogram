@@ -8,11 +8,11 @@ from aiogram import Bot
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 if TYPE_CHECKING:
-    from .telegram_queue import TelegramQueue
+    from .telegram.queue import TelegramQueue
 
-from .telegram_queue import OutgoingBatch, EditBatch, DeleteBatch
+from .telegram.queue import OutgoingBatch, EditBatch, DeleteBatch
 from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status, parse_input_suggestion, extract_input_text, PASTED_PATTERN, detect_compacting
-from .keyboards import permission_keyboard
+from .telegram.keyboards import permission_keyboard
 from .state import permission_messages
 from .session_manager import ProjectState, ThreadInfo, project_manager
 from .tmux import TmuxSession

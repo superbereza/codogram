@@ -1,4 +1,4 @@
-# src/codogram/launch_animation.py
+# src/codogram/telegram/launch_animation.py
 """Background launch animation for Claude sessions."""
 
 import asyncio
@@ -6,14 +6,14 @@ import time
 
 from aiogram import Bot
 
-from . import strings
-from .config import settings
-from .logging_config import logger
-from .screen import parse_screen, PermissionPrompt
-from .services.start_flow import build_announcement, build_thread_announcement
-from .session_manager import ProjectState, ThreadInfo, project_manager
-from .telegram_queue import TelegramQueue, EditBatch
-from .tmux import TmuxSession
+from .. import strings
+from ..config import settings
+from ..logging_config import logger
+from ..screen import parse_screen, PermissionPrompt
+from ..services.start_flow import build_announcement, build_thread_announcement
+from ..session_manager import ProjectState, ThreadInfo, project_manager
+from .queue import TelegramQueue, EditBatch
+from ..tmux import TmuxSession
 
 FACES = [
     "[._.]",   # Sleeping
@@ -48,8 +48,8 @@ async def _start_monitoring(
     For RESUMED sessions: starts both poller AND watcher immediately,
     since we already have session_id and jsonl_path.
     """
-    from .permission_poller import create_poller_task_for_thread
-    from .history_watcher import watch_thread_jsonl
+    from ..permission_poller import create_poller_task_for_thread
+    from ..history_watcher import watch_thread_jsonl
 
     # Always start poller (works with tmux directly)
     if not thread.poller_task or thread.poller_task.done():

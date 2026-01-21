@@ -1,7 +1,7 @@
 """Keyboards for DM onboarding and dashboard."""
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from .. import strings
+from ... import strings
 
 
 def carousel_keyboard(current_slide: int, total_slides: int) -> InlineKeyboardMarkup:

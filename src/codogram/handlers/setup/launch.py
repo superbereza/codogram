@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup
 
 from ...domain.states import SetupFlow
-from ...keyboards.setup import go_back_keyboard
+from ...telegram.keyboards.setup import go_back_keyboard
 from ...services.setup import check_bot_admin_rights
 from ... import strings
 
@@ -117,7 +117,7 @@ async def _execute_launch(message: Message, state: FSMContext):
     # Lazy imports to avoid circular dependencies
     from ...services.setup.init_project import init_project
     from ...services.menu import register_menu_for_chat
-    from ...launch_animation import launch_with_animation
+    from ...telegram.launch_animation import launch_with_animation
     from ...session_manager import project_manager
     from ...main import telegram_queue
 
@@ -195,9 +195,9 @@ async def _create_emoji_pack_background(bot, chat_id: int, telegram_queue) -> No
 
     Only called when feat_avatar_pack is enabled.
     """
-    from ...adapters.sticker import StickerAdapter
+    from ...telegram.sticker import StickerAdapter
     from ...services.emoji_pack import EmojiPackService
-    from ...telegram_queue import OutgoingBatch
+    from ...telegram.queue import OutgoingBatch
 
     try:
         # Wait for setup to complete

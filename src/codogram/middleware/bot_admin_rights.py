@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from ..session_manager import project_manager
 from ..services.setup import check_bot_admin_rights
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from ..logging_config import logger
 from .. import strings
 

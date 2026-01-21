@@ -26,7 +26,7 @@ async def on_clone_selected(callback: CallbackQuery, state: FSMContext):
     await state.update_data(setup_type="clone")
 
     # Import here to avoid circular imports
-    from ...keyboards.setup.common import go_back_keyboard
+    from ...telegram.keyboards.setup.common import go_back_keyboard
 
     await callback.message.edit_text(
         strings.SETUP_CLONE_URL_PROMPT,

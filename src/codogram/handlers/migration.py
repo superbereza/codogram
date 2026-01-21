@@ -5,10 +5,10 @@ from aiogram import Bot, Router, F
 from aiogram.types import CallbackQuery, ChatMemberUpdated, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from ..session_manager import project_manager
-from ..telegram_queue import TelegramQueue, OutgoingBatch, DeleteBatch
+from ..telegram.queue import TelegramQueue, OutgoingBatch, DeleteBatch
 from ..services.menu import register_menu_for_chat
 from ..services.setup import check_bot_admin_rights
-from ..adapters.sticker import StickerAdapter
+from ..telegram.sticker import StickerAdapter
 from ..services.emoji_pack import EmojiPackService
 from ..logging_config import logger
 from .. import strings

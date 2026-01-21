@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import AsyncIterator, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .telegram_queue import TelegramQueue
+    from .telegram.queue import TelegramQueue
 from aiogram import Bot
 from .config import settings
 from .logging_config import logger
@@ -212,7 +212,7 @@ async def create_watcher_task(
 
 async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "TelegramQueue"):
     """Watch jsonl and send entries through queue."""
-    from .telegram_queue import OutgoingBatch
+    from .telegram.queue import OutgoingBatch
     from pathlib import Path
 
     if not thread.jsonl_path:

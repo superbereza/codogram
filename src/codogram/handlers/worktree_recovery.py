@@ -9,7 +9,7 @@ from aiogram.types import CallbackQuery
 from codogram import strings
 from codogram.services.branch import archive_thread, create_worktree, create_branch_with_worktree
 from codogram.session_manager import ProjectManager
-from codogram.telegram_queue import TelegramQueue
+from codogram.telegram.queue import TelegramQueue
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ class WorktreeRecoveryHandler:
     async def _start_claude_session(self, message, thread) -> None:
         """Start Claude session in recovered worktree."""
         import asyncio
-        from ..launch_animation import launch_with_animation
+        from ..telegram.launch_animation import launch_with_animation
 
         project = self.project_manager.get_by_chat(message.chat.id)
         if not project:

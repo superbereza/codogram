@@ -9,7 +9,7 @@ from aiogram.types import CallbackQuery, Message
 
 from ...config import settings
 from ...domain.states import SetupFlow
-from ...keyboards.setup import (
+from ...telegram.keyboards.setup import (
     setup_type_keyboard,
     folder_select_keyboard,
     connected_projects_keyboard,
@@ -115,7 +115,7 @@ async def _check_git_and_proceed(message: Message, state: FSMContext, target_dir
         # Ask about git
         await state.set_state(SetupFlow.awaiting_git_choice)
 
-        from ...keyboards.setup.git_choice import git_choice_keyboard
+        from ...telegram.keyboards.setup.git_choice import git_choice_keyboard
         data = await state.get_data()
         folder_name = data["project_name"]
 

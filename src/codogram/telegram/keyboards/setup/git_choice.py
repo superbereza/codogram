@@ -2,7 +2,7 @@
 """Git setup choice keyboard."""
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from ... import strings
+from .... import strings
 
 
 def git_choice_keyboard() -> InlineKeyboardMarkup:

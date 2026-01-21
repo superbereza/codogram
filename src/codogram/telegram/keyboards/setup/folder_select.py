@@ -2,7 +2,7 @@
 """Folder selection keyboard with pagination."""
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from ... import strings
+from .... import strings
 
 FOLDERS_PER_PAGE = 10
 

@@ -9,11 +9,11 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 
 if TYPE_CHECKING:
-    from ..telegram_queue import TelegramQueue
+    from ..telegram.queue import TelegramQueue
 
 from .. import strings
 from ..session_manager import ProjectState, ThreadInfo, project_manager
-from ..launch_animation import launch_with_animation
+from ..telegram.launch_animation import launch_with_animation
 from ..logging_config import logger
 
 

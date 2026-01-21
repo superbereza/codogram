@@ -1,7 +1,7 @@
 """Keyboards for avatar pack prompts."""
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from .. import strings
+from ... import strings
 
 
 def avatar_pack_create_keyboard() -> InlineKeyboardMarkup:

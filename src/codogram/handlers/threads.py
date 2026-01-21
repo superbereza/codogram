@@ -3,7 +3,7 @@ from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
 
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from .new_chat import cmd_new_chat
 
 router = Router(name="threads")

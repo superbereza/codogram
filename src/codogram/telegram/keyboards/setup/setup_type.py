@@ -1,7 +1,7 @@
 """Setup type selection keyboards."""
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from ... import strings
+from .... import strings
 
 
 def setup_type_keyboard() -> InlineKeyboardMarkup:

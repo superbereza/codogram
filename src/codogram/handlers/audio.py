@@ -7,7 +7,7 @@ from ..config import settings
 from ..services.file_input import FileInputService
 from ..services.message_router import MessageRouterService, RouteAction
 from ..services.whisper import WhisperService
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from ..logging_config import logger
 from .. import strings
 from .common import normalize_thread_id

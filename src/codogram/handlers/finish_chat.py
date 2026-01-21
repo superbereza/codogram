@@ -7,7 +7,7 @@ from aiogram.filters import Command
 
 from .. import strings
 from ..session_manager import project_manager
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from .common import require_claude_ready
 from ..services.branch import archive_thread
 from ..git_utils import has_uncommitted_changes, get_default_branch, branch_exists

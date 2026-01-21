@@ -7,7 +7,7 @@ from aiogram.enums import ChatType
 
 from .. import strings
 from ..config import get_user_onboarded, set_user_onboarded, settings
-from ..keyboards.dm_onboarding import (
+from ..telegram.keyboards.dm_onboarding import (
     carousel_keyboard,
     validation_recheck_keyboard,
     dashboard_keyboard,
@@ -23,7 +23,7 @@ from ..services.dm_onboarding import (
 from ..services.dashboard import format_dashboard, ProjectInfo
 from ..session_manager import project_manager
 from ..project_launcher import is_tmux_session_exists
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 
 router = Router(name="dm")
 

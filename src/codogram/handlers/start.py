@@ -12,9 +12,9 @@ from aiogram.fsm.context import FSMContext
 from .. import strings
 from ..domain.states import StartFlow, RestartFlow, ResetFlow
 from ..domain.worktree_state import WorktreeState, get_worktree_state
-from ..keyboards.keyboards import worktree_recovery_keyboard
+from ..telegram.keyboards.keyboards import worktree_recovery_keyboard
 from ..git_utils import has_uncommitted_changes
-from ..keyboards.reset import reset_confirm_keyboard, reset_dir_choice_keyboard, reset_uncommitted_keyboard
+from ..telegram.keyboards.reset import reset_confirm_keyboard, reset_dir_choice_keyboard, reset_uncommitted_keyboard
 from ..services.start_flow import StartFlowService, FlowAction, FlowResult, is_setup_phase, cleanup_project
 from ..session_manager import project_manager
 from ..start_flow import (
@@ -23,8 +23,8 @@ from ..start_flow import (
     git_visibility_keyboard,
     restart_confirm_keyboard,
 )
-from ..telegram_queue import TelegramQueue, OutgoingBatch
-from ..tmux_selector import create_tmux_selection_keyboard
+from ..telegram.queue import TelegramQueue, OutgoingBatch
+from ..telegram.keyboards.tmux_selector import create_tmux_selection_keyboard
 from ..project_launcher import is_tmux_session_exists
 from ..services.menu import register_menu_for_chat
 
@@ -260,7 +260,7 @@ async def _handle_callback_result(
 
 async def _launch_claude(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
     """Launch Claude session from message context."""
-    from ..launch_animation import launch_with_animation
+    from ..telegram.launch_animation import launch_with_animation
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
@@ -288,7 +288,7 @@ async def _launch_claude(message: Message, result: FlowResult, telegram_queue: T
 
 async def _launch_claude_from_callback(callback: CallbackQuery, result: FlowResult, telegram_queue: TelegramQueue):
     """Launch Claude session from callback context."""
-    from ..launch_animation import launch_with_animation
+    from ..telegram.launch_animation import launch_with_animation
 
     project = project_manager.get_by_chat(callback.message.chat.id)
     if not project:
@@ -314,7 +314,7 @@ async def _launch_claude_from_callback(callback: CallbackQuery, result: FlowResu
 
 async def _launch_claude_in_thread(message: Message, result: FlowResult, telegram_queue: TelegramQueue):
     """Launch Claude in a specific thread."""
-    from ..launch_animation import launch_with_animation
+    from ..telegram.launch_animation import launch_with_animation
 
     project = project_manager.get_by_chat(message.chat.id)
     if not project:
@@ -801,7 +801,7 @@ async def on_resume_callback(callback: CallbackQuery, state: FSMContext, telegra
         await callback.answer()
 
         # Trigger launch
-        from ..launch_animation import launch_with_animation
+        from ..telegram.launch_animation import launch_with_animation
         cwd = thread.worktree_path if thread and thread.has_valid_worktree() else None
 
         if thread:

@@ -2,11 +2,11 @@
 from aiogram import Router
 from aiogram.types import ChatMemberUpdated
 
-from ..adapters.sticker import StickerAdapter
+from ..telegram.sticker import StickerAdapter
 from ..session_manager import project_manager
 from ..services.emoji_pack import EmojiPackService
 from ..services.group_auth import GroupAuthService
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from .. import strings
 from ..logging_config import logger
 

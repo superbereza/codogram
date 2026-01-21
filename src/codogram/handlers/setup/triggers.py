@@ -17,7 +17,7 @@ from ...domain.states import SetupFlow
 from ...session_manager import ProjectManager
 from ...services.setup import check_bot_admin_rights, check_base_dir
 from ...services.group_auth import GroupAuthService
-from ...keyboards.setup import admin_check_keyboard, setup_type_keyboard
+from ...telegram.keyboards.setup import admin_check_keyboard, setup_type_keyboard
 from ... import strings
 
 logger = logging.getLogger(__name__)

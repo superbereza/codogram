@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message
 from ...config import settings
 from ...domain.states import SetupFlow
 from ...domain.validators import validate_git_url, extract_project_name_from_url
-from ...keyboards.setup import go_back_keyboard, setup_type_keyboard, folder_exists_keyboard, clone_error_keyboard
+from ...telegram.keyboards.setup import go_back_keyboard, setup_type_keyboard, folder_exists_keyboard, clone_error_keyboard
 from ... import strings
 
 logger = logging.getLogger(__name__)

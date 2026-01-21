@@ -9,7 +9,7 @@ from . import strings
 from .session_manager import project_manager, ProjectState, ThreadInfo
 
 if TYPE_CHECKING:
-    from .telegram_queue import TelegramQueue
+    from .telegram.queue import TelegramQueue
 from .config import settings
 from .history_reader import find_session_for_project
 from .logging_config import logger
@@ -103,7 +103,7 @@ class HistoryWatcher:
                             thread.poller_task = None
 
                         # Notify user through queue
-                        from .telegram_queue import OutgoingBatch
+                        from .telegram.queue import OutgoingBatch
                         try:
                             batch = OutgoingBatch(
                                 chat_id=project.chat_id,
@@ -226,7 +226,7 @@ class HistoryWatcher:
         )
 
         # Notify user
-        from .telegram_queue import OutgoingBatch
+        from .telegram.queue import OutgoingBatch
         try:
             batch = OutgoingBatch(
                 chat_id=project.chat_id,
@@ -245,7 +245,7 @@ class HistoryWatcher:
 async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo, telegram_queue: "TelegramQueue"):
     """Watch jsonl for a specific thread and send messages through queue."""
     from .watcher import JsonlWatcher, _entry_to_messages
-    from .telegram_queue import OutgoingBatch
+    from .telegram.queue import OutgoingBatch
     from pathlib import Path
 
     if not thread.jsonl_path:
@@ -366,7 +366,7 @@ async def poll_for_session_thread(
     logger.warning(f"poll_for_session_thread_timeout: project={project.project_name}, thread={thread.name}")
     thread.awaiting_new_session = False
     try:
-        from .telegram_queue import OutgoingBatch
+        from .telegram.queue import OutgoingBatch
         batch = OutgoingBatch(
             chat_id=project.chat_id,
             thread_id=thread.thread_id,

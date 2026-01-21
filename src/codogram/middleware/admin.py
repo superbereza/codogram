@@ -9,7 +9,7 @@ from ..config import settings
 from ..logging_config import logger
 
 if TYPE_CHECKING:
-    from ..telegram_queue import TelegramQueue
+    from ..telegram.queue import TelegramQueue
     from ..services.group_auth import GroupAuthService
 
 # Cache admin IDs

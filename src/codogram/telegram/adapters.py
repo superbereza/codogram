@@ -1,6 +1,6 @@
 """Telegram adapter - messaging utilities."""
 
-from ..telegram_queue import TelegramQueue
+from .queue import TelegramQueue
 
 
 async def send_with_retry(

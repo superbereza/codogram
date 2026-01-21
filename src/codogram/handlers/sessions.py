@@ -11,7 +11,7 @@ from ..session_manager import project_manager
 from ..project_launcher import is_tmux_session_exists
 from ..tmux import TmuxSession
 from ..logging_config import logger
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from .common import require_tmux_exists, require_claude_ready
 
 router = Router(name="sessions")

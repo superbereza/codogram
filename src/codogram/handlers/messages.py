@@ -8,7 +8,7 @@ from ..services.message_router import MessageRouterService, RouteAction
 from ..services.file_input import FileInputService
 from ..services.response_mode import ResponseModeService
 from ..session_manager import project_manager, ThreadInfo
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from ..logging_config import logger
 from .. import strings
 from .new_chat import handle_name_input

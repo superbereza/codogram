@@ -20,7 +20,7 @@ from .handlers import register_handlers
 from .session_manager import project_manager, ProjectState
 from .tmux import TmuxSession
 from .logging_config import setup_logging, logger
-from .telegram_queue import TelegramQueue
+from .telegram.queue import TelegramQueue
 from .services.menu import BASIC_COMMANDS, register_menu_for_chat, register_dm_commands
 from .handlers.worktree_recovery import WorktreeRecoveryHandler, register_worktree_recovery_handlers
 

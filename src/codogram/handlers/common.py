@@ -3,7 +3,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 
 from .. import strings
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from ..session_manager import project_manager
 from ..project_launcher import is_tmux_session_exists
 from ..tmux import TmuxSession

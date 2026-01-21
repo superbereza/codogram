@@ -15,7 +15,7 @@ from aiogram.filters import Command
 from .. import strings
 from ..config import settings
 from ..session_manager import project_manager
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from .common import (
     require_forum_group,
     require_claude_ready,

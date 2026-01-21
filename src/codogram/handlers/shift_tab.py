@@ -4,7 +4,7 @@ from aiogram.types import Message
 from aiogram.filters import Command
 
 from ..session_manager import project_manager
-from ..telegram_queue import TelegramQueue
+from ..telegram.queue import TelegramQueue
 from ..tmux import TmuxSession
 from ..services.session_state import SessionStateService
 
