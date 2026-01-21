@@ -29,6 +29,7 @@ class AskUserQuestionProcessor(BaseProcessor):
         self.debounce_start: float = 0.0
         self.last_options: list[str] | None = None
         self.last_body: str | None = None
+        self.last_checked: dict[str, bool] | None = None
         self.content_msg_ids: list[int] = []
         self.kb_msg_id: int | None = None
 
@@ -76,10 +77,19 @@ class AskUserQuestionProcessor(BaseProcessor):
             self._reset_state()
             return
 
-        if parsed.options != self.last_options or parsed.body != self.last_body:
-            # Options/body changed - this is a NEW question, send it
-            self.log_debug("SHOWING: new question detected, sending")
-            await self._send_ask_user(parsed)
+        # Same body = same question, just update keyboard if checkboxes changed
+        if parsed.body == self.last_body:
+            if parsed.checked != self.last_checked:
+                self.log_debug(f"SHOWING: checkbox changed old={self.last_checked} new={parsed.checked}")
+                if self.kb_msg_id:
+                    await self._update_keyboard(parsed)
+                else:
+                    self.log_warning("SHOWING: no kb_msg_id to update!")
+            return
+
+        # Different body = truly new question
+        self.log_debug("SHOWING: new question detected (body changed), sending")
+        await self._send_ask_user(parsed)
 
     async def _send_ask_user(self, parsed: AskUserQuestion) -> None:
         try:
@@ -94,7 +104,7 @@ class AskUserQuestionProcessor(BaseProcessor):
             messages.append({"text": options_text})
             messages.append({"text": "👆 select or text me"})
 
-            kb = ask_user_keyboard(parsed.options, self.ctx.tmux_name)
+            kb = ask_user_keyboard(parsed.options, self.ctx.tmux_name, parsed.checked)
             batch = OutgoingBatch(
                 chat_id=self.ctx.chat_id,
                 thread_id=self.ctx.thread_id,
@@ -110,14 +120,30 @@ class AskUserQuestionProcessor(BaseProcessor):
 
             self.state = AskUserState.SHOWING
             self.last_body = parsed.body
+            self.last_checked = parsed.checked
             self.log_debug(f"SHOWING: sent AskUserQuestion, kb_msg={self.kb_msg_id}")
         except Exception as e:
             self.log_warning(f"send error: {e}")
             self.state = AskUserState.IDLE
 
+    async def _update_keyboard(self, parsed: AskUserQuestion) -> None:
+        """Update keyboard without sending new messages (for checkbox toggle)."""
+        try:
+            kb = ask_user_keyboard(parsed.options, self.ctx.tmux_name, parsed.checked)
+            await self.ctx.bot.edit_message_reply_markup(
+                chat_id=self.ctx.chat_id,
+                message_id=self.kb_msg_id,
+                reply_markup=kb,
+            )
+            self.last_checked = parsed.checked
+            self.log_debug(f"SHOWING: updated keyboard for checkbox toggle")
+        except Exception as e:
+            self.log_warning(f"keyboard update error: {e}")
+
     def _reset_state(self) -> None:
         self.state = AskUserState.IDLE
         self.last_options = None
         self.last_body = None
+        self.last_checked = None
         self.content_msg_ids = []
         self.kb_msg_id = None

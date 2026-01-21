@@ -38,9 +38,6 @@ class PermissionProcessor(BaseProcessor):
         parsed = parse_screen(screen)
         is_permission = isinstance(parsed, PermissionPrompt)
 
-        # Debug: log if prompt character detected but no permission parsed
-        if "❯" in screen and not is_permission:
-            self.log_debug(f"prompt found but no permission! parsed={type(parsed).__name__}")
 
         if self.state == PermissionState.IDLE:
             await self._handle_idle(parsed, is_permission)

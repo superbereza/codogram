@@ -56,8 +56,10 @@ class Idle:
 @dataclass
 class AskUserQuestion:
     """Parsed AskUserQuestion prompt from Claude screen."""
-    options: list[str]         # ["1. 1", "2. 2", "3. 3+", "4. Type something."]
+    options: list[str]         # ["1. Option", "2. Option", ...]
     body: str = ""             # Raw text between separators (header + question)
+    checked: dict[str, bool] | None = None  # {"1": True, "2": False} for multi-select
+    is_multi_select: bool = False
 
 ScreenState = PermissionPrompt | AskUserQuestion | ToolProgress | Idle
 
@@ -202,14 +204,28 @@ def _parse_ask_user_question(lines: list[str]) -> AskUserQuestion | None:
     options = []
     has_selector = False  # Must have ❯ to be real AskUserQuestion
 
+    checked: dict[str, bool] = {}
+    is_multi_select = False
+
     for line in content_lines:
         stripped = line.strip()
-        # Option line: "❯ 1. Text" or "  2. Text"
+        # Option line: "❯ 1. Text" or "  2. Text" or "❯ 1. [ ] Text"
         opt_match = re.match(r'([❯\s]*)(\d+)\.\s+(.+)', stripped)
         if opt_match:
             prefix = opt_match.group(1)
             num = opt_match.group(2)
             text = opt_match.group(3)
+            logger.debug(f"_parse_ask: raw opt {num} text='{text[:40]}'")
+
+            # Check for multi-select checkbox: [ ] or [x] or [X] or [✔]
+            checkbox_match = re.match(r'\[([ xX✔])\]\s*(.*)', text)
+            if checkbox_match:
+                is_multi_select = True
+                is_checked = checkbox_match.group(1) in ('x', 'X', '✔')
+                checked[num] = is_checked
+                text = checkbox_match.group(2)  # Text without checkbox
+                logger.debug(f"_parse_ask: opt {num} checkbox={is_checked}")
+
             options.append(f"{num}. {text}")
             if "❯" in prefix:
                 has_selector = True
@@ -226,6 +242,8 @@ def _parse_ask_user_question(lines: list[str]) -> AskUserQuestion | None:
     return AskUserQuestion(
         options=options,
         body=body,
+        checked=checked if is_multi_select else None,
+        is_multi_select=is_multi_select,
     )
 
 

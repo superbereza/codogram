@@ -257,6 +257,9 @@ BTN_YES_RESTART = "Yes, restart"
 BTN_NO = "No"
 BTN_CANCEL = "Cancel"
 BTN_CANCEL_X = "[x] Cancel"
+
+# AskUserQuestion
+ASK_USER_TYPE_PROMPT = "✍️ Type your comment in one message"
 BTN_CREATE = "Create"
 BTN_DIFFERENT_PATH = "Different path"
 BTN_NO_GIT = "no git"
