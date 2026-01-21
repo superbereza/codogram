@@ -41,7 +41,7 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
             if item.get("type") == "tool_result":
                 content = str(item.get("content", ""))
                 if len(content) > 500:
-                    content = content[:500] + "\nstrings.SNIP"
+                    content = content[:500] + f"\n{strings.SNIP}"
                 return ParsedEntry(
                     content_type=ContentType.TOOL_RESULT,
                     text=content
@@ -81,7 +81,7 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
         elif item_type == "thinking":
             thinking = item.get("thinking", "")
             if len(thinking) > 100:
-                thinking = thinking[:100] + " strings.SNIP"
+                thinking = thinking[:100] + f" {strings.SNIP}"
             return ParsedEntry(
                 content_type=ContentType.THINKING,
                 text=thinking
@@ -102,8 +102,8 @@ def format_tool_use(tool_name: str, tool_input: dict | None, verbose: bool = Fal
         cmd = cmd[:char_limit]
         desc = tool_input.get("description", "")
         cmd_display = truncate_body(cmd, verbose=verbose) or cmd
-        if was_truncated and "strings.SNIP" not in cmd_display:
-            cmd_display += "\nstrings.SNIP"
+        if was_truncated and strings.SNIP not in cmd_display:
+            cmd_display += f"\n{strings.SNIP}"
         if desc:
             return f"● **Bash**: {desc}\n`{cmd_display}`"
         return f"● **Bash**\n`{cmd_display}`"
@@ -132,8 +132,8 @@ def format_tool_use(tool_name: str, tool_input: dict | None, verbose: bool = Fal
         was_truncated = len(preview_raw) > 200
         preview = preview_raw[:200]
         preview = truncate_body(preview, verbose=verbose) or preview
-        if was_truncated and "strings.SNIP" not in preview:
-            preview += "\nstrings.SNIP"
+        if was_truncated and strings.SNIP not in preview:
+            preview += f"\n{strings.SNIP}"
         return f"● **{tool_name}**\n`{preview}`"
 
 class JsonlWatcher:
