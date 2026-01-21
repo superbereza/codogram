@@ -7,7 +7,7 @@ from codogram.domain.worktree_state import WorktreeState
 class TestWorktreeRecoveryKeyboard:
     def test_missing_with_branch_keyboard(self):
         """Keyboard for missing worktree when branch exists."""
-        from codogram.keyboards.keyboards import worktree_recovery_keyboard
+        from codogram.telegram.keyboards.keyboards import worktree_recovery_keyboard
 
         kb = worktree_recovery_keyboard(thread_id=123, state=WorktreeState.MISSING_WITH_BRANCH)
         buttons = kb.inline_keyboard
@@ -22,7 +22,7 @@ class TestWorktreeRecoveryKeyboard:
 
     def test_missing_no_branch_keyboard(self):
         """Keyboard for missing worktree when branch also missing."""
-        from codogram.keyboards.keyboards import worktree_recovery_keyboard
+        from codogram.telegram.keyboards.keyboards import worktree_recovery_keyboard
 
         kb = worktree_recovery_keyboard(thread_id=456, state=WorktreeState.MISSING_NO_BRANCH)
         buttons = kb.inline_keyboard

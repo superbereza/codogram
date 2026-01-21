@@ -1,6 +1,6 @@
 # tests/keyboards/test_folder_select.py
 import pytest
-from codogram.keyboards.setup.folder_select import (
+from codogram.telegram.keyboards.setup.folder_select import (
     folder_select_keyboard,
     FOLDERS_PER_PAGE,
 )

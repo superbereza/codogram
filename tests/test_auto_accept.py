@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from codogram.auto_accept import select_option, try_auto_accept, AUTO_ACCEPT_TYPES
-from codogram.screen import PromptType
+from codogram.claude.screen import PromptType
 from codogram.strings import SNIP
 
 # Tests for select_option

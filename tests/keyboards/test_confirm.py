@@ -1,6 +1,6 @@
 # tests/keyboards/test_confirm.py
-from codogram.keyboards.setup.confirm import rename_confirm_keyboard
-from codogram.keyboards.setup.common import folder_exists_keyboard
+from codogram.telegram.keyboards.setup.confirm import rename_confirm_keyboard
+from codogram.telegram.keyboards.setup.common import folder_exists_keyboard
 
 
 def test_rename_confirm_keyboard():

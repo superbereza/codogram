@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import AsyncMock
 
-from codogram.adapters.telegram import send_with_retry
+from codogram.telegram.adapters import send_with_retry
 
 
 class TestSendWithRetry:

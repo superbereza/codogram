@@ -6,7 +6,7 @@ from unittest.mock import Mock, AsyncMock
 
 from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 
-from codogram.telegram_queue import TelegramQueue, EditBatch
+from codogram.telegram.queue import TelegramQueue, EditBatch
 
 
 @pytest.fixture
@@ -181,7 +181,7 @@ async def test_edit_batch_deleted_message_ignored(queue, mock_bot):
 @pytest.mark.asyncio
 async def test_edit_and_send_use_same_queue(queue, mock_bot):
     """Edit and send operations should go through the same per-chat queue."""
-    from codogram.telegram_queue import OutgoingBatch
+    from codogram.telegram.queue import OutgoingBatch
 
     results = []
 

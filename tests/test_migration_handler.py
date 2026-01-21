@@ -29,7 +29,7 @@ def test_migration_message_format():
 @pytest.mark.asyncio
 async def test_migration_ignores_unknown_chat():
     """Migration handler ignores chats without registered project."""
-    from codogram.session_manager import project_manager
+    from codogram.core.session_manager import project_manager
 
     message = MagicMock()
     message.chat.id = 999999

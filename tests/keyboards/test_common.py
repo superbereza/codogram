@@ -1,6 +1,6 @@
 # tests/keyboards/test_common.py
 """Tests for common keyboard helpers."""
-from codogram.keyboards.setup.common import go_back_keyboard, clone_error_keyboard
+from codogram.telegram.keyboards.setup.common import go_back_keyboard, clone_error_keyboard
 from codogram import strings
 
 

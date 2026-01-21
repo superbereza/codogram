@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 from pathlib import Path
 
 from codogram.handlers.worktree_recovery import WorktreeRecoveryHandler
-from codogram.session_manager import ThreadInfo
+from codogram.core.session_manager import ThreadInfo
 
 
 @pytest.fixture

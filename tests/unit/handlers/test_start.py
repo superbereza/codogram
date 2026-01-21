@@ -39,7 +39,7 @@ class TestStartStaleWorktree:
     async def test_start_with_stale_worktree_and_branch_shows_recovery(self, mock_message, mock_queue, mock_state):
         """Start in topic with stale worktree but branch exists shows recovery options."""
         from codogram.handlers.start import cmd_start
-        from codogram.session_manager import ThreadInfo
+        from codogram.core.session_manager import ThreadInfo
         from codogram.domain.worktree_state import WorktreeState
 
         mock_message.message_thread_id = 123
@@ -71,7 +71,7 @@ class TestStartStaleWorktree:
     async def test_start_with_stale_worktree_no_branch_shows_create_new(self, mock_message, mock_queue, mock_state):
         """Start in topic with stale worktree and no branch shows create new option."""
         from codogram.handlers.start import cmd_start
-        from codogram.session_manager import ThreadInfo
+        from codogram.core.session_manager import ThreadInfo
         from codogram.domain.worktree_state import WorktreeState
 
         mock_message.message_thread_id = 123

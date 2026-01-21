@@ -1,5 +1,5 @@
 # tests/keyboards/test_git_choice.py
-from codogram.keyboards.setup.git_choice import git_choice_keyboard
+from codogram.telegram.keyboards.setup.git_choice import git_choice_keyboard
 
 
 def test_git_choice_keyboard_has_all_options():

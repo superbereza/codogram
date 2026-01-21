@@ -3,7 +3,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from codogram.launch_animation import launch_with_animation, _start_monitoring
+from codogram.telegram.launch_animation import launch_with_animation, _start_monitoring
 
 
 @pytest.fixture
@@ -45,9 +45,9 @@ def mock_thread():
 @pytest.mark.asyncio
 async def test_launch_success_starts_poller(mock_bot, mock_queue, mock_project, mock_thread):
     """Successful launch starts poller only."""
-    with patch('codogram.launch_animation.TmuxSession') as MockTmux, \
-         patch('codogram.launch_animation.project_manager') as mock_pm, \
-         patch('codogram.permission_poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
+    with patch('codogram.telegram.launch_animation.TmuxSession') as MockTmux, \
+         patch('codogram.telegram.launch_animation.project_manager') as mock_pm, \
+         patch('codogram.claude.poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
 
         # Setup tmux mock
         tmux_instance = MagicMock()
@@ -74,8 +74,8 @@ async def test_launch_success_starts_poller(mock_bot, mock_queue, mock_project, 
 @pytest.mark.asyncio
 async def test_launch_timeout_shows_error(mock_bot, mock_queue, mock_project, mock_thread):
     """After timeout, shows error message and returns False."""
-    with patch('codogram.launch_animation.TmuxSession') as MockTmux, \
-         patch('codogram.launch_animation.time') as mock_time:
+    with patch('codogram.telegram.launch_animation.TmuxSession') as MockTmux, \
+         patch('codogram.telegram.launch_animation.time') as mock_time:
 
         # Setup tmux mock - never ready
         tmux_instance = MagicMock()
@@ -108,7 +108,7 @@ async def test_launch_cleanup_on_error(mock_bot, mock_queue, mock_project, mock_
     mock_thread.awaiting_new_session = False
     mock_thread.launch_task = MagicMock()  # Simulate running task
 
-    with patch('codogram.launch_animation.TmuxSession') as MockTmux:
+    with patch('codogram.telegram.launch_animation.TmuxSession') as MockTmux:
         # Setup tmux mock to raise error
         tmux_instance = MagicMock()
         tmux_instance.exists.side_effect = Exception("Test error")
@@ -132,9 +132,9 @@ async def test_launch_cleanup_on_error(mock_bot, mock_queue, mock_project, mock_
 @pytest.mark.asyncio
 async def test_launch_creates_tmux_if_not_exists(mock_bot, mock_queue, mock_project, mock_thread):
     """Creates tmux session if it doesn't exist."""
-    with patch('codogram.launch_animation.TmuxSession') as MockTmux, \
-         patch('codogram.launch_animation.project_manager'), \
-         patch('codogram.permission_poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
+    with patch('codogram.telegram.launch_animation.TmuxSession') as MockTmux, \
+         patch('codogram.telegram.launch_animation.project_manager'), \
+         patch('codogram.claude.poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
 
         tmux_instance = MagicMock()
         tmux_instance.exists.return_value = False  # Doesn't exist
@@ -159,9 +159,9 @@ async def test_launch_creates_tmux_if_not_exists(mock_bot, mock_queue, mock_proj
 @pytest.mark.asyncio
 async def test_launch_sends_claude_command(mock_bot, mock_queue, mock_project, mock_thread):
     """Sends 'claude' command to tmux."""
-    with patch('codogram.launch_animation.TmuxSession') as MockTmux, \
-         patch('codogram.launch_animation.project_manager'), \
-         patch('codogram.permission_poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
+    with patch('codogram.telegram.launch_animation.TmuxSession') as MockTmux, \
+         patch('codogram.telegram.launch_animation.project_manager'), \
+         patch('codogram.claude.poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
 
         tmux_instance = MagicMock()
         tmux_instance.exists.return_value = True
@@ -185,7 +185,7 @@ async def test_launch_sends_claude_command(mock_bot, mock_queue, mock_project, m
 @pytest.mark.asyncio
 async def test_start_monitoring_creates_poller(mock_bot, mock_queue, mock_project, mock_thread):
     """_start_monitoring creates poller task when none exists."""
-    with patch('codogram.permission_poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
+    with patch('codogram.claude.poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
         mock_task = MagicMock()
         mock_create_poller.return_value = mock_task
 
@@ -200,7 +200,7 @@ async def test_start_monitoring_creates_poller(mock_bot, mock_queue, mock_projec
 @pytest.mark.asyncio
 async def test_start_monitoring_skips_if_poller_running(mock_bot, mock_queue, mock_project, mock_thread):
     """_start_monitoring skips if poller is already running."""
-    with patch('codogram.permission_poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
+    with patch('codogram.claude.poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
         existing_task = MagicMock()
         existing_task.done.return_value = False  # Still running
         mock_thread.poller_task = existing_task
@@ -214,7 +214,7 @@ async def test_start_monitoring_skips_if_poller_running(mock_bot, mock_queue, mo
 @pytest.mark.asyncio
 async def test_start_monitoring_restarts_if_poller_done(mock_bot, mock_queue, mock_project, mock_thread):
     """_start_monitoring restarts poller if previous task is done."""
-    with patch('codogram.permission_poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
+    with patch('codogram.claude.poller.create_poller_task_for_thread', new_callable=AsyncMock) as mock_create_poller:
         old_task = MagicMock()
         old_task.done.return_value = True  # Finished
         mock_thread.poller_task = old_task

@@ -27,7 +27,7 @@ class TestFinishStaleWorktree:
     async def test_finish_with_stale_worktree_shows_warning(self, mock_message, mock_queue):
         """Finish with stale worktree shows warning and archives."""
         from codogram.handlers.finish import cmd_finish
-        from codogram.session_manager import ThreadInfo
+        from codogram.core.session_manager import ThreadInfo
 
         thread = ThreadInfo(
             thread_id=456,

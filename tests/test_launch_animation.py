@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from codogram.launch_animation import FACES, FACE_READY
+from codogram.telegram.launch_animation import FACES, FACE_READY
 
 
 def test_faces_are_unique():
@@ -40,15 +40,15 @@ def mock_thread():
 @pytest.mark.asyncio
 async def test_launch_with_session_id_uses_resume_flag(mock_project, mock_thread):
     """When session_id provided, should use 'claude --resume {id}'."""
-    from codogram.launch_animation import launch_with_animation
+    from codogram.telegram.launch_animation import launch_with_animation
 
     bot = AsyncMock()
     queue = AsyncMock()
     queue.send = AsyncMock(return_value=[123])
 
-    with patch("codogram.launch_animation.TmuxSession") as MockTmux, \
-         patch("codogram.launch_animation.project_manager"), \
-         patch("codogram.launch_animation._start_monitoring"):
+    with patch("codogram.telegram.launch_animation.TmuxSession") as MockTmux, \
+         patch("codogram.telegram.launch_animation.project_manager"), \
+         patch("codogram.telegram.launch_animation._start_monitoring"):
 
         mock_tmux = MagicMock()
         mock_tmux.exists.return_value = False
@@ -72,15 +72,15 @@ async def test_launch_with_session_id_uses_resume_flag(mock_project, mock_thread
 @pytest.mark.asyncio
 async def test_launch_with_cwd_uses_custom_directory(mock_project, mock_thread):
     """When cwd provided, TmuxSession should use that cwd."""
-    from codogram.launch_animation import launch_with_animation
+    from codogram.telegram.launch_animation import launch_with_animation
 
     bot = AsyncMock()
     queue = AsyncMock()
     queue.send = AsyncMock(return_value=[123])
 
-    with patch("codogram.launch_animation.TmuxSession") as MockTmux, \
-         patch("codogram.launch_animation.project_manager"), \
-         patch("codogram.launch_animation._start_monitoring"):
+    with patch("codogram.telegram.launch_animation.TmuxSession") as MockTmux, \
+         patch("codogram.telegram.launch_animation.project_manager"), \
+         patch("codogram.telegram.launch_animation._start_monitoring"):
 
         mock_tmux = MagicMock()
         mock_tmux.exists.return_value = False

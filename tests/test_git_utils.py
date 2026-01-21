@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def test_sanitize_branch_name():
-    from codogram.git_utils import sanitize_branch_name
+    from codogram.git.utils import sanitize_branch_name
 
     assert sanitize_branch_name("feature/auth") == "feature-auth"
     assert sanitize_branch_name("fix login bug") == "fix-login-bug"
@@ -13,7 +13,7 @@ def test_sanitize_branch_name():
 
 
 def test_get_default_branch(tmp_path, monkeypatch):
-    from codogram.git_utils import get_default_branch
+    from codogram.git.utils import get_default_branch
 
     # Create a git repo with main branch
     subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
@@ -26,7 +26,7 @@ def test_get_default_branch(tmp_path, monkeypatch):
 
 
 def test_branch_exists(tmp_path):
-    from codogram.git_utils import branch_exists
+    from codogram.git.utils import branch_exists
 
     subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
     subprocess.run(["git", "checkout", "-b", "main"], cwd=tmp_path, capture_output=True)
@@ -39,7 +39,7 @@ def test_branch_exists(tmp_path):
 
 
 def test_has_uncommitted_changes(tmp_path):
-    from codogram.git_utils import has_uncommitted_changes
+    from codogram.git.utils import has_uncommitted_changes
 
     subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
     subprocess.run(["git", "checkout", "-b", "main"], cwd=tmp_path, capture_output=True)
@@ -54,7 +54,7 @@ def test_has_uncommitted_changes(tmp_path):
 
 
 def test_is_git_repo(tmp_path):
-    from codogram.git_utils import is_git_repo
+    from codogram.git.utils import is_git_repo
 
     assert is_git_repo(tmp_path) is False
 
@@ -63,7 +63,7 @@ def test_is_git_repo(tmp_path):
 
 
 def test_max_branch_name_length():
-    from codogram.git_utils import max_branch_name_length
+    from codogram.git.utils import max_branch_name_length
 
     assert max_branch_name_length("codogram") == 37  # 45 - 8
     assert max_branch_name_length("my-long-project") == 30  # 45 - 15

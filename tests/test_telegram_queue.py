@@ -1,6 +1,6 @@
 # tests/test_telegram_queue.py
 import pytest
-from codogram.telegram_queue import OutgoingBatch
+from codogram.telegram.queue import OutgoingBatch
 
 
 # --- OutgoingBatch tests ---
@@ -25,7 +25,7 @@ def test_outgoing_batch_without_thread():
 import asyncio
 from unittest.mock import Mock, AsyncMock
 from aiogram import Bot
-from codogram.telegram_queue import TelegramQueue
+from codogram.telegram.queue import TelegramQueue
 
 
 @pytest.fixture
@@ -282,7 +282,7 @@ async def test_markdownv2_messages_are_converted(queue, mock_bot):
 async def test_enqueue_timeout():
     """Test that enqueue raises timeout after specified duration."""
     from unittest.mock import MagicMock
-    from codogram.telegram_queue import TelegramQueueTimeout
+    from codogram.telegram.queue import TelegramQueueTimeout
 
     bot = MagicMock()
     # Make send_message hang forever
@@ -372,7 +372,7 @@ async def test_edit_helper():
 async def test_delete_batch_deletes_message():
     """DeleteBatch should call bot.delete_message."""
     from unittest.mock import MagicMock
-    from codogram.telegram_queue import DeleteBatch
+    from codogram.telegram.queue import DeleteBatch
 
     bot = MagicMock()
     bot.delete_message = AsyncMock()
@@ -448,7 +448,7 @@ async def test_sent_statuses_tracks_message_ids():
 async def test_edit_by_replace_key():
     """EditBatch with replace_key should use stored msg_id."""
     from unittest.mock import MagicMock
-    from codogram.telegram_queue import EditBatch
+    from codogram.telegram.queue import EditBatch
 
     bot = MagicMock()
     bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))
@@ -483,7 +483,7 @@ async def test_edit_by_replace_key():
 async def test_delete_by_replace_key():
     """DeleteBatch with replace_key should use stored msg_id and clean up."""
     from unittest.mock import MagicMock
-    from codogram.telegram_queue import DeleteBatch
+    from codogram.telegram.queue import DeleteBatch
 
     bot = MagicMock()
     bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))

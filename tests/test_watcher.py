@@ -4,7 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from codogram.watcher import parse_jsonl_entry, ContentType
+from codogram.claude.history_watcher import parse_jsonl_entry, ContentType
 from codogram.strings import SNIP
 
 def test_parse_text_entry():
@@ -55,7 +55,7 @@ def test_parse_jsonl_entry_handles_string_in_assistant_content():
     assert result.content_type == ContentType.TEXT
 
 
-from codogram.watcher import format_tool_use
+from codogram.claude.history_watcher import format_tool_use
 
 
 def test_format_tool_use_bash_truncates_in_short_mode():

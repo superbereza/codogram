@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def test_create_worktree(tmp_path):
-    from codogram.worktree import create_worktree
+    from codogram.git.worktree import create_worktree
 
     # Setup main repo
     main_repo = tmp_path / "project"
@@ -30,7 +30,7 @@ def test_create_worktree(tmp_path):
 
 
 def test_create_worktree_branch_exists(tmp_path):
-    from codogram.worktree import create_worktree
+    from codogram.git.worktree import create_worktree
 
     main_repo = tmp_path / "project"
     main_repo.mkdir()
@@ -56,7 +56,7 @@ def test_create_worktree_branch_exists(tmp_path):
 
 
 def test_remove_worktree(tmp_path):
-    from codogram.worktree import create_worktree, remove_worktree
+    from codogram.git.worktree import create_worktree, remove_worktree
 
     main_repo = tmp_path / "project"
     main_repo.mkdir()
@@ -76,7 +76,7 @@ def test_remove_worktree(tmp_path):
 
 
 def test_merge_branch(tmp_path):
-    from codogram.worktree import create_worktree, merge_branch
+    from codogram.git.worktree import create_worktree, merge_branch
 
     main_repo = tmp_path / "project"
     main_repo.mkdir()

@@ -10,7 +10,7 @@ os.environ.setdefault("ADMIN_IDS", "123")
 os.environ.setdefault("BASE_DIR", "/tmp")
 
 from codogram.services.session_state import SessionStateService
-from codogram.screen import StatusBar
+from codogram.claude.screen import StatusBar
 
 
 class TestSessionStateService:

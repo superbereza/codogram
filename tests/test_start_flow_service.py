@@ -850,7 +850,7 @@ class TestIsSetupPhase:
     def test_is_setup_phase_no_threads(self):
         """No threads at all -> True."""
         from codogram.services.start_flow import is_setup_phase
-        from codogram.session_manager import ProjectState
+        from codogram.core.session_manager import ProjectState
 
         project = ProjectState(project_name="test")
         assert is_setup_phase(project) is True
@@ -858,7 +858,7 @@ class TestIsSetupPhase:
     def test_is_setup_phase_main_thread_no_session(self):
         """Main thread exists but no session_id -> True."""
         from codogram.services.start_flow import is_setup_phase
-        from codogram.session_manager import ProjectState, ThreadInfo
+        from codogram.core.session_manager import ProjectState, ThreadInfo
 
         project = ProjectState(project_name="test")
         project.threads[None] = ThreadInfo(thread_id=None, name="main")
@@ -867,7 +867,7 @@ class TestIsSetupPhase:
     def test_is_setup_phase_main_thread_with_session(self):
         """Main thread has session_id -> False."""
         from codogram.services.start_flow import is_setup_phase
-        from codogram.session_manager import ProjectState, ThreadInfo
+        from codogram.core.session_manager import ProjectState, ThreadInfo
 
         project = ProjectState(project_name="test")
         project.threads[None] = ThreadInfo(thread_id=None, name="main", session_id="abc123")
@@ -876,7 +876,7 @@ class TestIsSetupPhase:
     def test_is_setup_phase_legacy_session_id(self):
         """Legacy projects have session_id on project, not thread."""
         from codogram.services.start_flow import is_setup_phase
-        from codogram.session_manager import ProjectState
+        from codogram.core.session_manager import ProjectState
 
         project = ProjectState(project_name="test")
         project.session_id = "legacy-session"
@@ -890,7 +890,7 @@ class TestCleanupProject:
         """cleanup_project should kill tmux for all threads."""
         from unittest.mock import MagicMock, patch
         from codogram.services.start_flow import cleanup_project
-        from codogram.session_manager import ProjectState, ThreadInfo
+        from codogram.core.session_manager import ProjectState, ThreadInfo
 
         project = ProjectState(project_name="test", cwd="/test/path")
         project.threads[None] = ThreadInfo(thread_id=None, name="main")
@@ -898,7 +898,7 @@ class TestCleanupProject:
 
         with patch('codogram.services.start_flow.is_tmux_session_exists') as exists, \
              patch('codogram.services.start_flow.kill_tmux_session') as kill, \
-             patch('codogram.session_manager.project_manager') as pm:
+             patch('codogram.core.session_manager.project_manager') as pm:
 
             exists.return_value = True
             pm.projects = {"test": project}
@@ -913,14 +913,14 @@ class TestCleanupProject:
         """cleanup_project should report if directory deletion fails."""
         from unittest.mock import MagicMock, patch
         from codogram.services.start_flow import cleanup_project
-        from codogram.session_manager import ProjectState, ThreadInfo
+        from codogram.core.session_manager import ProjectState, ThreadInfo
 
         project = ProjectState(project_name="test", cwd="/nonexistent/protected/path")
         project.threads[None] = ThreadInfo(thread_id=None, name="main")
 
         with patch('codogram.services.start_flow.is_tmux_session_exists') as exists, \
              patch('codogram.services.start_flow.kill_tmux_session') as kill, \
-             patch('codogram.session_manager.project_manager') as pm, \
+             patch('codogram.core.session_manager.project_manager') as pm, \
              patch('codogram.services.start_flow.Path') as MockPath:
 
             exists.return_value = False

@@ -15,7 +15,7 @@ from aiogram.fsm.context import FSMContext
 
 from codogram.handlers.start import cmd_start
 from codogram.services.start_flow import FlowAction
-from codogram.telegram_queue import TelegramQueue
+from codogram.telegram.queue import TelegramQueue
 
 
 @pytest.fixture

@@ -1,7 +1,7 @@
 """Tests for settings keyboard builder."""
 
 import pytest
-from codogram.keyboards.settings import settings_keyboard, _short_id
+from codogram.telegram.keyboards.settings import settings_keyboard, _short_id
 
 
 def test_settings_keyboard_structure():

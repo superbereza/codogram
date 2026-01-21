@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from codogram.project_resolver import get_project_name
+from codogram.git.resolver import get_project_name
 
 def test_simple_directory():
     """Directory without git returns its name."""
