@@ -79,7 +79,7 @@ async def on_help_close(callback: CallbackQuery):
 
 def _build_settings_text(project, thread, tmux_name: str) -> str:
     """Build settings message text. Used by cmd_settings and callback handler."""
-    from ..tmux import TmuxSession
+    from ..tmux.session import TmuxSession
     from ..services.session_state import SessionStateService
 
     # Get settings from context
@@ -466,7 +466,7 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
         await callback.answer(f"Verbose: {status}")
 
     elif action == "m":
-        from ..tmux import TmuxSession
+        from ..tmux.session import TmuxSession
         from ..services.session_state import SessionStateService
 
         # Get cwd for tmux

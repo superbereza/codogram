@@ -223,7 +223,7 @@ async def _send_content(message: Message, result, telegram_queue: TelegramQueue)
 def _try_send_to_tmux(result, text: str) -> bool:
     """Try to send message to tmux if session exists."""
     if result.tmux_name and result.cwd:
-        from ..tmux import TmuxSession
+        from ..tmux.session import TmuxSession
         tmux = TmuxSession(result.tmux_name, result.cwd)
         if tmux.exists():
             tmux.send(text)

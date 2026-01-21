@@ -18,7 +18,7 @@ from .middleware.clear_create_state import ClearCreateStateMiddleware
 from .middleware.setup_blocker import SetupBlockerMiddleware
 from .handlers import register_handlers
 from .session_manager import project_manager, ProjectState
-from .tmux import TmuxSession
+from .tmux.session import TmuxSession
 from .logging_config import setup_logging, logger
 from .telegram.queue import TelegramQueue
 from .services.menu import BASIC_COMMANDS, register_menu_for_chat, register_dm_commands

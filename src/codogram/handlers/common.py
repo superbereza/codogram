@@ -5,8 +5,8 @@ from aiogram.types import Message, CallbackQuery
 from .. import strings
 from ..telegram.queue import TelegramQueue
 from ..session_manager import project_manager
-from ..project_launcher import is_tmux_session_exists
-from ..tmux import TmuxSession
+from ..tmux.launcher import is_tmux_session_exists
+from ..tmux.session import TmuxSession
 
 router = Router(name="common")
 

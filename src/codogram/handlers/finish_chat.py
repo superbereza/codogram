@@ -12,7 +12,7 @@ from .common import require_claude_ready
 from ..services.branch import archive_thread
 from ..git_utils import has_uncommitted_changes, get_default_branch, branch_exists
 from ..worktree import merge_branch, push_branch, remove_worktree
-from ..tmux import TmuxSession
+from ..tmux.session import TmuxSession
 
 router = Router(name="finish_chat")
 

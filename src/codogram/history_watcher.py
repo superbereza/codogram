@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 from .config import settings
 from .history_reader import find_session_for_project
 from .logging_config import logger
-from .tmux import TmuxSession
+from .tmux.session import TmuxSession
 
 
 class HistoryWatcher:

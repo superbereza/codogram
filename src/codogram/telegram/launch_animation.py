@@ -13,7 +13,7 @@ from ..screen import parse_screen, PermissionPrompt
 from ..services.start_flow import build_announcement, build_thread_announcement
 from ..session_manager import ProjectState, ThreadInfo, project_manager
 from .queue import TelegramQueue, EditBatch
-from ..tmux import TmuxSession
+from ..tmux.session import TmuxSession
 
 FACES = [
     "[._.]",   # Sleeping

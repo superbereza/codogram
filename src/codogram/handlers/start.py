@@ -25,7 +25,7 @@ from ..start_flow import (
 )
 from ..telegram.queue import TelegramQueue, OutgoingBatch
 from ..telegram.keyboards.tmux_selector import create_tmux_selection_keyboard
-from ..project_launcher import is_tmux_session_exists
+from ..tmux.launcher import is_tmux_session_exists
 from ..services.menu import register_menu_for_chat
 
 router = Router(name="start")
@@ -329,7 +329,7 @@ async def _launch_claude_in_thread(message: Message, result: FlowResult, telegra
     actual_cwd = thread.worktree_path or project.cwd
     if is_tmux_session_exists(tmux_name):
         # Check if Claude is ready in tmux
-        from ..tmux import TmuxSession
+        from ..tmux.session import TmuxSession
         tmux = TmuxSession(tmux_name, actual_cwd)
         if tmux.is_claude_ready():
             await telegram_queue.reply(

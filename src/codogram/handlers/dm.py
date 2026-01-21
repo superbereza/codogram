@@ -22,7 +22,7 @@ from ..services.dm_onboarding import (
 )
 from ..services.dashboard import format_dashboard, ProjectInfo
 from ..session_manager import project_manager
-from ..project_launcher import is_tmux_session_exists
+from ..tmux.launcher import is_tmux_session_exists
 from ..telegram.queue import TelegramQueue
 
 router = Router(name="dm")

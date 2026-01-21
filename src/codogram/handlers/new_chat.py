@@ -33,7 +33,7 @@ from ..git_utils import (
     get_default_branch,
     branch_exists,
 )
-from ..tmux import TmuxSession
+from ..tmux.session import TmuxSession
 
 router = Router(name="new_chat")
 

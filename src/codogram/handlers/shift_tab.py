@@ -5,7 +5,7 @@ from aiogram.filters import Command
 
 from ..session_manager import project_manager
 from ..telegram.queue import TelegramQueue
-from ..tmux import TmuxSession
+from ..tmux.session import TmuxSession
 from ..services.session_state import SessionStateService
 
 router = Router(name="shift_tab")

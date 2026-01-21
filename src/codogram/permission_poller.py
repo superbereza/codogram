@@ -15,7 +15,7 @@ from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_think
 from .telegram.keyboards import permission_keyboard
 from .state import permission_messages
 from .session_manager import ProjectState, ThreadInfo, project_manager
-from .tmux import TmuxSession
+from .tmux.session import TmuxSession
 from .logging_config import logger
 from .auto_accept import try_auto_accept
 from .config import settings

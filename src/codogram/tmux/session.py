@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .logging_config import logger
-from .config import TMUX_CAPTURE_LINES_DEFAULT
+from ..logging_config import logger
+from ..config import TMUX_CAPTURE_LINES_DEFAULT
 
 # Debug log for tmux send operations
 TMUX_DEBUG_LOG = Path(__file__).parent.parent.parent / "logs/tmux-send-debug.log"
@@ -124,7 +124,7 @@ class TmuxSession:
         Returns True if prompt was cancelled or wasn't active.
         Returns False if failed to cancel after max_attempts.
         """
-        from .screen import parse_screen, PermissionPrompt
+        from ..screen import parse_screen, PermissionPrompt
 
         for attempt in range(max_attempts):
             output = self.capture_pane()
@@ -211,7 +211,7 @@ class TmuxSession:
 
     def is_claude_ready(self) -> bool:
         """Check if Claude UI is loaded and ready for input."""
-        from .screen import is_claude_ready
+        from ..screen import is_claude_ready
         output = self.capture_pane()
         return is_claude_ready(output)
 

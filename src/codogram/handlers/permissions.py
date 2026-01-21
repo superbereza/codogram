@@ -3,7 +3,7 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery
 
 from ..session_manager import project_manager
-from ..tmux import TmuxSession
+from ..tmux.session import TmuxSession
 from ..state import permission_messages
 from ..logging_config import logger
 
