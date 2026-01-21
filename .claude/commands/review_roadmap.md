@@ -9,6 +9,7 @@ Read the current state from:
 2. `docs/bugs/active/` - Active bugs
 3. `docs/bugs/testing/` - Testing bugs
 4. `docs/bugs/fixed/` - Fixed bugs (for today's date)
+5. `git log --oneline -20` - Recent commits to identify what was done
 
 Generate a formatted list in this exact format:
 
@@ -73,3 +74,7 @@ Rules:
 - Mark changes since last review in this conversation:
   - Make changed item **bold**
   - Add comment after `—`: `**Item name** — was In Progress` or `**Item name** — new`
+- **Analyze git commits** (`git log --oneline --since="00:00"` for today):
+  - Cross-reference commits with roadmap items and bugs
+  - If commit indicates fix/feature completion not in roadmap — add to "Done today" with note
+  - Ask user if roadmap needs updating based on commits

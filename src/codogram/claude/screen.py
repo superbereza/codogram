@@ -6,9 +6,9 @@ from ..config import SCREEN_SEPARATOR_MIN_DASHES
 from ..logging_config import logger
 
 # Claude thinking status spinners (unique Unicode chars)
-# Excluded: * (too common in text) and · (middle dot, appears in bullet lists)
-# These remaining chars are specific enough to not need content validation
-THINKING_SPINNERS = "✶✻✽✢"
+# · added because Claude uses it; false positives avoided by checking only 5 lines before separator
+# Excluded: * (too common in text)
+THINKING_SPINNERS = "✶✻✽✢·"
 
 
 # Pattern for pasted content placeholder: [Pasted text #1 +51 lines]
@@ -363,7 +363,9 @@ def parse_thinking_status(output: str) -> str | None:
     for line in recent_lines:
         stripped = line.strip()
         if stripped and stripped[0] in THINKING_SPINNERS:
-            # THINKING_SPINNERS are unique enough - no content validation needed
+            # For · (middle dot), require "to interrupt" to distinguish from bullet lists
+            if stripped[0] == "·" and "to interrupt" not in stripped:
+                continue
             # Replace ctrl+c first, then esc (but only standalone, not /esc)
             result = stripped.replace("ctrl+c to interrupt", "/esc to interrupt")
             # Use regex to replace only standalone "esc to interrupt" (not "/esc")
