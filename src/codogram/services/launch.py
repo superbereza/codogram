@@ -121,7 +121,7 @@ async def _create_worktree_with_status(
 
     Returns (worktree_path, error) - path on success, error message on failure.
     """
-    from ..worktree import create_worktree
+    from ..git.worktree import create_worktree
 
     main_repo = Path(project.cwd)
     # Worktree inside .worktrees/ subdirectory

@@ -3,7 +3,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .git_utils import branch_exists
+from .utils import branch_exists
 
 
 @dataclass

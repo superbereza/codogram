@@ -27,7 +27,7 @@ from ..domain.worktree_state import WorktreeState, get_worktree_state
 from ..services.create_flow import create_flow_service
 from ..services.branch import do_branch_create
 from ..services.launch import create_thread_with_session
-from ..git_utils import (
+from ..git.utils import (
     is_git_repo,
     has_uncommitted_changes,
     get_default_branch,

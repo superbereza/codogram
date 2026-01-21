@@ -13,7 +13,7 @@ from .. import strings
 from ..domain.states import StartFlow, RestartFlow, ResetFlow
 from ..domain.worktree_state import WorktreeState, get_worktree_state
 from ..telegram.keyboards.keyboards import worktree_recovery_keyboard
-from ..git_utils import has_uncommitted_changes
+from ..git.utils import has_uncommitted_changes
 from ..telegram.keyboards.reset import reset_confirm_keyboard, reset_dir_choice_keyboard, reset_uncommitted_keyboard
 from ..services.start_flow import StartFlowService, FlowAction, FlowResult, is_setup_phase, cleanup_project
 from ..session_manager import project_manager

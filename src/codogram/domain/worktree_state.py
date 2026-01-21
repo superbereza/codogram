@@ -17,7 +17,7 @@ class WorktreeState(Enum):
 
 def get_worktree_state(thread: ThreadInfo, project_cwd: Path) -> WorktreeState:
     """Check worktree state for a thread."""
-    from codogram.git_utils import branch_exists
+    from codogram.git.utils import branch_exists
 
     if not thread.worktree_path:
         return WorktreeState.OK

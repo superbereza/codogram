@@ -3,7 +3,7 @@ from pathlib import Path
 
 from .. import strings
 from ..magic_names import get_random_magic_name
-from ..git_utils import sanitize_branch_name, max_branch_name_length, is_git_repo, has_uncommitted_changes
+from ..git.utils import sanitize_branch_name, max_branch_name_length, is_git_repo, has_uncommitted_changes
 
 
 class CreateFlowService:

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import settings, load_config, get_config_path
-from .project_resolver import get_project_name
+from .git.resolver import get_project_name
 from .tmux.session import TmuxSession
 from .claude.session_finder import find_session_for_project, compute_jsonl_path
 from .logging_config import logger
