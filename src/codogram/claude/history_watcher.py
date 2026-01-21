@@ -245,6 +245,10 @@ def _entry_to_messages(entry: ParsedEntry, verbose: bool = False) -> list[dict]:
         messages.append({"text": f"● {entry.text}", "parse_mode": "MarkdownV2"})
 
     elif entry.content_type == ContentType.TOOL_USE:
+        # Hide AskUserQuestion - shown by poller instead
+        if entry.tool_name == "AskUserQuestion":
+            return []
+
         text = format_tool_use(entry.tool_name, entry.tool_input, verbose=verbose)
         messages.append({"text": text, "parse_mode": "MarkdownV2"})
 
