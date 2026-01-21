@@ -20,14 +20,17 @@ def extract_input_text(screen: str) -> str | None:
 
     Returns None if input is empty or not found.
     Used for stuck message detection.
+
+    Note: Returns the LAST ❯ line (current input), not first (could be scrollback).
     """
+    result = None
     for line in screen.split("\n"):
         stripped = line.strip()
         if stripped.startswith("❯"):
-            # Text after ❯
             text = stripped[1:].strip()
-            return text if text else None
-    return None
+            if text:
+                result = text
+    return result
 
 
 class PromptType(Enum):
