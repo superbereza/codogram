@@ -14,7 +14,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Chat, ChatMemberUpdated, Message
 
 from ...domain.states import SetupFlow
-from ...session_manager import ProjectManager
+from ...core.session_manager import ProjectManager
 from ...services.setup import check_bot_admin_rights, check_base_dir
 from ...services.group_auth import GroupAuthService
 from ...telegram.keyboards.setup import admin_check_keyboard, setup_type_keyboard

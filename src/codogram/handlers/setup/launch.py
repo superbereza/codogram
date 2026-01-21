@@ -118,7 +118,7 @@ async def _execute_launch(message: Message, state: FSMContext):
     from ...services.setup.init_project import init_project
     from ...services.menu import register_menu_for_chat
     from ...telegram.launch_animation import launch_with_animation
-    from ...session_manager import project_manager
+    from ...core.session_manager import project_manager
     from ...main import telegram_queue
 
     # Enter launching state (blocks user input)

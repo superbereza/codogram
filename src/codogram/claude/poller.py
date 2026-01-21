@@ -14,7 +14,7 @@ from ..telegram.queue import OutgoingBatch, EditBatch, DeleteBatch
 from .screen import parse_screen, PermissionPrompt, is_claude_ready, parse_thinking_status, parse_input_suggestion, extract_input_text, PASTED_PATTERN, detect_compacting
 from ..telegram.keyboards import permission_keyboard
 from ..state import permission_messages
-from ..session_manager import ProjectState, ThreadInfo, project_manager
+from ..core.session_manager import ProjectState, ThreadInfo, project_manager
 from ..tmux.session import TmuxSession
 from ..logging_config import logger
 from ..auto_accept import try_auto_accept

@@ -4,7 +4,7 @@ import asyncio
 from aiogram import Bot, Router, F
 from aiogram.types import CallbackQuery, ChatMemberUpdated, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from ..session_manager import project_manager
+from ..core.session_manager import project_manager
 from ..telegram.queue import TelegramQueue, OutgoingBatch, DeleteBatch
 from ..services.menu import register_menu_for_chat
 from ..services.setup import check_bot_admin_rights

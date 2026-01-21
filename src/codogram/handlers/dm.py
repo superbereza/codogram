@@ -21,7 +21,7 @@ from ..services.dm_onboarding import (
     run_warning_checks,
 )
 from ..services.dashboard import format_dashboard, ProjectInfo
-from ..session_manager import project_manager
+from ..core.session_manager import project_manager
 from ..tmux.launcher import is_tmux_session_exists
 from ..telegram.queue import TelegramQueue
 

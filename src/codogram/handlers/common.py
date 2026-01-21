@@ -4,7 +4,7 @@ from aiogram.types import Message, CallbackQuery
 
 from .. import strings
 from ..telegram.queue import TelegramQueue
-from ..session_manager import project_manager
+from ..core.session_manager import project_manager
 from ..tmux.launcher import is_tmux_session_exists
 from ..tmux.session import TmuxSession
 

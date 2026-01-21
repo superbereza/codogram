@@ -3,7 +3,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
-from ..session_manager import project_manager
+from ..core.session_manager import project_manager
 from ..telegram.queue import TelegramQueue
 from .. import strings
 from ..logging_config import logger

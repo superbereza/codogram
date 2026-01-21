@@ -142,7 +142,7 @@ async def on_view_connected(callback: CallbackQuery, state: FSMContext):
     else:
         lines = [strings.SETUP_CONNECTED_HEADER, ""]
 
-        from ...session_manager import ProjectManager
+        from ...core.session_manager import ProjectManager
         pm = ProjectManager()
 
         for folder_name, chat_id in connected.items():

@@ -16,7 +16,7 @@ from ..telegram.keyboards.keyboards import worktree_recovery_keyboard
 from ..git.utils import has_uncommitted_changes
 from ..telegram.keyboards.reset import reset_confirm_keyboard, reset_dir_choice_keyboard, reset_uncommitted_keyboard
 from ..services.start_flow import StartFlowService, FlowAction, FlowResult, is_setup_phase, cleanup_project
-from ..session_manager import project_manager
+from ..core.session_manager import project_manager
 from ..start_flow import (
     dir_not_found_keyboard,
     git_setup_keyboard,

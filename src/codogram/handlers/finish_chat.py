@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 
 from .. import strings
-from ..session_manager import project_manager
+from ..core.session_manager import project_manager
 from ..telegram.queue import TelegramQueue
 from .common import require_claude_ready
 from ..services.branch import archive_thread

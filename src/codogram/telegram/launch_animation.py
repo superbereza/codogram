@@ -11,7 +11,7 @@ from ..config import settings
 from ..logging_config import logger
 from ..claude.screen import parse_screen, PermissionPrompt
 from ..services.start_flow import build_announcement, build_thread_announcement
-from ..session_manager import ProjectState, ThreadInfo, project_manager
+from ..core.session_manager import ProjectState, ThreadInfo, project_manager
 from .queue import TelegramQueue, EditBatch
 from ..tmux.session import TmuxSession
 
@@ -49,7 +49,7 @@ async def _start_monitoring(
     since we already have session_id and jsonl_path.
     """
     from ..claude.poller import create_poller_task_for_thread
-    from ..claude.history_watcher import watch_thread_jsonl
+    from ..core.coordinator import watch_thread_jsonl
 
     # Always start poller (works with tmux directly)
     if not thread.poller_task or thread.poller_task.done():

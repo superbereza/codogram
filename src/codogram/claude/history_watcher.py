@@ -190,7 +190,7 @@ async def create_watcher_task(
     This is a compatibility shim - actual watching is done per-thread
     via watch_thread_jsonl in history_watcher.py.
     """
-    from ..session_manager import ProjectState
+    from ..core.session_manager import ProjectState
 
     if not isinstance(project, ProjectState):
         raise TypeError("project must be ProjectState")

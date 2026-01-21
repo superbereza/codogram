@@ -5,15 +5,15 @@ from typing import TYPE_CHECKING
 
 from aiogram import Bot
 
-from . import strings
+from .. import strings
 from .session_manager import project_manager, ProjectState, ThreadInfo
 
 if TYPE_CHECKING:
-    from .telegram.queue import TelegramQueue
-from .config import settings
-from .claude.session_finder import find_session_for_project
-from .logging_config import logger
-from .tmux.session import TmuxSession
+    from ..telegram.queue import TelegramQueue
+from ..config import settings
+from ..claude.session_finder import find_session_for_project
+from ..logging_config import logger
+from ..tmux.session import TmuxSession
 
 
 class HistoryWatcher:
@@ -54,7 +54,7 @@ class HistoryWatcher:
 
     async def _check_for_changes(self):
         """Check tmux health and session changes for all projects."""
-        from .session_manager import should_cleanup_project
+        from .session_manager import should_cleanup_project  # same module
 
         for project in list(self.project_manager.projects.values()):
             if not project.chat_id or not project.cwd:
@@ -103,7 +103,7 @@ class HistoryWatcher:
                             thread.poller_task = None
 
                         # Notify user through queue
-                        from .telegram.queue import OutgoingBatch
+                        from ..telegram.queue import OutgoingBatch
                         try:
                             batch = OutgoingBatch(
                                 chat_id=project.chat_id,
@@ -135,7 +135,7 @@ class HistoryWatcher:
         NOTE: Binds only ONE thread per cycle to prevent race condition where
         multiple awaiting threads bind to the same session.
         """
-        from .claude.session_finder import get_session_creation_time
+        from ..claude.session_finder import get_session_creation_time
         from pathlib import Path
 
         # Find all sessions for this project, sorted by creation time (newest first)
@@ -193,7 +193,7 @@ class HistoryWatcher:
         new_session_id: str
     ):
         """Bind thread to new session."""
-        from .claude.session_finder import compute_jsonl_path
+        from ..claude.session_finder import compute_jsonl_path
 
         logger.info(
             f"session_bound: project={project.project_name}, thread={thread.name}, "
@@ -220,13 +220,13 @@ class HistoryWatcher:
         # Restart permission poller
         if thread.poller_task:
             thread.poller_task.cancel()
-        from .claude.poller import create_poller_task_for_thread
+        from ..claude.poller import create_poller_task_for_thread
         thread.poller_task = await create_poller_task_for_thread(
             self.bot, project, thread, self.telegram_queue
         )
 
         # Notify user
-        from .telegram.queue import OutgoingBatch
+        from ..telegram.queue import OutgoingBatch
         try:
             batch = OutgoingBatch(
                 chat_id=project.chat_id,
@@ -244,8 +244,8 @@ class HistoryWatcher:
 
 async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo, telegram_queue: "TelegramQueue"):
     """Watch jsonl for a specific thread and send messages through queue."""
-    from .claude.history_watcher import JsonlWatcher, _entry_to_messages
-    from .telegram.queue import OutgoingBatch
+    from ..claude.history_watcher import JsonlWatcher, _entry_to_messages
+    from ..telegram.queue import OutgoingBatch
     from pathlib import Path
 
     if not thread.jsonl_path:
@@ -296,7 +296,7 @@ async def poll_for_session_thread(
     threads may have different Claude sessions in the same project directory.
     """
     try:
-        from .claude.session_finder import find_session_by_user_message
+        from ..claude.session_finder import find_session_by_user_message
     except Exception as e:
         logger.error(f"poll_for_session_thread: import error: {e}")
         return
@@ -340,7 +340,7 @@ async def poll_for_session_thread(
                 thread.start_requested_at = None
 
                 # Save config after binding
-                from .session_manager import project_manager
+                from .session_manager import project_manager  # same module
                 project_manager._save()
 
                 # Start thread-specific watcher
@@ -350,7 +350,7 @@ async def poll_for_session_thread(
                     )
 
                 # Start thread-specific permission poller
-                from .claude.poller import create_poller_task_for_thread
+                from ..claude.poller import create_poller_task_for_thread
                 if not thread.poller_task or thread.poller_task.done():
                     thread.poller_task = await create_poller_task_for_thread(bot, project, thread, telegram_queue)
 
@@ -366,7 +366,7 @@ async def poll_for_session_thread(
     logger.warning(f"poll_for_session_thread_timeout: project={project.project_name}, thread={thread.name}")
     thread.awaiting_new_session = False
     try:
-        from .telegram.queue import OutgoingBatch
+        from ..telegram.queue import OutgoingBatch
         batch = OutgoingBatch(
             chat_id=project.chat_id,
             thread_id=thread.thread_id,

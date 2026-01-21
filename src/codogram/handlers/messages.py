@@ -7,7 +7,7 @@ from aiogram.types import Message
 from ..services.message_router import MessageRouterService, RouteAction
 from ..services.file_input import FileInputService
 from ..services.response_mode import ResponseModeService
-from ..session_manager import project_manager, ThreadInfo
+from ..core.session_manager import project_manager, ThreadInfo
 from ..telegram.queue import TelegramQueue
 from ..logging_config import logger
 from .. import strings
@@ -233,7 +233,7 @@ def _try_send_to_tmux(result, text: str) -> bool:
 
 async def _start_binding(message: Message, result, telegram_queue: TelegramQueue):
     """Start session binding for unbound thread."""
-    from ..history_watcher import poll_for_session_thread
+    from ..core.coordinator import poll_for_session_thread
 
     thread = result.thread
     project = result.project

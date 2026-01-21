@@ -3,7 +3,7 @@ from aiogram import Router
 from aiogram.types import ChatMemberUpdated
 
 from ..telegram.sticker import StickerAdapter
-from ..session_manager import project_manager
+from ..core.session_manager import project_manager
 from ..services.emoji_pack import EmojiPackService
 from ..services.group_auth import GroupAuthService
 from ..telegram.queue import TelegramQueue

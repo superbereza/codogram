@@ -1,4 +1,4 @@
-# src/codogram/session_manager.py
+# src/codogram/core/session_manager.py
 import asyncio
 import fcntl
 import json
@@ -6,11 +6,11 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .config import settings, load_config, get_config_path
-from .git.resolver import get_project_name
-from .tmux.session import TmuxSession
-from .claude.session_finder import find_session_for_project, compute_jsonl_path
-from .logging_config import logger
+from ..config import settings, load_config, get_config_path
+from ..git.resolver import get_project_name
+from ..tmux.session import TmuxSession
+from ..claude.session_finder import find_session_for_project, compute_jsonl_path
+from ..logging_config import logger
 
 def should_cleanup_project(project: 'ProjectState') -> bool:
     """Check if project should be cleaned up (inactive > 30 days).
@@ -451,7 +451,7 @@ class ProjectManager:
 
     async def restore_projects(self, bot, start_poller, start_watcher, telegram_queue) -> None:
         """Restore sessions from history.jsonl after bot restart."""
-        from .history_watcher import watch_thread_jsonl
+        from .coordinator import watch_thread_jsonl
 
         # DEBUG: Log what we have at restore time
         for pname, p in self.projects.items():
@@ -504,7 +504,7 @@ class ProjectManager:
                     logger.debug(f"restore: no session for thread={thread.name} (session_id={thread.session_id}, jsonl={thread.jsonl_path})")
 
                 # Start poller for this thread (regardless of watcher)
-                from .claude.poller import create_poller_task_for_thread
+                from ..claude.poller import create_poller_task_for_thread
                 if not thread.poller_task or thread.poller_task.done():
                     thread.poller_task = await create_poller_task_for_thread(bot, project, thread, telegram_queue)
 

@@ -3,7 +3,7 @@ from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
 
-from ..session_manager import project_manager
+from ..core.session_manager import project_manager
 from ..telegram.queue import TelegramQueue
 from ..tmux.session import TmuxSession
 from ..services.session_state import SessionStateService

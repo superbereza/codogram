@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from ..telegram.sticker import StickerAdapter
 from ..config import settings
-from ..session_manager import project_manager
+from ..core.session_manager import project_manager
 from ..logging_config import logger
 
 # Fun adjectives and nouns for pack titles

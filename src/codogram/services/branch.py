@@ -4,7 +4,7 @@ from pathlib import Path
 
 from aiogram import Bot
 
-from ..session_manager import project_manager, ProjectState, ThreadInfo
+from ..core.session_manager import project_manager, ProjectState, ThreadInfo
 from ..logging_config import logger
 
 

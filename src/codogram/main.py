@@ -17,7 +17,7 @@ from .middleware.bot_admin_rights import BotAdminRightsMiddleware
 from .middleware.clear_create_state import ClearCreateStateMiddleware
 from .middleware.setup_blocker import SetupBlockerMiddleware
 from .handlers import register_handlers
-from .session_manager import project_manager, ProjectState
+from .core.session_manager import project_manager, ProjectState
 from .tmux.session import TmuxSession
 from .logging_config import setup_logging, logger
 from .telegram.queue import TelegramQueue
@@ -100,7 +100,7 @@ async def main():
                 logger.warning(f"Failed to register menu for {project.project_name}: {e}")
 
     # Start history watcher for session changes
-    from .history_watcher import create_history_watcher
+    from .core.coordinator import create_history_watcher
     await create_history_watcher(bot, start_poller, start_watcher, telegram_queue)
 
     logger.info("History watcher started (15s polling)")

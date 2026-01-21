@@ -42,7 +42,7 @@ async def init_project(
             logger.info(f"Created directory: {target_dir}")
 
         # Register project in config
-        from ...session_manager import project_manager
+        from ...core.session_manager import project_manager
         project = project_manager.get_or_create(project_name)
         project.chat_id = chat_id
         project.cwd = str(target_dir)

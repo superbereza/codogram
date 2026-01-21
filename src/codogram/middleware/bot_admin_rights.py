@@ -4,7 +4,7 @@ from typing import Any, Awaitable, Callable
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
-from ..session_manager import project_manager
+from ..core.session_manager import project_manager
 from ..services.setup import check_bot_admin_rights
 from ..telegram.queue import TelegramQueue
 from ..logging_config import logger

@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery
 
 from codogram import strings
 from codogram.services.branch import archive_thread, create_worktree, create_branch_with_worktree
-from codogram.session_manager import ProjectManager
+from codogram.core.session_manager import ProjectManager
 from codogram.telegram.queue import TelegramQueue
 
 logger = logging.getLogger(__name__)

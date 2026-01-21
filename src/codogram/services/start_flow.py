@@ -15,11 +15,11 @@ from ..domain.validators import (
 )
 from ..magic_names import get_random_magic_name
 from ..tmux.launcher import resolve_project_path, is_tmux_session_exists, git_init, git_init_with_github, git_clone
-from ..session_manager import ThreadInfo
+from ..core.session_manager import ThreadInfo
 from ..tmux.session import find_all_tmux_by_cwd, find_tmux_by_convention, TmuxSession, kill_tmux_session
 
 if TYPE_CHECKING:
-    from ..session_manager import ProjectManager, ProjectState
+    from ..core.session_manager import ProjectManager, ProjectState
 
 
 def build_announcement(project_name: str, tmux_name: str, is_forum: bool) -> str:
@@ -130,7 +130,7 @@ def cleanup_project(project: "ProjectState", delete_directory: bool) -> CleanupR
             cleanup_failed = True
 
     # 4. Remove from config
-    from ..session_manager import project_manager
+    from ..core.session_manager import project_manager
     if project.project_name in project_manager.projects:
         del project_manager.projects[project.project_name]
         project_manager._save()
