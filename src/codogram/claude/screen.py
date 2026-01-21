@@ -387,7 +387,7 @@ def detect_compacting(output: str) -> bool:
     # Find first ──── separator (top of input box)
     first_sep_idx = -1
     for i, line in enumerate(lines):
-        if "─" * 10 in line:
+        if "─" * SCREEN_SEPARATOR_MIN_DASHES in line:
             first_sep_idx = i
             break
 
@@ -401,12 +401,13 @@ def detect_compacting(output: str) -> bool:
     for line in recent_lines:
         stripped = line.strip()
         if stripped and stripped[0] in compact_spinners:
+            # Debug: log spinner lines that contain "compact" for troubleshooting
+            if "compact" in stripped.lower():
+                logger.debug(f"detect_compacting: found '{stripped[:60]}...'")
             if "compacting" in stripped.lower():
                 return True
 
     return False
-
-    return None
 
 
 def parse_input_suggestion(output: str) -> str | None:

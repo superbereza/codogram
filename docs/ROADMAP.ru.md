@@ -277,6 +277,15 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Супергруппы: проверяем админские права для функций топиков/переименования
 - См. [docs/plans/done/2026-01-18-group-authorization-design.md](plans/done/2026-01-18-group-authorization-design.md)
 
+### Реструктуризация проекта
+Реорганизация кодовой базы в логические модули:
+- `telegram/` — queue, adapters, keyboards, launch animation
+- `tmux/` — sessions, commands, window creation
+- `claude/` — screen parsing, permission prompts, history.jsonl
+- `git/` — worktree, branches, utils
+- `core/` — project state, background task coordinator
+- См. [docs/designs/done/2026-01-21-project-restructure.md](designs/done/2026-01-21-project-restructure.md)
+
 ### Объединение команд thread/branch и упрощение меню
 Единые команды вместо отдельных thread/branch/finish:
 - `/new_chat` — создать новый чат (thread или branch с worktree)
@@ -288,7 +297,16 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Относительные пути в UI (`./project` вместо полного пути)
 - См. [docs/designs/done/2026-01-19-command-merge-design.md](designs/done/2026-01-19-command-merge-design.md)
 
-## Beta Test
+### Avatar emoji pack
+Кастомный эмодзи пак из аватарок участников группы:
+- `/exp_avatar_pack` — toggle on/off, создать или удалить пак
+- Создание пака при миграции группа → супергруппа (async)
+- Добавление аватарки при присоединении участника, удаление при уходе
+- Генерация плейсхолдера (буква + цвет) для юзеров без аватарки
+- Весёлые рандомные названия: "Cosmic Dolphins", "Epic Titans" и т.д.
+- Подсказка с ссылкой на пак при запуске топика (если фича включена)
+- Ограничение: Premium нужен для установки кастом эмодзи как иконки топика
+- См. [docs/designs/done/2026-01-18-emoji-pack-design.md](designs/done/2026-01-18-emoji-pack-design.md)
 
 ### Редизайн set up flow + robust start
 Полный редизайн /start flow с устойчивой обработкой ошибок и интуитивным UX настройки:
@@ -298,6 +316,15 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Кнопка Cancel и /reset_all для отмены setup
 - Навигация с кнопками Go back
 - См. [docs/designs/done/2026-01-18-start-flow-v2.md](designs/done/2026-01-18-start-flow-v2.md)
+
+### Режим ответа на сообщения
+Per-chat настройка когда бот должен отвечать:
+- **Все сообщения** — отвечать на всё (по умолчанию)
+- **Polite** — пропускать сообщения с @упоминаниями других
+- **Mentions only** — отвечать только когда бот @упомянут или на него ответили
+- Переключение через `/response_mode` или кнопку в `/settings`
+
+## Beta Test
 
 ### Voice → Whisper транскрипция
 Голосовые и аудио файлы транскрибируются через OpenAI Whisper:
@@ -333,28 +360,24 @@ Per-thread/per-project toggle verbose output и UX настроек:
 - Предотвращает потерю сообщений из-за race conditions
 - См. [docs/designs/done/2026-01-17-stuck-message-recovery.md](designs/done/2026-01-17-stuck-message-recovery.md)
 
-### Режим ответа на сообщения
-Per-chat настройка когда бот должен отвечать:
-- **Все сообщения** — отвечать на всё (по умолчанию)
-- **Polite** — пропускать сообщения с @упоминаниями других
-- **Mentions only** — отвечать только когда бот @упомянут или на него ответили
-- Переключение через `/response_mode` или кнопку в `/settings`
-- Экспериментально: нужны фичи контекста чата для полной полезности
-
 ## In Progress
 
 ### Architecture review and clean up
 Ревью архитектуры и уменьшение технического долга.
-- Phase 1 done, новый подход TBD
+- Phase 1 done (реструктуризация проекта), продолжаем с рефакторингом поллера
 
-### Avatar emoji pack
-Emoji pack из аватарок участников группы:
-- Создание pack при миграции группа → супергруппа (async)
-- Добавление аватарки при входе участника, удаление при выходе
-- Генерация placeholder (буква + цвет) для юзеров без аватарки
-- Уведомление: "`[v]` Gift unlocked — avatar pack for topic icons"
-- Ограничение: Premium нужен для установки custom emoji как иконки топика
-- См. [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
+### Рефакторинг permission poller
+Разбить god-function на handler классы:
+- Разбить 500-строчный `permission_poller()` на отдельные handlers
+- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
+- Каждый handler 20-150 строк, unit-тестируемый
+- См. [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
+
+### Поддержка AskUserQuestion
+Детектить и обрабатывать AskUserQuestion промпты от Claude:
+- Парсить текст вопроса и варианты ответов из tmux
+- Показывать как inline кнопки в Telegram
+- Связанный баг: askuserquestion-not-detected
 
 ## Backlog
 
@@ -408,13 +431,6 @@ MCP tool для Claude чтобы читать историю Telegram чата:
 - Конвертация ASCII/markdown таблиц в картинки
 - Конвертация mermaid/plantuml диаграмм в картинки
 - Улучшенная читаемость в Telegram
-
-### Рефакторинг permission poller
-Разбить god-function на handler классы:
-- Разбить 500-строчный `permission_poller()` на отдельные handlers
-- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
-- Каждый handler 20-150 строк, unit-тестируемый
-- См. [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
 
 ### Скрытые tool calls
 Скрывать internal tool calls по умолчанию:
