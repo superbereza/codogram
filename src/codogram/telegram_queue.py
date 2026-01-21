@@ -259,11 +259,19 @@ class TelegramQueue:
         for msg in batch.messages:
             if msg.get("parse_mode") == "MarkdownV2":
                 try:
-                    msg = {**msg, "text": telegramify_markdown.markdownify(
-                        msg.get("text", ""),
+                    text = msg.get("text", "")
+                    # Strip "● " prefix before markdownify, add back after
+                    # This prevents prefix from breaking code blocks at start
+                    prefix = ""
+                    if text.startswith("● "):
+                        prefix = "● "
+                        text = text[2:]
+                    converted = telegramify_markdown.markdownify(
+                        text,
                         max_line_length=None,
                         normalize_whitespace=False
-                    )}
+                    )
+                    msg = {**msg, "text": prefix + converted}
                 except Exception as e:
                     logger.warning(f"markdownify failed: {e}")
             converted_messages.append(msg)
