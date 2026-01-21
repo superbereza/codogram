@@ -80,11 +80,11 @@ async def main():
 
     # Define task starters
     async def start_poller(project: ProjectState) -> asyncio.Task:
-        from .permission_poller import create_poller_task
+        from .claude.poller import create_poller_task
         return await create_poller_task(bot, project, telegram_queue)
 
     async def start_watcher(project: ProjectState, send_missed: bool = False) -> asyncio.Task:
-        from .watcher import create_watcher_task
+        from .claude.history_watcher import create_watcher_task
         return await create_watcher_task(bot, project, telegram_queue, send_missed)
 
     # Restore sessions from history.jsonl

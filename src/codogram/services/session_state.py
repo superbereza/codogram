@@ -2,7 +2,7 @@
 import time
 from dataclasses import dataclass
 
-from ..screen import StatusBar, parse_status_bar
+from ..claude.screen import StatusBar, parse_status_bar
 from ..tmux.session import TmuxSession
 
 

@@ -1,4 +1,4 @@
-# src/codogram/watcher.py
+# src/codogram/claude/history_watcher.py
 import json
 import asyncio
 from enum import Enum
@@ -7,12 +7,12 @@ from pathlib import Path
 from typing import AsyncIterator, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .telegram.queue import TelegramQueue
+    from ..telegram.queue import TelegramQueue
 from aiogram import Bot
-from .config import settings
-from .logging_config import logger
-from .utils.truncate import truncate_body
-from . import strings
+from ..config import settings
+from ..logging_config import logger
+from ..utils.truncate import truncate_body
+from .. import strings
 
 class ContentType(Enum):
     TEXT = "text"
@@ -190,7 +190,7 @@ async def create_watcher_task(
     This is a compatibility shim - actual watching is done per-thread
     via watch_thread_jsonl in history_watcher.py.
     """
-    from .session_manager import ProjectState
+    from ..session_manager import ProjectState
 
     if not isinstance(project, ProjectState):
         raise TypeError("project must be ProjectState")
@@ -212,7 +212,7 @@ async def create_watcher_task(
 
 async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "TelegramQueue"):
     """Watch jsonl and send entries through queue."""
-    from .telegram.queue import OutgoingBatch
+    from ..telegram.queue import OutgoingBatch
     from pathlib import Path
 
     if not thread.jsonl_path:

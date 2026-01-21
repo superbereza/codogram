@@ -244,11 +244,11 @@ async def _start_binding(message: Message, result, telegram_queue: TelegramQueue
         logger.debug(f"Starting binding task for thread {thread.name}")
 
         async def start_poller(p):
-            from ..permission_poller import create_poller_task
+            from ..claude.poller import create_poller_task
             return await create_poller_task(message.bot, p, telegram_queue)
 
         async def start_watcher(p, send_missed=False):
-            from ..watcher import create_watcher_task
+            from ..claude.history_watcher import create_watcher_task
             return await create_watcher_task(message.bot, p, telegram_queue, send_missed)
 
         thread.binding_task = asyncio.create_task(

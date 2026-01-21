@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from .logging_config import logger
+from ..logging_config import logger
 
 HISTORY_PATH = Path.home() / ".claude" / "history.jsonl"
 

@@ -11,7 +11,7 @@ from .session_manager import project_manager, ProjectState, ThreadInfo
 if TYPE_CHECKING:
     from .telegram.queue import TelegramQueue
 from .config import settings
-from .history_reader import find_session_for_project
+from .claude.session_finder import find_session_for_project
 from .logging_config import logger
 from .tmux.session import TmuxSession
 
@@ -135,7 +135,7 @@ class HistoryWatcher:
         NOTE: Binds only ONE thread per cycle to prevent race condition where
         multiple awaiting threads bind to the same session.
         """
-        from .history_reader import get_session_creation_time
+        from .claude.session_finder import get_session_creation_time
         from pathlib import Path
 
         # Find all sessions for this project, sorted by creation time (newest first)
@@ -193,7 +193,7 @@ class HistoryWatcher:
         new_session_id: str
     ):
         """Bind thread to new session."""
-        from .history_reader import compute_jsonl_path
+        from .claude.session_finder import compute_jsonl_path
 
         logger.info(
             f"session_bound: project={project.project_name}, thread={thread.name}, "
@@ -220,7 +220,7 @@ class HistoryWatcher:
         # Restart permission poller
         if thread.poller_task:
             thread.poller_task.cancel()
-        from .permission_poller import create_poller_task_for_thread
+        from .claude.poller import create_poller_task_for_thread
         thread.poller_task = await create_poller_task_for_thread(
             self.bot, project, thread, self.telegram_queue
         )
@@ -244,7 +244,7 @@ class HistoryWatcher:
 
 async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo, telegram_queue: "TelegramQueue"):
     """Watch jsonl for a specific thread and send messages through queue."""
-    from .watcher import JsonlWatcher, _entry_to_messages
+    from .claude.history_watcher import JsonlWatcher, _entry_to_messages
     from .telegram.queue import OutgoingBatch
     from pathlib import Path
 
@@ -296,7 +296,7 @@ async def poll_for_session_thread(
     threads may have different Claude sessions in the same project directory.
     """
     try:
-        from .history_reader import find_session_by_user_message
+        from .claude.session_finder import find_session_by_user_message
     except Exception as e:
         logger.error(f"poll_for_session_thread: import error: {e}")
         return
@@ -350,7 +350,7 @@ async def poll_for_session_thread(
                     )
 
                 # Start thread-specific permission poller
-                from .permission_poller import create_poller_task_for_thread
+                from .claude.poller import create_poller_task_for_thread
                 if not thread.poller_task or thread.poller_task.done():
                     thread.poller_task = await create_poller_task_for_thread(bot, project, thread, telegram_queue)
 

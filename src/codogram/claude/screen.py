@@ -2,8 +2,8 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
-from .config import SCREEN_SEPARATOR_MIN_DASHES
-from .logging_config import logger
+from ..config import SCREEN_SEPARATOR_MIN_DASHES
+from ..logging_config import logger
 
 # Claude thinking status spinners (unique Unicode chars)
 # Excluded: * (too common in text) and · (middle dot, appears in bullet lists)

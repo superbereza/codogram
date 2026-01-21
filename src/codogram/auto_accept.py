@@ -2,7 +2,7 @@
 import re
 from typing import TYPE_CHECKING
 
-from .screen import PromptType
+from .claude.screen import PromptType
 from .telegram.queue import OutgoingBatch
 from .tmux.session import TmuxSession
 from .logging_config import logger
