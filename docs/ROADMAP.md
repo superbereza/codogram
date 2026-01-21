@@ -277,6 +277,15 @@ Allow bot usage in groups where at least one group admin is in ADMIN_IDS:
 - Supergroups: check admin rights for topics/rename features
 - See [docs/plans/done/2026-01-18-group-authorization-design.md](plans/done/2026-01-18-group-authorization-design.md)
 
+### Project restructure
+Reorganized codebase into logical modules:
+- `telegram/` — queue, adapters, keyboards, launch animation
+- `tmux/` — sessions, commands, window creation
+- `claude/` — screen parsing, permission prompts, history.jsonl
+- `git/` — worktree, branches, utils
+- `core/` — project state, background task coordinator
+- See [docs/designs/done/2026-01-21-project-restructure.md](designs/done/2026-01-21-project-restructure.md)
+
 ### Thread/branch command merge and menu simplification
 Unified commands instead of separate thread/branch/finish:
 - `/new_chat` — create new chat (thread or branch with worktree)
@@ -287,8 +296,6 @@ Unified commands instead of separate thread/branch/finish:
 - Context-aware behavior: from main → thread, from branch → nested branch
 - Relative paths in UI (`./project` instead of full path)
 - See [docs/designs/done/2026-01-19-command-merge-design.md](designs/done/2026-01-19-command-merge-design.md)
-
-## Beta Test
 
 ### Avatar emoji pack
 Custom emoji pack from group members' avatars:
@@ -309,6 +316,15 @@ Full redesign of /start flow with robust error handling and intuitive setup UX:
 - Cancel button and /reset_all to abort setup
 - Proper navigation with Go back buttons
 - See [docs/designs/done/2026-01-18-start-flow-v2.md](designs/done/2026-01-18-start-flow-v2.md)
+
+### Message response mode
+Per-chat setting for when bot should respond:
+- **All messages** — respond to everything (default)
+- **Polite** — skip messages with @mentions to others
+- **Mentions only** — respond only when bot is @mentioned or replied to
+- Toggle via `/response_mode` or `/settings` button
+
+## Beta Test
 
 ### Voice → Whisper transcription
 Voice messages and audio files transcribed via OpenAI Whisper:
@@ -344,19 +360,24 @@ Auto-detect and resend messages stuck in Claude's input:
 - Prevents messages from getting lost due to race conditions
 - See [docs/designs/done/2026-01-17-stuck-message-recovery.md](designs/done/2026-01-17-stuck-message-recovery.md)
 
-### Message response mode
-Per-chat setting for when bot should respond:
-- **All messages** — respond to everything (default)
-- **Polite** — skip messages with @mentions to others
-- **Mentions only** — respond only when bot is @mentioned or replied to
-- Toggle via `/response_mode` or `/settings` button
-- Experimental: needs chat context features for full usefulness
-
 ## In Progress
 
 ### Architecture review and clean up
 Ongoing architecture improvements and technical debt reduction.
-- Phase 1 done, new approach TBD
+- Phase 1 done (project restructure), continuing with poller refactoring
+
+### Permission poller refactoring
+Refactor god-function into handler classes:
+- Split 500-line `permission_poller()` into separate handlers
+- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
+- Each handler 20-150 lines, unit-testable
+- See [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
+
+### AskUserQuestion support
+Detect and handle AskUserQuestion prompts from Claude:
+- Parse question text and answer options from tmux
+- Show as inline buttons in Telegram
+- Related bug: askuserquestion-not-detected
 
 ## Backlog
 
@@ -410,13 +431,6 @@ Render tables and diagrams from text to images:
 - Convert ASCII/markdown tables to images
 - Convert mermaid/plantuml diagrams to images
 - Better readability in Telegram
-
-### Permission poller refactoring
-Refactor god-function into handler classes:
-- Split 500-line `permission_poller()` into separate handlers
-- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
-- Each handler 20-150 lines, unit-testable
-- See [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
 
 ### Hidden tool calls
 Hide internal tool calls by default:
