@@ -48,39 +48,25 @@ async def on_ask_user_callback(callback: CallbackQuery):
         await callback.answer("Tmux session closed")
         return
 
-    # Cleanup messages
-    await _cleanup_messages(callback)
-
     # Send key to tmux
     if action == "esc":
         logger.info(f"ask_user_callback: sending Escape to tmux={tmux_session}")
         tmux.send_key("Escape")
+        selected_text = "✗ Cancelled"
     else:
         logger.info(f"ask_user_callback: sending {action} to tmux={tmux_session}")
         tmux.send_key(action)
+        selected_text = f"✓ Selected: {action}"
+
+    # Edit message to show selection (keep history, remove keyboard)
+    try:
+        await callback.message.edit_text(selected_text)
+        logger.debug(f"ask_user_callback: edited message to show selection")
+    except Exception as e:
+        logger.warning(f"ask_user_callback: failed to edit message: {e}")
+
+    # Remove from permission_messages tracking
+    kb_msg_id = callback.message.message_id
+    permission_messages.pop(kb_msg_id, None)
 
     await callback.answer()
-
-
-async def _cleanup_messages(callback: CallbackQuery):
-    """Delete content messages and keyboard."""
-    chat_id = callback.message.chat.id
-    kb_msg_id = callback.message.message_id
-
-    # Delete content messages
-    logger.debug(f"cleanup: kb_msg_id={kb_msg_id}, permission_messages keys={list(permission_messages.keys())}")
-    content_ids = permission_messages.pop(kb_msg_id, [])
-    logger.debug(f"cleanup: content_ids={content_ids}")
-    for msg_id in content_ids:
-        try:
-            await callback.bot.delete_message(chat_id, msg_id)
-            logger.debug(f"cleanup: deleted content msg {msg_id}")
-        except Exception as e:
-            logger.warning(f"cleanup: failed to delete content msg {msg_id}: {e}")
-
-    # Delete keyboard message
-    try:
-        await callback.message.delete()
-        logger.debug(f"cleanup: deleted keyboard msg {kb_msg_id}")
-    except Exception as e:
-        logger.warning(f"cleanup: failed to delete keyboard msg {kb_msg_id}: {e}")

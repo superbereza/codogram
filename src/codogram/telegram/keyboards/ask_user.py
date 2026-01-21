@@ -21,10 +21,6 @@ def ask_user_keyboard(options: list[str], tmux_session: str) -> InlineKeyboardMa
         num = opt.split(".")[0].strip()
         label = opt.split(".", 1)[1].strip()[:20]  # Truncate label
 
-        # "Type something" -> "Другое"
-        if "type something" in label.lower():
-            label = "Другое"
-
         buttons.append([InlineKeyboardButton(
             text=label,
             callback_data=f"ask:{num}:{tmux_session}"

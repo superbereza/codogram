@@ -17,7 +17,7 @@ class AskUserState(Enum):
     SHOWING = "showing"
 
 
-SEPARATOR_SOLID = "------------"
+SEPARATOR_SOLID = "────────────"
 
 
 class AskUserQuestionProcessor(BaseProcessor):
@@ -28,7 +28,7 @@ class AskUserQuestionProcessor(BaseProcessor):
         self.state = AskUserState.IDLE
         self.debounce_start: float = 0.0
         self.last_options: list[str] | None = None
-        self.last_question: str | None = None
+        self.last_body: str | None = None
         self.content_msg_ids: list[int] = []
         self.kb_msg_id: int | None = None
 
@@ -45,7 +45,7 @@ class AskUserQuestionProcessor(BaseProcessor):
 
     async def _handle_idle(self, parsed, is_ask_user: bool) -> None:
         if is_ask_user:
-            self.log_debug(f"IDLE->DEBOUNCING: detected AskUserQuestion, header={parsed.header}")
+            self.log_debug(f"IDLE->DEBOUNCING: detected AskUserQuestion, options={len(parsed.options)}")
             self.state = AskUserState.DEBOUNCING
             self.debounce_start = asyncio.get_event_loop().time()
             self.last_options = parsed.options
@@ -71,41 +71,28 @@ class AskUserQuestionProcessor(BaseProcessor):
 
     async def _handle_showing(self, parsed, is_ask_user: bool) -> None:
         if not is_ask_user:
-            self.log_debug("SHOWING->IDLE: AskUserQuestion gone, cleaning up")
-            await self._cleanup_messages()
+            # AskUserQuestion gone - just reset state, keep messages for history
+            self.log_debug("SHOWING->IDLE: AskUserQuestion gone")
             self._reset_state()
             return
 
-        if parsed.options != self.last_options or parsed.question != self.last_question:
-            # Options/question changed - resend
-            self.log_debug("SHOWING: options/question changed, resending")
-            await self._cleanup_messages()
+        if parsed.options != self.last_options or parsed.body != self.last_body:
+            # Options/body changed - this is a NEW question, send it
+            self.log_debug("SHOWING: new question detected, sending")
             await self._send_ask_user(parsed)
 
     async def _send_ask_user(self, parsed: AskUserQuestion) -> None:
         try:
-            # Build message content
-            # Format: header + question + options with descriptions
-            lines = [SEPARATOR_SOLID]
-            lines.append(f"[ ] {parsed.header}")
-            lines.append("")
-            lines.append(parsed.question)
-            lines.append("")
+            # Build messages like PermissionProcessor - body + options as-is
+            messages = []
 
-            for opt in parsed.options:
-                num = opt.split(".")[0]
-                desc = parsed.descriptions.get(num, "")
-                if desc:
-                    lines.append(f"{opt} -- {desc}")
-                else:
-                    lines.append(opt)
+            if parsed.body:
+                body_text = SEPARATOR_SOLID + "\n" + parsed.body
+                messages.append({"text": body_text})
 
-            body_text = "\n".join(lines)
-
-            messages = [
-                {"text": body_text},
-                {"text": "point up"},
-            ]
+            options_text = "\n".join(parsed.options)
+            messages.append({"text": options_text})
+            messages.append({"text": "👆 select or text me"})
 
             kb = ask_user_keyboard(parsed.options, self.ctx.tmux_name)
             batch = OutgoingBatch(
@@ -122,28 +109,15 @@ class AskUserQuestionProcessor(BaseProcessor):
                 permission_messages[self.kb_msg_id] = self.content_msg_ids
 
             self.state = AskUserState.SHOWING
-            self.last_question = parsed.question
+            self.last_body = parsed.body
             self.log_debug(f"SHOWING: sent AskUserQuestion, kb_msg={self.kb_msg_id}")
         except Exception as e:
             self.log_warning(f"send error: {e}")
             self.state = AskUserState.IDLE
 
-    async def _cleanup_messages(self) -> None:
-        if self.kb_msg_id and self.kb_msg_id in permission_messages:
-            for msg_id in permission_messages[self.kb_msg_id]:
-                try:
-                    await self.ctx.bot.delete_message(self.ctx.chat_id, msg_id)
-                except Exception:
-                    pass
-            try:
-                await self.ctx.bot.delete_message(self.ctx.chat_id, self.kb_msg_id)
-            except Exception:
-                pass
-            permission_messages.pop(self.kb_msg_id, None)
-
     def _reset_state(self) -> None:
         self.state = AskUserState.IDLE
         self.last_options = None
-        self.last_question = None
+        self.last_body = None
         self.content_msg_ids = []
         self.kb_msg_id = None

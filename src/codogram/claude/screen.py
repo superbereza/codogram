@@ -56,10 +56,8 @@ class Idle:
 @dataclass
 class AskUserQuestion:
     """Parsed AskUserQuestion prompt from Claude screen."""
-    question: str              # "Сколько мониторов?"
-    header: str                # "Мониторы"
     options: list[str]         # ["1. 1", "2. 2", "3. 3+", "4. Type something."]
-    descriptions: dict[str, str]  # {"1": "Минимализм", "2": "Код + доки", ...}
+    body: str = ""             # Raw text between separators (header + question)
 
 ScreenState = PermissionPrompt | AskUserQuestion | ToolProgress | Idle
 
@@ -173,11 +171,8 @@ def _parse_ask_user_question(lines: list[str]) -> AskUserQuestion | None:
     Question text?
 
     ❯ 1. Option1
-         Description1
       2. Option2
-         Description2
     ────────────────────────────────────────────
-      Chat about this
 
     Returns AskUserQuestion or None if not an AskUserQuestion prompt.
     """
@@ -192,7 +187,6 @@ def _parse_ask_user_question(lines: list[str]) -> AskUserQuestion | None:
         return None
 
     # Get content between last two separators
-    # Use the last two separators to handle scrollback
     start_sep = sep_indices[-2]
     end_sep = sep_indices[-1]
 
@@ -203,63 +197,35 @@ def _parse_ask_user_question(lines: list[str]) -> AskUserQuestion | None:
     if "☐" not in content_text and "☒" not in content_text:
         return None
 
-    # Parse header from line with ☐/☒
-    header = ""
-    header_line_idx = -1
-    for i, line in enumerate(content_lines):
-        if "☐" in line or "☒" in line:
-            # Extract header: " ☐ Header" -> "Header"
-            # May have multiple checkboxes: "← ☐ A ☐ B ☒ C ✔ Submit →"
-            # Find the unchecked one (☐) - that's current question
-            match = re.search(r'☐\s+(\w+)', line)
-            if match:
-                header = match.group(1)
-            header_line_idx = i
-            break
-
-    if not header:
-        return None
-
-    # Parse question - first non-empty line after header line
-    question = ""
-    question_line_idx = -1
-    for i in range(header_line_idx + 1, len(content_lines)):
-        line = content_lines[i].strip()
-        if line and not line.startswith("❯") and not re.match(r'\d+\.', line):
-            question = line
-            question_line_idx = i
-            break
-
-    # Parse options and descriptions
+    # Extract body (lines before options) and options
+    body_lines = []
     options = []
-    descriptions = {}
-    current_option_num = None
+    has_selector = False  # Must have ❯ to be real AskUserQuestion
 
-    start_options = question_line_idx + 1 if question_line_idx >= 0 else header_line_idx + 1
-    for i in range(start_options, len(content_lines)):
-        line = content_lines[i]
+    for line in content_lines:
         stripped = line.strip()
-
         # Option line: "❯ 1. Text" or "  2. Text"
-        opt_match = re.match(r'[❯\s]*(\d+)\.\s+(.+)', stripped)
+        opt_match = re.match(r'([❯\s]*)(\d+)\.\s+(.+)', stripped)
         if opt_match:
-            num = opt_match.group(1)
-            text = opt_match.group(2)
+            prefix = opt_match.group(1)
+            num = opt_match.group(2)
+            text = opt_match.group(3)
             options.append(f"{num}. {text}")
-            current_option_num = num
-        elif current_option_num and stripped and not stripped.startswith(("Enter", "↑", "Tab", "Esc", "Chat")):
-            # Description line (indented, after option)
-            # Only if it looks like a description (not UI hints)
-            descriptions[current_option_num] = stripped
+            if "❯" in prefix:
+                has_selector = True
+        elif not options:
+            # Before options - part of body
+            body_lines.append(line.rstrip())
 
-    if not options:
+    # Must have options AND selector
+    if not options or not has_selector:
         return None
+
+    body = "\n".join(body_lines).strip()
 
     return AskUserQuestion(
-        question=question,
-        header=header,
         options=options,
-        descriptions=descriptions,
+        body=body,
     )
 
 
