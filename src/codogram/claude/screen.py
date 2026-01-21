@@ -53,7 +53,15 @@ class ToolProgress:
 class Idle:
     pass
 
-ScreenState = PermissionPrompt | ToolProgress | Idle
+@dataclass
+class AskUserQuestion:
+    """Parsed AskUserQuestion prompt from Claude screen."""
+    question: str              # "Сколько мониторов?"
+    header: str                # "Мониторы"
+    options: list[str]         # ["1. 1", "2. 2", "3. 3+", "4. Type something."]
+    descriptions: dict[str, str]  # {"1": "Минимализм", "2": "Код + доки", ...}
+
+ScreenState = PermissionPrompt | AskUserQuestion | ToolProgress | Idle
 
 
 @dataclass
@@ -155,15 +163,116 @@ def _parse_mcp_trust_prompt(lines: list[str]) -> PermissionPrompt | None:
     )
 
 
+def _parse_ask_user_question(lines: list[str]) -> AskUserQuestion | None:
+    """Parse AskUserQuestion prompt (two separators + checkboxes).
+
+    Format:
+    ────────────────────────────────────────────
+     ☐ Header  (or ☒ for completed)
+
+    Question text?
+
+    ❯ 1. Option1
+         Description1
+      2. Option2
+         Description2
+    ────────────────────────────────────────────
+      Chat about this
+
+    Returns AskUserQuestion or None if not an AskUserQuestion prompt.
+    """
+    # Find all separator indices
+    sep_indices = []
+    for i, line in enumerate(lines):
+        if "─" * SCREEN_SEPARATOR_MIN_DASHES in line:
+            sep_indices.append(i)
+
+    # Need at least 2 separators
+    if len(sep_indices) < 2:
+        return None
+
+    # Get content between last two separators
+    # Use the last two separators to handle scrollback
+    start_sep = sep_indices[-2]
+    end_sep = sep_indices[-1]
+
+    content_lines = lines[start_sep + 1:end_sep]
+
+    # Must have checkbox markers (☐ or ☒) - unique to AskUserQuestion
+    content_text = "\n".join(content_lines)
+    if "☐" not in content_text and "☒" not in content_text:
+        return None
+
+    # Parse header from line with ☐/☒
+    header = ""
+    header_line_idx = -1
+    for i, line in enumerate(content_lines):
+        if "☐" in line or "☒" in line:
+            # Extract header: " ☐ Header" -> "Header"
+            # May have multiple checkboxes: "← ☐ A ☐ B ☒ C ✔ Submit →"
+            # Find the unchecked one (☐) - that's current question
+            match = re.search(r'☐\s+(\w+)', line)
+            if match:
+                header = match.group(1)
+            header_line_idx = i
+            break
+
+    if not header:
+        return None
+
+    # Parse question - first non-empty line after header line
+    question = ""
+    question_line_idx = -1
+    for i in range(header_line_idx + 1, len(content_lines)):
+        line = content_lines[i].strip()
+        if line and not line.startswith("❯") and not re.match(r'\d+\.', line):
+            question = line
+            question_line_idx = i
+            break
+
+    # Parse options and descriptions
+    options = []
+    descriptions = {}
+    current_option_num = None
+
+    start_options = question_line_idx + 1 if question_line_idx >= 0 else header_line_idx + 1
+    for i in range(start_options, len(content_lines)):
+        line = content_lines[i]
+        stripped = line.strip()
+
+        # Option line: "❯ 1. Text" or "  2. Text"
+        opt_match = re.match(r'[❯\s]*(\d+)\.\s+(.+)', stripped)
+        if opt_match:
+            num = opt_match.group(1)
+            text = opt_match.group(2)
+            options.append(f"{num}. {text}")
+            current_option_num = num
+        elif current_option_num and stripped and not stripped.startswith(("Enter", "↑", "Tab", "Esc", "Chat")):
+            # Description line (indented, after option)
+            # Only if it looks like a description (not UI hints)
+            descriptions[current_option_num] = stripped
+
+    if not options:
+        return None
+
+    return AskUserQuestion(
+        question=question,
+        header=header,
+        options=options,
+        descriptions=descriptions,
+    )
+
+
 def parse_screen(output: str) -> ScreenState:
     """Parse tmux capture-pane output to detect state.
 
     Parsing order (most specific first):
     1. MCP trust prompt (box-style) — ╭╮╯╰│ characters
-    2. Regular permission prompt — ──── separator + ❯ options
-    3. Permission without separator — ❯ options only (trust folder)
-    4. Tool progress — ● or ✶ markers
-    5. Idle — default
+    2. AskUserQuestion — two ──── separators + ☐/☒ checkboxes
+    3. Regular permission prompt — ──── separator + ❯ options
+    4. Permission without separator — ❯ options only (trust folder)
+    5. Tool progress — ● or ✶ markers
+    6. Idle — default
     """
     lines = output.split("\n")
 
@@ -172,7 +281,12 @@ def parse_screen(output: str) -> ScreenState:
     if mcp_result:
         return mcp_result
 
-    # 2. Find last solid separator ────
+    # 2. Try AskUserQuestion (two separators + checkboxes)
+    ask_result = _parse_ask_user_question(lines)
+    if ask_result:
+        return ask_result
+
+    # 3. Find last solid separator ────
     last_sep_idx = -1
     for i, line in enumerate(lines):
         if "─" * SCREEN_SEPARATOR_MIN_DASHES in line:
