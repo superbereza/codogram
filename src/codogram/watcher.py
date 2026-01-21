@@ -53,6 +53,13 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
         return None
 
     message = entry.get("message", {})
+
+    # Skip "No response requested." synthetic messages (from hooks)
+    # But keep API errors - those are useful to show
+    if message.get("model") == "<synthetic>":
+        content = message.get("content", [])
+        if content and content[0].get("text") == "No response requested.":
+            return None
     content = message.get("content", [])
 
     for item in content:
