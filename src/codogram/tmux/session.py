@@ -167,7 +167,7 @@ class TmuxSession:
             ["tmux", "send-keys", "-t", self.name, key],
             check=True
         )
-        time.sleep(0.1)
+        time.sleep(0.15)  # Increased for Claude UI responsiveness
 
         after = self._capture_last_lines(20)
         _log_tmux_debug(f"AFTER:\n{after}")

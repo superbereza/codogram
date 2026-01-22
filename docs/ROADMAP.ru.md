@@ -31,6 +31,17 @@
 ### Interactive prompts
 - Уточняющие вопросы от Claude с кнопками вариантов ответа (plan mode → AskUserQuestion)
 
+### Поддержка AskUserQuestion
+Полная поддержка AskUserQuestion промптов от Claude:
+- Парсинг текста вопроса и вариантов ответа из tmux
+- Single-select: тап на кнопку → отправка номера в tmux
+- Multi-select: переключение чекбоксов в Telegram, отправка diff при Submit
+- Детект опции "Type something" с сообщением "✏️ Type your answer"
+- Заголовок с прогрессом: "☐ Title (N/M)" для многовопросных flow
+- Автоудаление сообщений при отправке текста или /esc (как permission poller)
+- Рефакторинг с dataclasses и helper functions
+- См. [docs/designs/done/2026-01-21-askuserquestion-support.md](designs/done/2026-01-21-askuserquestion-support.md)
+
 ### Multi-admin support
 - ADMIN_IDS через запятую в .env
 - /my_chat_id команда для всех
@@ -372,12 +383,6 @@ Per-chat настройка когда бот должен отвечать:
 - CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
 - Каждый handler 20-150 строк, unit-тестируемый
 - См. [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
-
-### Поддержка AskUserQuestion
-Детектить и обрабатывать AskUserQuestion промпты от Claude:
-- Парсить текст вопроса и варианты ответов из tmux
-- Показывать как inline кнопки в Telegram
-- Связанный баг: askuserquestion-not-detected
 
 ## Backlog
 
