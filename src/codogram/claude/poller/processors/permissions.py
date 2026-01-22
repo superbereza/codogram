@@ -11,6 +11,7 @@ from ....state import permission_messages
 from ....auto_accept import try_auto_accept
 from ....config import settings
 from ....utils.truncate import truncate_body
+from .ask_user import _parse_review_answers
 
 
 class PermissionState(Enum):
@@ -126,12 +127,24 @@ class PermissionProcessor(BaseProcessor):
 
     async def _send_permission(self, parsed: PermissionPrompt, verbose: bool) -> None:
         try:
-            display_body = truncate_body(parsed.body, verbose=verbose)
+            # Check if this is a review screen (AskUserQuestion final review)
+            review_answers = _parse_review_answers(parsed.body) if parsed.body else None
 
             messages = []
-            if display_body:
-                body_text = SEPARATOR_SOLID + "\n" + display_body
-                messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
+            if review_answers:
+                # Format review answers nicely
+                lines = ["📋 Review your answers", ""]
+                for question, answer in review_answers:
+                    lines.append(f"● {question}")
+                    lines.append(f"  → {answer}")
+                    lines.append("")
+                body_text = SEPARATOR_SOLID + "\n" + "\n".join(lines).strip()
+                messages.append({"text": body_text})
+            elif parsed.body:
+                display_body = truncate_body(parsed.body, verbose=verbose)
+                if display_body:
+                    body_text = SEPARATOR_SOLID + "\n" + display_body
+                    messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
 
             options_text = "\n".join(parsed.options)
             messages.append({"text": options_text})
