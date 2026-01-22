@@ -151,6 +151,8 @@ async def _handle_ask_other_pending(message: Message) -> bool:
     thread_id = normalize_thread_id(message.chat, message.message_thread_id)
     key = (chat_id, thread_id)
 
+    logger.debug(f"ask_other_pending check: key={key}, pending_keys={list(ask_other_pending.keys())}")
+
     pending = ask_other_pending.get(key)
     if not pending:
         return False
