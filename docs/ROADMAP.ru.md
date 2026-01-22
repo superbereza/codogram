@@ -375,14 +375,9 @@ Per-chat настройка когда бот должен отвечать:
 
 ### Architecture review and clean up
 Ревью архитектуры и уменьшение технического долга.
-- Phase 1 done (реструктуризация проекта), продолжаем с рефакторингом поллера
-
-### Рефакторинг permission poller
-Разбить god-function на handler классы:
-- Разбить 500-строчный `permission_poller()` на отдельные handlers
-- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
-- Каждый handler 20-150 строк, unit-тестируемый
-- См. [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
+- Phase 1: реструктуризация проекта ✅
+- Phase 2: рефакторинг permission poller ✅
+- См. [docs/plans/2026-01-22-architecture-refactoring-roadmap.md](plans/2026-01-22-architecture-refactoring-roadmap.md) — полный бэклог
 
 ## Backlog
 

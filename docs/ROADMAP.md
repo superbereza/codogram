@@ -375,14 +375,9 @@ Auto-detect and resend messages stuck in Claude's input:
 
 ### Architecture review and clean up
 Ongoing architecture improvements and technical debt reduction.
-- Phase 1 done (project restructure), continuing with poller refactoring
-
-### Permission poller refactoring
-Refactor god-function into handler classes:
-- Split 500-line `permission_poller()` into separate handlers
-- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
-- Each handler 20-150 lines, unit-testable
-- See [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
+- Phase 1: project restructure ✅
+- Phase 2: permission poller refactoring ✅
+- See [docs/plans/2026-01-22-architecture-refactoring-roadmap.md](plans/2026-01-22-architecture-refactoring-roadmap.md) for full backlog
 
 ## Backlog
 
