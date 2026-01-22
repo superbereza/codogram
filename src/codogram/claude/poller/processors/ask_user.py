@@ -87,10 +87,12 @@ class AskUserQuestionProcessor(BaseProcessor):
         if thread and thread.last_ask_msg_id:
             self.showing = True
             self.kb_msg_id = thread.last_ask_msg_id
+            self.restored_from_restart = True  # Skip body comparison on first process()
             self.log_debug(f"ask: restored from restart, kb_msg={self.kb_msg_id}")
         else:
             self.showing = False
             self.kb_msg_id = None
+            self.restored_from_restart = False
 
     async def process(self, screen: str) -> None:
         parsed = parse_screen(screen)
@@ -101,6 +103,12 @@ class AskUserQuestionProcessor(BaseProcessor):
             if not is_ask:
                 self.log_debug("ask: gone from tmux, reset")
                 self._reset()
+                return
+            # After restart, last_body is None - sync it from current screen
+            if self.restored_from_restart:
+                self.last_body = parsed.body
+                self.restored_from_restart = False
+                self.log_debug("ask: synced body after restart")
                 return
             # Check if it's a DIFFERENT question (Claude asked next question)
             if parsed.body != self.last_body:
