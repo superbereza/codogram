@@ -9,6 +9,7 @@ from ....telegram.queue import OutgoingBatch
 from ....telegram.keyboards import ask_user_keyboard
 from ....state import permission_messages, ask_options_state, active_ask_prompts
 from ....config import settings
+from ....core.session_manager import project_manager
 
 
 SEPARATOR = "────────────"
@@ -78,10 +79,18 @@ class AskUserQuestionProcessor(BaseProcessor):
 
     def __init__(self, ctx):
         super().__init__(ctx)
-        self.showing = False
         self.debounce_start: float = 0.0
         self.last_body: str | None = None
-        self.kb_msg_id: int | None = None
+
+        # Restore state from persisted last_ask_msg_id (survives restart)
+        thread = ctx.thread if ctx.thread else ctx.project.threads.get(None)
+        if thread and thread.last_ask_msg_id:
+            self.showing = True
+            self.kb_msg_id = thread.last_ask_msg_id
+            self.log_debug(f"ask: restored from restart, kb_msg={self.kb_msg_id}")
+        else:
+            self.showing = False
+            self.kb_msg_id = None
 
     async def process(self, screen: str) -> None:
         parsed = parse_screen(screen)
@@ -193,6 +202,12 @@ class AskUserQuestionProcessor(BaseProcessor):
                 # Register active prompt for this chat/thread
                 active_ask_prompts[(self.ctx.chat_id, self.ctx.thread_id)] = self.kb_msg_id
 
+                # Persist for restart survival
+                thread = self.ctx.thread if self.ctx.thread else self.ctx.project.threads.get(None)
+                if thread:
+                    thread.last_ask_msg_id = self.kb_msg_id
+                    project_manager._save()
+
             self.showing = True
             self.log_debug(f"ask: sent, kb_msg={self.kb_msg_id}")
         except Exception as e:
@@ -203,3 +218,9 @@ class AskUserQuestionProcessor(BaseProcessor):
         self.debounce_start = 0.0
         self.last_body = None
         self.kb_msg_id = None
+
+        # Clear persisted state
+        thread = self.ctx.thread if self.ctx.thread else self.ctx.project.threads.get(None)
+        if thread and thread.last_ask_msg_id:
+            thread.last_ask_msg_id = None
+            project_manager._save()

@@ -128,6 +128,7 @@ class ThreadInfo:
 
     # Persisted message IDs (for cleanup after restart):
     last_suggestion_msg_id: int | None = None  # Last 💡 message ID
+    last_ask_msg_id: int | None = None  # Last AskUserQuestion keyboard message ID
 
     # Runtime-only (not persisted):
     notified_closed: bool = False      # True = already sent "session closed" notification
@@ -272,6 +273,7 @@ class ProjectManager:
                         feat_thinking_status=thread_data.get("feat_thinking_status", False),
                         response_mode=thread_data.get("response_mode", "all"),
                         last_suggestion_msg_id=thread_data.get("last_suggestion_msg_id"),
+                        last_ask_msg_id=thread_data.get("last_ask_msg_id"),
                         # Assume already notified if session exists but tmux likely dead
                         notified_closed=bool(thread_data.get("session_id")),
                     )
@@ -362,6 +364,8 @@ class ProjectManager:
                                 thread_data["response_mode"] = t.response_mode
                             if t.last_suggestion_msg_id:
                                 thread_data["last_suggestion_msg_id"] = t.last_suggestion_msg_id
+                            if t.last_ask_msg_id:
+                                thread_data["last_ask_msg_id"] = t.last_ask_msg_id
                             threads_dict[str(tid) if tid is not None else "null"] = thread_data
                         project_data["threads"] = threads_dict
                     projects_data[name] = project_data
