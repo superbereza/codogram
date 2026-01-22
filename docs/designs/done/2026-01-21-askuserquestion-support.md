@@ -161,12 +161,42 @@ def ask_user_keyboard(options: list[str], tmux_session: str) -> InlineKeyboardMa
 
 ### 4. "Type something" flow
 
-1. Пользователь кликает "Другое"
-2. Бот отправляет номер опции в tmux (навигация)
-3. Бот переходит в FSM состояние `waiting_custom_input`
-4. Пользователь пишет текст в Telegram
-5. Бот отправляет текст + Enter в tmux
-6. FSM сбрасывается
+**Single-select vs Multi-select навигация:**
+
+В AskUserQuestion UI Claude Code есть важная разница:
+- **Single-select**: нажатие числовой клавиши (1, 2, 3...) сразу выбирает опцию и перемещает курсор
+- **Multi-select**: нажатие числовой клавиши ТОЛЬКО переключает чекбокс, курсор НЕ перемещается. Для навигации нужны Down arrows
+
+**Алгоритм "Type something":**
+
+1. Пользователь кликает кнопку "Type something" (или "Другое")
+2. Callback handler определяет режим (single/multi) по формату callback_data:
+   - `ask:other:{num}:{tmux}` — single-select
+   - `ask:other:{num}:{total}:{tmux}` — multi-select
+3. Навигация к опции в tmux:
+   - **Single-select**: отправляет номер опции (например, "4")
+   - **Multi-select**: отправляет (N-1) Down arrows, чтобы дойти до опции N (курсор стартует на опции 1)
+4. Сохраняет состояние ожидания в `ask_other_pending[(chat_id, thread_id)]`
+5. Редактирует сообщение на "✏️ Type your answer"
+6. Пользователь пишет текст в Telegram
+7. `_handle_ask_other_pending` в messages.py:
+   - Находит pending state по ключу `(chat_id, thread_id)`
+   - Отправляет текст через `tmux send-keys -l` (literal mode для спецсимволов)
+   - Отправляет Enter
+8. Очищает состояние и редактирует сообщение на "✓ {text}"
+
+**ВАЖНО: Thread ID нормализация**
+
+При использовании `(chat_id, thread_id)` как ключа для состояния, ОБЯЗАТЕЛЬНО использовать `normalize_thread_id()`:
+
+```python
+from .common import normalize_thread_id
+
+thread_id = normalize_thread_id(message.chat, message.message_thread_id)
+key = (chat_id, thread_id)
+```
+
+Причина: `callback.message.message_thread_id` может вернуть значение (например, reply_to message_id), которое не является настоящим thread_id в non-forum чатах. `normalize_thread_id()` возвращает `None` для non-forum чатов, обеспечивая консистентность между callback handlers и message handlers
 
 ### 5. Скрыть AskUserQuestion из watcher
 
@@ -200,3 +230,28 @@ E2E через Telegram MCP:
 3. Кликнуть опцию → проверить ответ в tmux
 4. Проверить "Type something" flow
 5. Проверить multi-question flow (последовательные вопросы)
+
+## Lessons Learned (добавлено после реализации)
+
+### Thread ID Normalization Bug
+
+**Проблема:** Callback handler сохранял state с `callback.message.message_thread_id` (мог быть reply_to msg_id), а message handler искал по `normalize_thread_id()` (возвращает None для non-forum). Ключи не совпадали, pending state не находился.
+
+**Решение:** Всегда использовать `normalize_thread_id()` для формирования ключа `(chat_id, thread_id)`.
+
+### Multi-select Navigation
+
+**Проблема:** В multi-select режиме нажатие цифровой клавиши не перемещает курсор — только переключает чекбокс. Поэтому "Type something" не работал в multi-select.
+
+**Решение:** Определять режим по callback_data и использовать:
+- Single-select: просто номер опции
+- Multi-select: Down arrows для навигации
+
+```python
+if is_multi:
+    option_num = int(num)
+    for _ in range(option_num - 1):
+        tmux.send_key("Down")
+else:
+    tmux.send_key(num)
+```

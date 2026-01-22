@@ -1483,6 +1483,10 @@ git commit -m "feat(keyboards): add ask_user_keyboard"
 
 ### Task 12: Create AskUserQuestion callback handler
 
+> **⚠️ ВАЖНО (добавлено после реализации):**
+> 1. **Thread ID нормализация**: Обязательно использовать `normalize_thread_id()` при формировании ключей `(chat_id, thread_id)` для state storage. Иначе callback handler и message handler будут использовать разные ключи.
+> 2. **Multi-select навигация**: В multi-select режиме цифровые клавиши только переключают чекбоксы, не перемещают курсор. Для навигации к "Type something" нужны Down arrows.
+
 **Files:**
 - Create: `src/codogram/handlers/ask_user.py`
 - Modify: `src/codogram/handlers/__init__.py`
@@ -1693,3 +1697,53 @@ git commit -m "chore: cleanup after AskUserQuestion implementation"
 cd /home/superbereza/dev/codogram
 ./stop-and-restart.sh
 ```
+
+---
+
+## Post-Implementation Notes
+
+### Bugs Found During Testing
+
+**1. Thread ID Normalization Mismatch**
+
+Симптом: "Type something" не работал — пользователь отправлял текст, но он не отправлялся в tmux.
+
+Причина: Callback handler сохранял state с `callback.message.message_thread_id`, а message handler искал по `normalize_thread_id()`. В non-forum чатах эти значения отличались.
+
+Фикс в `handlers/ask_user.py`:
+```python
+from .common import normalize_thread_id
+
+# В _handle_other_select:
+thread_id = normalize_thread_id(callback.message.chat, callback.message.message_thread_id)
+key = (chat_id, thread_id)
+```
+
+**2. Multi-select Navigation Difference**
+
+Симптом: "Type something" работал в single-select, но не в multi-select.
+
+Причина: В multi-select режиме Claude UI нажатие цифровой клавиши не перемещает курсор — только переключает чекбокс. Поэтому текст отправлялся в пустоту.
+
+Фикс в `handlers/ask_user.py`:
+```python
+async def _handle_other_select(callback: CallbackQuery, num: str, tmux_name: str, is_multi: bool = False):
+    # Navigate to the option
+    if is_multi:
+        # In multi-select, cursor starts at option 1
+        # Need to send (num-1) Down keys to reach option num
+        option_num = int(num)
+        for _ in range(option_num - 1):
+            tmux.send_key("Down")
+    else:
+        # In single-select, sending number key navigates to that option
+        tmux.send_key(num)
+```
+
+### Key Learnings
+
+1. **Консистентность ключей состояния**: Если используете `(chat_id, thread_id)` как ключ в нескольких местах, убедитесь что `thread_id` вычисляется одинаково везде.
+
+2. **Тестирование обоих режимов**: AskUserQuestion может быть как single-select, так и multi-select. Поведение клавиш отличается — нужно тестировать оба.
+
+3. **Literal mode для tmux**: Для отправки произвольного текста пользователя используйте `tmux send-keys -l` (literal mode), чтобы спецсимволы не интерпретировались как команды tmux.
