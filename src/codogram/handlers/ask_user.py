@@ -36,9 +36,15 @@ async def on_ask_callback(callback: CallbackQuery):
         tmux_name = parts[2]
         return await _handle_esc(callback, tmux_name)
     if action == "other":
-        # ask:other:{num}:{tmux} - "type something" option
+        # ask:other:{num}:{tmux} - single-select "type something"
+        # ask:other:{num}:{total}:{tmux} - multi-select "type something"
         num = parts[2]
-        tmux_name = parts[3]
+        if len(parts) == 5:
+            # Multi-select: ask:other:{num}:{total}:{tmux}
+            tmux_name = parts[4]
+        else:
+            # Single-select: ask:other:{num}:{tmux}
+            tmux_name = parts[3]
         return await _handle_other_select(callback, num, tmux_name)
 
     # Handle option selection

@@ -23,6 +23,7 @@ def ask_user_keyboard(
     - ask:{num}:{tmux} - single-select (sends num, finishes)
     - ask:other:{num}:{tmux} - single-select "type something" option
     - ask:{num}:{total}:{tmux} - multi-select toggle (sends num, updates checkboxes)
+    - ask:other:{num}:{total}:{tmux} - multi-select "type something" option
     - ask:submit:{tmux} - submit multi-select
     - ask:esc:{tmux} - cancel
     """
@@ -33,10 +34,14 @@ def ask_user_keyboard(
         label = opt.split(".", 1)[1].strip() if "." in opt else opt
         display_label = label[:25]
 
-        if is_multi:
+        if _is_other_option(label):
+            # "Type something" option - same behavior in single and multi-select
+            if is_multi:
+                callback = f"ask:other:{num}:{total}:{tmux_session}"
+            else:
+                callback = f"ask:other:{num}:{tmux_session}"
+        elif is_multi:
             callback = f"ask:{num}:{total}:{tmux_session}"
-        elif _is_other_option(label):
-            callback = f"ask:other:{num}:{tmux_session}"
         else:
             callback = f"ask:{num}:{tmux_session}"
 
