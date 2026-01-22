@@ -37,6 +37,40 @@ def _parse_option(opt: str) -> ParsedOption:
     return ParsedOption(num=num, label=label)
 
 
+def _parse_review_answers(body: str) -> list[tuple[str, str]] | None:
+    """Parse review screen answers.
+
+    Input format:
+        Review your answers
+
+         ● Любимый напиток?
+           → Чай
+         ● Какие фреймворки знаешь?
+           → React, Vue
+
+    Returns list of (question, answer) tuples, or None if not a review screen.
+    """
+    if "Review your answers" not in body:
+        return None
+
+    answers = []
+    lines = body.split("\n")
+    current_question = None
+
+    for line in lines:
+        line = line.strip()
+        if line.startswith("●"):
+            # Question line: "● Любимый напиток?"
+            current_question = line[1:].strip()
+        elif line.startswith("→") and current_question:
+            # Answer line: "→ Чай"
+            answer = line[1:].strip()
+            answers.append((current_question, answer))
+            current_question = None
+
+    return answers if answers else None
+
+
 def _parse_question_header(body: str) -> tuple[QuestionHeader | None, str]:
     """Parse question header and return cleaned body.
 
@@ -143,24 +177,35 @@ class AskUserQuestionProcessor(BaseProcessor):
         try:
             messages = []
             if parsed.body:
-                # Parse header and clean body (remove navigation line)
-                header_info, clean_body = _parse_question_header(parsed.body)
-                if header_info and header_info.title:
-                    # Format: "☐ Title (N/M)" or "☐ Title" if single question
-                    if header_info.total > 1:
-                        header = f"☐ {header_info.title} ({header_info.current}/{header_info.total})"
-                    else:
-                        header = f"☐ {header_info.title}"
-                    messages.append({"text": f"{SEPARATOR}\n{header}\n\n{clean_body}"})
-                elif header_info:
-                    # Has progress but no title
-                    if header_info.total > 1:
-                        header = f"({header_info.current}/{header_info.total})"
-                        messages.append({"text": f"{SEPARATOR}\n{header}\n\n{clean_body}"})
-                    else:
-                        messages.append({"text": f"{SEPARATOR}\n{clean_body}"})
+                # Check if this is a review screen
+                review_answers = _parse_review_answers(parsed.body)
+                if review_answers:
+                    # Format review answers nicely
+                    lines = ["📋 Review your answers", ""]
+                    for question, answer in review_answers:
+                        lines.append(f"● {question}")
+                        lines.append(f"  → {answer}")
+                        lines.append("")
+                    messages.append({"text": f"{SEPARATOR}\n" + "\n".join(lines).strip()})
                 else:
-                    messages.append({"text": f"{SEPARATOR}\n{parsed.body}"})
+                    # Parse header and clean body (remove navigation line)
+                    header_info, clean_body = _parse_question_header(parsed.body)
+                    if header_info and header_info.title:
+                        # Format: "☐ Title (N/M)" or "☐ Title" if single question
+                        if header_info.total > 1:
+                            header = f"☐ {header_info.title} ({header_info.current}/{header_info.total})"
+                        else:
+                            header = f"☐ {header_info.title}"
+                        messages.append({"text": f"{SEPARATOR}\n{header}\n\n{clean_body}"})
+                    elif header_info:
+                        # Has progress but no title
+                        if header_info.total > 1:
+                            header = f"({header_info.current}/{header_info.total})"
+                            messages.append({"text": f"{SEPARATOR}\n{header}\n\n{clean_body}"})
+                        else:
+                            messages.append({"text": f"{SEPARATOR}\n{clean_body}"})
+                    else:
+                        messages.append({"text": f"{SEPARATOR}\n{parsed.body}"})
 
             is_multi = parsed.checked is not None
             if is_multi:
