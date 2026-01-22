@@ -9,7 +9,7 @@ from ..services.file_input import FileInputService
 from ..services.response_mode import ResponseModeService
 from ..core.session_manager import project_manager, ThreadInfo
 from ..telegram.queue import TelegramQueue
-from ..state import active_ask_prompts, permission_messages, ask_options_state
+from ..state import active_ask_prompts, permission_messages, ask_options_state, ask_other_pending
 from ..logging_config import logger
 from .. import strings
 from .new_chat import handle_name_input
@@ -139,6 +139,76 @@ async def _delete_active_ask_prompt(message: Message):
     logger.debug(f"Deleted active AskUserQuestion for {key}")
 
 
+async def _handle_ask_other_pending(message: Message) -> bool:
+    """Handle pending 'Type something' input for AskUserQuestion.
+
+    When user pressed 'Type something' button, we're waiting for their custom text.
+    This text should be typed directly into the AskUserQuestion option field.
+
+    Returns True if handled, False if no pending input.
+    """
+    chat_id = message.chat.id
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
+    key = (chat_id, thread_id)
+
+    pending = ask_other_pending.get(key)
+    if not pending:
+        return False
+
+    text = message.text
+    if not text:
+        return False  # Files not supported for custom input
+
+    tmux_name = pending["tmux"]
+    kb_msg_id = pending.get("kb_msg_id")
+
+    logger.info(f"ask: sending custom input '{text[:50]}' → {tmux_name}")
+
+    # Get tmux session
+    project = project_manager.get_by_tmux(tmux_name)
+    if not project or not project.cwd:
+        logger.warning(f"ask: project not found for tmux {tmux_name}")
+        ask_other_pending.pop(key, None)
+        return True
+
+    from ..tmux.session import TmuxSession
+    tmux = TmuxSession(tmux_name, project.cwd)
+
+    # Send text directly (replaces "Type something." in the option field)
+    # Use -l for literal text to handle special characters
+    import subprocess
+    subprocess.run(
+        ["tmux", "send-keys", "-t", tmux_name, "-l", "--", text],
+        check=True
+    )
+
+    # Send Enter to submit
+    import time
+    time.sleep(0.1)
+    tmux.send_key("Enter")
+
+    # Clean up state
+    ask_other_pending.pop(key, None)
+
+    # Delete related messages
+    if kb_msg_id:
+        related_ids = permission_messages.pop(kb_msg_id, [])
+        for msg_id in related_ids:
+            try:
+                await message.bot.delete_message(chat_id, msg_id)
+            except Exception:
+                pass
+        try:
+            await message.bot.delete_message(chat_id, kb_msg_id)
+        except Exception:
+            pass
+
+    ask_options_state.pop(kb_msg_id, None)
+    active_ask_prompts.pop(key, None)
+
+    return True
+
+
 async def _route_message(message: Message, telegram_queue: TelegramQueue):
     """Common routing logic for all messages."""
     text = message.text
@@ -161,6 +231,10 @@ async def _route_message(message: Message, telegram_queue: TelegramQueue):
     )
 
     chat_id = message.chat.id
+
+    # Check for pending "Type something" input first
+    if await _handle_ask_other_pending(message):
+        return
 
     # Check if awaiting name input for create flow
     if await handle_name_input(message, telegram_queue):
