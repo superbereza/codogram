@@ -49,6 +49,13 @@
 | No state on SELECT_TMUX | `_handle_result` | Add state for tmux selection |
 | Cross-flow FSM conflict | `/restart` during StartFlow | Check and clear other flow states |
 
+### 🟠 Low (improve during refactor)
+
+| Bug | Location | Fix |
+|-----|----------|-----|
+| Exception swallowing | `reopen_forum_topic`, `edit_forum_topic` | Log exceptions instead of bare `pass` |
+| Magic emoji ID hardcoded | `start.py:364` | Move to `strings.py` as `ICON_BALLOT_BOX`, `ICON_FOLDER` |
+
 ---
 
 ## Target Structure
@@ -952,14 +959,15 @@ async def launch_claude_in_thread(msg: Message, result: FlowResult, queue: Teleg
             await msg.bot.reopen_forum_topic(msg.chat.id, result.thread_id)
             logger.info(f"Topic {result.thread_id} reopened")
             was_reopened = True
-        except Exception:
-            pass
+        except Exception as e:
+            # 🟠 FIX: Log instead of bare pass
+            logger.debug(f"reopen_forum_topic failed (may be already open): {e}")
 
         if was_reopened:
             try:
                 await msg.bot.edit_forum_topic(
                     msg.chat.id, result.thread_id,
-                    icon_custom_emoji_id="5350387571199319521"  # 🗳️
+                    icon_custom_emoji_id=strings.ICON_BALLOT_BOX  # 🟠 FIX: Use constant
                 )
             except Exception as e:
                 logger.warning(f"Failed to set topic icon: {e}")
@@ -1323,7 +1331,17 @@ git commit -m "refactor(restart): create simple handlers without FlowAction"
 
 ## Phase 6: Integration
 
-### Task 16: Update handlers/__init__.py
+### Task 16: Add emoji constants to strings.py
+
+```python
+# src/codogram/strings.py - add at top with other constants
+
+# Topic icon emoji IDs (Telegram custom emoji)
+ICON_BALLOT_BOX = "5350387571199319521"  # 🗳️ - active topic
+ICON_FOLDER = "5357315181649076022"       # 📁 - archived topic
+```
+
+### Task 17: Update handlers/__init__.py
 
 ```python
 # Add imports
@@ -1337,29 +1355,30 @@ dp.include_router(restart_router)
 dp.include_router(reset_router)
 ```
 
-### Task 17: Delete old files
+### Task 18: Delete old files
 
 - Delete: `src/codogram/handlers/start.py`
 - Delete: `src/codogram/handlers/worktree_recovery.py` (merged into start/launch.py)
 - Update: `src/codogram/handlers/__init__.py` (remove worktree_recovery registration)
 
-### Task 18: Update test imports
+### Task 19: Update test imports
 
-### Task 19: Run full test suite + E2E verification
+### Task 20: Run full test suite + E2E verification
 
 ---
 
 ## Summary
 
-**Total tasks:** 19
+**Total tasks:** 20
 
 **Key improvements over v1:**
 1. Restart/Reset use simple services (no enum)
 2. Handler registry replaces god-switch
 3. **7 critical bugs fixed** (including worktree_recovery missing session_id/reopen/icon)
 4. 2 medium bugs fixed
-5. Safer callback data parsing
-6. **worktree_recovery.py merged** into handlers/start/launch.py (eliminates duplication)
+5. **2 low priority fixes** (exception logging, emoji constants)
+6. Safer callback data parsing
+7. **worktree_recovery.py merged** into handlers/start/launch.py (eliminates duplication)
 
 **Files created:** ~15 new files
 **Files deleted:** 2 (old start.py, worktree_recovery.py)
