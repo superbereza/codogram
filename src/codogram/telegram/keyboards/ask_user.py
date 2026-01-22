@@ -1,60 +1,56 @@
 """Inline keyboard for AskUserQuestion prompts."""
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from ... import strings
+
+# Keywords that indicate "type your own answer" option
+OTHER_KEYWORDS = ("type something", "other", "что-то другое", "другое")
+
+
+def _is_other_option(label: str) -> bool:
+    """Check if option is 'type something' / 'other'."""
+    return any(kw in label.lower() for kw in OTHER_KEYWORDS)
 
 
 def ask_user_keyboard(
     options: list[str],
     tmux_session: str,
-    checked: dict[str, bool] | None = None,
+    is_multi: bool = False,
+    total: int = 0,
 ) -> InlineKeyboardMarkup:
-    """Build inline keyboard from AskUserQuestion options.
+    """Build keyboard for AskUserQuestion.
 
-    Args:
-        options: List of options in format ["1. Option", "2. Option", ...]
-        tmux_session: Tmux session name for stable routing
-        checked: For multi-select: {"1": True, "2": False} checkbox states
-
-    Returns:
-        InlineKeyboardMarkup with buttons for each option plus Cancel/Submit
+    Callback formats:
+    - ask:{num}:{tmux} - single-select (sends num, finishes)
+    - ask:other:{num}:{tmux} - single-select "type something" option
+    - ask:{num}:{total}:{tmux} - multi-select toggle (sends num, updates checkboxes)
+    - ask:submit:{tmux} - submit multi-select
+    - ask:esc:{tmux} - cancel
     """
     buttons = []
-    is_multi_select = checked is not None
 
-    if is_multi_select:
-        # Multi-select: all options get checkboxes
-        for opt in options:
-            num = opt.split(".")[0].strip()
-            label = opt.split(".", 1)[1].strip()[:20]
-            is_checked = checked.get(num, False)
-            display = f"✓ {label}" if is_checked else f"☐ {label}"
+    for opt in options:
+        num = opt.split(".")[0].strip()
+        label = opt.split(".", 1)[1].strip() if "." in opt else opt
+        display_label = label[:25]
 
-            # Type something needs special handling (multi + type prompt)
-            is_type = "type" in label.lower()
-            callback = f"ask:{num}:multitype:{tmux_session}" if is_type else f"ask:{num}:multi:{tmux_session}"
+        if is_multi:
+            callback = f"ask:{num}:{total}:{tmux_session}"
+        elif _is_other_option(label):
+            callback = f"ask:other:{num}:{tmux_session}"
+        else:
+            callback = f"ask:{num}:{tmux_session}"
 
-            buttons.append([InlineKeyboardButton(text=display, callback_data=callback)])
+        buttons.append([InlineKeyboardButton(text=f"{num}. {display_label}", callback_data=callback)])
 
-        # Submit + Cancel
+    # Footer row: Cancel left, Submit right
+    if is_multi:
         buttons.append([
+            InlineKeyboardButton(text="Cancel", callback_data=f"ask:esc:{tmux_session}"),
             InlineKeyboardButton(text="Submit", callback_data=f"ask:submit:{tmux_session}"),
-            InlineKeyboardButton(text=strings.BTN_CANCEL_X, callback_data=f"ask:esc:{tmux_session}"),
         ])
     else:
-        # Single-select: one button per row with label
-        for opt in options:
-            num = opt.split(".")[0].strip()
-            label = opt.split(".", 1)[1].strip()[:20]
-
-            is_type = "type" in label.lower()
-            callback = f"ask:{num}:type:{tmux_session}" if is_type else f"ask:{num}:{tmux_session}"
-
-            buttons.append([InlineKeyboardButton(text=label, callback_data=callback)])
-
-        buttons.append([InlineKeyboardButton(
-            text=strings.BTN_CANCEL_X,
-            callback_data=f"ask:esc:{tmux_session}"
-        )])
+        buttons.append([
+            InlineKeyboardButton(text="Cancel", callback_data=f"ask:esc:{tmux_session}")
+        ])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)

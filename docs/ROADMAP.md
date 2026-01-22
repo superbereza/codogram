@@ -31,6 +31,17 @@
 ### Interactive prompts
 - Claude's clarifying questions with option buttons (plan mode → AskUserQuestion)
 
+### AskUserQuestion support
+Full support for Claude's AskUserQuestion tool prompts:
+- Parse question text and options from tmux screen
+- Single-select: tap button → send number to tmux
+- Multi-select: toggle checkboxes in Telegram, send diff on Submit
+- "Type something" option detection with special "✏️ Type your answer" message
+- Question progress header: "☐ Title (N/M)" for multi-question flows
+- Auto-delete messages when user sends text or /esc (like permission poller)
+- Refactored with dataclasses and helper functions
+- See [docs/designs/done/2026-01-21-askuserquestion-support.md](designs/done/2026-01-21-askuserquestion-support.md)
+
 ### Multi-admin support
 - ADMIN_IDS comma-separated in .env
 - /my_chat_id command for everyone
@@ -372,12 +383,6 @@ Refactor god-function into handler classes:
 - CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
 - Each handler 20-150 lines, unit-testable
 - See [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
-
-### AskUserQuestion support
-Detect and handle AskUserQuestion prompts from Claude:
-- Parse question text and answer options from tmux
-- Show as inline buttons in Telegram
-- Related bug: askuserquestion-not-detected
 
 ## Backlog
 

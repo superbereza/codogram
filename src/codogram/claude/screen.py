@@ -192,6 +192,11 @@ def _parse_ask_user_question(lines: list[str]) -> AskUserQuestion | None:
     start_sep = sep_indices[-2]
     end_sep = sep_indices[-1]
 
+    # Check that this is an ACTIVE prompt - after last separator should have "Enter to select"
+    after_last_sep = "\n".join(lines[end_sep + 1:])
+    if "Enter to select" not in after_last_sep:
+        return None
+
     content_lines = lines[start_sep + 1:end_sep]
 
     # Must have checkbox markers (☐ or ☒) - unique to AskUserQuestion
@@ -233,8 +238,11 @@ def _parse_ask_user_question(lines: list[str]) -> AskUserQuestion | None:
             # Before options - part of body
             body_lines.append(line.rstrip())
 
-    # Must have options AND selector
-    if not options or not has_selector:
+    # Must have options (selector not required for multi-select - cursor may be on Submit/Next)
+    if not options:
+        return None
+    # For single-select, must have selector on an option
+    if not is_multi_select and not has_selector:
         return None
 
     body = "\n".join(body_lines).strip()

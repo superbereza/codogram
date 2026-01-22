@@ -9,6 +9,7 @@ from ..services.file_input import FileInputService
 from ..services.response_mode import ResponseModeService
 from ..core.session_manager import project_manager, ThreadInfo
 from ..telegram.queue import TelegramQueue
+from ..state import active_ask_prompts, permission_messages, ask_options_state
 from ..logging_config import logger
 from .. import strings
 from .new_chat import handle_name_input
@@ -105,6 +106,39 @@ async def on_message(
     await _route_message(message, telegram_queue)
 
 
+async def _delete_active_ask_prompt(message: Message):
+    """Delete active AskUserQuestion messages if any."""
+    chat_id = message.chat.id
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
+    key = (chat_id, thread_id)
+
+    kb_msg_id = active_ask_prompts.get(key)
+    if not kb_msg_id:
+        return
+
+    # Get related message IDs
+    related_ids = permission_messages.get(kb_msg_id, [])
+
+    # Delete all messages
+    for msg_id in related_ids:
+        try:
+            await message.bot.delete_message(chat_id, msg_id)
+        except Exception:
+            pass  # Message may already be deleted
+
+    try:
+        await message.bot.delete_message(chat_id, kb_msg_id)
+    except Exception:
+        pass
+
+    # Cleanup state
+    permission_messages.pop(kb_msg_id, None)
+    ask_options_state.pop(kb_msg_id, None)
+    active_ask_prompts.pop(key, None)
+
+    logger.debug(f"Deleted active AskUserQuestion for {key}")
+
+
 async def _route_message(message: Message, telegram_queue: TelegramQueue):
     """Common routing logic for all messages."""
     text = message.text
@@ -164,6 +198,9 @@ async def _route_message(message: Message, telegram_queue: TelegramQueue):
             return
 
         case RouteAction.SEND_TO_TMUX:
+            # Delete active AskUserQuestion if user is sending a message
+            await _delete_active_ask_prompt(message)
+
             success = await _send_content(message, result, telegram_queue)
             if not success and message.chat.id < 0:
                 await telegram_queue.reply(message, "No active Claude session. Use /start to launch.")
