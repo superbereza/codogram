@@ -46,6 +46,13 @@ class AdminMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
+        # Always allow migration messages (system messages about chat conversion)
+        # These are critical for maintaining project state during group->supergroup migration
+        if isinstance(event, Message):
+            if event.migrate_to_chat_id or event.migrate_from_chat_id:
+                logger.debug(f"middleware_bypass: migration message chat_id={event.chat.id}")
+                return await handler(event, data)
+
         user: User | None = data.get("event_from_user")
 
         if user is None:
