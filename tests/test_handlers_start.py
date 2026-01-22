@@ -14,6 +14,7 @@ from aiogram.enums import ChatType
 from aiogram.fsm.context import FSMContext
 
 from codogram.handlers.start import cmd_start
+from codogram.handlers.start.commands import cmd_start as cmd_start_func  # For patching
 from codogram.services.start_flow import FlowAction
 from codogram.telegram.queue import TelegramQueue
 
@@ -62,7 +63,7 @@ class TestCmdStart:
         """No project and no chat title -> asks for project name."""
         mock_message.chat.title = None  # No chat title
 
-        with patch("codogram.handlers.start.project_manager") as mock_pm:
+        with patch("codogram.handlers.start.commands.project_manager") as mock_pm:
             mock_pm.get_by_chat.return_value = None
 
             await cmd_start(mock_message, mock_state, mock_telegram_queue)

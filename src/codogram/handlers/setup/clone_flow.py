@@ -149,8 +149,8 @@ async def _do_clone(message: Message, state: FSMContext):
     progress_msg = await message.answer(strings.SETUP_CLONE_PROGRESS, parse_mode="MarkdownV2")
     await state.update_data(bot_message_id=progress_msg.message_id)
 
-    # Import git_clone from existing service
-    from ...services.start_flow import git_clone
+    # Import git_clone from tmux launcher
+    from ...tmux.launcher import git_clone
 
     result = git_clone(target_dir, url)
 

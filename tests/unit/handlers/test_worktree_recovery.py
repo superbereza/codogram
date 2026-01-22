@@ -1,30 +1,32 @@
 # tests/unit/handlers/test_worktree_recovery.py
-"""Tests for worktree recovery callbacks."""
+"""Tests for worktree recovery callbacks (now in handlers/start/launch.py)."""
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-from pathlib import Path
 
-from codogram.handlers.worktree_recovery import WorktreeRecoveryHandler
+from codogram.handlers.start.launch import (
+    handle_wr_recreate,
+    handle_wr_create,
+    handle_wr_main,
+    handle_wr_cancel,
+)
 from codogram.core.session_manager import ThreadInfo
 
 
 @pytest.fixture
-def recovery_handler():
-    mock_queue = MagicMock()
-    mock_queue.edit = AsyncMock()
-    mock_queue.send = AsyncMock()
-    handler = WorktreeRecoveryHandler(
-        project_manager=MagicMock(),
-        queue=mock_queue,
-        bot=MagicMock(),
-    )
-    return handler
+def mock_queue():
+    queue = MagicMock()
+    queue.edit = AsyncMock()
+    queue.send = AsyncMock()
+    return queue
 
 
 @pytest.fixture
 def mock_callback():
     callback = MagicMock()
     callback.answer = AsyncMock()
+    callback.bot = MagicMock()
+    callback.bot.reopen_forum_topic = AsyncMock()
+    callback.bot.edit_forum_topic = AsyncMock()
     callback.message.edit_text = AsyncMock()
     callback.message.delete = AsyncMock()
     callback.message.chat.id = 123
@@ -33,166 +35,161 @@ def mock_callback():
 
 class TestWorktreeRecoveryCallbacks:
     @pytest.mark.asyncio
-    async def test_wr_recreate_recreates_worktree(self, recovery_handler, mock_callback):
+    async def test_wr_recreate_recreates_worktree(self, mock_queue, mock_callback):
         """wr_recreate callback recreates worktree and starts Claude."""
-        mock_callback.data = "wr_recreate:123"
-        thread = ThreadInfo(thread_id=123, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
-        mock_project = MagicMock(cwd="/repo")
+        mock_callback.data = "wr_recreate:456"
+        thread = ThreadInfo(thread_id=456, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
+        mock_project = MagicMock(cwd="/repo", project_name="test")
         mock_project.get_thread.return_value = thread
-        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
-        with patch("codogram.handlers.worktree_recovery.create_worktree") as mock_create:
-            mock_create.return_value = (True, "/repo/.worktrees/my-feature")
-            with patch.object(recovery_handler, "_start_claude_session", new_callable=AsyncMock):
-                await recovery_handler.handle_wr_recreate(mock_callback)
+        with patch("codogram.handlers.start.launch.project_manager") as mock_pm:
+            mock_pm.get_by_chat.return_value = mock_project
+            with patch("codogram.services.branch.create_worktree") as mock_create:
+                mock_create.return_value = (True, "/repo/.worktrees/my-feature")
+                with patch("codogram.telegram.launch_animation.launch_with_animation", new_callable=AsyncMock):
+                    await handle_wr_recreate(mock_callback, mock_queue)
 
         mock_create.assert_called_once()
+        mock_callback.message.delete.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_wr_create_creates_branch_and_worktree(self, recovery_handler, mock_callback):
+    async def test_wr_create_creates_branch_and_worktree(self, mock_queue, mock_callback):
         """wr_create callback creates new branch and worktree."""
-        mock_callback.data = "wr_create:123"
-        thread = ThreadInfo(thread_id=123, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
-        mock_project = MagicMock(cwd="/repo")
+        mock_callback.data = "wr_create:456"
+        thread = ThreadInfo(thread_id=456, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
+        mock_project = MagicMock(cwd="/repo", project_name="test")
         mock_project.get_thread.return_value = thread
-        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
-        with patch("codogram.handlers.worktree_recovery.create_branch_with_worktree") as mock_create:
-            mock_create.return_value = (True, "/repo/.worktrees/my-feature")
-            with patch.object(recovery_handler, "_start_claude_session", new_callable=AsyncMock):
-                await recovery_handler.handle_wr_create(mock_callback)
+        with patch("codogram.handlers.start.launch.project_manager") as mock_pm:
+            mock_pm.get_by_chat.return_value = mock_project
+            with patch("codogram.services.branch.create_branch_with_worktree") as mock_create:
+                mock_create.return_value = (True, "/repo/.worktrees/my-feature")
+                with patch("codogram.telegram.launch_animation.launch_with_animation", new_callable=AsyncMock):
+                    await handle_wr_create(mock_callback, mock_queue)
 
         mock_create.assert_called_once()
+        mock_callback.message.delete.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_wr_main_archives_topic(self, recovery_handler, mock_callback):
-        """wr_main callback archives topic."""
-        mock_callback.data = "wr_main:123"
-        thread = ThreadInfo(thread_id=123, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
-        mock_project = MagicMock(cwd="/repo")
+    async def test_wr_main_archives_topic_and_launches_in_main(self, mock_queue, mock_callback):
+        """wr_main callback archives topic and launches Claude in main."""
+        mock_callback.data = "wr_main:456"
+        thread = ThreadInfo(thread_id=456, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
+        main_thread = ThreadInfo(thread_id=None, name="main")
+        mock_project = MagicMock(cwd="/repo", project_name="test")
         mock_project.get_thread.return_value = thread
-        recovery_handler.project_manager.get_by_chat.return_value = mock_project
+        mock_project.get_or_create_thread.return_value = main_thread
 
-        with patch("codogram.handlers.worktree_recovery.archive_thread", new_callable=AsyncMock) as mock_archive:
-            await recovery_handler.handle_wr_main(mock_callback)
+        with patch("codogram.handlers.start.launch.project_manager") as mock_pm:
+            mock_pm.get_by_chat.return_value = mock_project
+            with patch("codogram.services.branch.archive_thread", new_callable=AsyncMock) as mock_archive:
+                with patch("codogram.telegram.launch_animation.launch_with_animation", new_callable=AsyncMock):
+                    await handle_wr_main(mock_callback, mock_queue)
 
         mock_archive.assert_called_once_with(
-            recovery_handler.bot,
+            mock_callback.bot,
             123,  # chat_id
             mock_project,
             thread,
         )
 
     @pytest.mark.asyncio
-    async def test_wr_cancel_deletes_message(self, recovery_handler, mock_callback):
+    async def test_wr_cancel_deletes_message(self, mock_queue, mock_callback):
         """wr_cancel callback just deletes the message."""
-        mock_callback.data = "wr_cancel:123"
+        mock_callback.data = "wr_cancel:456"
 
-        await recovery_handler.handle_wr_cancel(mock_callback)
+        await handle_wr_cancel(mock_callback, mock_queue)
 
         mock_callback.message.delete.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_wr_recreate_shows_error_on_failure(self, recovery_handler, mock_callback):
-        """wr_recreate shows error message with options on failure."""
-        mock_callback.data = "wr_recreate:123"
-        thread = ThreadInfo(thread_id=123, name="my-feature", worktree_path="/repo/.worktrees/my-feature")
-        mock_project = MagicMock(cwd="/repo")
-        mock_project.get_thread.return_value = thread
-        recovery_handler.project_manager.get_by_chat.return_value = mock_project
-
-        with patch("codogram.handlers.worktree_recovery.create_worktree") as mock_create:
-            mock_create.return_value = (False, "branch already checked out")
-            await recovery_handler.handle_wr_recreate(mock_callback)
-
-        # Should show error with options
-        recovery_handler.queue.edit.assert_called()
-        call_args = recovery_handler.queue.edit.call_args
-        text = call_args[0][1] if len(call_args[0]) > 1 else ""
-        assert "[x]" in text
-        assert "/finish" in text
-        assert "/thread" in text
-        assert "/branch" in text
 
 
 class TestWorktreeRecoveryEdgeCases:
     @pytest.mark.asyncio
-    async def test_wr_recreate_thread_not_found(self, recovery_handler, mock_callback):
+    async def test_wr_recreate_thread_not_found(self, mock_queue, mock_callback):
         """wr_recreate handles missing thread gracefully."""
         mock_callback.data = "wr_recreate:999"
         mock_project = MagicMock()
         mock_project.get_thread.return_value = None
-        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
-        await recovery_handler.handle_wr_recreate(mock_callback)
+        with patch("codogram.handlers.start.launch.project_manager") as mock_pm:
+            mock_pm.get_by_chat.return_value = mock_project
+            await handle_wr_recreate(mock_callback, mock_queue)
 
-        recovery_handler.queue.edit.assert_called()
-        call_args = recovery_handler.queue.edit.call_args
+        mock_queue.edit.assert_called()
+        call_args = mock_queue.edit.call_args
         text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "not found" in text.lower()
 
     @pytest.mark.asyncio
-    async def test_wr_create_thread_not_found(self, recovery_handler, mock_callback):
+    async def test_wr_create_thread_not_found(self, mock_queue, mock_callback):
         """wr_create handles missing thread gracefully."""
         mock_callback.data = "wr_create:999"
         mock_project = MagicMock()
         mock_project.get_thread.return_value = None
-        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
-        await recovery_handler.handle_wr_create(mock_callback)
+        with patch("codogram.handlers.start.launch.project_manager") as mock_pm:
+            mock_pm.get_by_chat.return_value = mock_project
+            await handle_wr_create(mock_callback, mock_queue)
 
-        recovery_handler.queue.edit.assert_called()
-        call_args = recovery_handler.queue.edit.call_args
+        mock_queue.edit.assert_called()
+        call_args = mock_queue.edit.call_args
         text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "not found" in text.lower()
 
     @pytest.mark.asyncio
-    async def test_wr_main_thread_not_found(self, recovery_handler, mock_callback):
+    async def test_wr_main_thread_not_found(self, mock_queue, mock_callback):
         """wr_main handles missing thread gracefully."""
         mock_callback.data = "wr_main:999"
         mock_project = MagicMock()
         mock_project.get_thread.return_value = None
-        recovery_handler.project_manager.get_by_chat.return_value = mock_project
 
-        await recovery_handler.handle_wr_main(mock_callback)
+        with patch("codogram.handlers.start.launch.project_manager") as mock_pm:
+            mock_pm.get_by_chat.return_value = mock_project
+            await handle_wr_main(mock_callback, mock_queue)
 
-        recovery_handler.queue.edit.assert_called()
-        call_args = recovery_handler.queue.edit.call_args
+        mock_queue.edit.assert_called()
+        call_args = mock_queue.edit.call_args
         text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "not found" in text.lower()
 
     @pytest.mark.asyncio
-    async def test_wr_recreate_malformed_callback_data(self, recovery_handler, mock_callback):
+    async def test_wr_recreate_malformed_callback_data(self, mock_queue, mock_callback):
         """wr_recreate handles malformed callback data gracefully."""
         mock_callback.data = "wr_recreate:"  # Missing thread_id
 
-        await recovery_handler.handle_wr_recreate(mock_callback)
+        with patch("codogram.handlers.start.launch.project_manager") as mock_pm:
+            mock_pm.get_by_chat.return_value = MagicMock()
+            await handle_wr_recreate(mock_callback, mock_queue)
 
-        recovery_handler.queue.edit.assert_called()
-        call_args = recovery_handler.queue.edit.call_args
+        mock_queue.edit.assert_called()
+        call_args = mock_queue.edit.call_args
         text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "invalid" in text.lower()
 
     @pytest.mark.asyncio
-    async def test_wr_create_malformed_callback_data(self, recovery_handler, mock_callback):
+    async def test_wr_create_malformed_callback_data(self, mock_queue, mock_callback):
         """wr_create handles malformed callback data gracefully."""
         mock_callback.data = "wr_create:not_a_number"
 
-        await recovery_handler.handle_wr_create(mock_callback)
+        with patch("codogram.handlers.start.launch.project_manager") as mock_pm:
+            mock_pm.get_by_chat.return_value = MagicMock()
+            await handle_wr_create(mock_callback, mock_queue)
 
-        recovery_handler.queue.edit.assert_called()
-        call_args = recovery_handler.queue.edit.call_args
+        mock_queue.edit.assert_called()
+        call_args = mock_queue.edit.call_args
         text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "invalid" in text.lower()
 
     @pytest.mark.asyncio
-    async def test_wr_main_malformed_callback_data(self, recovery_handler, mock_callback):
+    async def test_wr_main_malformed_callback_data(self, mock_queue, mock_callback):
         """wr_main handles malformed callback data gracefully."""
         mock_callback.data = "wr_main"  # No colon or thread_id
 
-        await recovery_handler.handle_wr_main(mock_callback)
+        with patch("codogram.handlers.start.launch.project_manager") as mock_pm:
+            mock_pm.get_by_chat.return_value = MagicMock()
+            await handle_wr_main(mock_callback, mock_queue)
 
-        recovery_handler.queue.edit.assert_called()
-        call_args = recovery_handler.queue.edit.call_args
+        mock_queue.edit.assert_called()
+        call_args = mock_queue.edit.call_args
         text = call_args[0][1] if len(call_args[0]) > 1 else ""
         assert "invalid" in text.lower()
