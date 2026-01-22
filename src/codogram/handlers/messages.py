@@ -189,22 +189,20 @@ async def _handle_ask_other_pending(message: Message) -> bool:
 
     # Clean up state
     ask_other_pending.pop(key, None)
-
-    # Delete related messages
-    if kb_msg_id:
-        related_ids = permission_messages.pop(kb_msg_id, [])
-        for msg_id in related_ids:
-            try:
-                await message.bot.delete_message(chat_id, msg_id)
-            except Exception:
-                pass
-        try:
-            await message.bot.delete_message(chat_id, kb_msg_id)
-        except Exception:
-            pass
-
+    permission_messages.pop(kb_msg_id, None)
     ask_options_state.pop(kb_msg_id, None)
     active_ask_prompts.pop(key, None)
+
+    # Edit keyboard message to show result (like regular selection)
+    if kb_msg_id:
+        try:
+            await message.bot.edit_message_text(
+                f"✓ {text}",
+                chat_id=chat_id,
+                message_id=kb_msg_id,
+            )
+        except Exception as e:
+            logger.warning(f"ask: edit failed: {e}")
 
     return True
 
