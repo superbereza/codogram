@@ -4,7 +4,7 @@ from aiogram.types import CallbackQuery
 
 from ..core.session_manager import project_manager
 from ..tmux.session import TmuxSession
-from ..state import permission_messages, ask_options_state, active_ask_prompts
+from ..state import permission_messages, ask_options_state, active_ask_prompts, ask_other_pending
 from ..logging_config import logger
 
 router = Router(name="ask_user")
@@ -68,7 +68,13 @@ async def _handle_single_select(callback: CallbackQuery, num: str, tmux_name: st
 
 
 async def _handle_other_select(callback: CallbackQuery, num: str, tmux_name: str):
-    """Handle 'Type something' option: send number, prompt for text input."""
+    """Handle 'Type something' option: navigate to option, wait for text input.
+
+    Instead of selecting the option immediately, we:
+    1. Send the number key to navigate to that option
+    2. Store state to wait for user's text input
+    3. When user sends text, it will be typed into the option field
+    """
     logger.info(f"ask: other {num} → {tmux_name}")
 
     tmux = _get_tmux(tmux_name)
@@ -76,8 +82,26 @@ async def _handle_other_select(callback: CallbackQuery, num: str, tmux_name: str
         await callback.answer("Session not found")
         return
 
+    # Navigate to the option (sends number key, cursor moves to that option)
     tmux.send_key(num)
-    await _finish(callback, "✏️ Type your answer")
+
+    # Store state - we're waiting for custom text input
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+    key = (chat_id, thread_id)
+
+    ask_other_pending[key] = {
+        "tmux": tmux_name,
+        "kb_msg_id": callback.message.message_id,
+    }
+
+    # Edit message to prompt for text input, but keep state active
+    try:
+        await callback.message.edit_text("✏️ Type your answer", reply_markup=None)
+    except Exception as e:
+        logger.warning(f"ask: edit failed: {e}")
+
+    await callback.answer()
 
 
 async def _handle_multi_toggle(callback: CallbackQuery, num: str, total: int, tmux_name: str):

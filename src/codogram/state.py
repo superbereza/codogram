@@ -9,3 +9,7 @@ ask_options_state: dict[int, dict] = {}
 
 # Track active AskUserQuestion prompts by chat/thread: {(chat_id, thread_id): kb_msg_id}
 active_ask_prompts: dict[tuple[int, int | None], int] = {}
+
+# Track "waiting for custom input" state: {(chat_id, thread_id): {"tmux": name, "option_num": num}}
+# When user pressed "Type something", we navigate to that option and wait for text input
+ask_other_pending: dict[tuple[int, int | None], dict] = {}
