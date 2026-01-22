@@ -14,7 +14,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Chat, ChatMemberUpdated, Message
 
 from ...domain.states import SetupFlow
-from ...core.session_manager import ProjectManager
+from ...core.session_manager import project_manager
 from ...services.setup import check_bot_admin_rights, check_base_dir
 from ...services.group_auth import GroupAuthService
 from ...telegram.keyboards.setup import admin_check_keyboard, setup_type_keyboard
@@ -33,8 +33,7 @@ class ProjectNotRegistered(BaseFilter):
     """Filter that passes only if chat has no registered project."""
 
     async def __call__(self, message: Message) -> bool:
-        pm = ProjectManager()
-        result = pm.get_by_chat(message.chat.id) is None
+        result = project_manager.get_by_chat(message.chat.id) is None
         logger.debug(f"ProjectNotRegistered filter: chat={message.chat.id}, result={result}")
         return result
 
@@ -65,8 +64,7 @@ def _is_group_chat(chat_type: str) -> bool:
 
 def _is_project_registered(chat_id: int) -> bool:
     """Check if chat has a registered project."""
-    pm = ProjectManager()
-    return pm.get_by_chat(chat_id) is not None
+    return project_manager.get_by_chat(chat_id) is not None
 
 
 # --- Entry Point 1: Bot added to chat ---

@@ -10,6 +10,7 @@ from ..services.menu import register_menu_for_chat
 from ..services.setup import check_bot_admin_rights
 from ..telegram.sticker import StickerAdapter
 from ..services.emoji_pack import EmojiPackService
+from ..config import add_allowed_group, remove_allowed_group
 from ..logging_config import logger
 from .. import strings
 
@@ -107,6 +108,11 @@ async def on_chat_migration(message: Message, telegram_queue: TelegramQueue) -> 
     project_manager._save()
     logger.info(f"migration_updated: project={project.project_name} new_chat_id={new_chat_id}")
 
+    # Update allowed_groups: remove old, add new
+    remove_allowed_group(old_chat_id)
+    add_allowed_group(new_chat_id)
+    logger.info(f"migration_allowed_groups_updated: removed={old_chat_id} added={new_chat_id}")
+
     # Check admin rights in new chat
     has_rights = await check_bot_admin_rights(message.bot, new_chat_id)
 
@@ -115,6 +121,78 @@ async def on_chat_migration(message: Message, telegram_queue: TelegramQueue) -> 
         project.awaiting_admin_rights = True
         project_manager._save()
         logger.info(f"migration_awaiting_admin: project={project.project_name}")
+
+        batch = OutgoingBatch(
+            chat_id=new_chat_id,
+            thread_id=None,
+            messages=[{"text": strings.MIGRATION_ADMIN_REQUIRED, "parse_mode": "MarkdownV2"}],
+            reply_markup=_migration_check_keyboard(),
+            replace_key=f"migration_admin:{new_chat_id}",
+        )
+        await telegram_queue.enqueue(batch)
+        return
+
+    # Has rights - register menu and send success notification
+    await register_menu_for_chat(message.bot, new_chat_id, is_forum=True)
+
+    batch = OutgoingBatch(
+        chat_id=new_chat_id,
+        thread_id=None,
+        messages=[{"text": strings.MIGRATION_SUCCESS, "parse_mode": "MarkdownV2"}],
+    )
+    await telegram_queue.enqueue(batch)
+
+    # Create emoji pack asynchronously (only if has rights)
+    asyncio.create_task(
+        _create_emoji_pack_background(message.bot, new_chat_id, telegram_queue)
+    )
+
+
+@router.message(F.migrate_from_chat_id)
+async def on_chat_migration_from(message: Message, telegram_queue: TelegramQueue) -> None:
+    """Handle chat migration event in the NEW chat.
+
+    This is a backup handler for when migrate_to_chat_id wasn't received.
+    Telegram sends both events but order/delivery isn't guaranteed.
+
+    This message arrives in the NEW supergroup with migrate_from_chat_id = OLD chat_id.
+    """
+    new_chat_id = message.chat.id
+    old_chat_id = message.migrate_from_chat_id
+
+    logger.info(f"migration_from_detected: old={old_chat_id} new={new_chat_id}")
+
+    # Check if already migrated (migrate_to handler already ran)
+    existing = project_manager.get_by_chat(new_chat_id)
+    if existing:
+        logger.debug(f"migration_from_skipped: already migrated project={existing.project_name}")
+        return
+
+    # Find project by old chat_id
+    project = project_manager.get_by_chat(old_chat_id)
+    if not project:
+        logger.debug(f"migration_from_ignored: no project for old_chat={old_chat_id}")
+        return
+
+    # Update chat_id
+    project.old_chat_id = old_chat_id
+    project.chat_id = new_chat_id
+    project_manager._save()
+    logger.info(f"migration_from_updated: project={project.project_name} new_chat_id={new_chat_id}")
+
+    # Update allowed_groups: remove old, add new
+    remove_allowed_group(old_chat_id)
+    add_allowed_group(new_chat_id)
+    logger.info(f"migration_from_allowed_groups_updated: removed={old_chat_id} added={new_chat_id}")
+
+    # Check admin rights in new chat
+    has_rights = await check_bot_admin_rights(message.bot, new_chat_id)
+
+    if not has_rights:
+        # Block until admin rights granted
+        project.awaiting_admin_rights = True
+        project_manager._save()
+        logger.info(f"migration_from_awaiting_admin: project={project.project_name}")
 
         batch = OutgoingBatch(
             chat_id=new_chat_id,

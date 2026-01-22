@@ -387,10 +387,23 @@ class ProjectManager:
         return self.projects[project_name]
 
     def get_by_chat(self, chat_id: int) -> ProjectState | None:
-        """Find project by chat_id."""
+        """Find project by chat_id or old_chat_id.
+
+        Also checks old_chat_id to handle race conditions during migration.
+        When a group migrates to supergroup, messages may arrive at new chat_id
+        before migration handler updates the project.
+        """
+        # First try exact match on chat_id
         for project in self.projects.values():
             if project.chat_id == chat_id:
                 return project
+
+        # Fallback: check old_chat_id (migration in progress)
+        for project in self.projects.values():
+            if project.old_chat_id == chat_id:
+                logger.debug(f"get_by_chat: found by old_chat_id={chat_id} project={project.project_name}")
+                return project
+
         return None
 
     def get_by_tmux(self, tmux_session: str) -> ProjectState | None:
