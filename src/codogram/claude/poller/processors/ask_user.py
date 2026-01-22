@@ -221,7 +221,7 @@ class AskUserQuestionProcessor(BaseProcessor):
                 # Single-select: just options
                 messages.append({"text": "\n".join(parsed.options)})
 
-            messages.append({"text": "👆 select or type"})
+            messages.append({"text": "👆 select"})
 
             total = len(parsed.options)
             kb = ask_user_keyboard(parsed.options, self.ctx.tmux_name, is_multi, total)
