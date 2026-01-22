@@ -11,6 +11,10 @@ STATUS_PENDING = "`[~]`"
 STATUS_QUESTION = "`[?]`"
 STATUS_INFO = "`[i]`"
 
+# Topic icon emoji IDs (Telegram custom emoji)
+ICON_BALLOT_BOX = "5350387571649076022"  # active topic
+ICON_FOLDER = "5357315181649076022"       # archived topic
+
 # Toggle states
 STATUS_ON = "`● on`"
 STATUS_OFF = "`○ off`"
