@@ -41,6 +41,7 @@
 | **worktree_recovery missing resume** | `worktree_recovery.py:130` | Pass `session_id` to launch_with_animation |
 | **worktree_recovery no topic reopen** | `worktree_recovery.py` | Call `reopen_forum_topic` before launch |
 | **worktree_recovery no icon restore** | `worktree_recovery.py` | Call `edit_forum_topic` to restore icon |
+| **"Resume in main" no launch** | `worktree_recovery.py:93-112` | After archiving, launch Claude in main thread |
 
 ### 🟡 Medium (fix during refactor)
 
@@ -1015,6 +1016,185 @@ async def launch_claude_in_thread(msg: Message, result: FlowResult, queue: Teleg
             session_id=session_id, cwd=cwd,
         )
     )
+
+
+# === Worktree Recovery Handlers (merged from worktree_recovery.py) ===
+
+async def handle_wr_recreate(callback: CallbackQuery, queue: TelegramQueue):
+    """Recreate worktree from existing branch.
+
+    🔴 FIXES: pass session_id, reopen topic, restore icon
+    """
+    from ...services.branch import create_worktree
+    from ...telegram.launch_animation import launch_with_animation
+    from ...logging_config import logger
+
+    await callback.answer()
+    thread_id = _parse_thread_id(callback.data)
+    if thread_id is None:
+        await queue.edit(callback.message, strings.ERR_INVALID_CALLBACK)
+        return
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await queue.edit(callback.message, strings.ERR_PROJECT_NOT_FOUND)
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await queue.edit(callback.message, strings.ERR_THREAD_NOT_FOUND)
+        return
+
+    success, path = create_worktree(Path(project.cwd), thread.name)
+    if not success:
+        await queue.edit(callback.message, strings.WORKTREE_RECREATE_FAILED.format(path=path))
+        return
+
+    thread.worktree_path = path
+    project_manager._save()
+    await callback.message.delete()
+
+    # 🔴 FIX: Reopen topic and restore icon
+    try:
+        await callback.bot.reopen_forum_topic(callback.message.chat.id, thread_id)
+    except Exception as e:
+        logger.debug(f"reopen_forum_topic failed: {e}")
+
+    try:
+        await callback.bot.edit_forum_topic(
+            callback.message.chat.id, thread_id,
+            icon_custom_emoji_id=strings.ICON_BALLOT_BOX
+        )
+    except Exception as e:
+        logger.warning(f"Failed to set topic icon: {e}")
+
+    if thread.archived:
+        thread.archived = False
+        project_manager._save()
+
+    # 🔴 FIX: Pass session_id if valid
+    session_id = thread.session_id if thread.has_valid_session() else None
+
+    thread.launch_task = asyncio.create_task(
+        launch_with_animation(
+            bot=callback.bot, chat_id=callback.message.chat.id,
+            thread_id=thread_id, project=project, thread=thread,
+            queue=queue, cwd=path, session_id=session_id,
+        )
+    )
+
+
+async def handle_wr_create(callback: CallbackQuery, queue: TelegramQueue):
+    """Create new branch and worktree."""
+    from ...services.branch import create_branch_with_worktree
+    from ...telegram.launch_animation import launch_with_animation
+    from ...logging_config import logger
+
+    await callback.answer()
+    thread_id = _parse_thread_id(callback.data)
+    if thread_id is None:
+        await queue.edit(callback.message, strings.ERR_INVALID_CALLBACK)
+        return
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await queue.edit(callback.message, strings.ERR_PROJECT_NOT_FOUND)
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await queue.edit(callback.message, strings.ERR_THREAD_NOT_FOUND)
+        return
+
+    success, path = create_branch_with_worktree(Path(project.cwd), thread.name)
+    if not success:
+        await queue.edit(callback.message, strings.WORKTREE_BRANCH_CREATE_FAILED.format(path=path))
+        return
+
+    thread.worktree_path = path
+    project_manager._save()
+    await callback.message.delete()
+
+    # 🔴 FIX: Reopen topic and restore icon
+    try:
+        await callback.bot.reopen_forum_topic(callback.message.chat.id, thread_id)
+    except Exception as e:
+        logger.debug(f"reopen_forum_topic failed: {e}")
+
+    try:
+        await callback.bot.edit_forum_topic(
+            callback.message.chat.id, thread_id,
+            icon_custom_emoji_id=strings.ICON_BALLOT_BOX
+        )
+    except Exception as e:
+        logger.warning(f"Failed to set topic icon: {e}")
+
+    if thread.archived:
+        thread.archived = False
+        project_manager._save()
+
+    thread.launch_task = asyncio.create_task(
+        launch_with_animation(
+            bot=callback.bot, chat_id=callback.message.chat.id,
+            thread_id=thread_id, project=project, thread=thread,
+            queue=queue, cwd=path,
+        )
+    )
+
+
+async def handle_wr_main(callback: CallbackQuery, queue: TelegramQueue):
+    """Resume in main by archiving topic, then launch Claude in main.
+
+    🔴 FIX: Original just archived topic without launching Claude!
+    """
+    from ...services.branch import archive_thread
+    from ...telegram.launch_animation import launch_with_animation
+
+    await callback.answer()
+    thread_id = _parse_thread_id(callback.data)
+    if thread_id is None:
+        await queue.edit(callback.message, strings.ERR_INVALID_CALLBACK)
+        return
+
+    project = project_manager.get_by_chat(callback.message.chat.id)
+    if not project:
+        await queue.edit(callback.message, strings.ERR_PROJECT_NOT_FOUND)
+        return
+
+    thread = project.get_thread(thread_id)
+    if not thread:
+        await queue.edit(callback.message, strings.ERR_THREAD_NOT_FOUND)
+        return
+
+    # Archive the topic
+    await archive_thread(callback.bot, callback.message.chat.id, project, thread)
+    await queue.edit(callback.message, strings.WORKTREE_TOPIC_ARCHIVED)
+
+    # 🔴 FIX: Launch Claude in main thread
+    main_thread = project.get_or_create_thread(None, "main")
+    session_id = main_thread.session_id if main_thread.has_valid_session() else None
+
+    main_thread.launch_task = asyncio.create_task(
+        launch_with_animation(
+            bot=callback.bot, chat_id=callback.message.chat.id,
+            thread_id=None, project=project, thread=main_thread,
+            queue=queue, cwd=project.cwd, session_id=session_id,
+        )
+    )
+
+
+async def handle_wr_cancel(callback: CallbackQuery, queue: TelegramQueue):
+    """Cancel recovery - just delete message."""
+    await callback.answer()
+    await callback.message.delete()
+
+
+def _parse_thread_id(callback_data: str) -> int | None:
+    """Parse thread_id from callback data like 'wr_recreate:123'."""
+    try:
+        return int(callback_data.split(":")[1])
+    except (IndexError, ValueError):
+        return None
 ```
 
 **Step 2: Commit**
@@ -1374,7 +1554,7 @@ dp.include_router(reset_router)
 **Key improvements over v1:**
 1. Restart/Reset use simple services (no enum)
 2. Handler registry replaces god-switch
-3. **7 critical bugs fixed** (including worktree_recovery missing session_id/reopen/icon)
+3. **8 critical bugs fixed** (including worktree_recovery missing session_id/reopen/icon + "Resume in main" no launch)
 4. 2 medium bugs fixed
 5. **2 low priority fixes** (exception logging, emoji constants)
 6. Safer callback data parsing
