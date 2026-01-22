@@ -82,33 +82,34 @@ class AskUserQuestionProcessor(BaseProcessor):
         self.debounce_start: float = 0.0
         self.last_body: str | None = None
 
-        # Restore state from persisted last_ask_msg_id (survives restart)
+        # Check for stale message from previous run (callbacks won't work after restart)
         thread = ctx.thread if ctx.thread else ctx.project.threads.get(None)
         if thread and thread.last_ask_msg_id:
-            self.showing = True
-            self.kb_msg_id = thread.last_ask_msg_id
-            self.restored_from_restart = True  # Skip body comparison on first process()
-            self.log_debug(f"ask: restored from restart, kb_msg={self.kb_msg_id}")
+            # Delete old message - callbacks are lost after restart
+            self.stale_msg_id = thread.last_ask_msg_id
+            self.log_debug(f"ask: found stale msg from restart, will delete: {self.stale_msg_id}")
+            # Clear persisted state
+            thread.last_ask_msg_id = None
+            project_manager._save()
         else:
-            self.showing = False
-            self.kb_msg_id = None
-            self.restored_from_restart = False
+            self.stale_msg_id = None
+
+        self.showing = False
+        self.kb_msg_id = None
 
     async def process(self, screen: str) -> None:
         parsed = parse_screen(screen)
         is_ask = isinstance(parsed, AskUserQuestion)
+
+        # Delete stale message from previous run (once, when we see AskUserQuestion)
+        if self.stale_msg_id and is_ask:
+            await self._delete_stale_message()
 
         # Already showing - check if question changed or disappeared
         if self.showing:
             if not is_ask:
                 self.log_debug("ask: gone from tmux, reset")
                 self._reset()
-                return
-            # After restart, last_body is None - sync it from current screen
-            if self.restored_from_restart:
-                self.last_body = parsed.body
-                self.restored_from_restart = False
-                self.log_debug("ask: synced body after restart")
                 return
             # Check if it's a DIFFERENT question (Claude asked next question)
             if parsed.body != self.last_body:
@@ -220,6 +221,25 @@ class AskUserQuestionProcessor(BaseProcessor):
             self.log_debug(f"ask: sent, kb_msg={self.kb_msg_id}")
         except Exception as e:
             self.log_warning(f"ask: send error: {e}")
+
+    async def _delete_stale_message(self) -> None:
+        """Delete stale message from previous bot run."""
+        if not self.stale_msg_id:
+            return
+        try:
+            # Delete the keyboard message and associated messages
+            related = permission_messages.pop(self.stale_msg_id, [])
+            for msg_id in related:
+                try:
+                    await self.ctx.bot.delete_message(self.ctx.chat_id, msg_id)
+                except Exception:
+                    pass
+            await self.ctx.bot.delete_message(self.ctx.chat_id, self.stale_msg_id)
+            self.log_debug(f"ask: deleted stale msg {self.stale_msg_id}")
+        except Exception as e:
+            self.log_warning(f"ask: failed to delete stale msg {self.stale_msg_id}: {e}")
+        finally:
+            self.stale_msg_id = None
 
     def _reset(self) -> None:
         self.showing = False
