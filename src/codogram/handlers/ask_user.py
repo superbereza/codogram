@@ -6,6 +6,7 @@ from ..core.session_manager import project_manager
 from ..tmux.session import TmuxSession
 from ..state import permission_messages, ask_options_state, active_ask_prompts, ask_other_pending
 from ..logging_config import logger
+from .common import normalize_thread_id
 
 router = Router(name="ask_user")
 
@@ -21,6 +22,7 @@ async def on_ask_callback(callback: CallbackQuery):
     - ask:esc:{tmux} - cancel
     """
     data = callback.data
+    logger.info(f"ask: callback received data={data}")
     parts = data.split(":")
     if len(parts) < 3:
         await callback.answer("Invalid")
@@ -42,10 +44,12 @@ async def on_ask_callback(callback: CallbackQuery):
         if len(parts) == 5:
             # Multi-select: ask:other:{num}:{total}:{tmux}
             tmux_name = parts[4]
+            is_multi = True
         else:
             # Single-select: ask:other:{num}:{tmux}
             tmux_name = parts[3]
-        return await _handle_other_select(callback, num, tmux_name)
+            is_multi = False
+        return await _handle_other_select(callback, num, tmux_name, is_multi)
 
     # Handle option selection
     num = action
@@ -73,27 +77,35 @@ async def _handle_single_select(callback: CallbackQuery, num: str, tmux_name: st
     await _finish(callback, f"✓ Selected: {num}")
 
 
-async def _handle_other_select(callback: CallbackQuery, num: str, tmux_name: str):
+async def _handle_other_select(callback: CallbackQuery, num: str, tmux_name: str, is_multi: bool = False):
     """Handle 'Type something' option: navigate to option, wait for text input.
 
     Instead of selecting the option immediately, we:
-    1. Send the number key to navigate to that option
+    1. Navigate to that option (Down arrows in multi-select, number key in single-select)
     2. Store state to wait for user's text input
     3. When user sends text, it will be typed into the option field
     """
-    logger.info(f"ask: other {num} → {tmux_name}")
+    logger.info(f"ask: other {num} → {tmux_name} (multi={is_multi})")
 
     tmux = _get_tmux(tmux_name)
     if not tmux:
         await callback.answer("Session not found")
         return
 
-    # Navigate to the option (sends number key, cursor moves to that option)
-    tmux.send_key(num)
+    # Navigate to the option
+    if is_multi:
+        # In multi-select, cursor starts at option 1
+        # Need to send (num-1) Down keys to reach option num
+        option_num = int(num)
+        for _ in range(option_num - 1):
+            tmux.send_key("Down")
+    else:
+        # In single-select, sending number key navigates to that option
+        tmux.send_key(num)
 
     # Store state - we're waiting for custom text input
     chat_id = callback.message.chat.id
-    thread_id = callback.message.message_thread_id
+    thread_id = normalize_thread_id(callback.message.chat, callback.message.message_thread_id)
     key = (chat_id, thread_id)
 
     ask_other_pending[key] = {
@@ -229,7 +241,7 @@ async def _finish(callback: CallbackQuery, text: str):
     """Finish interaction - edit message, remove from tracking."""
     kb_msg_id = callback.message.message_id
     chat_id = callback.message.chat.id
-    thread_id = callback.message.message_thread_id
+    thread_id = normalize_thread_id(callback.message.chat, callback.message.message_thread_id)
 
     permission_messages.pop(kb_msg_id, None)
     ask_options_state.pop(kb_msg_id, None)
@@ -247,7 +259,7 @@ async def _finish_delete(callback: CallbackQuery):
     """Finish interaction - delete all messages, remove from tracking."""
     kb_msg_id = callback.message.message_id
     chat_id = callback.message.chat.id
-    thread_id = callback.message.message_thread_id
+    thread_id = normalize_thread_id(callback.message.chat, callback.message.message_thread_id)
 
     # Get related message IDs and clean up state
     related_ids = permission_messages.pop(kb_msg_id, [])
