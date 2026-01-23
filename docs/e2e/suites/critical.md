@@ -59,30 +59,48 @@
 |---|-----|----------|------|
 | 29 | TC-SESSIONS-001 | /clear_context создаёт новую сессию | commands/sessions.md |
 | 30 | TC-SESSIONS-002 | /esc отменяет запрос | commands/sessions.md |
-| 31 | TC-NEWCHAT-001 | /new_chat shows context + choice | commands/new_chat.md |
-| 32 | TC-NEWCHAT-004 | Magic name creates chat | commands/new_chat.md |
-| 33 | TC-FINISHCHAT-001 | /finish_chat archives topic | commands/finish_chat.md |
-| 34 | TC-FINISHCHAT-002 | /finish_chat merges branch | commands/finish_chat.md |
+| 31 | TC-SESSIONS-005 | /hard_reset shows confirmation | commands/sessions.md |
+| 32 | TC-NEWCHAT-001 | /new_chat shows context + choice | commands/new_chat.md |
+| 33 | TC-NEWCHAT-004 | Magic name creates chat | commands/new_chat.md |
+| 34 | TC-NEWCHAT-012 | /new_chat in non-forum shows explanation | commands/new_chat.md |
+| 35 | TC-FINISHCHAT-001 | /finish_chat archives topic | commands/finish_chat.md |
+| 36 | TC-FINISHCHAT-002 | /finish_chat merges branch | commands/finish_chat.md |
+
+### Launch Animation & Trust Prompt
+
+| # | ID | Название | Файл |
+|---|-----|----------|------|
+| 37 | TC-START-018 | Launch animation face appears after 3s | commands/start.md |
+| 38 | TC-START-019 | Trust prompt appears as inline buttons | commands/start.md |
+| 39 | TC-START-020 | Animation stops when trust prompt appears | commands/start.md |
+
+### Group Authorization
+
+| # | ID | Название | Файл |
+|---|-----|----------|------|
+| 40 | TC-GRPAUTH-001 | Bot added to group with admin | commands/group-auth.md |
+| 41 | TC-GRPAUTH-002 | Bot added to unauthorized group - one-time message | commands/group-auth.md |
+| 42 | TC-GRPAUTH-003 | Subsequent messages in unauthorized group - silent | commands/group-auth.md |
 
 ### Settings
 
 | # | ID | Название | Файл |
 |---|-----|----------|------|
-| 35 | TC-SETTINGS-002 | /settings показывает session state | commands/settings.md |
-| 36 | TC-SETTINGS-005 | /shift_tab переключает mode | commands/settings.md |
-| 37 | TC-SETTINGS-008 | /settings новый формат с inline кнопками | commands/settings.md |
-| 38 | TC-SETTINGS-009 | /verbose toggle | commands/settings.md |
+| 43 | TC-SETTINGS-002 | /settings показывает session state | commands/settings.md |
+| 44 | TC-SETTINGS-005 | /shift_tab переключает mode | commands/settings.md |
+| 45 | TC-SETTINGS-008 | /settings новый формат с inline кнопками | commands/settings.md |
+| 46 | TC-SETTINGS-009 | /verbose toggle | commands/settings.md |
 
 ### Avatar Pack
 
 | # | ID | Название | Файл |
 |---|-----|----------|------|
-| 39 | TC-AVATAR-001 | /exp_avatar_pack create prompt (OFF) | commands/avatar_pack.md |
-| 40 | TC-AVATAR-002 | Create avatar pack via button | commands/avatar_pack.md |
-| 41 | TC-AVATAR-003 | /exp_avatar_pack disable prompt (ON) | commands/avatar_pack.md |
-| 42 | TC-AVATAR-005 | Disable avatar pack via button | commands/avatar_pack.md |
-| 43 | TC-AVATAR-006 | /settings shows avatar_pack status | commands/avatar_pack.md |
-| 44 | TC-AVATAR-007 | Topic launch shows emoji hint | commands/avatar_pack.md |
+| 47 | TC-AVATAR-001 | /exp_avatar_pack create prompt (OFF) | commands/avatar_pack.md |
+| 48 | TC-AVATAR-002 | Create avatar pack via button | commands/avatar_pack.md |
+| 49 | TC-AVATAR-003 | /exp_avatar_pack disable prompt (ON) | commands/avatar_pack.md |
+| 50 | TC-AVATAR-005 | Disable avatar pack via button | commands/avatar_pack.md |
+| 51 | TC-AVATAR-006 | /settings shows avatar_pack status | commands/avatar_pack.md |
+| 52 | TC-AVATAR-007 | Topic launch shows emoji hint | commands/avatar_pack.md |
 
 ## Подготовка
 
@@ -102,4 +120,4 @@ cd /tmp/test-branch-repo && git status
 
 ## Критерий успеха
 
-Все 44 теста PASS = основной функционал работает, регрессий нет.
+Все 52 теста PASS = основной функционал работает, регрессий нет.
