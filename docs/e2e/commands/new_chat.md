@@ -196,3 +196,25 @@ mcp__telegram__get_messages(chat_id=TEST_CHAT_ID, page_size=3)
 **Expected:**
 - Error message: "[x] Invalid name"
 - No topic created
+
+---
+
+## TC-NEWCHAT-012: /new_chat in non-forum group shows explanation
+
+**Tags:** critical, new_chat
+**Preconditions:** Registered project in a non-forum supergroup (topics not enabled)
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=NON_FORUM_GROUP_ID, message="/new_chat")
+# Wait 2s
+mcp__telegram__get_messages(chat_id=NON_FORUM_GROUP_ID, page_size=2)
+```
+
+**Expected:**
+- UI: "[!] Topics required" message
+- UI: Instructions how to enable topics:
+  - "To enable:"
+  - "1. Open group settings (tap group name)"
+  - "2. Topics → Enable"
+- State: No topic created (can't create topics without forum mode)
