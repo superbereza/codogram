@@ -22,7 +22,6 @@ from .tmux.session import TmuxSession
 from .logging_config import setup_logging, logger
 from .telegram.queue import TelegramQueue
 from .services.menu import BASIC_COMMANDS, register_menu_for_chat, register_dm_commands
-from .handlers.worktree_recovery import WorktreeRecoveryHandler, register_worktree_recovery_handlers
 
 telegram_queue: TelegramQueue | None = None
 
@@ -67,10 +66,6 @@ async def main():
 
     # Register handler routers (all protected by AdminMiddleware)
     register_handlers(dp)
-
-    # Register worktree recovery handlers (needs bot instance)
-    worktree_recovery_handler = WorktreeRecoveryHandler(project_manager, telegram_queue, bot)
-    register_worktree_recovery_handlers(dp, worktree_recovery_handler)
 
     # Set global default menu (for new chats)
     await bot.set_my_commands(BASIC_COMMANDS)
