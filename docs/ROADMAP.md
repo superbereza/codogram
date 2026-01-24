@@ -404,6 +404,13 @@ More granular control over output verbosity:
 - `[• on/off]` — toggle bullet point prefix
 - `[save settings]` — persist choice
 
+### Global settings in DM
+`/settings` command in DM with bot to set defaults for all chats:
+- Default verbose mode, response mode, auto-accept, etc.
+- New chats/threads inherit these defaults
+- Per-chat settings override global defaults
+- Easy way to configure preferences once
+
 ### Project-less chat mode
 Connect bot to chat without creating a project:
 - Starter worktrees in codogram folder
