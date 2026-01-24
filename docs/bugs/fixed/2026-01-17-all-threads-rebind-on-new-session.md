@@ -2,7 +2,7 @@
 
 **Date:** 2026-01-17
 **Severity:** Critical
-**Status:** Active
+**Status:** Fixed (2026-01-23)
 
 ## Summary
 
@@ -97,3 +97,21 @@ Either:
 ## Workaround
 
 Manually fix config.json to point threads back to correct sessions.
+
+## Fix (2026-01-23)
+
+**Root cause confirmed:** `_bind_awaiting_threads()` didn't check if session was already bound to another thread.
+
+**Fix in `coordinator.py`:**
+```python
+# Collect all session_ids already bound to threads
+bound_sessions = {t.session_id for t in project.threads.values() if t.session_id}
+
+# In the loop:
+if session_id in bound_sessions:
+    continue  # Session already bound to another thread
+```
+
+**Also added debug logging:**
+- `awaiting_set_true: thread=X` when flag is set
+- `bind_check: thread=X awaiting=True` when thread is checked for binding

@@ -422,6 +422,13 @@ More granular control over output verbosity:
 - Per-chat settings override global defaults
 - Easy way to configure preferences once
 
+### Voice messages from bot
+Text-to-speech for Claude's responses:
+- Convert Claude's text responses to voice messages
+- OpenAI TTS or similar API
+- Toggle per-chat or per-message
+- Useful for listening while multitasking
+
 ### Project-less chat mode
 Connect bot to chat without creating a project:
 - Starter worktrees in codogram folder
