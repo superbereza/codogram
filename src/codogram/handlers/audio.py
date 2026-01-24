@@ -70,7 +70,20 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
         return
 
     # Send "Transcribing..." message
-    status_msg = await telegram_queue.reply(message, strings.AUDIO_TRANSCRIBING)
+    status_msg_ids = await telegram_queue.reply(message, strings.AUDIO_TRANSCRIBING)
+    status_msg_id = status_msg_ids[0] if status_msg_ids else None
+
+    async def edit_status(text: str):
+        """Edit the status message."""
+        if status_msg_id:
+            try:
+                await message.bot.edit_message_text(
+                    text=text,
+                    chat_id=chat_id,
+                    message_id=status_msg_id,
+                )
+            except Exception:
+                pass  # Ignore edit errors
 
     try:
         # Build file path
@@ -83,6 +96,7 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
         )
 
         # Download from Telegram
+        logger.info(f"Audio download: file_id={audio_info.file_id[:20]}... size={audio_info.size}")
         tg_file = await message.bot.get_file(audio_info.file_id)
         await message.bot.download(tg_file.file_path, destination=str(file_path))
 
@@ -101,22 +115,19 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
                 transcription.error,
                 strings.AUDIO_ERR_GENERIC.format(error=transcription.error)
             )
-            await telegram_queue.edit(status_msg, error_msg)
+            await edit_status(error_msg)
             return
 
         # Show transcription and send to Claude
         text = transcription.text
-        await telegram_queue.edit(status_msg, strings.AUDIO_SENT.format(text=text))
+        await edit_status(strings.AUDIO_SENT.format(text=text))
 
         # Send to tmux
         _message_router.send_to_tmux(result, text)
 
     except Exception as e:
         logger.exception(f"Audio handling failed: {e}")
-        await telegram_queue.edit(
-            status_msg,
-            strings.AUDIO_ERR_GENERIC.format(error=str(e)[:50])
-        )
+        await edit_status(strings.AUDIO_ERR_GENERIC.format(error=str(e)[:50]))
 
 
 @router.message(F.content_type.in_({ContentType.VOICE, ContentType.AUDIO, ContentType.VIDEO_NOTE}))
