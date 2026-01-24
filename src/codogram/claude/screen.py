@@ -498,6 +498,10 @@ def detect_compacting(output: str) -> bool:
             break
 
     if first_sep_idx == -1:
+        # Debug: no separator found - unusual, log first 3 lines
+        first_lines = [l.strip()[:40] for l in lines[:3] if l.strip()]
+        if first_lines:
+            logger.debug(f"detect_compacting: no separator, first_lines={first_lines}")
         return False
 
     # Look at last 5 lines before separator
@@ -512,6 +516,11 @@ def detect_compacting(output: str) -> bool:
                 logger.debug(f"detect_compacting: found '{stripped[:60]}...'")
             if "compacting" in stripped.lower():
                 return True
+
+    # Debug: log when no compact found but we had spinner lines
+    spinner_lines = [l.strip() for l in recent_lines if l.strip() and l.strip()[0] in compact_spinners]
+    if spinner_lines:
+        logger.debug(f"detect_compacting: no match, spinner_lines={spinner_lines[:2]}")
 
     return False
 
