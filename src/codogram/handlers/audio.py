@@ -122,6 +122,10 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
         text = transcription.text
         await edit_status(strings.AUDIO_SENT.format(text=text))
 
+        # Track for stuck message detection
+        if result.thread:
+            result.thread.last_sent_message = text
+
         # Send to tmux
         _message_router.send_to_tmux(result, text)
 
