@@ -81,6 +81,7 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
                     text=text,
                     chat_id=chat_id,
                     message_id=status_msg_id,
+                    parse_mode="Markdown",
                 )
             except Exception:
                 pass  # Ignore edit errors
@@ -95,10 +96,9 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
             extension=audio_info.extension
         )
 
-        # Download from Telegram
+        # Download from Telegram (use file_id directly like messages.py)
         logger.info(f"Audio download: file_id={audio_info.file_id[:20]}... size={audio_info.size}")
-        tg_file = await message.bot.get_file(audio_info.file_id)
-        await message.bot.download(tg_file.file_path, destination=str(file_path))
+        await message.bot.download(audio_info.file_id, destination=str(file_path))
 
         logger.info(f"Audio saved: {file_path} ({audio_info.size} bytes)")
 
