@@ -490,23 +490,24 @@ def detect_compacting(output: str) -> bool:
     compact_spinners = "·✶✻✽✢*"
     lines = output.split("\n")
 
-    # Find first ──── separator (top of input box)
-    first_sep_idx = -1
+    # Find all ──── separators, then use second-to-last (top of input box)
+    # Input box has two separators: one above ❯ and one below
+    # We need the one ABOVE to find status line before it
+    sep_indices = []
     for i, line in enumerate(lines):
         if "─" * SCREEN_SEPARATOR_MIN_DASHES in line:
-            first_sep_idx = i
-            break
+            sep_indices.append(i)
 
-    if first_sep_idx == -1:
-        # Debug: no separator found - unusual, log first 3 lines
-        first_lines = [l.strip()[:40] for l in lines[:3] if l.strip()]
-        if first_lines:
-            logger.debug(f"detect_compacting: no separator, first_lines={first_lines}")
+    if len(sep_indices) < 2:
+        # Not enough separators - Claude UI not fully loaded
         return False
 
-    # Look at last 5 lines before separator
-    start_idx = max(0, first_sep_idx - 5)
-    recent_lines = lines[start_idx:first_sep_idx]
+    # Second-to-last separator is the top of input box
+    input_box_top_idx = sep_indices[-2]
+
+    # Look at last 5 lines before that separator
+    start_idx = max(0, input_box_top_idx - 5)
+    recent_lines = lines[start_idx:input_box_top_idx]
 
     for line in recent_lines:
         stripped = line.strip()
@@ -517,10 +518,6 @@ def detect_compacting(output: str) -> bool:
             if "compacting" in stripped.lower():
                 return True
 
-    # Debug: log when no compact found but we had spinner lines
-    spinner_lines = [l.strip() for l in recent_lines if l.strip() and l.strip()[0] in compact_spinners]
-    if spinner_lines:
-        logger.debug(f"detect_compacting: no match, spinner_lines={spinner_lines[:2]}")
 
     return False
 
