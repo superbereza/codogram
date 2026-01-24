@@ -76,11 +76,11 @@ class WhisperService:
 
         except BadRequestError as e:
             error_msg = str(e).lower()
+            logger.warning(f"Whisper BadRequest: {e}")
             if "size" in error_msg or "large" in error_msg or "limit" in error_msg:
                 return TranscriptionResult(success=False, error="file_too_large")
             if "format" in error_msg or "codec" in error_msg:
                 return TranscriptionResult(success=False, error="format")
-            logger.error(f"Whisper BadRequest: {e}")
             return TranscriptionResult(success=False, error="api_error")
 
         except (APITimeoutError, asyncio.TimeoutError):
