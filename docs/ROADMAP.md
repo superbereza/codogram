@@ -404,6 +404,13 @@ Toggle visibility of Claude's `<thinking>` blocks:
 - Hide by default for cleaner output
 - Show for debugging or learning
 
+### Collapsible permission prompts
+Show only header by default, expand on demand:
+- Permission prompt shows just the action (Bash, Read, Edit, etc.)
+- `[Show more]` button reveals full context
+- Message edits in place to show details
+- Reduces noise while keeping full info accessible
+
 ### Verbose mode detailed menu
 More granular control over output verbosity:
 - `/verbose` opens submenu with current setting displayed
@@ -485,12 +492,6 @@ Render tables and diagrams from text to images:
 - Convert ASCII/markdown tables to images
 - Convert mermaid/plantuml diagrams to images
 - Better readability in Telegram
-
-### Hidden tool calls
-Hide internal tool calls by default:
-- Hide tool calls (TodoWrite, Read, etc.) from output
-- `/silent` command to toggle tools visibility
-- Filter TOOL_USE, TOOL_RESULT, show only TEXT
 
 ### Tool visibility R&D
 Research and implement tool display improvements:
