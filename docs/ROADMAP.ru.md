@@ -373,6 +373,17 @@ Per-chat настройка когда бот должен отвечать:
 
 ## In Progress
 
+### Auto-suspend & auto-resume
+Экономия RAM за счёт убийства idle сессий, auto-resume при сообщении:
+- **Auto-suspend:** Убить tmux после 12ч неактивности (тихо, без уведомления)
+- **Auto-resume:** Перезапуск Claude когда юзер пишет в мёртвую сессию:
+  - Suspended сессия → "Session was suspended. Resuming..."
+  - Tmux отсутствует → "Tmux not found. Launching..."
+  - Claude упал → "Claude not responding. Relaunching..."
+- Трекинг активности через `last_activity_at` + jsonl mtime
+- Держим сообщение юзера во время resume, отправляем после готовности Claude
+- См. [docs/plans/2026-01-24-auto-suspend-design.md](plans/2026-01-24-auto-suspend-design.md)
+
 ### Architecture review and clean up
 Ревью архитектуры и уменьшение технического долга.
 - Phase 1: реструктуризация проекта ✅
@@ -418,13 +429,6 @@ MCP tool для Claude чтобы читать историю Telegram чата:
 При реплае на сообщение отправлять контекст в tmux:
 - Цитировать кусочек сообщения на которое ответили
 - Формат: `> цитата\n\nтекст ответа`
-
-### Auto-resume при отправке сообщения
-Авто-запуск Claude когда пользователь отправляет сообщение, а tmux не существует:
-- Показать: `` `[~]` Tmux session not found, launching... ``
-- Если есть `session_id` → `claude --resume`, иначе `claude`
-- Очередь всех сообщений (текст + файлы) пока запускается
-- Отправить очередь после готовности Claude
 
 ### Отрисовка таблиц и диаграмм из текста в картинку
 Рендерить таблицы и диаграммы из текста в изображения:

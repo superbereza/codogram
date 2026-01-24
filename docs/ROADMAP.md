@@ -373,6 +373,17 @@ Auto-detect and resend messages stuck in Claude's input:
 
 ## In Progress
 
+### Auto-suspend & auto-resume
+Save RAM by killing idle sessions, auto-resume on user message:
+- **Auto-suspend:** Kill tmux after 12h inactivity (silent, no notification)
+- **Auto-resume:** Relaunch Claude when user writes to dead session:
+  - Suspended session → "Session was suspended. Resuming..."
+  - Tmux missing → "Tmux not found. Launching..."
+  - Claude crashed → "Claude not responding. Relaunching..."
+- Track activity via `last_activity_at` + jsonl mtime
+- Hold user message during resume, send after Claude ready
+- See [docs/plans/2026-01-24-auto-suspend-design.md](plans/2026-01-24-auto-suspend-design.md)
+
 ### Architecture review and clean up
 Ongoing architecture improvements and technical debt reduction.
 - Phase 1: project restructure ✅
@@ -418,13 +429,6 @@ Save FSM state to config file to survive bot restarts:
 When replying to message, send context to tmux:
 - Quote piece of message being replied to
 - Format: `> quote\n\nresponse text`
-
-### Auto-resume on message
-Auto-launch Claude when user sends message but tmux doesn't exist:
-- Show: `` `[~]` Tmux session not found, launching... ``
-- If `session_id` exists → `claude --resume`, else `claude`
-- Queue all messages (text + files) while launching
-- Send queued messages after Claude ready
 
 ### Tables and diagrams rendering
 Render tables and diagrams from text to images:
