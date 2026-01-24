@@ -411,6 +411,13 @@ Show only header by default, expand on demand:
 - Message edits in place to show details
 - Reduces noise while keeping full info accessible
 
+### Companion / personal account integration
+Connect a Telegram user account to the bot:
+- **Service account** — read chat history, join groups, bypass bot limitations
+- **Personal account** — receive your messages, reply with Claude's help from your own account
+- MTProto client (Telethon) alongside Bot API
+- Research needed: auth flow, session storage, bot↔userbot architecture
+
 ### Verbose mode detailed menu
 More granular control over output verbosity:
 - `/verbose` opens submenu with current setting displayed
