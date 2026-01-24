@@ -381,6 +381,42 @@ Ongoing architecture improvements and technical debt reduction.
 
 ## Backlog
 
+### Fork command
+`/fork` command to create a copy of current branch:
+- Fork current worktree to new branch
+- Useful when conversation goes in wrong direction
+- Preserve context but start fresh direction
+
+### Hide/show thinking setting
+Toggle visibility of Claude's `<thinking>` blocks:
+- Per-chat setting
+- Hide by default for cleaner output
+- Show for debugging or learning
+
+### Verbose mode detailed menu
+More granular control over output verbosity:
+- `/verbose` opens submenu with current setting displayed
+- `[full]` — show everything (current verbose on behavior)
+- `[-5 strings] [+5 strings]` — adjust line limit
+- `[just headers]` — show only tool names (same as 0 strings)
+- `[only current header]` — single message, updates with new headers
+- `[total silence]` — only user-facing messages shown
+- `[• on/off]` — toggle bullet point prefix
+- `[save settings]` — persist choice
+
+### Project-less chat mode
+Connect bot to chat without creating a project:
+- Starter worktrees in codogram folder
+- Quick access without full project setup
+- Option to "promote" to real project later
+- Useful for quick questions or experiments
+
+### Pass user names in multi-user chats
+When multiple people use same chat, identify who's talking:
+- Inject sender name before message: `[Username]: message`
+- Helps Claude understand conversation context
+- Toggle setting per chat
+
 ### Team mode: user avatar and name for topics
 In team mode, personalize topics with user identity:
 - Topic icon = user's avatar (from emoji pack)
