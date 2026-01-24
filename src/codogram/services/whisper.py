@@ -75,11 +75,20 @@ class WhisperService:
             return TranscriptionResult(success=True, text=text)
 
         except BadRequestError as e:
+            # Log full error details for debugging
+            logger.warning(f"Whisper BadRequest: message={e.message}, code={e.code}, body={e.body}")
+
+            # Check structured error code first
+            if e.code:
+                code = str(e.code).lower()
+                if "format" in code or "codec" in code:
+                    return TranscriptionResult(success=False, error="format")
+
+            # Fallback to message parsing
             error_msg = str(e).lower()
-            logger.warning(f"Whisper BadRequest: {e}")
             if "size" in error_msg or "large" in error_msg or "limit" in error_msg:
                 return TranscriptionResult(success=False, error="file_too_large")
-            if "format" in error_msg or "codec" in error_msg:
+            if "format" in error_msg or "codec" in error_msg or "invalid" in error_msg:
                 return TranscriptionResult(success=False, error="format")
             return TranscriptionResult(success=False, error="api_error")
 
