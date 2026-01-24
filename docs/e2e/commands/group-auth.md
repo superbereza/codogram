@@ -29,26 +29,46 @@ mcp__telegram__list_messages(chat_id=TEST_GROUP_ID, limit=2)
 
 ---
 
-## TC-GRPAUTH-002: Bot in group without admin - command blocked
+## TC-GRPAUTH-002: Bot added to unauthorized group - one-time message
 
 **Tags:** critical, group-auth
-**Preconditions:** Test group with no ADMIN_IDS users as members
+**Preconditions:** Group with no ADMIN_IDS users as members
+
+**Human action required:**
+ASK USER: "Please add bot to a group where you are NOT in ADMIN_IDS. Let me know when done."
 
 **Steps:**
 ```python
-# Send command in group where no ADMIN_IDS users are members
-mcp__telegram__send_message(chat_id=NO_ADMIN_GROUP_ID, message="/help")
-# Wait 3s
-mcp__telegram__list_messages(chat_id=NO_ADMIN_GROUP_ID, limit=2)
+# After bot is added, check for rejection message
+mcp__telegram__list_messages(chat_id=NO_ADMIN_GROUP_ID, limit=3)
 ```
 
 **Expected:**
-- UI: `[x] Bot not active in this group`
+- UI: `[x] Bot not active in this group` (sent once when bot is added)
+- State: Group not registered
+
+---
+
+## TC-GRPAUTH-003: Subsequent messages in unauthorized group - silent ignore
+
+**Tags:** critical, group-auth
+**Preconditions:** Bot already added to unauthorized group (TC-GRPAUTH-002 completed)
+
+**Steps:**
+```python
+# Send command in unauthorized group
+mcp__telegram__send_message(chat_id=NO_ADMIN_GROUP_ID, message="/help")
+# Wait 3s
+mcp__telegram__list_messages(chat_id=NO_ADMIN_GROUP_ID, limit=3)
+```
+
+**Expected:**
+- UI: No new message from bot (silent ignore, no spam)
 - State: Command not processed
 
 ---
 
-## TC-GRPAUTH-003: Admin leaves group - bot deactivated
+## TC-GRPAUTH-004: Admin leaves group - bot deactivated
 
 **Tags:** critical, group-auth
 **Preconditions:**
@@ -67,7 +87,7 @@ mcp__telegram__list_messages(chat_id=NO_ADMIN_GROUP_ID, limit=2)
 
 ---
 
-## TC-GRPAUTH-004: Private chat still works for admins
+## TC-GRPAUTH-005: Private chat still works for admins
 
 **Tags:** smoke, group-auth
 **Preconditions:** MCP user is in ADMIN_IDS
@@ -86,7 +106,7 @@ mcp__telegram__list_messages(chat_id=BOT_PRIVATE_CHAT_ID, limit=2)
 
 ---
 
-## TC-GRPAUTH-005: Private chat blocked for non-admins
+## TC-GRPAUTH-006: Private chat blocked for non-admins
 
 **Tags:** critical, group-auth
 **Preconditions:** User NOT in ADMIN_IDS sends message in private chat
@@ -105,7 +125,7 @@ mcp__telegram__list_messages(chat_id=BOT_PRIVATE_CHAT_ID, limit=2)
 
 ---
 
-## TC-GRPAUTH-006: Button callback blocked in unauthorized group
+## TC-GRPAUTH-007: Button callback blocked in unauthorized group
 
 **Tags:** full, group-auth
 **Preconditions:** Group with no ADMIN_IDS members, message with inline buttons exists
@@ -122,7 +142,7 @@ mcp__telegram__press_inline_button(chat_id=NO_ADMIN_GROUP_ID, button_text="Some 
 
 ---
 
-## TC-GRPAUTH-007: Multiple admins - one leaves, bot still works
+## TC-GRPAUTH-008: Multiple admins - one leaves, bot still works
 
 **Tags:** full, group-auth
 **Preconditions:**
@@ -139,7 +159,7 @@ mcp__telegram__press_inline_button(chat_id=NO_ADMIN_GROUP_ID, button_text="Some 
 
 ---
 
-## TC-GRPAUTH-008: Admin rejoins group - bot reactivated
+## TC-GRPAUTH-009: Admin rejoins group - bot reactivated
 
 **Tags:** full, group-auth
 **Preconditions:**

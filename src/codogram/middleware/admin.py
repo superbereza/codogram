@@ -101,9 +101,10 @@ class AdminMiddleware(BaseMiddleware):
                 logger.info(f"group_registered: chat_id={chat.id}")
                 return await handler(event, data)
 
-            # No admin from ADMIN_IDS in group
-            logger.debug(f"group_rejected: chat_id={chat.id}")
-            await self._reject_group(event, data)
+            # No admin from ADMIN_IDS in group - silently ignore.
+            # The rejection message is sent once by on_bot_added when bot is first added.
+            # We don't want to spam on every subsequent message.
+            logger.debug(f"group_rejected_silent: chat_id={chat.id}")
             return None
 
         # Fallback for groups without group_auth - use old behavior (admin only)

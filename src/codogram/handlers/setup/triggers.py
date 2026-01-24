@@ -99,11 +99,13 @@ async def on_bot_added(event: ChatMemberUpdated, state: FSMContext, group_auth: 
         return
 
     # Check group authorization (must have admin from ADMIN_IDS)
+    # Send rejection message here (one-time notification when bot is added).
+    # AdminMiddleware silently ignores subsequent messages from unauthorized groups.
     if chat.type in ("group", "supergroup"):
         registered = await group_auth.check_and_register(event.bot, chat.id)
         if not registered:
             logger.info(f"group_not_authorized: chat_id={chat.id}")
-            await event.bot.send_message(chat.id, strings.ERR_GROUP_NOT_ALLOWED, parse_mode="MarkdownV2")
+            await event.answer(strings.ERR_GROUP_NOT_ALLOWED)
             return
 
     # Check if setup already in progress

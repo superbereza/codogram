@@ -427,3 +427,86 @@ mcp__telegram__list_messages(chat_id=-1003356094635, reply_to=TOPIC_ID, limit=3)
 **Expected:**
 - UI: Recovery message deleted
 - State: No changes, topic remains in same state
+
+---
+
+## TC-START-018: Launch animation face appears after 3s
+
+**Tags:** critical, start, animation
+**Preconditions:** Project registered, no tmux session running
+
+**Setup:**
+```bash
+tmux kill-session -t claude-codogram-testing-area 2>/dev/null || true
+```
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=-1003356094635, message="/start")
+# ASK USER: "Watch the chat. After ~3 seconds, does a face animation appear? (e.g., [._.])"
+# Wait for user observation (they should see faces like [._.] → [-_-] → [^_^])
+```
+
+**Expected:**
+- UI: After ~3 seconds of waiting, face animation starts
+- UI: Face changes every ~3 seconds: `[._.]` → `[-_-]` → `[^_^]` etc.
+- State: Animation continues until Claude trust prompt or permission prompt appears
+
+**Note:** MCP cannot observe real-time animations. Requires user visual confirmation.
+
+---
+
+## TC-START-019: Trust prompt appears as inline buttons
+
+**Tags:** critical, start, permissions
+**Preconditions:** Claude just launched (fresh session, not resumed)
+
+**Steps:**
+```python
+# After /start launches Claude
+# ASK USER: "When trust prompt appears, does it show as inline buttons like permission prompts?"
+# Wait for user observation
+```
+
+**Expected:**
+- UI: Trust prompt appears with inline buttons (Yes/No style, like permission prompts)
+- UI: Trust prompt allows one-click approval
+- State: After approval, Claude session becomes ready
+
+**Note:** Trust prompts only appear for fresh sessions, not resumed ones.
+
+---
+
+## TC-START-020: Animation stops when trust prompt appears
+
+**Tags:** critical, start, animation
+**Preconditions:** TC-START-018 animation running
+
+**Steps:**
+```python
+# ASK USER: "Does the face animation stop when the trust prompt appears?"
+```
+
+**Expected:**
+- UI: Face animation message is deleted when trust prompt appears
+- UI: Trust prompt becomes the primary message
+
+---
+
+## TC-START-021: Long wait shows increasing faces
+
+**Tags:** full, start, animation
+**Preconditions:** /start running, waiting for trust prompt
+
+**Steps:**
+```python
+# ASK USER: "During a long wait (2+ minutes), do you see:
+# 1. Face animation every ~3 seconds
+# 2. Occasional sad faces like [T_T] or [;_;]"
+```
+
+**Expected:**
+- UI: Face animation continues throughout the wait
+- UI: Mix of expressions including occasional sad/bored faces for long waits
+
+**Note:** This tests the patience of both bot and user during long Claude startup times.

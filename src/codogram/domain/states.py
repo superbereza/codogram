@@ -15,6 +15,7 @@ class StartFlow(StatesGroup):
     awaiting_clone_url = State()
     awaiting_custom_path = State()
     awaiting_launch_confirm = State()
+    awaiting_tmux_select = State()
 
 
 class RestartFlow(StatesGroup):
