@@ -156,16 +156,27 @@ Permission prompts показывают полный контент сразу. 
 По умолчанию prompt свёрнут — только заголовок. Кнопка [Show more] раскрывает детали.
 Настройки нет — всегда collapsed с возможностью развернуть.
 
+### Одно сообщение вместо нескольких
+
+Текущая проблема: permission prompt = 3-4 сообщения (body, options, 👆, keyboard).
+При рестарте бота content сообщения зависают.
+
+Решение: всегда одно сообщение с inline keyboard. Нечему зависать.
+
 ### UI: Collapsed (дефолт)
 
 ```
 Bash: run tests
 
+[1] Allow once for this conversation
+[2] Always allow for this project
+[3] Deny
+
 [Show more]
-[Yes]
-[No]
-[Esc]
+[1] [2] [3]
 ```
+
+Опции показываются текстом (полные), кнопки — сокращённые метки.
 
 ### UI: Expanded
 
@@ -176,12 +187,21 @@ Bash: run tests
 [1/3] full body content chunk...
 ────────────
 
+[1] Allow once for this conversation
+[2] Always allow for this project
+[3] Deny
+
 [◀] [▶]
 [Show less]
-[Yes]
-[No]
-[Esc]
+[1] [2] [3]
 ```
+
+### При устаревании prompt
+
+Если callback не находит processor или `last_body is None`:
+1. Удаляем сообщение (`await callback.message.delete()`)
+2. Сбрасываем state processor
+3. Следующий poll покажет новый prompt
 
 ### Пагинация
 
@@ -224,19 +244,29 @@ total_pages = len(body_chunks)
 # markdown применяется при рендере каждой страницы
 ```
 
-### Состояние
+### Состояние в PermissionProcessor
 
-Для каждого активного permission prompt хранить:
+Расширяем существующий processor (не отдельный dataclass):
 
 ```python
-@dataclass
-class PermissionPromptState:
-    message_id: int
-    expanded: bool = False
-    current_page: int = 0
-    total_pages: int = 1
-    chunks: list[str] = field(default_factory=list)
+class PermissionProcessor(BaseProcessor):
+    # Существующие поля
+    self.state = PermissionState.IDLE
+    self.last_body: str | None = None
+    self.last_options: list[str] | None = None
+
+    # Удаляем (было для нескольких сообщений)
+    # self.content_msg_ids: list[int]
+    # self.kb_msg_id: int | None
+
+    # Новые поля
+    self.msg_id: int | None = None      # одно сообщение
+    self.expanded: bool = False
+    self.current_page: int = 0
+    self.chunks: list[str] | None = None
 ```
+
+При callback проверяем `callback.message.message_id == processor.msg_id` для защиты от устаревших сообщений.
 
 ---
 
@@ -342,7 +372,7 @@ if "feat_thinking_status" in project:
 
 ### Порядок реализации
 
-1. **Рефакторинг chunker.py** — вынести `_split_text()` helper
+1. **Рефакторинг инфраструктуры** — chunker.py, модуляризация handlers/settings, вынос tool_formatter
 2. **Data model changes** — новые поля, миграция verbose → display_mode
 3. **Feature 2: Bullet toggle** — простой, разогрев
 4. **Feature 3: Thinking text** — средняя сложность
@@ -350,16 +380,44 @@ if "feat_thinking_status" in project:
 6. **Feature 4: Collapsible prompts** — самая сложная, в конце
 7. **Settings UI** — пагинация кнопок
 
-### Файлы для изменения
+### Out of Scope
+
+- **AskUserQuestion** — не трогаем в этой итерации. Обкатаем подход на permission prompts, потом применим.
+
+---
+
+## File Architecture
+
+### Модуляризация handlers/settings
+
+```
+handlers/settings/                    # NEW директория
+├── __init__.py                       # router + include sub-routers
+├── settings.py                       # перенести как есть
+│                                     # TODO: модуляризировать в будущем
+└── verbose_menu.py                   # NEW: /verbose_mode menu + callbacks
+```
+
+### Вынос tool_formatter из history_watcher
+
+```
+claude/
+├── history_watcher.py                # watcher + парсинг jsonl (без форматирования)
+└── tool_formatter.py                 # NEW: format_tool_use, _entry_to_messages
+                                      # + display_mode logic
+                                      # + bullet toggle
+                                      # + thinking text processing
+```
+
+### Остальные файлы
 
 | Файл | Изменения |
 |------|-----------|
-| `chunker.py` | Вынести `_split_text()` |
-| `core/session_manager.py` | Новые поля: display_mode, line_limit, display_bullet, display_thinking_text; rename feat_thinking_status → working_status |
+| `chunker.py` | Вынести `_split_text()` helper |
+| `core/session_manager.py` | Новые поля, rename feat_thinking_status → working_status |
 | `config.py` | Миграция при загрузке |
-| `handlers/settings.py` | Новые команды, пагинация кнопок, обновить /verbose → /verbose_mode |
-| `claude/history_watcher.py` | Логика display_mode, bullet toggle |
-| `claude/poller/processors/permissions.py` | Collapsed UI, пагинация |
+| `claude/poller/processors/permissions.py` | Collapsed UI, одно сообщение, пагинация |
+| `telegram/keyboards/__init__.py` | Новые keyboards для permission prompts |
 | `strings.py` | Тексты для меню и описаний |
 
 ### Обратная совместимость
