@@ -10,7 +10,7 @@ from ....telegram.keyboards import permission_keyboard
 from ....state import permission_states, PermissionPromptState
 from ....auto_accept import try_auto_accept
 from ....config import settings
-from ....utils.truncate import truncate_body
+from ....chunker import _split_text
 from .ask_user import _parse_review_answers
 
 
@@ -21,6 +21,7 @@ class PermissionState(Enum):
 
 
 SEPARATOR_SOLID = "────────────"
+PERMISSION_PAGE_SIZE = 2000  # Characters per page for expanded view
 
 
 class PermissionProcessor(BaseProcessor):
@@ -130,66 +131,127 @@ class PermissionProcessor(BaseProcessor):
             await self._send_permission(parsed, verbose)
 
     async def _send_permission(self, parsed: PermissionPrompt, verbose: bool) -> None:
+        """Send permission prompt as single collapsible message."""
         try:
             # Check if this is a review screen (AskUserQuestion final review)
             review_answers = _parse_review_answers(parsed.body) if parsed.body else None
 
-            messages = []
-            if review_answers:
-                # Format review answers nicely
-                lines = ["\ud83d\udccb Review your answers", ""]
-                for question, answer in review_answers:
-                    lines.append(f"\u25cf {question}")
-                    lines.append(f"  \u2192 {answer}")
-                    lines.append("")
-                body_text = SEPARATOR_SOLID + "\n" + "\n".join(lines).strip()
-                messages.append({"text": body_text})
-            elif parsed.body:
-                display_body = truncate_body(parsed.body, verbose=verbose)
-                if display_body:
-                    body_text = SEPARATOR_SOLID + "\n" + display_body
-                    messages.append({"text": body_text, "parse_mode": "MarkdownV2"})
+            # Build message text (collapsed by default)
+            text = self._build_permission_text(parsed, collapsed=True, review_answers=review_answers)
 
-            options_text = "\n".join(parsed.options)
-            messages.append({"text": options_text})
-            messages.append({"text": "\ud83d\udc46"})
+            # Build keyboard (no pagination needed when collapsed)
+            kb = permission_keyboard(
+                parsed.options,
+                self.ctx.tmux_name,
+                expanded=False,
+                current_page=0,
+                total_pages=1,
+            )
 
-            kb = permission_keyboard(parsed.options, self.ctx.tmux_name)
+            # Send single message
             batch = OutgoingBatch(
                 chat_id=self.ctx.chat_id,
                 thread_id=self.ctx.thread_id,
-                messages=messages,
+                messages=[{"text": text}],
                 reply_markup=kb,
             )
             msg_ids = await self.ctx.queue.enqueue(batch)
 
-            self.msg_id = msg_ids[-1] if msg_ids else None
+            self.msg_id = msg_ids[0] if msg_ids else None
+
+            # Save state for callback handlers
             if self.msg_id:
-                # Store state for callback routing
                 permission_states[self.msg_id] = PermissionPromptState(
                     tmux_name=self.ctx.tmux_name,
                     body=parsed.body or "",
                     options=parsed.options,
                     expanded=False,
                     current_page=0,
-                    chunks=[],  # Will be populated when expanded
+                    chunks=[],  # Computed lazily on expand
                 )
                 self.log_debug(f"saved permission_states[{self.msg_id}]")
 
             self.state = PermissionState.SHOWING
             self.last_body = parsed.body
-            self.log_debug(f"SHOWING: sent {len(parsed.options)} options, msg_id={self.msg_id}")
+            self.log_debug(f"SHOWING: sent collapsed prompt, msg={self.msg_id}")
+
         except Exception as e:
             self.log_warning(f"send error: {e}")
             self.state = PermissionState.IDLE
 
+    def _build_permission_text(
+        self,
+        parsed: PermissionPrompt,
+        collapsed: bool,
+        review_answers: list[tuple[str, str]] | None = None,
+    ) -> str:
+        """Build permission prompt message text.
+
+        Args:
+            parsed: Parsed permission prompt
+            collapsed: If True, show only header. If False, show body page.
+            review_answers: Parsed review answers (for AskUserQuestion review screen)
+
+        Returns:
+            Formatted message text
+        """
+        # Header: tool name + brief description
+        header = self._get_prompt_header(parsed)
+
+        if collapsed:
+            # Collapsed: header + options
+            lines = [header, ""]
+            lines.extend(parsed.options)
+            return "\n".join(lines)
+
+        # Expanded: header + body content + options
+        lines = [header, "", SEPARATOR_SOLID]
+
+        if review_answers:
+            # Format review answers nicely
+            review_lines = []
+            for question, answer in review_answers:
+                review_lines.append(f"* {question}")
+                review_lines.append(f"  -> {answer}")
+                review_lines.append("")
+            body_content = "\n".join(review_lines).strip()
+        elif self.chunks:
+            # Show current page with indicator
+            total = len(self.chunks)
+            if total > 1:
+                body_content = f"[{self.current_page + 1}/{total}]\n{self.chunks[self.current_page]}"
+            else:
+                body_content = self.chunks[self.current_page]
+        else:
+            body_content = parsed.body or ""
+
+        lines.append(body_content)
+        lines.append(SEPARATOR_SOLID)
+        lines.append("")
+        lines.extend(parsed.options)
+
+        return "\n".join(lines)
+
+    def _get_prompt_header(self, parsed: PermissionPrompt) -> str:
+        """Extract brief header from permission prompt body."""
+        if not parsed.body:
+            return "Permission request"
+
+        # Try to extract tool name and brief description from first line
+        first_line = parsed.body.split("\n")[0][:60]
+        return first_line if first_line else "Permission request"
+
     async def _cleanup_messages(self) -> None:
+        """Delete permission message and state."""
         if self.msg_id:
+            # Remove state
+            permission_states.pop(self.msg_id, None)
+            # Delete message
             try:
                 await self.ctx.bot.delete_message(self.ctx.chat_id, self.msg_id)
             except Exception:
                 pass
-            permission_states.pop(self.msg_id, None)
+            self.msg_id = None
 
     def _reset_state(self) -> None:
         self.state = PermissionState.IDLE
