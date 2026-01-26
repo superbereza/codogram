@@ -1,18 +1,19 @@
+# TODO: modularize - split into commands.py, display.py, callbacks.py
 """Settings and info commands."""
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
-from ..core.session_manager import project_manager
-from ..telegram.queue import TelegramQueue
-from .. import strings
-from ..logging_config import logger
-from ..telegram.sticker import StickerAdapter
-from ..services.emoji_pack import EmojiPackService
-from ..services.response_mode import ResponseModeService
-from ..telegram.keyboards import avatar_pack_create_keyboard, avatar_pack_disable_keyboard
+from ...core.session_manager import project_manager
+from ...telegram.queue import TelegramQueue
+from ... import strings
+from ...logging_config import logger
+from ...telegram.sticker import StickerAdapter
+from ...services.emoji_pack import EmojiPackService
+from ...services.response_mode import ResponseModeService
+from ...telegram.keyboards import avatar_pack_create_keyboard, avatar_pack_disable_keyboard
 
-router = Router(name="settings")
+router = Router(name="settings_main")
 
 
 def _cycle_response_mode(project, thread) -> tuple[str, str]:
@@ -79,8 +80,8 @@ async def on_help_close(callback: CallbackQuery):
 
 def _build_settings_text(project, thread, tmux_name: str) -> str:
     """Build settings message text. Used by cmd_settings and callback handler."""
-    from ..tmux.session import TmuxSession
-    from ..services.session_state import SessionStateService
+    from ...tmux.session import TmuxSession
+    from ...services.session_state import SessionStateService
 
     # Get settings from context
     if thread:
@@ -171,7 +172,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
 @router.message(Command("settings", ignore_case=True))
 async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     """Show current settings including Claude session state."""
-    from ..telegram.keyboards import settings_keyboard
+    from ...telegram.keyboards import settings_keyboard
 
     chat_id = message.chat.id
     thread_id = message.message_thread_id
@@ -470,8 +471,8 @@ async def callback_avatar_pack(callback: CallbackQuery, telegram_queue: Telegram
 @router.callback_query(F.data.startswith("set:"))
 async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle settings keyboard button presses."""
-    from ..telegram.keyboards.settings import _short_id
-    from ..telegram.keyboards import settings_keyboard
+    from ...telegram.keyboards.settings import _short_id
+    from ...telegram.keyboards import settings_keyboard
 
     data = callback.data
     parts = data.split(":")
@@ -535,8 +536,8 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
         await callback.answer(f"Verbose: {status}")
 
     elif action == "m":
-        from ..tmux.session import TmuxSession
-        from ..services.session_state import SessionStateService
+        from ...tmux.session import TmuxSession
+        from ...services.session_state import SessionStateService
 
         # Get cwd for tmux
         if thread:
