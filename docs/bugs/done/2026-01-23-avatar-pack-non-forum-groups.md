@@ -20,3 +20,17 @@ Avatar pack должен предлагаться только в группах
 
 ## Приоритет
 Low - косметический баг, функционально ничего не ломает.
+
+## Исправление
+**Дата:** 2026-01-23
+
+В `handlers/setup/launch.py` строка 187:
+```python
+# Было:
+if project.feat_avatar_pack and chat_type == "supergroup":
+
+# Стало:
+if project.feat_avatar_pack and is_forum:
+```
+
+Переменная `is_forum` уже включает проверку `chat.is_forum`.

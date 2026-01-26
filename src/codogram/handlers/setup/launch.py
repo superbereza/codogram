@@ -182,9 +182,9 @@ async def _execute_launch(message: Message, state: FSMContext):
         )
     )
 
-    # Create emoji pack in background if feature enabled AND supergroup
+    # Create emoji pack in background if feature enabled AND forum
     # (emoji pack is for topic icons, only makes sense in forums)
-    if project.feat_avatar_pack and chat_type == "supergroup":
+    if project.feat_avatar_pack and is_forum:
         asyncio.create_task(
             _create_emoji_pack_background(message.bot, chat_id, telegram_queue)
         )
