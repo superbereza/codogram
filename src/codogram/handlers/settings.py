@@ -87,12 +87,14 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
         auto_accept = thread.auto_accept
         verbose = thread.verbose
         display_bullet = thread.display_bullet
+        display_thinking_text = thread.display_thinking_text
         context_name = thread.name
         cwd = thread.worktree_path or project.cwd
     else:
         auto_accept = project.auto_accept
         verbose = project.verbose
         display_bullet = project.display_bullet
+        display_thinking_text = project.display_thinking_text
         context_name = project.project_name
         cwd = project.cwd
 
@@ -100,6 +102,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     auto_status = "● on" if auto_accept else "○ off"
     verbose_status = "● on" if verbose else "○ off"
     bullet_status = "● on" if display_bullet else "○ off"
+    thinking_text_status = "● on" if display_thinking_text else "○ off"
 
     # Response mode
     response_mode = thread.response_mode if thread else project.response_mode
@@ -119,6 +122,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     lines.append("")
     lines.append("ui")
     lines.append(f"• bullet: {bullet_status}")
+    lines.append(f"• thinking\\_text: {thinking_text_status}")
     lines.append("")
     lines.append("claude")
 
@@ -305,6 +309,32 @@ async def cmd_response_mode(message: Message, telegram_queue: TelegramQueue):
     project_manager._save()
 
     await telegram_queue.reply(message, f"response mode: {new_mode}\n_{explanation}_")
+
+
+@router.message(Command("display_thinking_text", ignore_case=True))
+async def cmd_display_thinking_text(message: Message, telegram_queue: TelegramQueue):
+    """Toggle display of <thinking> blocks in Claude's responses."""
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    thread = None
+    if project.threads:
+        thread = project.threads.get(thread_id)
+
+    if thread:
+        thread.display_thinking_text = not thread.display_thinking_text
+        status = "● on" if thread.display_thinking_text else "○ off"
+    else:
+        project.display_thinking_text = not project.display_thinking_text
+        status = "● on" if project.display_thinking_text else "○ off"
+
+    project_manager._save()
+    await telegram_queue.reply(message, f"Show thinking blocks: {status}")
 
 
 @router.message(Command("exp_thinking_status", ignore_case=True))

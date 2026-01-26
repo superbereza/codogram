@@ -262,12 +262,14 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
                 display_mode = getattr(thread, 'display_mode', getattr(project, 'display_mode', 'lines'))
                 line_limit = getattr(thread, 'line_limit', getattr(project, 'line_limit', 5))
                 display_bullet = getattr(thread, 'display_bullet', getattr(project, 'display_bullet', True))
+                display_thinking_text = getattr(thread, 'display_thinking_text', getattr(project, 'display_thinking_text', True))
 
                 messages = _entry_to_messages(
                     entry,
                     display_mode=display_mode,
                     line_limit=line_limit,
                     display_bullet=display_bullet,
+                    display_thinking_text=display_thinking_text,
                 )
                 if messages:
                     text_preview = messages[0].get("text", "")[:40].replace("\n", " ")

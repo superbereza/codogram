@@ -1,6 +1,7 @@
 # src/codogram/claude/history_watcher.py
 import json
 import asyncio
+import re
 from enum import Enum
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +14,34 @@ from ..config import settings
 from ..logging_config import logger
 from .. import strings
 from .tool_formatter import format_tool_use
+
+
+def _process_thinking_text(text: str, display_thinking_text: bool) -> str:
+    """Process <thinking> blocks in text response.
+
+    Args:
+        text: Claude's text response
+        display_thinking_text: If True, show as italic. If False, replace with summary.
+
+    Returns:
+        Processed text
+    """
+    pattern = r'<thinking>(.*?)</thinking>'
+
+    if display_thinking_text:
+        # Show as italic, keep tags
+        def italicize(match):
+            content = match.group(0)
+            return f"_{content}_"
+        return re.sub(pattern, italicize, text, flags=re.DOTALL)
+    else:
+        # Replace with summary
+        def summarize(match):
+            content = match.group(1)
+            length = len(content)
+            return f"thinking • {length} symbols"
+        return re.sub(pattern, summarize, text, flags=re.DOTALL)
+
 
 class ContentType(Enum):
     TEXT = "text"
@@ -180,12 +209,14 @@ async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "Telegram
                 display_mode = getattr(thread, 'display_mode', getattr(project, 'display_mode', 'lines'))
                 line_limit = getattr(thread, 'line_limit', getattr(project, 'line_limit', 5))
                 display_bullet = getattr(thread, 'display_bullet', getattr(project, 'display_bullet', True))
+                display_thinking_text = getattr(thread, 'display_thinking_text', getattr(project, 'display_thinking_text', True))
 
                 messages = _entry_to_messages(
                     entry,
                     display_mode=display_mode,
                     line_limit=line_limit,
                     display_bullet=display_bullet,
+                    display_thinking_text=display_thinking_text,
                 )
                 if messages:
                     batch = OutgoingBatch(
@@ -205,13 +236,19 @@ def _entry_to_messages(
     display_mode: str = "lines",
     line_limit: int = 5,
     display_bullet: bool = True,
+    display_thinking_text: bool = True,
 ) -> list[dict]:
     """Convert ParsedEntry to list of message dicts for queue."""
     messages = []
 
     if entry.content_type == ContentType.TEXT:
         bullet = "● " if display_bullet else ""
-        messages.append({"text": f"{bullet}{entry.text}", "parse_mode": "MarkdownV2"})
+        text = entry.text
+
+        # Process thinking blocks
+        text = _process_thinking_text(text, display_thinking_text)
+
+        messages.append({"text": f"{bullet}{text}", "parse_mode": "MarkdownV2"})
 
     elif entry.content_type == ContentType.TOOL_USE:
         # Hide AskUserQuestion - shown by poller instead
