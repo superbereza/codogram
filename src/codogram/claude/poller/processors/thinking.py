@@ -16,12 +16,12 @@ class ThinkingProcessor(BaseProcessor):
 
     async def process(self, screen: str) -> None:
         # Check if feature enabled
-        feat_enabled = (
-            self.ctx.thread.feat_thinking_status
+        working_status = (
+            self.ctx.thread.working_status
             if self.ctx.thread
-            else self.ctx.project.feat_thinking_status
+            else self.ctx.project.working_status
         )
-        if not feat_enabled:
+        if not working_status:
             return
 
         thinking_text = parse_thinking_status(screen)

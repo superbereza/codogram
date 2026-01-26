@@ -108,9 +108,9 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     response_mode = thread.response_mode if thread else project.response_mode
 
     # Experimental features
-    feat_thinking = thread.feat_thinking_status if thread else project.feat_thinking_status
+    working = thread.working_status if thread else project.working_status
     # Note: feat_suggestions is project-level only
-    thinking_status = "● on" if feat_thinking else "○ off"
+    working_status_display = "● on" if working else "○ off"
     suggestions_status = "● on" if project.feat_suggestions else "○ off"
     avatar_pack_status = "● on" if project.feat_avatar_pack else "○ off"
 
@@ -161,7 +161,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
 
     lines.append("")
     lines.append("experimental features")
-    lines.append(f"• /exp\\_thinking\\_status: {thinking_status}")
+    lines.append(f"• /working\\_status: {working_status_display}")
     lines.append(f"• /exp\\_suggestions: {suggestions_status}")
     lines.append(f"• /exp\\_avatar\\_pack: {avatar_pack_status}")
 
@@ -337,9 +337,9 @@ async def cmd_display_thinking_text(message: Message, telegram_queue: TelegramQu
     await telegram_queue.reply(message, f"Show thinking blocks: {status}")
 
 
-@router.message(Command("exp_thinking_status", ignore_case=True))
-async def cmd_exp_thinking_status(message: Message, telegram_queue: TelegramQueue):
-    """Toggle thinking status feature."""
+@router.message(Command("working_status", ignore_case=True))
+async def cmd_working_status(message: Message, telegram_queue: TelegramQueue):
+    """Toggle working status indicator (Claude's activity)."""
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
@@ -353,14 +353,21 @@ async def cmd_exp_thinking_status(message: Message, telegram_queue: TelegramQueu
         thread = project.threads.get(thread_id)
 
     if thread:
-        thread.feat_thinking_status = not thread.feat_thinking_status
-        status = "● on" if thread.feat_thinking_status else "○ off"
+        thread.working_status = not thread.working_status
+        status = "● on" if thread.working_status else "○ off"
     else:
-        project.feat_thinking_status = not project.feat_thinking_status
-        status = "● on" if project.feat_thinking_status else "○ off"
+        project.working_status = not project.working_status
+        status = "● on" if project.working_status else "○ off"
 
     project_manager._save()
-    await telegram_queue.reply(message, f"Thinking status: {status}")
+    await telegram_queue.reply(message, f"Working status indicator: {status}")
+
+
+# Keep old command as alias for backward compat
+@router.message(Command("exp_thinking_status", ignore_case=True))
+async def cmd_exp_thinking_status_alias(message: Message, telegram_queue: TelegramQueue):
+    """Alias for /working_status (deprecated)."""
+    await cmd_working_status(message, telegram_queue)
 
 
 @router.message(Command("exp_suggestions", ignore_case=True))
