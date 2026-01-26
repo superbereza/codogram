@@ -129,10 +129,14 @@ async def launch_claude_in_thread(msg: Message, result: FlowResult, queue: Teleg
             logger.debug(f"reopen_forum_topic failed (may be already open): {e}")
 
         if was_reopened:
+            # Use user's custom emoji if available, otherwise default
+            user_id = msg.from_user.id if msg.from_user else None
+            icon_id = project.emoji_map.get(user_id) if user_id else None
+            icon_id = icon_id or strings.ICON_BALLOT_BOX
             try:
                 await msg.bot.edit_forum_topic(
                     msg.chat.id, result.thread_id,
-                    icon_custom_emoji_id=strings.ICON_BALLOT_BOX  # BUG FIX: Use constant
+                    icon_custom_emoji_id=icon_id
                 )
             except Exception as e:
                 logger.warning(f"Failed to set topic icon: {e}")
@@ -223,10 +227,14 @@ async def handle_wr_recreate(callback: CallbackQuery, queue: TelegramQueue):
     except Exception as e:
         logger.debug(f"reopen_forum_topic failed: {e}")
 
+    # Use user's custom emoji if available, otherwise default
+    user_id = callback.from_user.id if callback.from_user else None
+    icon_id = project.emoji_map.get(user_id) if user_id else None
+    icon_id = icon_id or strings.ICON_BALLOT_BOX
     try:
         await callback.bot.edit_forum_topic(
             callback.message.chat.id, thread_id,
-            icon_custom_emoji_id=strings.ICON_BALLOT_BOX
+            icon_custom_emoji_id=icon_id
         )
     except Exception as e:
         logger.warning(f"Failed to set topic icon: {e}")
@@ -283,10 +291,14 @@ async def handle_wr_create(callback: CallbackQuery, queue: TelegramQueue):
     except Exception as e:
         logger.debug(f"reopen_forum_topic failed: {e}")
 
+    # Use user's custom emoji if available, otherwise default
+    user_id = callback.from_user.id if callback.from_user else None
+    icon_id = project.emoji_map.get(user_id) if user_id else None
+    icon_id = icon_id or strings.ICON_BALLOT_BOX
     try:
         await callback.bot.edit_forum_topic(
             callback.message.chat.id, thread_id,
-            icon_custom_emoji_id=strings.ICON_BALLOT_BOX
+            icon_custom_emoji_id=icon_id
         )
     except Exception as e:
         logger.warning(f"Failed to set topic icon: {e}")
