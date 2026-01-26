@@ -31,7 +31,7 @@ def settings_keyboard(tmux_session: str) -> InlineKeyboardMarkup:
             callback_data=f"set:aa:{sid}"
         )],
         [InlineKeyboardButton(
-            text="/verbose",
+            text="/verbose_mode",
             callback_data=f"set:v:{sid}"
         )],
         [InlineKeyboardButton(

@@ -86,44 +86,45 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     # Get settings from context
     if thread:
         auto_accept = thread.auto_accept
-        verbose = thread.verbose
+        display_mode = thread.display_mode
+        line_limit = thread.line_limit
         display_bullet = thread.display_bullet
         display_thinking_text = thread.display_thinking_text
+        working_status = thread.working_status
         context_name = thread.name
         cwd = thread.worktree_path or project.cwd
+        response_mode = thread.response_mode
     else:
         auto_accept = project.auto_accept
-        verbose = project.verbose
+        display_mode = project.display_mode
+        line_limit = project.line_limit
         display_bullet = project.display_bullet
         display_thinking_text = project.display_thinking_text
+        working_status = project.working_status
         context_name = project.project_name
         cwd = project.cwd
+        response_mode = project.response_mode
 
-    # Format toggle indicators (strip backticks for inline display)
+    # Format toggle indicators
     auto_status = "● on" if auto_accept else "○ off"
-    verbose_status = "● on" if verbose else "○ off"
     bullet_status = "● on" if display_bullet else "○ off"
-    thinking_text_status = "● on" if display_thinking_text else "○ off"
+    thinking_status = "● on" if display_thinking_text else "○ off"
+    working_status_text = "● on" if working_status else "○ off"
 
-    # Response mode
-    response_mode = thread.response_mode if thread else project.response_mode
+    # Format display_mode (verbose_mode)
+    if display_mode == "lines":
+        verbose_status = f"lines ({line_limit})"
+    else:
+        verbose_status = display_mode
 
-    # Experimental features
-    working = thread.working_status if thread else project.working_status
-    # Note: feat_suggestions is project-level only
-    working_status_display = "● on" if working else "○ off"
+    # Experimental features (project-level)
     suggestions_status = "● on" if project.feat_suggestions else "○ off"
     avatar_pack_status = "● on" if project.feat_avatar_pack else "○ off"
 
     lines = [f"**{context_name}**", ""]
     lines.append("chat")
-    lines.append(f"• auto-accept: {auto_status}")
-    lines.append(f"• verbose: {verbose_status}")
-    lines.append(f"• response\\_mode: {response_mode}")
-    lines.append("")
-    lines.append("ui")
-    lines.append(f"• bullet: {bullet_status}")
-    lines.append(f"• thinking\\_text: {thinking_text_status}")
+    lines.append(f"• /auto\\_accept: {auto_status}")
+    lines.append(f"• /response\\_mode: {response_mode}")
     lines.append("")
     lines.append("claude")
 
@@ -161,8 +162,14 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
         lines.append("• context: ?")
 
     lines.append("")
+    lines.append("ui")
+    lines.append(f"• /verbose\\_mode: {verbose_status}")
+    lines.append(f"• /display\\_bullet: {bullet_status}")
+    lines.append(f"• /display\\_thinking\\_text: {thinking_status}")
+
+    lines.append("")
     lines.append("experimental features")
-    lines.append(f"• /working\\_status: {working_status_display}")
+    lines.append(f"• /working\\_status: {working_status_text}")
     lines.append(f"• /exp\\_suggestions: {suggestions_status}")
     lines.append(f"• /exp\\_avatar\\_pack: {avatar_pack_status}")
 
@@ -240,29 +247,9 @@ async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
 
 @router.message(Command("verbose", ignore_case=True))
 async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
-    """Toggle verbose output mode."""
-    chat_id = message.chat.id
-    thread_id = message.message_thread_id
-
-    project = project_manager.get_by_chat(chat_id)
-    if not project:
-        await telegram_queue.reply(message, "No project. Use /start first.")
-        return
-
-    thread = None
-    if project.threads:
-        thread = project.threads.get(thread_id)
-
-    # Toggle verbose
-    if thread:
-        thread.verbose = not thread.verbose
-        status = "● on" if thread.verbose else "○ off"
-    else:
-        project.verbose = not project.verbose
-        status = "● on" if project.verbose else "○ off"
-
-    project_manager._save()
-    await telegram_queue.reply(message, f"Verbose output: {status}")
+    """Alias for /verbose_mode (deprecated)."""
+    from .verbose_menu import cmd_verbose_mode
+    await cmd_verbose_mode(message, telegram_queue)
 
 
 @router.message(Command("display_bullet", ignore_case=True))
@@ -526,14 +513,22 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
         await callback.answer(f"Auto-accept: {status}")
 
     elif action == "v":
+        # Open verbose mode menu
+        from ...telegram.keyboards.verbose_menu import verbose_menu_keyboard
+        from .verbose_menu import _build_verbose_text
+
         if thread:
-            thread.verbose = not thread.verbose
-            status = "● on" if thread.verbose else "○ off"
+            display_mode = thread.display_mode
+            line_limit = thread.line_limit
         else:
-            project.verbose = not project.verbose
-            status = "● on" if project.verbose else "○ off"
-        project_manager._save()
-        await callback.answer(f"Verbose: {status}")
+            display_mode = project.display_mode
+            line_limit = project.line_limit
+
+        text = _build_verbose_text(display_mode, line_limit)
+        kb = verbose_menu_keyboard(display_mode, line_limit, short_id)
+        await telegram_queue.edit(callback.message, text, reply_markup=kb)
+        await callback.answer()
+        return  # Don't update settings message
 
     elif action == "m":
         from ...tmux.session import TmuxSession
