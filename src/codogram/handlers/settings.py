@@ -86,17 +86,20 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     if thread:
         auto_accept = thread.auto_accept
         verbose = thread.verbose
+        display_bullet = thread.display_bullet
         context_name = thread.name
         cwd = thread.worktree_path or project.cwd
     else:
         auto_accept = project.auto_accept
         verbose = project.verbose
+        display_bullet = project.display_bullet
         context_name = project.project_name
         cwd = project.cwd
 
     # Format toggle indicators (strip backticks for inline display)
     auto_status = "● on" if auto_accept else "○ off"
     verbose_status = "● on" if verbose else "○ off"
+    bullet_status = "● on" if display_bullet else "○ off"
 
     # Response mode
     response_mode = thread.response_mode if thread else project.response_mode
@@ -113,6 +116,9 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     lines.append(f"• auto-accept: {auto_status}")
     lines.append(f"• verbose: {verbose_status}")
     lines.append(f"• response\\_mode: {response_mode}")
+    lines.append("")
+    lines.append("ui")
+    lines.append(f"• bullet: {bullet_status}")
     lines.append("")
     lines.append("claude")
 
@@ -252,6 +258,32 @@ async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
 
     project_manager._save()
     await telegram_queue.reply(message, f"Verbose output: {status}")
+
+
+@router.message(Command("display_bullet", ignore_case=True))
+async def cmd_display_bullet(message: Message, telegram_queue: TelegramQueue):
+    """Toggle bullet point prefix in tool messages."""
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    thread = None
+    if project.threads:
+        thread = project.threads.get(thread_id)
+
+    if thread:
+        thread.display_bullet = not thread.display_bullet
+        status = "● on" if thread.display_bullet else "○ off"
+    else:
+        project.display_bullet = not project.display_bullet
+        status = "● on" if project.display_bullet else "○ off"
+
+    project_manager._save()
+    await telegram_queue.reply(message, f"Bullet prefix: {status}")
 
 
 @router.message(Command("response_mode", ignore_case=True))
