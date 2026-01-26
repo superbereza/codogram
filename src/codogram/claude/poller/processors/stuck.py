@@ -24,11 +24,17 @@ class StuckProcessor(BaseProcessor):
         last_msg = effective_thread.last_sent_message if effective_thread else None
 
         # Compare first line only (input_text is single line, last_msg may be multiline)
-        # Use startswith because tmux wraps long lines - input_text may be truncated
+        # Use multiple matching strategies:
+        # - startswith: tmux wraps long lines, input_text may be truncated
+        # - in: extra chars may be inserted at beginning (e.g. "1" from keypress)
         first_line = last_msg.split('\n')[0] if last_msg else None
         is_potentially_stuck = (
             PASTED_PATTERN.match(input_text) is not None or
-            (first_line is not None and first_line.startswith(input_text))
+            (first_line is not None and (
+                first_line.startswith(input_text) or
+                input_text in first_line or
+                first_line in input_text
+            ))
         )
 
         if not is_potentially_stuck:
