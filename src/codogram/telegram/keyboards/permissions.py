@@ -1,40 +1,76 @@
-"""Inline keyboards for Telegram bot interactions."""
+"""Permission prompt keyboards."""
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from ... import strings
 
 
-def permission_keyboard(options: list[str], tmux_session: str) -> InlineKeyboardMarkup:
-    """Build inline keyboard from permission options.
+def permission_keyboard(
+    options: list[str],
+    tmux_name: str,
+    expanded: bool = False,
+    current_page: int = 0,
+    total_pages: int = 1,
+) -> InlineKeyboardMarkup:
+    """Build permission prompt keyboard.
 
     Args:
-        options: List of permission options in format ["1. Yes", "2. No", ...]
-        tmux_session: Tmux session name for stable routing
+        options: Permission options (e.g., ["1. Yes", "2. Yes, allow all", ...])
+        tmux_name: Tmux session name for callback routing
+        expanded: Whether body is expanded
+        current_page: Current page index (0-based)
+        total_pages: Total number of pages
 
     Returns:
-        InlineKeyboardMarkup with buttons for each option (max 3) plus Cancel
+        Inline keyboard with option buttons and expand/collapse controls
 
     Example:
         >>> options = ["1. Yes", "2. Yes, allow all", "3. No"]
-        >>> keyboard = permission_keyboard(options, "claude-myproject")
-        >>> # Creates buttons: "Yes", "Yes, allow all", "No", "[x] Cancel"
+        >>> keyboard = permission_keyboard(options, "claude-myproject", expanded=True, total_pages=3)
     """
     buttons = []
 
-    for opt in options[:3]:  # Max 3 options
-        # Extract number from "1. Yes" -> "1"
-        num = opt.split(".")[0].strip()
-        label = opt.split(".", 1)[1].strip()[:20]  # Truncate label
+    # Expand/collapse and pagination controls
+    if expanded and total_pages > 1:
+        # Show pagination: [<] [>]
+        nav_row = []
+        if current_page > 0:
+            nav_row.append(InlineKeyboardButton(
+                text="\u25c0",  # <
+                callback_data=f"perm:{tmux_name}:page:{current_page - 1}"
+            ))
+        if current_page < total_pages - 1:
+            nav_row.append(InlineKeyboardButton(
+                text="\u25b6",  # >
+                callback_data=f"perm:{tmux_name}:page:{current_page + 1}"
+            ))
+        if nav_row:
+            buttons.append(nav_row)
+
+    # Expand/collapse button
+    if expanded:
         buttons.append([InlineKeyboardButton(
-            text=label,
-            callback_data=f"perm:{num}:{tmux_session}"
+            text="Show less",
+            callback_data=f"perm:{tmux_name}:collapse"
+        )])
+    else:
+        buttons.append([InlineKeyboardButton(
+            text="Show more",
+            callback_data=f"perm:{tmux_name}:expand"
         )])
 
-    # Always add Esc button
-    buttons.append([InlineKeyboardButton(
+    # Option buttons (numbered) in a single row
+    option_row = []
+    for i, opt in enumerate(options[:3]):  # Max 3 options
+        option_row.append(InlineKeyboardButton(
+            text=f"[{i + 1}]",
+            callback_data=f"perm:{tmux_name}:{i + 1}"
+        ))
+    # Add Cancel button to the same row
+    option_row.append(InlineKeyboardButton(
         text=strings.BTN_CANCEL_X,
-        callback_data=f"perm:esc:{tmux_session}"
-    )])
+        callback_data=f"perm:{tmux_name}:esc"
+    ))
+    buttons.append(option_row)
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
