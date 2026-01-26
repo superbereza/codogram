@@ -194,13 +194,17 @@ async def create_watcher_task(
 
 async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "TelegramQueue"):
     """Watch jsonl and send entries through queue."""
-    from ..telegram.queue import OutgoingBatch
+    from ..telegram.queue import OutgoingBatch, EditBatch
     from pathlib import Path
 
     if not thread.jsonl_path:
         return
 
     watcher = JsonlWatcher(Path(thread.jsonl_path))
+
+    # State for "current" mode - tracks whether we've sent the first tool message
+    current_mode_key = f"current:{project.chat_id}:{thread.thread_id}"
+    current_mode_active = False  # True after first tool message sent in "current" mode
 
     try:
         async for entry in watcher.watch():
@@ -218,13 +222,49 @@ async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "Telegram
                     display_bullet=display_bullet,
                     display_thinking_text=display_thinking_text,
                 )
-                if messages:
+
+                if not messages:
+                    continue
+
+                if display_mode == "current" and entry.content_type == ContentType.TOOL_USE:
+                    # In "current" mode, edit single message for tool calls
+                    text = messages[0]["text"]
+                    parse_mode = messages[0].get("parse_mode")
+
+                    if not current_mode_active:
+                        # First tool - send new message with replace_key
+                        batch = OutgoingBatch(
+                            chat_id=project.chat_id,
+                            thread_id=thread.thread_id,
+                            messages=messages,
+                            replace_key=current_mode_key,
+                        )
+                        await telegram_queue.enqueue_nowait(batch)
+                        current_mode_active = True
+                    else:
+                        # Subsequent tools - edit existing message
+                        batch = EditBatch(
+                            chat_id=project.chat_id,
+                            message_id=0,  # Lookup from sent_statuses using replace_key
+                            text=text,
+                            parse_mode=parse_mode,
+                            replace_key=current_mode_key,
+                        )
+                        await telegram_queue.enqueue_nowait(batch)
+                else:
+                    # Normal mode or non-tool content - send as usual
                     batch = OutgoingBatch(
                         chat_id=project.chat_id,
                         thread_id=thread.thread_id,
                         messages=messages,
                     )
                     await telegram_queue.enqueue_nowait(batch)
+
+                    # Reset current mode state on TEXT content (Claude's response)
+                    # This starts fresh for the next sequence of tool calls
+                    if entry.content_type == ContentType.TEXT:
+                        current_mode_active = False
+
             except Exception as e:
                 logger.warning(f"watch_with_queue error: {e}")
     except asyncio.CancelledError:
