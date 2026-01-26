@@ -258,7 +258,17 @@ async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo
     try:
         async for entry in watcher.watch():
             try:
-                messages = _entry_to_messages(entry, verbose=thread.verbose)
+                # Get display settings from thread (with fallback to project)
+                display_mode = getattr(thread, 'display_mode', getattr(project, 'display_mode', 'lines'))
+                line_limit = getattr(thread, 'line_limit', getattr(project, 'line_limit', 5))
+                display_bullet = getattr(thread, 'display_bullet', getattr(project, 'display_bullet', True))
+
+                messages = _entry_to_messages(
+                    entry,
+                    display_mode=display_mode,
+                    line_limit=line_limit,
+                    display_bullet=display_bullet,
+                )
                 if messages:
                     text_preview = messages[0].get("text", "")[:40].replace("\n", " ")
                     # Use hash of preview as tracking ID

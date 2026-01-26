@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 from aiogram import Bot
 from ..config import settings
 from ..logging_config import logger
-from ..utils.truncate import truncate_body
 from .. import strings
+from .tool_formatter import format_tool_use
 
 class ContentType(Enum):
     TEXT = "text"
@@ -88,53 +88,6 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
             )
 
     return None
-
-def format_tool_use(tool_name: str, tool_input: dict | None, verbose: bool = False) -> str:
-    """Format tool use for Telegram display."""
-    if not tool_input:
-        return f"● **{tool_name}**"
-
-    if tool_name == "Bash":
-        cmd = tool_input.get("command", "")
-        # Safety limits to prevent Telegram API errors
-        char_limit = 3500 if verbose else 500
-        was_truncated = len(cmd) > char_limit
-        cmd = cmd[:char_limit]
-        desc = tool_input.get("description", "")
-        cmd_display = truncate_body(cmd, verbose=verbose) or cmd
-        if was_truncated and strings.SNIP not in cmd_display:
-            cmd_display += f"\n{strings.SNIP}"
-        if desc:
-            return f"● **Bash**: {desc}\n`{cmd_display}`"
-        return f"● **Bash**\n`{cmd_display}`"
-    elif tool_name == "Read":
-        path = tool_input.get("file_path", "")
-        return f"● **Read** `{path}`"
-    elif tool_name == "Write":
-        path = tool_input.get("file_path", "")
-        return f"● **Write** `{path}`"
-    elif tool_name == "Edit":
-        path = tool_input.get("file_path", "")
-        return f"● **Edit** `{path}`"
-    elif tool_name == "Glob":
-        pattern = tool_input.get("pattern", "")
-        return f"● **Glob** `{pattern}`"
-    elif tool_name == "Grep":
-        pattern = tool_input.get("pattern", "")
-        return f"● **Grep** `{pattern}`"
-    elif tool_name == "Task":
-        desc = tool_input.get("description", "")
-        return f"● **Task**: {desc}"
-    elif tool_name == "TodoWrite":
-        return f"● **TodoWrite**"
-    else:
-        preview_raw = str(tool_input)
-        was_truncated = len(preview_raw) > 200
-        preview = preview_raw[:200]
-        preview = truncate_body(preview, verbose=verbose) or preview
-        if was_truncated and strings.SNIP not in preview:
-            preview += f"\n{strings.SNIP}"
-        return f"● **{tool_name}**\n`{preview}`"
 
 class JsonlWatcher:
     """Watches a jsonl file and yields new entries."""
@@ -223,7 +176,17 @@ async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "Telegram
     try:
         async for entry in watcher.watch():
             try:
-                messages = _entry_to_messages(entry, verbose=thread.verbose)
+                # Get display settings from thread (with fallback to project)
+                display_mode = getattr(thread, 'display_mode', getattr(project, 'display_mode', 'lines'))
+                line_limit = getattr(thread, 'line_limit', getattr(project, 'line_limit', 5))
+                display_bullet = getattr(thread, 'display_bullet', getattr(project, 'display_bullet', True))
+
+                messages = _entry_to_messages(
+                    entry,
+                    display_mode=display_mode,
+                    line_limit=line_limit,
+                    display_bullet=display_bullet,
+                )
                 if messages:
                     batch = OutgoingBatch(
                         chat_id=project.chat_id,
@@ -237,19 +200,32 @@ async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "Telegram
         raise
 
 
-def _entry_to_messages(entry: ParsedEntry, verbose: bool = False) -> list[dict]:
+def _entry_to_messages(
+    entry: ParsedEntry,
+    display_mode: str = "lines",
+    line_limit: int = 5,
+    display_bullet: bool = True,
+) -> list[dict]:
     """Convert ParsedEntry to list of message dicts for queue."""
     messages = []
 
     if entry.content_type == ContentType.TEXT:
-        messages.append({"text": f"● {entry.text}", "parse_mode": "MarkdownV2"})
+        bullet = "● " if display_bullet else ""
+        messages.append({"text": f"{bullet}{entry.text}", "parse_mode": "MarkdownV2"})
 
     elif entry.content_type == ContentType.TOOL_USE:
         # Hide AskUserQuestion - shown by poller instead
         if entry.tool_name == "AskUserQuestion":
             return []
 
-        text = format_tool_use(entry.tool_name, entry.tool_input, verbose=verbose)
-        messages.append({"text": text, "parse_mode": "MarkdownV2"})
+        text = format_tool_use(
+            entry.tool_name,
+            entry.tool_input,
+            display_mode=display_mode,
+            line_limit=line_limit,
+            display_bullet=display_bullet,
+        )
+        if text:  # None in silence mode
+            messages.append({"text": text, "parse_mode": "MarkdownV2"})
 
     return messages
