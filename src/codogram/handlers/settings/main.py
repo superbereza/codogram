@@ -200,7 +200,7 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
         tmux_name = f"claude-{project.project_name}"
 
     text = _build_settings_text(project, thread, tmux_name)
-    kb = settings_keyboard(tmux_name)
+    kb = settings_keyboard(tmux_name, page=0)
     await telegram_queue.reply(message, text, reply_markup=kb)
 
 
@@ -455,6 +455,57 @@ async def callback_avatar_pack(callback: CallbackQuery, telegram_queue: Telegram
         await service.delete_pack(chat_id)
 
 
+@router.callback_query(F.data.startswith("settings:") & F.data.contains(":page:"))
+async def callback_settings_page(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Handle settings page navigation."""
+    from ...telegram.keyboards import settings_keyboard
+    from ...telegram.keyboards.settings import _short_id
+
+    parts = callback.data.split(":")
+    if len(parts) < 4:
+        await callback.answer("Invalid callback")
+        return
+
+    short_id = parts[1]
+    try:
+        new_page = int(parts[3])
+    except ValueError:
+        await callback.answer("Invalid page")
+        return
+
+    # Find project and thread by short ID to get tmux_name
+    project = None
+    thread = None
+    tmux_name = None
+    for p in project_manager.projects.values():
+        for t in p.threads.values():
+            t_tmux = t.get_tmux_session(p.project_name)
+            if _short_id(t_tmux) == short_id:
+                project = p
+                thread = t
+                tmux_name = t_tmux
+                break
+        if project:
+            break
+        # Check project-level tmux
+        p_tmux = f"claude-{p.project_name}"
+        if _short_id(p_tmux) == short_id:
+            project = p
+            tmux_name = p_tmux
+            break
+
+    if not project or not tmux_name:
+        await callback.answer("Project not found")
+        return
+
+    # Rebuild keyboard with new page
+    kb = settings_keyboard(tmux_name, page=new_page)
+
+    # Edit message (text stays same, only keyboard changes)
+    await callback.message.edit_reply_markup(reply_markup=kb)
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("set:"))
 async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle settings keyboard button presses."""
@@ -562,7 +613,62 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
         project_manager._save()
         await callback.answer(f"Response: {new_mode}")
 
+    elif action == "db":  # display_bullet
+        if thread:
+            thread.display_bullet = not thread.display_bullet
+            status = "● on" if thread.display_bullet else "○ off"
+        else:
+            project.display_bullet = not project.display_bullet
+            status = "● on" if project.display_bullet else "○ off"
+        project_manager._save()
+        await callback.answer(f"Bullet prefix: {status}")
+
+    elif action == "dt":  # display_thinking_text
+        if thread:
+            thread.display_thinking_text = not thread.display_thinking_text
+            status = "● on" if thread.display_thinking_text else "○ off"
+        else:
+            project.display_thinking_text = not project.display_thinking_text
+            status = "● on" if project.display_thinking_text else "○ off"
+        project_manager._save()
+        await callback.answer(f"Thinking text: {status}")
+
+    elif action == "ws":  # working_status
+        if thread:
+            thread.working_status = not thread.working_status
+            status = "● on" if thread.working_status else "○ off"
+        else:
+            project.working_status = not project.working_status
+            status = "● on" if project.working_status else "○ off"
+        project_manager._save()
+        await callback.answer(f"Working status: {status}")
+
+    elif action == "es":  # exp_suggestions
+        project.feat_suggestions = not project.feat_suggestions
+        status = "● on" if project.feat_suggestions else "○ off"
+        project_manager._save()
+        await callback.answer(f"Suggestions: {status}")
+
+    elif action == "ea":  # exp_avatar_pack
+        # Avatar pack needs special handling - show confirmation dialog
+        # For now, just toggle like other settings
+        project.feat_avatar_pack = not project.feat_avatar_pack
+        status = "● on" if project.feat_avatar_pack else "○ off"
+        project_manager._save()
+        await callback.answer(f"Avatar pack: {status}")
+
+    # Determine current page from action code
+    from ...telegram.keyboards.settings import SETTINGS_BUTTON_GROUPS, _COMMAND_TO_ACTION
+    current_page = 0
+    action_to_cmd = {v: k for k, v in _COMMAND_TO_ACTION.items()}
+    if action in action_to_cmd:
+        cmd = action_to_cmd[action]
+        for i, group in enumerate(SETTINGS_BUTTON_GROUPS):
+            if cmd in group:
+                current_page = i
+                break
+
     # Update the settings message using shared helper
     text = _build_settings_text(project, thread, tmux_name)
-    kb = settings_keyboard(tmux_name)
+    kb = settings_keyboard(tmux_name, page=current_page)
     await telegram_queue.edit(callback.message, text, reply_markup=kb)
