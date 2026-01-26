@@ -1211,16 +1211,16 @@ class PermissionProcessor(BaseProcessor):
         self.chunks: list[str] | None = None  # Body chunks for pagination
 ```
 
-**Step 2: Remove old message tracking fields**
+**Step 3: Remove old message tracking fields**
 
 Remove:
 - `self.content_msg_ids: list[int] = []`
 - `self.kb_msg_id: int | None = None`
 
-**Step 3: Commit**
+**Step 4: Commit**
 
 ```bash
-git add src/codogram/claude/poller/processors/permissions.py
+git add src/codogram/state.py src/codogram/claude/poller/processors/permissions.py
 git commit -m "refactor(permissions): update state for single message approach"
 ```
 
@@ -1594,7 +1594,7 @@ async def _update_permission_message(
     await telegram_queue.edit(callback.message, text, reply_markup=kb)
 ```
 
-**Step 3: Commit**
+**Step 2: Commit**
 
 ```bash
 git add src/codogram/handlers/permissions.py src/codogram/claude/poller/processors/permissions.py
@@ -1697,7 +1697,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     # UI section
     lines.append("")
     lines.append("ui")
-    lines.append(f"• /verbose: {verbose_status}")
+    lines.append(f"• /verbose\\_mode: {verbose_status}")
     lines.append(f"• /display\\_bullet: {bullet_status}")
     lines.append(f"• /display\\_thinking\\_text: {thinking_status}")
 
@@ -1837,7 +1837,7 @@ git commit -m "feat(settings): add button pagination with [<] [>] navigation"
 **Precondition:** Project registered, Claude running
 
 **Steps:**
-1. Send `/verbose`
+1. Send `/verbose_mode`
 2. Observe menu message with current mode
 
 **Expected:**
