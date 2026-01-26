@@ -7,7 +7,7 @@ from ..base import BaseProcessor
 from ...screen import parse_screen, PermissionPrompt
 from ....telegram.queue import OutgoingBatch
 from ....telegram.keyboards import permission_keyboard
-from ....state import permission_messages
+from ....state import permission_states, PermissionPromptState
 from ....auto_accept import try_auto_accept
 from ....config import settings
 from ....utils.truncate import truncate_body
@@ -32,8 +32,12 @@ class PermissionProcessor(BaseProcessor):
         self.debounce_start: float = 0.0
         self.last_options: list[str] | None = None
         self.last_body: str | None = None
-        self.content_msg_ids: list[int] = []
-        self.kb_msg_id: int | None = None
+
+        # Single message approach (replaces content_msg_ids + kb_msg_id)
+        self.msg_id: int | None = None
+        self.expanded: bool = False
+        self.current_page: int = 0
+        self.chunks: list[str] | None = None  # Body chunks for pagination
 
     async def process(self, screen: str) -> None:
         parsed = parse_screen(screen)
@@ -133,10 +137,10 @@ class PermissionProcessor(BaseProcessor):
             messages = []
             if review_answers:
                 # Format review answers nicely
-                lines = ["📋 Review your answers", ""]
+                lines = ["\ud83d\udccb Review your answers", ""]
                 for question, answer in review_answers:
-                    lines.append(f"● {question}")
-                    lines.append(f"  → {answer}")
+                    lines.append(f"\u25cf {question}")
+                    lines.append(f"  \u2192 {answer}")
                     lines.append("")
                 body_text = SEPARATOR_SOLID + "\n" + "\n".join(lines).strip()
                 messages.append({"text": body_text})
@@ -148,7 +152,7 @@ class PermissionProcessor(BaseProcessor):
 
             options_text = "\n".join(parsed.options)
             messages.append({"text": options_text})
-            messages.append({"text": "👆"})
+            messages.append({"text": "\ud83d\udc46"})
 
             kb = permission_keyboard(parsed.options, self.ctx.tmux_name)
             batch = OutgoingBatch(
@@ -159,35 +163,39 @@ class PermissionProcessor(BaseProcessor):
             )
             msg_ids = await self.ctx.queue.enqueue(batch)
 
-            self.kb_msg_id = msg_ids[-1] if msg_ids else None
-            self.content_msg_ids = msg_ids[:-1] if len(msg_ids) > 1 else []
-            if self.kb_msg_id:
-                permission_messages[self.kb_msg_id] = self.content_msg_ids
-                self.log_debug(f"saved permission_messages[{self.kb_msg_id}] = {self.content_msg_ids}")
+            self.msg_id = msg_ids[-1] if msg_ids else None
+            if self.msg_id:
+                # Store state for callback routing
+                permission_states[self.msg_id] = PermissionPromptState(
+                    tmux_name=self.ctx.tmux_name,
+                    body=parsed.body or "",
+                    options=parsed.options,
+                    expanded=False,
+                    current_page=0,
+                    chunks=[],  # Will be populated when expanded
+                )
+                self.log_debug(f"saved permission_states[{self.msg_id}]")
 
             self.state = PermissionState.SHOWING
             self.last_body = parsed.body
-            self.log_debug(f"SHOWING: sent {len(parsed.options)} options, kb_msg={self.kb_msg_id}")
+            self.log_debug(f"SHOWING: sent {len(parsed.options)} options, msg_id={self.msg_id}")
         except Exception as e:
             self.log_warning(f"send error: {e}")
             self.state = PermissionState.IDLE
 
     async def _cleanup_messages(self) -> None:
-        if self.kb_msg_id and self.kb_msg_id in permission_messages:
-            for msg_id in permission_messages[self.kb_msg_id]:
-                try:
-                    await self.ctx.bot.delete_message(self.ctx.chat_id, msg_id)
-                except Exception:
-                    pass
+        if self.msg_id:
             try:
-                await self.ctx.bot.delete_message(self.ctx.chat_id, self.kb_msg_id)
+                await self.ctx.bot.delete_message(self.ctx.chat_id, self.msg_id)
             except Exception:
                 pass
-            permission_messages.pop(self.kb_msg_id, None)
+            permission_states.pop(self.msg_id, None)
 
     def _reset_state(self) -> None:
         self.state = PermissionState.IDLE
         self.last_options = None
         self.last_body = None
-        self.content_msg_ids = []
-        self.kb_msg_id = None
+        self.msg_id = None
+        self.expanded = False
+        self.current_page = 0
+        self.chunks = None
