@@ -97,6 +97,7 @@ async def launch_with_animation(
     try:
         thread.awaiting_new_session = True
         thread.start_requested_at = time.time()
+        logger.debug(f"awaiting_set_true: thread={thread.name}")
         thread.notified_closed = False  # Reset so we can notify again if this session dies
 
         # 1. Create tmux
@@ -108,6 +109,8 @@ async def launch_with_animation(
         # 2. Launch Claude
         if session_id:
             await queue.send(chat_id, strings.LAUNCH_RESUMING, thread_id=thread_id, parse_mode="MarkdownV2")
+            # Clear pane before resume to prevent stale UI from triggering is_claude_ready() early
+            tmux.clear_pane()
             tmux.send(f"claude --resume {session_id}")
         else:
             await queue.send(chat_id, strings.LAUNCH_STARTING, thread_id=thread_id, parse_mode="MarkdownV2")

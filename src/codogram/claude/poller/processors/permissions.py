@@ -167,6 +167,7 @@ class PermissionProcessor(BaseProcessor):
 
             self.state = PermissionState.SHOWING
             self.last_body = parsed.body
+            self.last_options = parsed.options
             self.log_debug(f"SHOWING: sent {len(parsed.options)} options, kb_msg={self.kb_msg_id}")
         except Exception as e:
             self.log_warning(f"send error: {e}")

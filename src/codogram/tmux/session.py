@@ -209,6 +209,25 @@ class TmuxSession:
         )
         return result.stdout if result.returncode == 0 else ""
 
+    def clear_pane(self) -> None:
+        """Clear pane content and scrollback history.
+
+        Used before resume to prevent stale UI from affecting is_claude_ready() check.
+        """
+        subprocess.run(
+            ["tmux", "send-keys", "-t", self.name, "clear"],
+            check=True
+        )
+        subprocess.run(
+            ["tmux", "send-keys", "-t", self.name, "Enter"],
+            check=True
+        )
+        time.sleep(0.3)  # Wait for clear to execute
+        subprocess.run(
+            ["tmux", "clear-history", "-t", self.name],
+            check=True
+        )
+
     def is_claude_ready(self) -> bool:
         """Check if Claude UI is loaded and ready for input."""
         from ..claude.screen import is_claude_ready

@@ -37,6 +37,16 @@ set +a
 pkill -f "codogram.main" 2>/dev/null
 sleep 1
 
+# Activate venv from main repo
+if [ -f "../../venv/bin/activate" ]; then
+    source ../../venv/bin/activate
+elif [ -f "./venv/bin/activate" ]; then
+    source ./venv/bin/activate
+else
+    echo "ERROR: venv not found"
+    exit 1
+fi
+
 # Always use main repo logs (../../logs for worktrees, ./logs for main)
 if [ -d "../../logs" ]; then
     LOGS_DIR="../../logs"

@@ -54,6 +54,7 @@ async def _send_session_command(
     # Mark thread as awaiting new session
     thread.awaiting_new_session = True
     thread.start_requested_at = time.time()
+    logger.debug(f"awaiting_set_true: thread={thread.name}, cmd={command}")
     thread.last_sent_message = None
     thread.session_id = None  # Clear so next message triggers rebinding
     project_manager._save()

@@ -1,4 +1,6 @@
 """Audio message handler - transcribes voice/audio/video_note via Whisper."""
+import asyncio
+
 from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.enums import ContentType
@@ -17,6 +19,38 @@ router = Router(name="audio")
 # Service instances
 _file_input = FileInputService()
 _message_router = MessageRouterService()
+
+
+async def _start_binding(message: Message, result, text: str, telegram_queue: TelegramQueue):
+    """Start session binding for unbound thread (audio version).
+
+    Unlike messages.py, we receive transcribed text as parameter since
+    audio messages don't have text until after transcription.
+    """
+    from ..core.coordinator import poll_for_session_thread
+
+    thread = result.thread
+    project = result.project
+
+    thread.last_sent_message = text
+
+    if not thread.binding_task or thread.binding_task.done():
+        logger.debug(f"Starting binding task for thread {thread.name} (audio)")
+
+        async def start_poller(p):
+            from ..claude.poller import create_poller_task
+            return await create_poller_task(message.bot, p, telegram_queue)
+
+        async def start_watcher(p, send_missed=False):
+            from ..claude.history_watcher import create_watcher_task
+            return await create_watcher_task(message.bot, p, telegram_queue, send_missed)
+
+        thread.binding_task = asyncio.create_task(
+            poll_for_session_thread(
+                project, thread, message.bot,
+                start_poller, start_watcher, telegram_queue
+            )
+        )
 
 # Error code to string mapping
 _ERROR_MESSAGES = {
@@ -107,6 +141,14 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
         # Show transcription and send to Claude
         text = transcription.text
         await telegram_queue.edit(status_msg, strings.AUDIO_SENT.format(text=text))
+
+        # Start binding if needed (session_id is None)
+        if result.action == RouteAction.START_BINDING:
+            await _start_binding(message, result, text, telegram_queue)
+
+        # Track for stuck message detection
+        if result.thread:
+            result.thread.last_sent_message = text
 
         # Send to tmux
         _message_router.send_to_tmux(result, text)

@@ -263,8 +263,8 @@ class ProjectManager:
                         topic_name=thread_data.get("topic_name"),
                         session_id=thread_data.get("session_id"),
                         jsonl_path=thread_data.get("jsonl_path"),
-                        awaiting_new_session=thread_data.get("awaiting_new_session", False),
-                        start_requested_at=thread_data.get("start_requested_at"),
+                        # NOTE: awaiting_new_session and start_requested_at are NOT loaded
+                        # They always start as False/None - runtime-only state
                         worktree_path=thread_data.get("worktree_path"),
                         base_branch=thread_data.get("base_branch"),
                         archived=thread_data.get("archived", False),
@@ -344,8 +344,8 @@ class ProjectManager:
                                 "topic_name": t.topic_name,
                                 "session_id": t.session_id,
                                 "jsonl_path": t.jsonl_path,
-                                "awaiting_new_session": t.awaiting_new_session,
-                                "start_requested_at": t.start_requested_at,
+                                # NOTE: awaiting_new_session and start_requested_at are NOT persisted
+                                # They are runtime-only state that should reset on bot restart
                             }
                             # Worktree fields - only save if set
                             if t.worktree_path:

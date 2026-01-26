@@ -156,10 +156,14 @@ class HistoryWatcher:
         # Sort by creation time, newest first
         sessions.sort(key=lambda x: x[1], reverse=True)
 
+        # Collect all session_ids already bound to threads
+        bound_sessions = {t.session_id for t in project.threads.values() if t.session_id}
+
         # Find first awaiting thread that can bind to a valid session
         for thread in project.threads.values():
             if not thread.awaiting_new_session:
                 continue
+            logger.debug(f"bind_check: thread={thread.name} awaiting=True")
             if thread.archived:
                 continue  # Archived threads should not auto-bind
 
@@ -167,6 +171,9 @@ class HistoryWatcher:
             for session_id, session_created in sessions:
                 if thread.session_id == session_id:
                     continue  # Already has this session
+
+                if session_id in bound_sessions:
+                    continue  # Session already bound to another thread
 
                 # Filter by creation time to prevent race condition
                 if thread.start_requested_at and session_created < thread.start_requested_at:
