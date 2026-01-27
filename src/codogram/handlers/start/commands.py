@@ -14,14 +14,14 @@ from ...telegram.keyboards.keyboards import worktree_recovery_keyboard
 from ...services.start import StartFlowService
 from ...telegram.queue import TelegramQueue, OutgoingBatch
 from ... import strings
-from ..common import normalize_thread_id
+from ..common import normalize_thread_id, CommandStrict
 from .registry import dispatch_result
 from .launch import launch_claude, launch_claude_in_thread
 
 router = Router(name="start_commands")
 
 
-@router.message(Command("start", ignore_case=True))
+@router.message(Command("start", ignore_case=True), CommandStrict())
 async def cmd_start(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /start command."""
     if message.chat.type == ChatType.PRIVATE:

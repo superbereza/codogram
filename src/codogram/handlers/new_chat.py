@@ -22,6 +22,7 @@ from .common import (
     set_flow_state,
     get_flow_state,
     clear_flow_state,
+    CommandStrict,
 )
 from ..domain.worktree_state import WorktreeState, get_worktree_state
 from ..services.create_flow import create_flow_service
@@ -99,7 +100,7 @@ def _uncommitted_keyboard(name: str) -> InlineKeyboardMarkup:
 
 # ===== Main command =====
 
-@router.message(Command("new_chat", "nc", ignore_case=True))
+@router.message(Command("new_chat", "nc", ignore_case=True), CommandStrict())
 async def cmd_new_chat(message: Message, telegram_queue: TelegramQueue):
     """Create a new chat (topic + Claude session)."""
     if not await require_forum_group(message, telegram_queue):

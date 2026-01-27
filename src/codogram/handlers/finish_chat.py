@@ -8,7 +8,7 @@ from aiogram.filters import Command
 from .. import strings
 from ..core.session_manager import project_manager
 from ..telegram.queue import TelegramQueue
-from .common import require_claude_ready
+from .common import require_claude_ready, CommandStrict
 from ..services.branch import archive_thread
 from ..git.utils import has_uncommitted_changes, get_default_branch, branch_exists
 from ..git.worktree import merge_branch, push_branch, remove_worktree
@@ -19,7 +19,7 @@ router = Router(name="finish_chat")
 
 # ===== /finish command =====
 
-@router.message(Command("finish_chat", "finish", "archive", "fc", ignore_case=True))
+@router.message(Command("finish_chat", "finish", "archive", "fc", ignore_case=True), CommandStrict())
 async def cmd_finish_chat(message: Message, telegram_queue: TelegramQueue):
     """Unified finish command: archive topic or merge branch."""
     # Note: We don't require Claude running - archive/merge works without it

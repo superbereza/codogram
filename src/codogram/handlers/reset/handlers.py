@@ -18,12 +18,12 @@ from ...telegram.keyboards.reset import (
 from ...telegram.queue import TelegramQueue
 from ...git.utils import has_uncommitted_changes
 from ... import strings
-from ..common import normalize_thread_id
+from ..common import normalize_thread_id, CommandStrict
 
 router = Router(name="reset")
 
 
-@router.message(Command("hard_reset", "reset_all", ignore_case=True))
+@router.message(Command("hard_reset", "reset_all", ignore_case=True), CommandStrict())
 async def cmd_hard_reset(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /hard_reset command (full project reset)."""
     # Check if start flow is in progress (e.g., clone running)

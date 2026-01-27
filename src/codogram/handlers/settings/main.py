@@ -4,6 +4,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
+from ..common import CommandStrict
 from ...core.session_manager import project_manager
 from ...telegram.queue import TelegramQueue
 from ... import strings
@@ -49,7 +50,7 @@ def _cycle_response_mode(project, thread) -> tuple[str, str]:
     return new_mode, explanations.get(new_mode, "")
 
 
-@router.message(Command("get_debug_ids", ignore_case=True))
+@router.message(Command("get_debug_ids", ignore_case=True), CommandStrict())
 async def cmd_get_debug_ids(message: Message, telegram_queue: TelegramQueue):
     """Show debug IDs - admin only (protected by middleware)."""
     thread_id = message.message_thread_id
@@ -61,7 +62,7 @@ async def cmd_get_debug_ids(message: Message, telegram_queue: TelegramQueue):
     )
 
 
-@router.message(Command("help", ignore_case=True))
+@router.message(Command("help", ignore_case=True), CommandStrict())
 async def cmd_help(message: Message, telegram_queue: TelegramQueue):
     """Show help with Close button."""
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -176,7 +177,7 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     return "\n".join(lines)
 
 
-@router.message(Command("settings", ignore_case=True))
+@router.message(Command("settings", ignore_case=True), CommandStrict())
 async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     """Show current settings including Claude session state."""
     from ...telegram.keyboards import settings_keyboard
@@ -204,7 +205,7 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, text, reply_markup=kb)
 
 
-@router.message(Command("auto_accept", ignore_case=True))
+@router.message(Command("auto_accept", ignore_case=True), CommandStrict())
 async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
     """Toggle auto-accept or reset all."""
     chat_id = message.chat.id
@@ -245,14 +246,14 @@ async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
     project_manager._save()
 
 
-@router.message(Command("verbose", ignore_case=True))
+@router.message(Command("verbose", ignore_case=True), CommandStrict())
 async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
     """Alias for /verbose_mode (deprecated)."""
     from .verbose_menu import cmd_verbose_mode
     await cmd_verbose_mode(message, telegram_queue)
 
 
-@router.message(Command("display_bullet", ignore_case=True))
+@router.message(Command("display_bullet", ignore_case=True), CommandStrict())
 async def cmd_display_bullet(message: Message, telegram_queue: TelegramQueue):
     """Toggle bullet point prefix in tool messages."""
     chat_id = message.chat.id
@@ -278,7 +279,7 @@ async def cmd_display_bullet(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, f"Bullet prefix: {status}")
 
 
-@router.message(Command("response_mode", ignore_case=True))
+@router.message(Command("response_mode", ignore_case=True), CommandStrict())
 async def cmd_response_mode(message: Message, telegram_queue: TelegramQueue):
     """Cycle response mode: all -> polite -> mentions -> all."""
     chat_id = message.chat.id
@@ -299,7 +300,7 @@ async def cmd_response_mode(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, f"response mode: {new_mode}\n_{explanation}_")
 
 
-@router.message(Command("display_thinking_text", ignore_case=True))
+@router.message(Command("display_thinking_text", ignore_case=True), CommandStrict())
 async def cmd_display_thinking_text(message: Message, telegram_queue: TelegramQueue):
     """Toggle display of <thinking> blocks in Claude's responses."""
     chat_id = message.chat.id
@@ -325,7 +326,7 @@ async def cmd_display_thinking_text(message: Message, telegram_queue: TelegramQu
     await telegram_queue.reply(message, f"Show thinking blocks: {status}")
 
 
-@router.message(Command("working_status", ignore_case=True))
+@router.message(Command("working_status", ignore_case=True), CommandStrict())
 async def cmd_working_status(message: Message, telegram_queue: TelegramQueue):
     """Toggle working status indicator (Claude's activity)."""
     chat_id = message.chat.id
@@ -352,13 +353,13 @@ async def cmd_working_status(message: Message, telegram_queue: TelegramQueue):
 
 
 # Keep old command as alias for backward compat
-@router.message(Command("exp_thinking_status", ignore_case=True))
+@router.message(Command("exp_thinking_status", ignore_case=True), CommandStrict())
 async def cmd_exp_thinking_status_alias(message: Message, telegram_queue: TelegramQueue):
     """Alias for /working_status (deprecated)."""
     await cmd_working_status(message, telegram_queue)
 
 
-@router.message(Command("exp_suggestions", ignore_case=True))
+@router.message(Command("exp_suggestions", ignore_case=True), CommandStrict())
 async def cmd_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
     """Toggle suggestions feature (chat-wide)."""
     chat_id = message.chat.id
@@ -375,7 +376,7 @@ async def cmd_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.reply(message, f"Suggestions (all topics): {status}")
 
 
-@router.message(Command("exp_avatar_pack", ignore_case=True))
+@router.message(Command("exp_avatar_pack", ignore_case=True), CommandStrict())
 async def cmd_exp_avatar_pack(message: Message, telegram_queue: TelegramQueue):
     """Toggle avatar pack feature."""
     chat_id = message.chat.id

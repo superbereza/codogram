@@ -15,13 +15,13 @@ from ...services.restart import RestartService
 from ...start_flow import restart_confirm_keyboard
 from ...telegram.queue import TelegramQueue
 from ... import strings
-from ..common import normalize_thread_id
+from ..common import normalize_thread_id, CommandStrict
 from ..start.helpers import parse_callback_data, parse_thread_id
 
 router = Router(name="restart")
 
 
-@router.message(Command("reset_chat", "restart", ignore_case=True))
+@router.message(Command("reset_chat", "restart", ignore_case=True), CommandStrict())
 async def cmd_restart(message: Message, state: FSMContext, telegram_queue: TelegramQueue):
     """Handle /restart command."""
     service = RestartService(project_manager)

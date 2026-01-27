@@ -1,8 +1,27 @@
 """Common handlers and helpers used by multiple modules."""
 from aiogram import Router, F
+from aiogram.filters import Filter
 from aiogram.types import Message, CallbackQuery
 
 from .. import strings
+
+
+class CommandStrict(Filter):
+    """Filter that only matches commands WITHOUT arguments.
+
+    Use with Command filter to ensure '/settings' matches but '/settings text' doesn't.
+    The message with args will fall through to on_unknown_command and be sent to Claude.
+
+    Usage:
+        @router.message(Command("settings"), CommandStrict())
+    """
+
+    async def __call__(self, message: Message) -> bool:
+        if not message.text:
+            return False
+        # Split on whitespace - if more than one part, there are arguments
+        parts = message.text.split(maxsplit=1)
+        return len(parts) == 1
 from ..telegram.queue import TelegramQueue
 from ..core.session_manager import project_manager
 from ..tmux.launcher import is_tmux_session_exists

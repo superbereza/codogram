@@ -13,7 +13,7 @@ from ..tmux.session import TmuxSession
 from ..state import active_ask_prompts, permission_messages, ask_options_state
 from ..logging_config import logger
 from ..telegram.queue import TelegramQueue
-from .common import require_tmux_exists, require_claude_ready, normalize_thread_id
+from .common import require_tmux_exists, require_claude_ready, normalize_thread_id, CommandStrict
 
 router = Router(name="sessions")
 
@@ -86,7 +86,7 @@ async def _wait_for_claude_ready(
     # Timeout - don't send anything, user will see when they interact
 
 
-@router.message(Command("clear_context", "clear", "new", ignore_case=True))
+@router.message(Command("clear_context", "clear", "new", ignore_case=True), CommandStrict())
 async def cmd_clear_context(message: Message, telegram_queue: TelegramQueue):
     """Clear Claude context and start fresh."""
     if not await require_tmux_exists(message, telegram_queue):
@@ -96,7 +96,7 @@ async def cmd_clear_context(message: Message, telegram_queue: TelegramQueue):
         await _wait_for_claude_ready(tmux, telegram_queue, message.chat.id, message.message_thread_id)
 
 
-@router.message(Command("esc", ignore_case=True))
+@router.message(Command("esc", ignore_case=True), CommandStrict())
 async def cmd_esc(message: Message, telegram_queue: TelegramQueue):
     """Send Escape to current thread's tmux."""
     if not await require_tmux_exists(message, telegram_queue):
@@ -141,7 +141,7 @@ async def cmd_esc(message: Message, telegram_queue: TelegramQueue):
         active_ask_prompts.pop(key, None)
 
 
-@router.message(Command("resume", ignore_case=True))
+@router.message(Command("resume", ignore_case=True), CommandStrict())
 async def cmd_resume(message: Message, telegram_queue: TelegramQueue):
     """Handle /resume command - not supported in multi-session mode."""
     thread_id = message.message_thread_id

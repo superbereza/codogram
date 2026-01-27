@@ -5,6 +5,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
 from ...core.session_manager import project_manager
+from ..common import CommandStrict
 from ...telegram.queue import TelegramQueue
 from ...telegram.keyboards.verbose_menu import verbose_menu_keyboard
 from ...telegram.keyboards.settings import _short_id
@@ -28,7 +29,7 @@ Current: {display_mode}{f' ({line_limit})' if display_mode == 'lines' else ''}
 {desc}"""
 
 
-@router.message(Command("verbose_mode", ignore_case=True))
+@router.message(Command("verbose_mode", ignore_case=True), CommandStrict())
 async def cmd_verbose_mode(message: Message, telegram_queue: TelegramQueue):
     """Show verbose mode menu."""
     chat_id = message.chat.id
