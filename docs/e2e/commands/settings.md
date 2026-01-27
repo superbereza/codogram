@@ -289,3 +289,207 @@ mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
 - UI: Settings message updated with new mode
 - Callback answer: `Mode: accept edits` or `Mode: plan mode` or `Mode: default`
 - State: Claude approval mode changed
+
+---
+
+# Less Noise Features (2026-01)
+
+## TC-NOISE-001: Verbose Mode Menu
+
+**Tags:** critical, settings, verbose_mode
+**Preconditions:** Project registered, Claude running
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=-1003356094635, message="/verbose_mode")
+# Wait 3s
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
+mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
+```
+
+**Expected:**
+- UI: Message shows "**Verbose mode**" with current setting and description
+- Buttons: [show all], [-5] [lines: N] [+5], [headers only], [only current], [total silence], [close]
+- State: None
+
+---
+
+## TC-NOISE-002: Change Display Mode via Menu
+
+**Tags:** full, settings, verbose_mode
+**Preconditions:** /verbose_mode menu open
+
+**Steps:**
+```python
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="headers only")
+# Wait 2s
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
+```
+
+**Expected:**
+- UI: Button becomes [headers only] (selected)
+- UI: Mode description updates to "Show tool headers only, no body"
+- Callback answer: "Mode: headers"
+- State: display_mode = "headers" in config
+
+---
+
+## TC-NOISE-003: Adjust Line Limit
+
+**Tags:** full, settings, verbose_mode
+**Preconditions:** /verbose_mode menu open, lines mode selected
+
+**Steps:**
+```python
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="+5")
+# Wait 2s
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
+```
+
+**Expected:**
+- UI: Line count increases by 5 (e.g., "lines: 10")
+- Callback answer: "Lines: 10"
+- State: line_limit updated in config
+
+---
+
+## TC-NOISE-004: Bullet Toggle Command
+
+**Tags:** critical, settings, display_bullet
+**Preconditions:** Project registered
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=-1003356094635, message="/display_bullet")
+# Wait 2s
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
+```
+
+**Expected:**
+- UI: Response shows "Bullet prefix: ○ off" or "Bullet prefix: ● on"
+- State: display_bullet toggled in config
+
+---
+
+## TC-NOISE-005: Thinking Text Toggle Command
+
+**Tags:** critical, settings, display_thinking_text
+**Preconditions:** Project registered
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=-1003356094635, message="/display_thinking_text")
+# Wait 2s
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
+```
+
+**Expected:**
+- UI: Response shows "Show thinking blocks: ○ off" or "Show thinking blocks: ● on"
+- State: display_thinking_text toggled in config
+
+---
+
+## TC-NOISE-006: Working Status Toggle
+
+**Tags:** full, settings, working_status
+**Preconditions:** Project registered
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=-1003356094635, message="/working_status")
+# Wait 2s
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
+```
+
+**Expected:**
+- UI: Response shows "Working status indicator: ○ off" or "Working status indicator: ● on"
+- State: working_status toggled in config
+
+---
+
+## TC-NOISE-007: Settings Shows New UI Section
+
+**Tags:** critical, settings
+**Preconditions:** Project registered
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=-1003356094635, message="/settings")
+# Wait 3s
+mcp__telegram__list_messages(chat_id=-1003356094635, limit=2)
+```
+
+**Expected:**
+- UI: Response contains sections in order:
+  - "chat" with /auto_accept, /response_mode
+  - "claude" with mode, background tasks, context
+  - "ui" with /verbose_mode, /display_bullet, /display_thinking_text
+  - "experimental features" with /working_status, /exp_suggestions, /exp_avatar_pack
+- State: None
+
+---
+
+## TC-NOISE-008: Settings Pagination
+
+**Tags:** full, settings, pagination
+**Preconditions:** Project registered, /settings message visible
+
+**Steps:**
+```python
+mcp__telegram__send_message(chat_id=-1003356094635, message="/settings")
+# Wait 2s
+mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
+# Press next page
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text=">")
+# Wait 2s
+mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
+```
+
+**Expected:**
+- Initial buttons: /auto_accept, /response_mode, [>]
+- After ">": /verbose_mode, /display_bullet, /display_thinking_text, [<], [>]
+- State: None (pagination is UI only)
+
+---
+
+## TC-NOISE-009: Collapsible Permission Prompt (ASK USER)
+
+**Tags:** critical, permissions, collapsible
+**Preconditions:** Project registered, auto_accept OFF, Claude running
+
+**Steps:**
+```python
+# Trigger a permission prompt by asking Claude to write a file
+mcp__telegram__send_message(chat_id=-1003356094635, message="Create a file /tmp/test.txt with content 'hello'")
+# Wait for Claude to request permission
+```
+
+**ASK USER:** "Do you see a permission prompt with [Show more] button and numbered option buttons [1] [2] [3]?"
+
+**Expected:**
+- UI: Single message with header + options (collapsed)
+- UI: [Show more] button visible
+- UI: Option buttons [1] [2] [3] [Cancel]
+- State: permission_states contains entry
+
+---
+
+## TC-NOISE-010: Expand Permission Prompt (ASK USER)
+
+**Tags:** full, permissions, collapsible
+**Preconditions:** Collapsed permission prompt visible
+
+**Steps:**
+```python
+mcp__telegram__press_inline_button(chat_id=-1003356094635, button_text="Show more")
+# Wait 2s
+mcp__telegram__list_inline_buttons(chat_id=-1003356094635)
+```
+
+**ASK USER:** "Do you see the expanded body with separator lines and [Show less] button?"
+
+**Expected:**
+- UI: Body content now visible with ──────── separators
+- UI: [Show less] button replaces [Show more]
+- UI: If long content: [◀] [▶] pagination buttons appear
+- State: permission_states.expanded = True

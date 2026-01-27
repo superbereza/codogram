@@ -49,7 +49,7 @@ async def _start_monitoring(
     since we already have session_id and jsonl_path.
     """
     from ..claude.poller import create_poller_task_for_thread
-    from ..core.coordinator import watch_thread_jsonl
+    from ..claude.history_watcher import watch_thread_jsonl
 
     # Always start poller (works with tmux directly)
     if not thread.poller_task or thread.poller_task.done():

@@ -1,6 +1,7 @@
 # src/codogram/claude/history_watcher.py
 import json
 import asyncio
+import re
 from enum import Enum
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,8 +12,36 @@ if TYPE_CHECKING:
 from aiogram import Bot
 from ..config import settings
 from ..logging_config import logger
-from ..utils.truncate import truncate_body
 from .. import strings
+from .tool_formatter import format_tool_use
+
+
+def _process_thinking_text(text: str, display_thinking_text: bool) -> str:
+    """Process <thinking> blocks in text response.
+
+    Args:
+        text: Claude's text response
+        display_thinking_text: If True, show as italic. If False, replace with summary.
+
+    Returns:
+        Processed text
+    """
+    pattern = r'<thinking>(.*?)</thinking>'
+
+    if display_thinking_text:
+        # Show as italic, keep tags
+        def italicize(match):
+            content = match.group(0)
+            return f"_{content}_"
+        return re.sub(pattern, italicize, text, flags=re.DOTALL)
+    else:
+        # Replace with summary
+        def summarize(match):
+            content = match.group(1)
+            length = len(content)
+            return f"thinking • {length} symbols"
+        return re.sub(pattern, summarize, text, flags=re.DOTALL)
+
 
 class ContentType(Enum):
     TEXT = "text"
@@ -89,53 +118,6 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
 
     return None
 
-def format_tool_use(tool_name: str, tool_input: dict | None, verbose: bool = False) -> str:
-    """Format tool use for Telegram display."""
-    if not tool_input:
-        return f"● **{tool_name}**"
-
-    if tool_name == "Bash":
-        cmd = tool_input.get("command", "")
-        # Safety limits to prevent Telegram API errors
-        char_limit = 3500 if verbose else 500
-        was_truncated = len(cmd) > char_limit
-        cmd = cmd[:char_limit]
-        desc = tool_input.get("description", "")
-        cmd_display = truncate_body(cmd, verbose=verbose) or cmd
-        if was_truncated and strings.SNIP not in cmd_display:
-            cmd_display += f"\n{strings.SNIP}"
-        if desc:
-            return f"● **Bash**: {desc}\n`{cmd_display}`"
-        return f"● **Bash**\n`{cmd_display}`"
-    elif tool_name == "Read":
-        path = tool_input.get("file_path", "")
-        return f"● **Read** `{path}`"
-    elif tool_name == "Write":
-        path = tool_input.get("file_path", "")
-        return f"● **Write** `{path}`"
-    elif tool_name == "Edit":
-        path = tool_input.get("file_path", "")
-        return f"● **Edit** `{path}`"
-    elif tool_name == "Glob":
-        pattern = tool_input.get("pattern", "")
-        return f"● **Glob** `{pattern}`"
-    elif tool_name == "Grep":
-        pattern = tool_input.get("pattern", "")
-        return f"● **Grep** `{pattern}`"
-    elif tool_name == "Task":
-        desc = tool_input.get("description", "")
-        return f"● **Task**: {desc}"
-    elif tool_name == "TodoWrite":
-        return f"● **TodoWrite**"
-    else:
-        preview_raw = str(tool_input)
-        was_truncated = len(preview_raw) > 200
-        preview = preview_raw[:200]
-        preview = truncate_body(preview, verbose=verbose) or preview
-        if was_truncated and strings.SNIP not in preview:
-            preview += f"\n{strings.SNIP}"
-        return f"● **{tool_name}**\n`{preview}`"
-
 class JsonlWatcher:
     """Watches a jsonl file and yields new entries."""
 
@@ -206,50 +188,140 @@ async def create_watcher_task(
 
     # Create watcher for main thread
     return asyncio.create_task(
-        _watch_with_queue(bot, project, main_thread, telegram_queue)
+        watch_thread_jsonl(bot, project, main_thread, telegram_queue)
     )
 
 
-async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "TelegramQueue"):
-    """Watch jsonl and send entries through queue."""
-    from ..telegram.queue import OutgoingBatch
+async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "TelegramQueue"):
+    """Watch jsonl for a thread and send entries through queue.
+
+    Supports all display modes including 'current' mode which edits
+    a single message instead of sending multiple.
+    """
+    from ..telegram.queue import OutgoingBatch, EditBatch
     from pathlib import Path
 
     if not thread.jsonl_path:
+        logger.warning(f"watch_thread_jsonl: no jsonl_path for thread={thread.name}")
         return
 
+    logger.info(f"thread_watcher_started: thread={thread.name}, session={thread.session_id[:8] if thread.session_id else 'None'}")
     watcher = JsonlWatcher(Path(thread.jsonl_path))
+
+    # State for "current" mode - tracks whether we've sent the first tool message
+    current_mode_key = f"current:{project.chat_id}:{thread.thread_id}"
+    current_mode_active = False  # True after first tool message sent in "current" mode
 
     try:
         async for entry in watcher.watch():
             try:
-                messages = _entry_to_messages(entry, verbose=thread.verbose)
-                if messages:
+                # Get display settings from thread (with fallback to project)
+                display_mode = getattr(thread, 'display_mode', getattr(project, 'display_mode', 'lines'))
+                line_limit = getattr(thread, 'line_limit', getattr(project, 'line_limit', 5))
+                display_bullet = getattr(thread, 'display_bullet', getattr(project, 'display_bullet', True))
+                display_thinking_text = getattr(thread, 'display_thinking_text', getattr(project, 'display_thinking_text', True))
+
+                messages = _entry_to_messages(
+                    entry,
+                    display_mode=display_mode,
+                    line_limit=line_limit,
+                    display_bullet=display_bullet,
+                    display_thinking_text=display_thinking_text,
+                )
+
+                if not messages:
+                    continue
+
+                # Logging
+                text_preview = messages[0].get("text", "")[:40].replace("\n", " ")
+                msg_id = hash(text_preview) & 0xFFFFFF
+                logger.info(f"message_read: msg_id={msg_id:06x} thread={thread.name} preview='{text_preview}'")
+
+                if display_mode == "current" and entry.content_type == ContentType.TOOL_USE:
+                    # In "current" mode, edit single message for tool calls
+                    text = messages[0]["text"]
+                    parse_mode = messages[0].get("parse_mode")
+                    logger.debug(f"watcher: current mode, active={current_mode_active}")
+
+                    if not current_mode_active:
+                        # First tool - send new message with replace_key
+                        batch = OutgoingBatch(
+                            chat_id=project.chat_id,
+                            thread_id=thread.thread_id,
+                            messages=messages,
+                            replace_key=current_mode_key,
+                        )
+                        telegram_ids = await telegram_queue.enqueue(batch)
+                        logger.info(f"message_sent: msg_id={msg_id:06x} thread={thread.name} telegram_ids={telegram_ids}")
+                        current_mode_active = True
+                    else:
+                        # Subsequent tools - edit existing message
+                        batch = EditBatch(
+                            chat_id=project.chat_id,
+                            message_id=0,  # Lookup from sent_statuses using replace_key
+                            text=text,
+                            parse_mode=parse_mode,
+                            replace_key=current_mode_key,
+                        )
+                        await telegram_queue.enqueue(batch)
+                        logger.info(f"message_edited: msg_id={msg_id:06x} thread={thread.name}")
+                else:
+                    # Normal mode or non-tool content - send as usual
                     batch = OutgoingBatch(
                         chat_id=project.chat_id,
                         thread_id=thread.thread_id,
                         messages=messages,
                     )
-                    await telegram_queue.enqueue_nowait(batch)
+                    telegram_ids = await telegram_queue.enqueue(batch)
+                    logger.info(f"message_sent: msg_id={msg_id:06x} thread={thread.name} telegram_ids={telegram_ids}")
+
+                    # Reset current mode state on TEXT content (Claude's response)
+                    # This starts fresh for the next sequence of tool calls
+                    if entry.content_type == ContentType.TEXT:
+                        current_mode_active = False
+
+                # Signal poller to resend thinking status (so it appears at bottom)
+                thread.thinking_needs_resend = True
+
             except Exception as e:
-                logger.warning(f"watch_with_queue error: {e}")
+                logger.error(f"watch_thread_error: {e}")
     except asyncio.CancelledError:
+        logger.info(f"watch_thread_cancelled: thread={thread.name}")
         raise
 
 
-def _entry_to_messages(entry: ParsedEntry, verbose: bool = False) -> list[dict]:
+def _entry_to_messages(
+    entry: ParsedEntry,
+    display_mode: str = "lines",
+    line_limit: int = 5,
+    display_bullet: bool = True,
+    display_thinking_text: bool = True,
+) -> list[dict]:
     """Convert ParsedEntry to list of message dicts for queue."""
     messages = []
 
     if entry.content_type == ContentType.TEXT:
-        messages.append({"text": f"● {entry.text}", "parse_mode": "MarkdownV2"})
+        bullet = "● " if display_bullet else ""
+        text = entry.text
+
+        # Process thinking blocks
+        text = _process_thinking_text(text, display_thinking_text)
+
+        messages.append({"text": f"{bullet}{text}", "parse_mode": "MarkdownV2"})
 
     elif entry.content_type == ContentType.TOOL_USE:
         # Hide AskUserQuestion - shown by poller instead
         if entry.tool_name == "AskUserQuestion":
             return []
 
-        text = format_tool_use(entry.tool_name, entry.tool_input, verbose=verbose)
-        messages.append({"text": text, "parse_mode": "MarkdownV2"})
+        text = format_tool_use(
+            entry.tool_name,
+            entry.tool_input,
+            display_mode=display_mode,
+            line_limit=line_limit,
+            display_bullet=display_bullet,
+        )
+        if text:  # None in silence mode
+            messages.append({"text": text, "parse_mode": "MarkdownV2"})
 
     return messages

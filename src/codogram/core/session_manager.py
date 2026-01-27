@@ -4,9 +4,19 @@ import fcntl
 import json
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 
 from ..config import settings, load_config, get_config_path
+
+
+class DisplayMode(str, Enum):
+    """Display mode for tool call output."""
+    SHOW_ALL = "show_all"       # Full output without truncation
+    LINES = "lines"             # Truncate to N lines (default)
+    HEADERS = "headers"         # Only tool headers, no body
+    CURRENT = "current"         # Single message, edited with each tool call
+    SILENCE = "silence"         # Hide tool calls, show only text responses
 from ..git.resolver import get_project_name
 from ..tmux.session import TmuxSession
 from ..claude.session_finder import find_session_for_project, compute_jsonl_path
@@ -116,11 +126,14 @@ class ThreadInfo:
     # Auto-accept permissions:
     auto_accept: bool = False          # True = auto-accept permission prompts
 
-    # Verbose output mode (show full body):
-    verbose: bool = False              # False = short (5 lines), True = full
+    # Display mode (replaces verbose):
+    display_mode: str = "lines"        # show_all, lines, headers, current, silence
+    line_limit: int = 5                # Used in 'lines' mode
+    display_bullet: bool = True        # Show ● prefix
+    display_thinking_text: bool = True # Show <thinking> blocks
 
-    # Experimental features:
-    feat_thinking_status: bool = False  # Show Claude's thinking status
+    # Working status indicator (renamed from feat_thinking_status):
+    working_status: bool = False       # Show Claude's working status indicator
     # Note: feat_suggestions is project-level only (in ProjectState)
 
     # Response mode: "all", "polite", "mentions"
@@ -129,6 +142,7 @@ class ThreadInfo:
     # Persisted message IDs (for cleanup after restart):
     last_suggestion_msg_id: int | None = None  # Last 💡 message ID
     last_ask_msg_id: int | None = None  # Last AskUserQuestion keyboard message ID
+    last_permission_msg_id: int | None = None  # Last permission prompt message ID
 
     # Runtime-only (not persisted):
     notified_closed: bool = False      # True = already sent "session closed" notification
@@ -179,11 +193,16 @@ class ProjectState:
     # Auto-accept permissions (project-wide default):
     auto_accept: bool = False
 
-    # Verbose output mode (project-wide default):
-    verbose: bool = False
+    # Display mode (project-wide default, replaces verbose):
+    display_mode: str = "lines"        # show_all, lines, headers, current, silence
+    line_limit: int = 5                # Used in 'lines' mode
+    display_bullet: bool = True        # Show ● prefix
+    display_thinking_text: bool = True # Show <thinking> blocks
+
+    # Working status indicator (renamed from feat_thinking_status):
+    working_status: bool = False
 
     # Experimental features (project-wide default):
-    feat_thinking_status: bool = False
     feat_suggestions: bool = True
 
     # Response mode: "all", "polite", "mentions"
@@ -240,8 +259,26 @@ class ProjectManager:
                 project.old_chat_id = data.get("old_chat_id")
                 project.awaiting_admin_rights = data.get("awaiting_admin_rights", False)
                 project.auto_accept = data.get("auto_accept", False)
-                project.verbose = data.get("verbose", False)
-                project.feat_thinking_status = data.get("feat_thinking_status", False)
+
+                # Migration: verbose -> display_mode
+                if "verbose" in data:
+                    if data["verbose"]:
+                        project.display_mode = "show_all"
+                    else:
+                        project.display_mode = "lines"
+                        project.line_limit = 5
+                else:
+                    project.display_mode = data.get("display_mode", "lines")
+                    project.line_limit = data.get("line_limit", 5)
+                project.display_bullet = data.get("display_bullet", True)
+                project.display_thinking_text = data.get("display_thinking_text", True)
+
+                # Migration: feat_thinking_status -> working_status
+                if "feat_thinking_status" in data:
+                    project.working_status = data["feat_thinking_status"]
+                else:
+                    project.working_status = data.get("working_status", False)
+
                 project.feat_suggestions = data.get("feat_suggestions", False)
                 project.feat_avatar_pack = data.get("feat_avatar_pack", True)
                 project.emoji_pack_name = data.get("emoji_pack_name")
@@ -257,6 +294,20 @@ class ProjectManager:
                     tid = None if tid_str == "null" else int(tid_str)
                     thread_name = thread_data.get("name", "main")
                     logger.debug(f"_load_projects: loading thread tid={tid} name={thread_name}")
+                    # Migration: verbose -> display_mode for thread
+                    if "verbose" in thread_data:
+                        thread_display_mode = "show_all" if thread_data["verbose"] else "lines"
+                        thread_line_limit = 5
+                    else:
+                        thread_display_mode = thread_data.get("display_mode", "lines")
+                        thread_line_limit = thread_data.get("line_limit", 5)
+
+                    # Migration: feat_thinking_status -> working_status for thread
+                    if "feat_thinking_status" in thread_data:
+                        thread_working_status = thread_data["feat_thinking_status"]
+                    else:
+                        thread_working_status = thread_data.get("working_status", False)
+
                     project.threads[tid] = ThreadInfo(
                         thread_id=tid,
                         name=thread_name,
@@ -269,11 +320,15 @@ class ProjectManager:
                         base_branch=thread_data.get("base_branch"),
                         archived=thread_data.get("archived", False),
                         auto_accept=thread_data.get("auto_accept", False),
-                        verbose=thread_data.get("verbose", False),
-                        feat_thinking_status=thread_data.get("feat_thinking_status", False),
+                        display_mode=thread_display_mode,
+                        line_limit=thread_line_limit,
+                        display_bullet=thread_data.get("display_bullet", True),
+                        display_thinking_text=thread_data.get("display_thinking_text", True),
+                        working_status=thread_working_status,
                         response_mode=thread_data.get("response_mode", "all"),
                         last_suggestion_msg_id=thread_data.get("last_suggestion_msg_id"),
                         last_ask_msg_id=thread_data.get("last_ask_msg_id"),
+                        last_permission_msg_id=thread_data.get("last_permission_msg_id"),
                         # Assume already notified if session exists but tmux likely dead
                         notified_closed=bool(thread_data.get("session_id")),
                     )
@@ -319,8 +374,11 @@ class ProjectManager:
                         "old_chat_id": p.old_chat_id,
                         "awaiting_admin_rights": p.awaiting_admin_rights,
                         "auto_accept": p.auto_accept,
-                        "verbose": p.verbose,
-                        "feat_thinking_status": p.feat_thinking_status,
+                        "display_mode": p.display_mode,
+                        "line_limit": p.line_limit,
+                        "display_bullet": p.display_bullet,
+                        "display_thinking_text": p.display_thinking_text,
+                        "working_status": p.working_status,
                         "feat_suggestions": p.feat_suggestions,
                         "feat_avatar_pack": p.feat_avatar_pack,
                         "emoji_pack_name": p.emoji_pack_name,
@@ -356,16 +414,25 @@ class ProjectManager:
                                 thread_data["archived"] = t.archived
                             if t.auto_accept:
                                 thread_data["auto_accept"] = t.auto_accept
-                            if t.verbose:
-                                thread_data["verbose"] = t.verbose
-                            if t.feat_thinking_status:
-                                thread_data["feat_thinking_status"] = t.feat_thinking_status
+                            # Display settings (only save if non-default)
+                            if t.display_mode != "lines":
+                                thread_data["display_mode"] = t.display_mode
+                            if t.line_limit != 5:
+                                thread_data["line_limit"] = t.line_limit
+                            if not t.display_bullet:
+                                thread_data["display_bullet"] = t.display_bullet
+                            if not t.display_thinking_text:
+                                thread_data["display_thinking_text"] = t.display_thinking_text
+                            if t.working_status:
+                                thread_data["working_status"] = t.working_status
                             if t.response_mode != "all":
                                 thread_data["response_mode"] = t.response_mode
                             if t.last_suggestion_msg_id:
                                 thread_data["last_suggestion_msg_id"] = t.last_suggestion_msg_id
                             if t.last_ask_msg_id:
                                 thread_data["last_ask_msg_id"] = t.last_ask_msg_id
+                            if t.last_permission_msg_id:
+                                thread_data["last_permission_msg_id"] = t.last_permission_msg_id
                             threads_dict[str(tid) if tid is not None else "null"] = thread_data
                         project_data["threads"] = threads_dict
                     projects_data[name] = project_data
@@ -468,7 +535,7 @@ class ProjectManager:
 
     async def restore_projects(self, bot, start_poller, start_watcher, telegram_queue) -> None:
         """Restore sessions from history.jsonl after bot restart."""
-        from .coordinator import watch_thread_jsonl
+        from ..claude.history_watcher import watch_thread_jsonl
 
         # DEBUG: Log what we have at restore time
         for pname, p in self.projects.items():
