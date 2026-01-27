@@ -29,10 +29,10 @@ def _process_thinking_text(text: str, display_thinking_text: bool) -> str:
     pattern = r'<thinking>(.*?)</thinking>'
 
     if display_thinking_text:
-        # Show as italic, keep tags
+        # Show tags on separate lines, content as italic
         def italicize(match):
-            content = match.group(0)
-            return f"_{content}_"
+            content = match.group(1).strip()
+            return f"<thinking>\n_{content}_\n</thinking>"
         return re.sub(pattern, italicize, text, flags=re.DOTALL)
     else:
         # Replace with summary
