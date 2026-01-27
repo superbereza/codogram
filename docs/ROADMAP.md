@@ -335,8 +335,6 @@ Per-chat setting for when bot should respond:
 - **Mentions only** — respond only when bot is @mentioned or replied to
 - Toggle via `/response_mode` or `/settings` button
 
-## Beta Test
-
 ### Voice → Whisper transcription
 Voice messages and audio files transcribed via OpenAI Whisper:
 - Voice messages (.ogg), audio files (.mp3, etc.), and video notes (круглые видео)
@@ -344,6 +342,30 @@ Voice messages and audio files transcribed via OpenAI Whisper:
 - Friendly error messages for API errors (too large, timeout, no speech, etc.)
 - Configurable via OPENAI_API_KEY, OPENAI_BASE_URL, WHISPER_TIMEOUT
 - See [docs/designs/done/2026-01-18-whisper-transcription-design.md](designs/done/2026-01-18-whisper-transcription-design.md)
+
+### Verbose mode detailed menu
+Granular control over bot output via `/verbose` submenu:
+- `[full]` — show everything (tool calls, auto-accept notifications)
+- `[-5 strings] [+5 strings]` — adjust line limit
+- `[just headers]` — tool names only, no content
+- `[only current header]` — single updating message with latest tool
+- `[total silence]` — only final user-facing messages
+
+### Toggle bullet point (•)
+Separate setting to enable/disable bullet point `•` prefix on bot messages.
+
+### Hide/show thinking
+Per-chat toggle for `<thinking>` block visibility:
+- Hidden by default for cleaner output
+- Enable for debugging or learning
+
+### Collapsible permission prompts
+Permission prompts show only header by default:
+- Action type shown (Bash, Read, Edit, etc.)
+- `[Show more]` button expands full context
+- Message edits in place to reveal details
+
+## Beta Test
 
 ### Compacting detection
 Detect when Claude compacts conversation and notify user:
@@ -411,36 +433,12 @@ Allow Claude to send files to Telegram:
 - Useful when conversation goes in wrong direction
 - Preserve context but start fresh direction
 
-### Hide/show thinking setting
-Toggle visibility of Claude's `<thinking>` blocks:
-- Per-chat setting
-- Hide by default for cleaner output
-- Show for debugging or learning
-
-### Collapsible permission prompts
-Show only header by default, expand on demand:
-- Permission prompt shows just the action (Bash, Read, Edit, etc.)
-- `[Show more]` button reveals full context
-- Message edits in place to show details
-- Reduces noise while keeping full info accessible
-
 ### Companion / personal account integration
 Connect a Telegram user account to the bot:
 - **Service account** — read chat history, join groups, bypass bot limitations
 - **Personal account** — receive your messages, reply with Claude's help from your own account
 - MTProto client (Telethon) alongside Bot API
 - Research needed: auth flow, session storage, bot↔userbot architecture
-
-### Verbose mode detailed menu
-More granular control over output verbosity:
-- `/verbose` opens submenu with current setting displayed
-- `[full]` — show everything (current verbose on behavior)
-- `[-5 strings] [+5 strings]` — adjust line limit
-- `[just headers]` — show only tool names (same as 0 strings)
-- `[only current header]` — single message, updates with new headers
-- `[total silence]` — only user-facing messages shown
-- `[• on/off]` — toggle bullet point prefix
-- `[save settings]` — persist choice
 
 ### Global settings in DM
 `/settings` command in DM with bot to set defaults for all chats:
