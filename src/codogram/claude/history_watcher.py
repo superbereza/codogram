@@ -188,18 +188,24 @@ async def create_watcher_task(
 
     # Create watcher for main thread
     return asyncio.create_task(
-        _watch_with_queue(bot, project, main_thread, telegram_queue)
+        watch_thread_jsonl(bot, project, main_thread, telegram_queue)
     )
 
 
-async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "TelegramQueue"):
-    """Watch jsonl and send entries through queue."""
+async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "TelegramQueue"):
+    """Watch jsonl for a thread and send entries through queue.
+
+    Supports all display modes including 'current' mode which edits
+    a single message instead of sending multiple.
+    """
     from ..telegram.queue import OutgoingBatch, EditBatch
     from pathlib import Path
 
     if not thread.jsonl_path:
+        logger.warning(f"watch_thread_jsonl: no jsonl_path for thread={thread.name}")
         return
 
+    logger.info(f"thread_watcher_started: thread={thread.name}, session={thread.session_id[:8] if thread.session_id else 'None'}")
     watcher = JsonlWatcher(Path(thread.jsonl_path))
 
     # State for "current" mode - tracks whether we've sent the first tool message
@@ -226,10 +232,16 @@ async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "Telegram
                 if not messages:
                     continue
 
+                # Logging
+                text_preview = messages[0].get("text", "")[:40].replace("\n", " ")
+                msg_id = hash(text_preview) & 0xFFFFFF
+                logger.info(f"message_read: msg_id={msg_id:06x} thread={thread.name} preview='{text_preview}'")
+
                 if display_mode == "current" and entry.content_type == ContentType.TOOL_USE:
                     # In "current" mode, edit single message for tool calls
                     text = messages[0]["text"]
                     parse_mode = messages[0].get("parse_mode")
+                    logger.debug(f"watcher: current mode, active={current_mode_active}")
 
                     if not current_mode_active:
                         # First tool - send new message with replace_key
@@ -239,7 +251,8 @@ async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "Telegram
                             messages=messages,
                             replace_key=current_mode_key,
                         )
-                        await telegram_queue.enqueue_nowait(batch)
+                        telegram_ids = await telegram_queue.enqueue(batch)
+                        logger.info(f"message_sent: msg_id={msg_id:06x} thread={thread.name} telegram_ids={telegram_ids}")
                         current_mode_active = True
                     else:
                         # Subsequent tools - edit existing message
@@ -250,7 +263,8 @@ async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "Telegram
                             parse_mode=parse_mode,
                             replace_key=current_mode_key,
                         )
-                        await telegram_queue.enqueue_nowait(batch)
+                        await telegram_queue.enqueue(batch)
+                        logger.info(f"message_edited: msg_id={msg_id:06x} thread={thread.name}")
                 else:
                     # Normal mode or non-tool content - send as usual
                     batch = OutgoingBatch(
@@ -258,16 +272,21 @@ async def _watch_with_queue(bot: Bot, project, thread, telegram_queue: "Telegram
                         thread_id=thread.thread_id,
                         messages=messages,
                     )
-                    await telegram_queue.enqueue_nowait(batch)
+                    telegram_ids = await telegram_queue.enqueue(batch)
+                    logger.info(f"message_sent: msg_id={msg_id:06x} thread={thread.name} telegram_ids={telegram_ids}")
 
                     # Reset current mode state on TEXT content (Claude's response)
                     # This starts fresh for the next sequence of tool calls
                     if entry.content_type == ContentType.TEXT:
                         current_mode_active = False
 
+                # Signal poller to resend thinking status (so it appears at bottom)
+                thread.thinking_needs_resend = True
+
             except Exception as e:
-                logger.warning(f"watch_with_queue error: {e}")
+                logger.error(f"watch_thread_error: {e}")
     except asyncio.CancelledError:
+        logger.info(f"watch_thread_cancelled: thread={thread.name}")
         raise
 
 

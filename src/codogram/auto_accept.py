@@ -58,15 +58,23 @@ async def try_auto_accept(
     thread_id: int | None,
     context_name: str,
     prompt_type: PromptType = PromptType.REGULAR,
-    verbose: bool = False,
+    display_mode: str = "lines",
+    line_limit: int = 5,
 ) -> bool:
     """Try to auto-accept a permission prompt.
 
     Returns True if auto-accepted, False if manual mode needed.
+
+    Args:
+        display_mode: How to show auto-accept notification:
+            - silence/current: no notification
+            - headers: only first line
+            - lines: truncated body
+            - show_all: full body
     """
     logger.debug(
         f"try_auto_accept ENTER: context={context_name} type={prompt_type.value} "
-        f"options={options!r} body_len={len(body) if body else 0}"
+        f"options={options!r} body_len={len(body) if body else 0} display_mode={display_mode}"
     )
 
     # Security: only auto-accept whitelisted prompt types
@@ -79,15 +87,30 @@ async def try_auto_accept(
         logger.info(f"try_auto_accept SKIP: no matching option for {options!r}")
         return False
 
-    body_text = truncate_body(body, verbose=verbose) if body else "[no details]"
     logger.info(f"try_auto_accept OK: {context_name} sending key={selected!r}")
 
-    batch = OutgoingBatch(
-        chat_id=chat_id,
-        thread_id=thread_id,
-        messages=[{"text": f"🤖 Auto: {body_text}", "parse_mode": "MarkdownV2"}],
-    )
-    await telegram_queue.enqueue_nowait(batch)
+    # Send notification based on display_mode
+    if display_mode in ("silence", "current"):
+        # No notification in silence/current mode
+        pass
+    else:
+        # Build body text based on display_mode
+        if display_mode == "headers":
+            # Only first line
+            body_text = body.split("\n")[0][:60] if body else "[no details]"
+        elif display_mode == "show_all":
+            # Full body
+            body_text = body if body else "[no details]"
+        else:
+            # lines mode - truncated
+            body_text = truncate_body(body, verbose=False, max_lines=line_limit) if body else "[no details]"
+
+        batch = OutgoingBatch(
+            chat_id=chat_id,
+            thread_id=thread_id,
+            messages=[{"text": f"🤖 Auto: {body_text}", "parse_mode": "MarkdownV2"}],
+        )
+        await telegram_queue.enqueue_nowait(batch)
 
     try:
         tmux.send_key(selected)

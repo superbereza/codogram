@@ -21,7 +21,7 @@ class PermissionState(Enum):
 
 
 SEPARATOR_SOLID = "────────────"
-PERMISSION_PAGE_SIZE = 2000  # Characters per page for expanded view
+PERMISSION_PAGE_SIZE = 500  # Characters per page for expanded view
 
 
 class PermissionProcessor(BaseProcessor):
@@ -39,6 +39,29 @@ class PermissionProcessor(BaseProcessor):
         self.expanded: bool = False
         self.current_page: int = 0
         self.chunks: list[str] | None = None  # Body chunks for pagination
+
+        # Cleanup old permission message from before restart
+        self._cleanup_old_permission_msg()
+
+    def _cleanup_old_permission_msg(self) -> None:
+        """Delete permission message that survived bot restart."""
+        thread = self.ctx.thread
+        if not thread:
+            return
+        old_msg_id = getattr(thread, 'last_permission_msg_id', None)
+        if old_msg_id:
+            self.log_debug(f"cleaning up old permission msg_id={old_msg_id}")
+            # Schedule deletion (can't await in __init__)
+            asyncio.create_task(self._delete_old_msg(old_msg_id))
+            thread.last_permission_msg_id = None
+
+    async def _delete_old_msg(self, msg_id: int) -> None:
+        """Delete old permission message."""
+        try:
+            await self.ctx.bot.delete_message(self.ctx.chat_id, msg_id)
+            self.log_debug(f"deleted old permission msg_id={msg_id}")
+        except Exception as e:
+            self.log_debug(f"failed to delete old permission msg_id={msg_id}: {e}")
 
     async def process(self, screen: str) -> None:
         parsed = parse_screen(screen)
@@ -78,7 +101,8 @@ class PermissionProcessor(BaseProcessor):
 
         # Debounce complete - check auto-accept or show prompt
         auto_accept = self.ctx.thread.auto_accept if self.ctx.thread else self.ctx.project.auto_accept
-        verbose = self.ctx.thread.verbose if self.ctx.thread else self.ctx.project.verbose
+        display_mode = self.ctx.thread.display_mode if self.ctx.thread else self.ctx.project.display_mode
+        line_limit = self.ctx.thread.line_limit if self.ctx.thread else self.ctx.project.line_limit
 
         self.log_debug(f"DEBOUNCING: auto_accept={auto_accept} prompt_type={parsed.prompt_type.value}")
 
@@ -86,7 +110,8 @@ class PermissionProcessor(BaseProcessor):
             accepted = await try_auto_accept(
                 parsed.options, parsed.body, self.ctx.tmux,
                 self.ctx.queue, self.ctx.chat_id, self.ctx.thread_id,
-                self.ctx.context_name, prompt_type=parsed.prompt_type, verbose=verbose,
+                self.ctx.context_name, prompt_type=parsed.prompt_type,
+                display_mode=display_mode, line_limit=line_limit,
             )
             if accepted:
                 self.log_info("DEBOUNCING->SHOWING: auto-accepted successfully")
@@ -97,7 +122,7 @@ class PermissionProcessor(BaseProcessor):
                 self.log_info("DEBOUNCING: auto_accept returned False, falling through to manual")
 
         # Show prompt in Telegram
-        await self._send_permission(parsed, verbose)
+        await self._send_permission(parsed, display_mode)
 
     async def _handle_showing(self, parsed, is_permission: bool) -> None:
         if not is_permission:
@@ -109,7 +134,8 @@ class PermissionProcessor(BaseProcessor):
         if parsed.options != self.last_options or parsed.body != self.last_body:
             # Options/body changed - check auto-accept or resend
             auto_accept = self.ctx.thread.auto_accept if self.ctx.thread else self.ctx.project.auto_accept
-            verbose = self.ctx.thread.verbose if self.ctx.thread else self.ctx.project.verbose
+            display_mode = self.ctx.thread.display_mode if self.ctx.thread else self.ctx.project.display_mode
+            line_limit = self.ctx.thread.line_limit if self.ctx.thread else self.ctx.project.line_limit
 
             self.log_debug(f"SHOWING: options/body changed! auto_accept={auto_accept}")
 
@@ -117,7 +143,8 @@ class PermissionProcessor(BaseProcessor):
                 accepted = await try_auto_accept(
                     parsed.options, parsed.body, self.ctx.tmux,
                     self.ctx.queue, self.ctx.chat_id, self.ctx.thread_id,
-                    self.ctx.context_name, prompt_type=parsed.prompt_type, verbose=verbose,
+                    self.ctx.context_name, prompt_type=parsed.prompt_type,
+                    display_mode=display_mode, line_limit=line_limit,
                 )
                 if accepted:
                     self.log_info("SHOWING: options/body changed, auto-accepted again")
@@ -128,9 +155,9 @@ class PermissionProcessor(BaseProcessor):
             # Resend prompt
             self.log_debug("SHOWING: body/options changed, resending")
             await self._cleanup_messages()
-            await self._send_permission(parsed, verbose)
+            await self._send_permission(parsed, display_mode)
 
-    async def _send_permission(self, parsed: PermissionPrompt, verbose: bool) -> None:
+    async def _send_permission(self, parsed: PermissionPrompt, display_mode: str) -> None:
         """Send permission prompt as single collapsible message."""
         try:
             # Check if this is a review screen (AskUserQuestion final review)
@@ -152,12 +179,22 @@ class PermissionProcessor(BaseProcessor):
             batch = OutgoingBatch(
                 chat_id=self.ctx.chat_id,
                 thread_id=self.ctx.thread_id,
-                messages=[{"text": text}],
+                messages=[{"text": text, "parse_mode": "MarkdownV2"}],
                 reply_markup=kb,
             )
             msg_ids = await self.ctx.queue.enqueue(batch)
 
             self.msg_id = msg_ids[0] if msg_ids else None
+
+            # Save to thread for restart persistence
+            if self.ctx.thread and self.msg_id:
+                self.ctx.thread.last_permission_msg_id = self.msg_id
+                # Persist config
+                from ....core.session_manager import project_manager
+                project_manager._save()
+                self.log_debug(f"saved last_permission_msg_id={self.msg_id} to thread")
+            else:
+                self.log_debug(f"NOT saving last_permission_msg_id: thread={self.ctx.thread is not None}, msg_id={self.msg_id}")
 
             # Save state for callback handlers
             if self.msg_id:
@@ -199,13 +236,13 @@ class PermissionProcessor(BaseProcessor):
         header = self._get_prompt_header(parsed)
 
         if collapsed:
-            # Collapsed: header + options
-            lines = [header, ""]
+            # Collapsed: header + hint + options
+            lines = [header, "click `Show more` to expand", ""]
             lines.extend(parsed.options)
             return "\n".join(lines)
 
-        # Expanded: header + body content + options
-        lines = [header, "", SEPARATOR_SOLID]
+        # Expanded: body content only (no header duplication)
+        lines = [SEPARATOR_SOLID]
 
         if review_answers:
             # Format review answers nicely
@@ -251,6 +288,9 @@ class PermissionProcessor(BaseProcessor):
                 await self.ctx.bot.delete_message(self.ctx.chat_id, self.msg_id)
             except Exception:
                 pass
+            # Clear thread persistence
+            if self.ctx.thread:
+                self.ctx.thread.last_permission_msg_id = None
             self.msg_id = None
 
     def _reset_state(self) -> None:

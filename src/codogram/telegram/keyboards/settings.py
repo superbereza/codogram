@@ -61,25 +61,40 @@ def settings_keyboard(tmux_session: str, page: int = 0) -> InlineKeyboardMarkup:
             callback_data=f"set:{action}:{sid}"
         )])
 
-    # Navigation row
-    nav_row = []
-    if page > 0:
-        nav_row.append(InlineKeyboardButton(
-            text="<",
+    # Navigation + Close row: [◀] [Close] [▶]
+    total_pages = len(SETTINGS_BUTTON_GROUPS)
+    nav_close_row = []
+
+    # Left button (placeholder if at start, or if single page)
+    if total_pages > 1 and page > 0:
+        nav_close_row.append(InlineKeyboardButton(
+            text="◀",
             callback_data=f"settings:{sid}:page:{page - 1}"
         ))
-    if page < len(SETTINGS_BUTTON_GROUPS) - 1:
-        nav_row.append(InlineKeyboardButton(
-            text=">",
-            callback_data=f"settings:{sid}:page:{page + 1}"
+    elif total_pages > 1:
+        nav_close_row.append(InlineKeyboardButton(
+            text="•",
+            callback_data="settings:noop"
         ))
-    if nav_row:
-        buttons.append(nav_row)
 
-    # Close button
-    buttons.append([InlineKeyboardButton(
+    # Close button (always)
+    nav_close_row.append(InlineKeyboardButton(
         text=strings.BTN_CLOSE,
         callback_data="set:close"
-    )])
+    ))
+
+    # Right button (placeholder if at end, or if single page)
+    if total_pages > 1 and page < total_pages - 1:
+        nav_close_row.append(InlineKeyboardButton(
+            text="▶",
+            callback_data=f"settings:{sid}:page:{page + 1}"
+        ))
+    elif total_pages > 1:
+        nav_close_row.append(InlineKeyboardButton(
+            text="•",
+            callback_data="settings:noop"
+        ))
+
+    buttons.append(nav_close_row)
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)

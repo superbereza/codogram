@@ -142,6 +142,7 @@ class ThreadInfo:
     # Persisted message IDs (for cleanup after restart):
     last_suggestion_msg_id: int | None = None  # Last 💡 message ID
     last_ask_msg_id: int | None = None  # Last AskUserQuestion keyboard message ID
+    last_permission_msg_id: int | None = None  # Last permission prompt message ID
 
     # Runtime-only (not persisted):
     notified_closed: bool = False      # True = already sent "session closed" notification
@@ -327,6 +328,7 @@ class ProjectManager:
                         response_mode=thread_data.get("response_mode", "all"),
                         last_suggestion_msg_id=thread_data.get("last_suggestion_msg_id"),
                         last_ask_msg_id=thread_data.get("last_ask_msg_id"),
+                        last_permission_msg_id=thread_data.get("last_permission_msg_id"),
                         # Assume already notified if session exists but tmux likely dead
                         notified_closed=bool(thread_data.get("session_id")),
                     )
@@ -429,6 +431,8 @@ class ProjectManager:
                                 thread_data["last_suggestion_msg_id"] = t.last_suggestion_msg_id
                             if t.last_ask_msg_id:
                                 thread_data["last_ask_msg_id"] = t.last_ask_msg_id
+                            if t.last_permission_msg_id:
+                                thread_data["last_permission_msg_id"] = t.last_permission_msg_id
                             threads_dict[str(tid) if tid is not None else "null"] = thread_data
                         project_data["threads"] = threads_dict
                     projects_data[name] = project_data
@@ -531,7 +535,7 @@ class ProjectManager:
 
     async def restore_projects(self, bot, start_poller, start_watcher, telegram_queue) -> None:
         """Restore sessions from history.jsonl after bot restart."""
-        from .coordinator import watch_thread_jsonl
+        from ..claude.history_watcher import watch_thread_jsonl
 
         # DEBUG: Log what we have at restore time
         for pname, p in self.projects.items():

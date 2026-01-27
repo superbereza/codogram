@@ -455,6 +455,12 @@ async def callback_avatar_pack(callback: CallbackQuery, telegram_queue: Telegram
         await service.delete_pack(chat_id)
 
 
+@router.callback_query(F.data == "settings:noop")
+async def callback_settings_noop(callback: CallbackQuery):
+    """Handle placeholder button press."""
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("settings:") & F.data.contains(":page:"))
 async def callback_settings_page(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Handle settings page navigation."""

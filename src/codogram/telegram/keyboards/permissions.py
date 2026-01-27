@@ -30,23 +30,6 @@ def permission_keyboard(
     """
     buttons = []
 
-    # Expand/collapse and pagination controls
-    if expanded and total_pages > 1:
-        # Show pagination: [<] [>]
-        nav_row = []
-        if current_page > 0:
-            nav_row.append(InlineKeyboardButton(
-                text="\u25c0",  # <
-                callback_data=f"perm:{tmux_name}:page:{current_page - 1}"
-            ))
-        if current_page < total_pages - 1:
-            nav_row.append(InlineKeyboardButton(
-                text="\u25b6",  # >
-                callback_data=f"perm:{tmux_name}:page:{current_page + 1}"
-            ))
-        if nav_row:
-            buttons.append(nav_row)
-
     # Expand/collapse button
     if expanded:
         buttons.append([InlineKeyboardButton(
@@ -59,18 +42,47 @@ def permission_keyboard(
             callback_data=f"perm:{tmux_name}:expand"
         )])
 
-    # Option buttons (numbered) in a single row
-    option_row = []
+    # Option buttons - each on its own row, with full label
     for i, opt in enumerate(options[:3]):  # Max 3 options
-        option_row.append(InlineKeyboardButton(
-            text=f"[{i + 1}]",
+        # Use option text as-is (e.g., "1. Yes"), truncate if needed
+        label = opt
+        if len(label) > 40:
+            label = label[:37] + "..."
+        buttons.append([InlineKeyboardButton(
+            text=label,
             callback_data=f"perm:{tmux_name}:{i + 1}"
-        ))
-    # Add Cancel button to the same row
-    option_row.append(InlineKeyboardButton(
+        )])
+
+    # Navigation + Cancel row: [◀] [Cancel] [▶]
+    nav_cancel_row = []
+    if expanded and total_pages > 1:
+        # Left button: active or placeholder
+        if current_page > 0:
+            nav_cancel_row.append(InlineKeyboardButton(
+                text="◀",
+                callback_data=f"perm:{tmux_name}:page:{current_page - 1}"
+            ))
+        else:
+            nav_cancel_row.append(InlineKeyboardButton(
+                text="•",
+                callback_data=f"perm:{tmux_name}:noop"
+            ))
+    nav_cancel_row.append(InlineKeyboardButton(
         text=strings.BTN_CANCEL_X,
         callback_data=f"perm:{tmux_name}:esc"
     ))
-    buttons.append(option_row)
+    if expanded and total_pages > 1:
+        # Right button: active or placeholder
+        if current_page < total_pages - 1:
+            nav_cancel_row.append(InlineKeyboardButton(
+                text="▶",
+                callback_data=f"perm:{tmux_name}:page:{current_page + 1}"
+            ))
+        else:
+            nav_cancel_row.append(InlineKeyboardButton(
+                text="•",
+                callback_data=f"perm:{tmux_name}:noop"
+            ))
+    buttons.append(nav_cancel_row)
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)

@@ -119,9 +119,11 @@ async def callback_verbose_menu(callback: CallbackQuery, telegram_queue: Telegra
         delta = int(parts[3])
         if thread:
             thread.line_limit = max(1, thread.line_limit + delta)
+            thread.display_mode = "lines"  # Switch to lines mode
             line_limit = thread.line_limit
         else:
             project.line_limit = max(1, project.line_limit + delta)
+            project.display_mode = "lines"  # Switch to lines mode
             line_limit = project.line_limit
         project_manager._save()
         await callback.answer(f"Lines: {line_limit}")

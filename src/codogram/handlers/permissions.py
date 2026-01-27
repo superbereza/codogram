@@ -11,7 +11,7 @@ from ..logging_config import logger
 
 router = Router(name="permissions")
 
-PERMISSION_PAGE_SIZE = 2000
+PERMISSION_PAGE_SIZE = 500
 
 
 def _build_permission_text(state: PermissionPromptState) -> str:
@@ -20,24 +20,29 @@ def _build_permission_text(state: PermissionPromptState) -> str:
     header = state.body.split("\n")[0][:60] if state.body else "Permission request"
 
     if not state.expanded:
-        # Collapsed: header + options
-        lines = [header, ""]
+        # Collapsed: header + hint + options
+        lines = [header, "click `Show more` to expand", ""]
         lines.extend(state.options)
         return "\n".join(lines)
 
-    # Expanded: header + body page + options
-    lines = [header, "", "────────────"]
+    # Expanded: body only (no header duplication)
+    lines = ["────────────"]
 
+    is_last_page = True
     if state.chunks:
         total = len(state.chunks)
+        is_last_page = state.current_page == total - 1
         if total > 1:
-            lines.append(f"[{state.current_page + 1}/{total}] {state.chunks[state.current_page]}")
+            lines.append(f"[{state.current_page + 1}/{total}]\n{state.chunks[state.current_page]}")
         else:
             lines.append(state.chunks[state.current_page])
 
     lines.append("────────────")
-    lines.append("")
-    lines.extend(state.options)
+
+    # Options only on last page
+    if is_last_page:
+        lines.append("")
+        lines.extend(state.options)
 
     return "\n".join(lines)
 
@@ -127,6 +132,11 @@ async def callback_permission(callback: CallbackQuery, telegram_queue: TelegramQ
         state.current_page = page_num
         await _update_permission_message(callback, state, telegram_queue)
         await callback.answer()
+
+    elif action == "noop":
+        # Placeholder button - do nothing
+        await callback.answer()
+        return
 
     elif action == "esc":
         # Cancel - send Escape key

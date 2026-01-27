@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from ..telegram.queue import TelegramQueue
 from ..config import settings
 from ..claude.session_finder import find_session_for_project
+from ..claude.history_watcher import watch_thread_jsonl
 from ..logging_config import logger
 from ..tmux.session import TmuxSession
 
@@ -240,58 +241,6 @@ class HistoryWatcher:
 
         # Save config
         self.project_manager._save()
-
-
-async def watch_thread_jsonl(bot: Bot, project: ProjectState, thread: ThreadInfo, telegram_queue: "TelegramQueue"):
-    """Watch jsonl for a specific thread and send messages through queue."""
-    from ..claude.history_watcher import JsonlWatcher, _entry_to_messages
-    from ..telegram.queue import OutgoingBatch
-    from pathlib import Path
-
-    if not thread.jsonl_path:
-        logger.warning(f"watch_thread_jsonl: no jsonl_path for thread={thread.name}")
-        return
-
-    logger.info(f"thread_watcher_started: thread={thread.name}, session={thread.session_id[:8] if thread.session_id else 'None'}")
-    watcher = JsonlWatcher(Path(thread.jsonl_path))
-
-    try:
-        async for entry in watcher.watch():
-            try:
-                # Get display settings from thread (with fallback to project)
-                display_mode = getattr(thread, 'display_mode', getattr(project, 'display_mode', 'lines'))
-                line_limit = getattr(thread, 'line_limit', getattr(project, 'line_limit', 5))
-                display_bullet = getattr(thread, 'display_bullet', getattr(project, 'display_bullet', True))
-                display_thinking_text = getattr(thread, 'display_thinking_text', getattr(project, 'display_thinking_text', True))
-
-                messages = _entry_to_messages(
-                    entry,
-                    display_mode=display_mode,
-                    line_limit=line_limit,
-                    display_bullet=display_bullet,
-                    display_thinking_text=display_thinking_text,
-                )
-                if messages:
-                    text_preview = messages[0].get("text", "")[:40].replace("\n", " ")
-                    # Use hash of preview as tracking ID
-                    msg_id = hash(text_preview) & 0xFFFFFF
-                    logger.info(f"message_read: msg_id={msg_id:06x} thread={thread.name} preview='{text_preview}'")
-
-                    batch = OutgoingBatch(
-                        chat_id=project.chat_id,
-                        thread_id=thread.thread_id,
-                        messages=messages,
-                    )
-                    telegram_ids = await telegram_queue.enqueue(batch)
-                    logger.info(f"message_sent: msg_id={msg_id:06x} thread={thread.name} telegram_ids={telegram_ids}")
-
-                    # Signal poller to resend thinking status (so it appears at bottom)
-                    thread.thinking_needs_resend = True
-            except Exception as e:
-                logger.error(f"watch_thread_error: {e}")
-    except asyncio.CancelledError:
-        logger.info(f"watch_thread_cancelled: thread={thread.name}")
-        raise
 
 
 async def poll_for_session_thread(
