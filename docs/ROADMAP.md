@@ -392,6 +392,19 @@ Ongoing architecture improvements and technical debt reduction.
 
 ## Backlog
 
+### Secure key-value storage
+Encrypted storage for sensitive data (API keys, tokens, secrets):
+- Claude can store and retrieve secrets without exposing them in chat
+- Encrypted at rest
+- Per-project or global scope
+- Commands or MCP tool for access
+
+### Claude file sending
+Allow Claude to send files to Telegram:
+- Send generated files (code, images, documents) directly to chat
+- MCP tool or special output format
+- Useful for exports, reports, generated assets
+
 ### Fork command
 `/fork` command to create a copy of current branch:
 - Fork current worktree to new branch
