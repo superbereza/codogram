@@ -412,6 +412,13 @@ Ongoing architecture improvements and technical debt reduction.
 - Phase 2: permission poller refactoring ✅
 - See [docs/plans/2026-01-22-architecture-refactoring-roadmap.md](plans/2026-01-22-architecture-refactoring-roadmap.md) for full backlog
 
+### Global settings in DM
+`/settings` command in DM with bot to set defaults for all projects:
+- Default verbose mode, response mode, auto-accept, etc.
+- New chats/threads inherit these defaults
+- Per-chat settings override global defaults
+- Configure once — works everywhere
+
 ## Backlog
 
 ### Secure key-value storage
@@ -439,13 +446,6 @@ Connect a Telegram user account to the bot:
 - **Personal account** — receive your messages, reply with Claude's help from your own account
 - MTProto client (Telethon) alongside Bot API
 - Research needed: auth flow, session storage, bot↔userbot architecture
-
-### Global settings in DM
-`/settings` command in DM with bot to set defaults for all chats:
-- Default verbose mode, response mode, auto-accept, etc.
-- New chats/threads inherit these defaults
-- Per-chat settings override global defaults
-- Easy way to configure preferences once
 
 ### Voice messages from bot
 Text-to-speech for Claude's responses:
@@ -637,3 +637,9 @@ Experiment: use only tmux capture-pane without jsonl.
 - See `docs/designs/2025-12-23-telegram-bridge-tmux-only.md`
 - Pros: simpler, doesn't depend on Claude's internal format
 - Cons: ANSI parsing, unstable
+
+### Ollama launch
+Run Claude Code CLI with other models via Ollama:
+- Launch codogram with local LLMs instead of Claude API
+- Useful for testing, development, or cost savings
+- Research: how Claude Code handles different model backends
