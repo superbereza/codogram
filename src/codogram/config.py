@@ -2,6 +2,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Telegram limits
@@ -72,6 +73,35 @@ def save_config(config: dict) -> None:
     """Save config to ~/.codogram/config.json."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(json.dumps(config, indent=2))
+
+
+HARDCODED_DEFAULTS: dict[str, Any] = {
+    "auto_accept": False,
+    "response_mode": "all",
+    "display_mode": "lines",
+    "line_limit": 5,
+    "display_bullet": True,
+    "display_thinking_text": False,
+    "working_status": False,
+    "feat_suggestions": False,
+    "feat_avatar_pack": False,
+}
+
+
+def get_global_defaults() -> dict[str, Any]:
+    """Load global defaults from config, falling back to HARDCODED_DEFAULTS."""
+    config = load_config()
+    saved = config.get("global_defaults", {})
+    return {**HARDCODED_DEFAULTS, **saved}
+
+
+def set_global_default(key: str, value: Any) -> None:
+    """Update a single global default and save."""
+    config = load_config()
+    if "global_defaults" not in config:
+        config["global_defaults"] = {}
+    config["global_defaults"][key] = value
+    save_config(config)
 
 
 def get_allowed_groups() -> set[int]:
