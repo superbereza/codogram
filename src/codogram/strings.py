@@ -441,12 +441,16 @@ ADMIN_ALERT_GROUP_ACCESS = """`[!]` Unauthorized group access
 
 Group: {chat_title}
 Chat ID: `{chat_id}`
-User: {user_name} \\(`{user_id}`\\)"""
+User: {user_name}
+Group admins: {admins_list}"""
 
 BTN_APPROVE_GROUP = "✓ Approve"
 BTN_REJECT_GROUP = "✗ Dismiss"
 ADMIN_GROUP_APPROVED = "`[v]` Group approved: {chat_title}"
 ADMIN_GROUP_REJECTED = "`[x]` Dismissed"
+
+GROUP_REQUEST_SENT = "`[i]` Approval request sent to bot admin"
+GROUP_REQUEST_DENIED = "`[x]` Access denied"
 GROUP_REGISTERED = f"{STATUS_OK} Group registered"
 GROUP_DEACTIVATED = f"{STATUS_WARN} Admin left\\. Bot deactivated"
 

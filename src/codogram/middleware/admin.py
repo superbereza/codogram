@@ -164,18 +164,37 @@ class AdminMiddleware(BaseMiddleware):
                 text = text.replace(ch, f"\\{ch}")
             return text
 
+        def format_user(u: User) -> str:
+            """Format user: @username or Name (id)"""
+            if u.username:
+                return f"@{escape_md(u.username)}"
+            return f"{escape_md(u.full_name or 'Unknown')} \\(`{u.id}`\\)"
+
         chat_title = escape_md(chat.title or "Unknown")
-        user_name = escape_md(user.full_name or "Unknown")
+        user_display = format_user(user)
+
+        # Fetch group admins
+        bot = data.get("bot")
+        admins_list = "unknown"
+        if bot:
+            try:
+                admins = await bot.get_chat_administrators(chat.id)
+                admin_names = [format_user(a.user) for a in admins if not a.user.is_bot]
+                admins_list = ", ".join(admin_names[:5]) if admin_names else "none"
+                if len(admin_names) > 5:
+                    admins_list += f" \\+{len(admin_names) - 5} more"
+            except Exception as e:
+                logger.debug(f"failed_to_get_admins_for_alert: {e}")
+                admins_list = "\\(couldn't fetch\\)"
 
         alert_text = strings.ADMIN_ALERT_GROUP_ACCESS.format(
             chat_title=chat_title,
             chat_id=chat.id,
-            user_name=user_name,
-            user_id=user.id,
+            user_name=user_display,
+            admins_list=admins_list,
         )
 
         # Send to first admin with approve/reject buttons
-        bot = data.get("bot")
         if not bot:
             return
 
@@ -200,5 +219,11 @@ class AdminMiddleware(BaseMiddleware):
                 reply_markup=keyboard
             )
             logger.info(f"admin_notified_group_access: chat_id={chat.id} user_id={user.id}")
+
+            # Notify group that request was sent
+            await bot.send_message(
+                chat.id, strings.GROUP_REQUEST_SENT,
+                parse_mode="MarkdownV2"
+            )
         except Exception as e:
             logger.warning(f"failed_to_notify_admin: {e}")

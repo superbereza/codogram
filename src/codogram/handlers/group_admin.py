@@ -38,7 +38,16 @@ async def on_group_action(callback: CallbackQuery):
     elif action == "reject":
         logger.info(f"group_rejected_by_admin: chat_id={chat_id}")
 
-        # Just remove the message
+        # Notify the group
+        try:
+            await callback.bot.send_message(
+                chat_id, strings.GROUP_REQUEST_DENIED,
+                parse_mode="MarkdownV2"
+            )
+        except Exception as e:
+            logger.warning(f"failed_to_notify_group_rejected: {e}")
+
+        # Remove the admin message
         await callback.message.delete()
         await callback.answer("Dismissed")
 
