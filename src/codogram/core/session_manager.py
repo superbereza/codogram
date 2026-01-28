@@ -142,21 +142,16 @@ class ThreadInfo:
     base_branch: str | None = None     # Branch this worktree was created from
     archived: bool = False             # True = topic closed after /branch_finish
 
-    # Auto-accept permissions:
-    auto_accept: bool = False          # True = auto-accept permission prompts
-
-    # Display mode (replaces verbose):
-    display_mode: str = "lines"        # show_all, lines, headers, current, silence
-    line_limit: int = 5                # Used in 'lines' mode
-    display_bullet: bool = True        # Show ● prefix
-    display_thinking_text: bool = True # Show <thinking> blocks
-
-    # Working status indicator (renamed from feat_thinking_status):
-    working_status: bool = False       # Show Claude's working status indicator
-    # Note: feat_suggestions is project-level only (in ProjectState)
-
-    # Response mode: "all", "polite", "mentions"
-    response_mode: str = "all"
+    # Settings - None means inherit from global defaults
+    auto_accept: bool | None = None
+    display_mode: str | None = None
+    line_limit: int | None = None
+    display_bullet: bool | None = None
+    display_thinking_text: bool | None = None
+    working_status: bool | None = None
+    response_mode: str | None = None
+    feat_suggestions: bool | None = None
+    feat_avatar_pack: bool | None = None
 
     # Persisted message IDs (for cleanup after restart):
     last_suggestion_msg_id: int | None = None  # Last 💡 message ID
@@ -318,14 +313,16 @@ class ProjectManager:
                         thread_display_mode = "show_all" if thread_data["verbose"] else "lines"
                         thread_line_limit = 5
                     else:
-                        thread_display_mode = thread_data.get("display_mode", "lines")
-                        thread_line_limit = thread_data.get("line_limit", 5)
+                        # None = inherit from global (new behavior)
+                        thread_display_mode = thread_data.get("display_mode")
+                        thread_line_limit = thread_data.get("line_limit")
 
                     # Migration: feat_thinking_status -> working_status for thread
                     if "feat_thinking_status" in thread_data:
                         thread_working_status = thread_data["feat_thinking_status"]
                     else:
-                        thread_working_status = thread_data.get("working_status", False)
+                        # None = inherit from global (new behavior)
+                        thread_working_status = thread_data.get("working_status")
 
                     project.threads[tid] = ThreadInfo(
                         thread_id=tid,
@@ -338,13 +335,16 @@ class ProjectManager:
                         worktree_path=thread_data.get("worktree_path"),
                         base_branch=thread_data.get("base_branch"),
                         archived=thread_data.get("archived", False),
-                        auto_accept=thread_data.get("auto_accept", False),
+                        # Settings - None = inherit from global
+                        auto_accept=thread_data.get("auto_accept"),
                         display_mode=thread_display_mode,
                         line_limit=thread_line_limit,
-                        display_bullet=thread_data.get("display_bullet", True),
-                        display_thinking_text=thread_data.get("display_thinking_text", True),
+                        display_bullet=thread_data.get("display_bullet"),
+                        display_thinking_text=thread_data.get("display_thinking_text"),
                         working_status=thread_working_status,
-                        response_mode=thread_data.get("response_mode", "all"),
+                        response_mode=thread_data.get("response_mode"),
+                        feat_suggestions=thread_data.get("feat_suggestions"),
+                        feat_avatar_pack=thread_data.get("feat_avatar_pack"),
                         last_suggestion_msg_id=thread_data.get("last_suggestion_msg_id"),
                         last_ask_msg_id=thread_data.get("last_ask_msg_id"),
                         last_permission_msg_id=thread_data.get("last_permission_msg_id"),
@@ -431,21 +431,25 @@ class ProjectManager:
                                 thread_data["base_branch"] = t.base_branch
                             if t.archived:
                                 thread_data["archived"] = t.archived
-                            if t.auto_accept:
+                            # Settings - only save if not None (explicit override)
+                            if t.auto_accept is not None:
                                 thread_data["auto_accept"] = t.auto_accept
-                            # Display settings (only save if non-default)
-                            if t.display_mode != "lines":
+                            if t.display_mode is not None:
                                 thread_data["display_mode"] = t.display_mode
-                            if t.line_limit != 5:
+                            if t.line_limit is not None:
                                 thread_data["line_limit"] = t.line_limit
-                            if not t.display_bullet:
+                            if t.display_bullet is not None:
                                 thread_data["display_bullet"] = t.display_bullet
-                            if not t.display_thinking_text:
+                            if t.display_thinking_text is not None:
                                 thread_data["display_thinking_text"] = t.display_thinking_text
-                            if t.working_status:
+                            if t.working_status is not None:
                                 thread_data["working_status"] = t.working_status
-                            if t.response_mode != "all":
+                            if t.response_mode is not None:
                                 thread_data["response_mode"] = t.response_mode
+                            if t.feat_suggestions is not None:
+                                thread_data["feat_suggestions"] = t.feat_suggestions
+                            if t.feat_avatar_pack is not None:
+                                thread_data["feat_avatar_pack"] = t.feat_avatar_pack
                             if t.last_suggestion_msg_id:
                                 thread_data["last_suggestion_msg_id"] = t.last_suggestion_msg_id
                             if t.last_ask_msg_id:
