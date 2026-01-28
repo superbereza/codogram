@@ -82,28 +82,37 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     """Build settings message text. Used by cmd_settings and callback handler."""
     from ...tmux.session import TmuxSession
     from ...services.session_state import SessionStateService
+    from ...core.session_manager import get_thread_setting
+    from ...config import get_global_defaults
 
-    # Get settings from context
+    global_defaults = get_global_defaults()
+
+    # Get settings from thread with fallback to global defaults
     if thread:
-        auto_accept = thread.auto_accept
-        display_mode = thread.display_mode
-        line_limit = thread.line_limit
-        display_bullet = thread.display_bullet
-        display_thinking_text = thread.display_thinking_text
-        working_status = thread.working_status
+        auto_accept = get_thread_setting(thread, "auto_accept", global_defaults)
+        display_mode = get_thread_setting(thread, "display_mode", global_defaults)
+        line_limit = get_thread_setting(thread, "line_limit", global_defaults)
+        display_bullet = get_thread_setting(thread, "display_bullet", global_defaults)
+        display_thinking_text = get_thread_setting(thread, "display_thinking_text", global_defaults)
+        working_status = get_thread_setting(thread, "working_status", global_defaults)
+        response_mode = get_thread_setting(thread, "response_mode", global_defaults)
+        feat_suggestions = get_thread_setting(thread, "feat_suggestions", global_defaults)
+        feat_avatar_pack = get_thread_setting(thread, "feat_avatar_pack", global_defaults)
         context_name = thread.name
         cwd = thread.worktree_path or project.cwd
-        response_mode = thread.response_mode
     else:
-        auto_accept = project.auto_accept
-        display_mode = project.display_mode
-        line_limit = project.line_limit
-        display_bullet = project.display_bullet
-        display_thinking_text = project.display_thinking_text
-        working_status = project.working_status
+        # Fallback to global defaults when no thread
+        auto_accept = global_defaults["auto_accept"]
+        display_mode = global_defaults["display_mode"]
+        line_limit = global_defaults["line_limit"]
+        display_bullet = global_defaults["display_bullet"]
+        display_thinking_text = global_defaults["display_thinking_text"]
+        working_status = global_defaults["working_status"]
+        response_mode = global_defaults["response_mode"]
+        feat_suggestions = global_defaults["feat_suggestions"]
+        feat_avatar_pack = global_defaults["feat_avatar_pack"]
         context_name = project.project_name
         cwd = project.cwd
-        response_mode = project.response_mode
 
     # Format toggle indicators
     auto_status = "● on" if auto_accept else "○ off"
@@ -117,9 +126,9 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     else:
         verbose_status = display_mode
 
-    # Experimental features (project-level)
-    suggestions_status = "● on" if project.feat_suggestions else "○ off"
-    avatar_pack_status = "● on" if project.feat_avatar_pack else "○ off"
+    # Experimental features
+    suggestions_status = "● on" if feat_suggestions else "○ off"
+    avatar_pack_status = "● on" if feat_avatar_pack else "○ off"
 
     lines = [f"**{context_name}**", ""]
     lines.append("chat")
@@ -172,6 +181,8 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     lines.append(f"• /working\\_status: {working_status_text}")
     lines.append(f"• /exp\\_suggestions: {suggestions_status}")
     lines.append(f"• /exp\\_avatar\\_pack: {avatar_pack_status}")
+    lines.append("")
+    lines.append(strings.SETTINGS_RESET_HINT)
 
     return "\n".join(lines)
 
