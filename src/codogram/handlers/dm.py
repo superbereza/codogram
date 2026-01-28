@@ -492,6 +492,134 @@ async def cmd_dm_settings(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.send(message.chat.id, text, reply_markup=kb)
 
 
+# ===== DM settings commands (change global defaults) =====
+
+@router.message(Command("auto_accept"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_auto_accept(message: Message, telegram_queue: TelegramQueue):
+    """Toggle auto_accept global default."""
+    if not is_admin(message):
+        return
+    from ..config import set_global_default
+    defaults = get_global_defaults()
+    new_value = not defaults["auto_accept"]
+    set_global_default("auto_accept", new_value)
+    status = "● on" if new_value else "○ off"
+    await telegram_queue.send(message.chat.id, f"Global auto-accept: {status}")
+
+
+@router.message(Command("response_mode"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_response_mode(message: Message, telegram_queue: TelegramQueue):
+    """Cycle response_mode global default."""
+    if not is_admin(message):
+        return
+    from ..config import set_global_default
+    defaults = get_global_defaults()
+    modes = ["all", "polite", "mentions"]
+    current = defaults["response_mode"]
+    try:
+        next_idx = (modes.index(current) + 1) % len(modes)
+    except ValueError:
+        next_idx = 0
+    new_mode = modes[next_idx]
+    set_global_default("response_mode", new_mode)
+    await telegram_queue.send(message.chat.id, f"Global response mode: {new_mode}")
+
+
+@router.message(Command("display_bullet"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_display_bullet(message: Message, telegram_queue: TelegramQueue):
+    """Toggle display_bullet global default."""
+    if not is_admin(message):
+        return
+    from ..config import set_global_default
+    defaults = get_global_defaults()
+    new_value = not defaults["display_bullet"]
+    set_global_default("display_bullet", new_value)
+    status = "● on" if new_value else "○ off"
+    await telegram_queue.send(message.chat.id, f"Global bullet prefix: {status}")
+
+
+@router.message(Command("display_thinking_text"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_display_thinking(message: Message, telegram_queue: TelegramQueue):
+    """Toggle display_thinking_text global default."""
+    if not is_admin(message):
+        return
+    from ..config import set_global_default
+    defaults = get_global_defaults()
+    new_value = not defaults["display_thinking_text"]
+    set_global_default("display_thinking_text", new_value)
+    status = "● on" if new_value else "○ off"
+    await telegram_queue.send(message.chat.id, f"Global thinking text: {status}")
+
+
+@router.message(Command("working_status"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_working_status(message: Message, telegram_queue: TelegramQueue):
+    """Toggle working_status global default."""
+    if not is_admin(message):
+        return
+    from ..config import set_global_default
+    defaults = get_global_defaults()
+    new_value = not defaults["working_status"]
+    set_global_default("working_status", new_value)
+    status = "● on" if new_value else "○ off"
+    await telegram_queue.send(message.chat.id, f"Global working status: {status}")
+
+
+@router.message(Command("exp_suggestions"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
+    """Toggle feat_suggestions global default."""
+    if not is_admin(message):
+        return
+    from ..config import set_global_default
+    defaults = get_global_defaults()
+    new_value = not defaults["feat_suggestions"]
+    set_global_default("feat_suggestions", new_value)
+    status = "● on" if new_value else "○ off"
+    await telegram_queue.send(message.chat.id, f"Global suggestions: {status}")
+
+
+@router.message(Command("exp_avatar_pack"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_exp_avatar_pack(message: Message, telegram_queue: TelegramQueue):
+    """Toggle feat_avatar_pack global default."""
+    if not is_admin(message):
+        return
+    from ..config import set_global_default
+    defaults = get_global_defaults()
+    new_value = not defaults["feat_avatar_pack"]
+    set_global_default("feat_avatar_pack", new_value)
+    status = "● on" if new_value else "○ off"
+    await telegram_queue.send(message.chat.id, f"Global avatar pack: {status}")
+
+
+@router.message(Command("verbose_mode"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_verbose_mode(message: Message, telegram_queue: TelegramQueue):
+    """Show verbose mode menu for global defaults."""
+    if not is_admin(message):
+        return
+    from ..telegram.keyboards.verbose_menu import verbose_menu_keyboard_dm
+    from ..handlers.settings.verbose_menu import _build_verbose_text
+
+    defaults = get_global_defaults()
+    text = _build_verbose_text(defaults["display_mode"], defaults["line_limit"])
+    kb = verbose_menu_keyboard_dm(defaults["display_mode"], defaults["line_limit"])
+    await telegram_queue.send(message.chat.id, text, reply_markup=kb)
+
+
+@router.message(Command("reset_to_default"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_reset_to_default(message: Message, telegram_queue: TelegramQueue):
+    """Reset ALL threads to global defaults."""
+    if not is_admin(message):
+        return
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Yes", callback_data="reset:all:yes"),
+            InlineKeyboardButton(text="No", callback_data="reset:all:no"),
+        ]
+    ])
+    await telegram_queue.send(message.chat.id, strings.RESET_ALL_CONFIRM, reply_markup=kb)
+
+
 # ===== DM settings callbacks =====
 
 @router.callback_query(F.data == "dmset:noop")
