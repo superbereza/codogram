@@ -28,7 +28,16 @@ async def on_group_action(callback: CallbackQuery):
         add_allowed_group(chat_id)
         logger.info(f"group_approved_by_admin: chat_id={chat_id}")
 
-        # Update message
+        # Notify the group
+        try:
+            await callback.bot.send_message(
+                chat_id, strings.GROUP_REGISTERED,
+                parse_mode="MarkdownV2"
+            )
+        except Exception as e:
+            logger.warning(f"failed_to_notify_group_approved: {e}")
+
+        # Update admin message
         await callback.message.edit_text(
             strings.ADMIN_GROUP_APPROVED.format(chat_title=f"`{chat_id}`"),
             parse_mode="MarkdownV2",
