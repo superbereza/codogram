@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from ..config import settings, load_config, get_config_path
 
@@ -21,6 +22,24 @@ from ..git.resolver import get_project_name
 from ..tmux.session import TmuxSession
 from ..claude.session_finder import find_session_for_project, compute_jsonl_path
 from ..logging_config import logger
+
+
+def get_thread_setting(thread: 'ThreadInfo', key: str, global_defaults: dict[str, Any]) -> Any:
+    """Get effective setting: thread override or global default.
+
+    Args:
+        thread: ThreadInfo instance
+        key: Setting key (e.g. "auto_accept")
+        global_defaults: Dict of global defaults
+
+    Returns:
+        Thread value if not None, otherwise global default
+    """
+    thread_value = getattr(thread, key, None)
+    if thread_value is not None:
+        return thread_value
+    return global_defaults.get(key)
+
 
 def should_cleanup_project(project: 'ProjectState') -> bool:
     """Check if project should be cleaned up (inactive > 30 days).
