@@ -827,3 +827,17 @@ Operations
 Settings
 /settings — show settings
 /get\\_debug\\_ids — debug info"""
+
+# --- DM Settings ---
+
+DM_SETTINGS_HEADER = "**Global defaults**"
+DM_SETTINGS_HINT = "/reset\\_to\\_default — reset to factory defaults"
+
+# Reset confirmation
+RESET_THREAD_CONFIRM = "Reset this thread to global defaults?"
+RESET_ALL_CONFIRM = "Reset ALL threads in ALL projects to global defaults?"
+RESET_THREAD_DONE = "Thread reset to global defaults"
+RESET_ALL_DONE = "All threads reset to global defaults"
+
+# Settings footer in group
+SETTINGS_RESET_HINT = "/reset\\_to\\_default — reset to global defaults"
