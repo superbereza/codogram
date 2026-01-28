@@ -22,6 +22,9 @@ def _cycle_response_mode(project, thread) -> tuple[str, str]:
     Returns:
         Tuple of (mode_name, explanation_string)
     """
+    from ...core.session_manager import get_thread_setting
+    from ...config import get_global_defaults
+
     modes = list(ResponseModeService.VALID_MODES)
     explanations = {
         "all": strings.RESPONSE_MODE_ALL,
@@ -29,8 +32,10 @@ def _cycle_response_mode(project, thread) -> tuple[str, str]:
         "mentions": strings.RESPONSE_MODE_MENTIONS,
     }
 
+    global_defaults = get_global_defaults()
+
     if thread:
-        current = thread.response_mode
+        current = get_thread_setting(thread, "response_mode", global_defaults)
         try:
             next_idx = (modes.index(current) + 1) % len(modes)
         except ValueError:
@@ -38,13 +43,8 @@ def _cycle_response_mode(project, thread) -> tuple[str, str]:
         thread.response_mode = modes[next_idx]
         new_mode = thread.response_mode
     else:
-        current = project.response_mode
-        try:
-            next_idx = (modes.index(current) + 1) % len(modes)
-        except ValueError:
-            next_idx = 0
-        project.response_mode = modes[next_idx]
-        new_mode = project.response_mode
+        # No thread - just use first mode
+        new_mode = modes[0]
 
     return new_mode, explanations.get(new_mode, "")
 
@@ -218,6 +218,9 @@ async def cmd_settings(message: Message, telegram_queue: TelegramQueue):
 @router.message(Command("auto_accept", ignore_case=True))
 async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
     """Toggle auto-accept or reset all."""
+    from ...core.session_manager import get_thread_setting
+    from ...config import get_global_defaults
+
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
@@ -236,24 +239,23 @@ async def cmd_auto_accept(message: Message, telegram_queue: TelegramQueue):
 
     # /auto_accept reset all - reset all to off
     if len(args) >= 2 and args[0].lower() == "reset" and args[1].lower() == "all":
-        project.auto_accept = False
         if project.threads:
             for t in project.threads.values():
                 t.auto_accept = False
         project_manager._save()
-        await telegram_queue.reply(message, "Auto-accept reset to ○ off for project and all threads.")
+        await telegram_queue.reply(message, "Auto-accept reset to ○ off for all threads.")
         return
 
     # /auto_accept - toggle current context
     if thread:
-        thread.auto_accept = not thread.auto_accept
+        global_defaults = get_global_defaults()
+        current = get_thread_setting(thread, "auto_accept", global_defaults)
+        thread.auto_accept = not current
         status = "● on" if thread.auto_accept else "○ off"
         await telegram_queue.reply(message, f"Auto-accept: {status}")
+        project_manager._save()
     else:
-        project.auto_accept = not project.auto_accept
-        status = "● on" if project.auto_accept else "○ off"
-        await telegram_queue.reply(message, f"Auto-accept: {status}")
-    project_manager._save()
+        await telegram_queue.reply(message, "Thread not found. Use /start first.")
 
 
 @router.message(Command("verbose", ignore_case=True))
@@ -266,6 +268,9 @@ async def cmd_verbose(message: Message, telegram_queue: TelegramQueue):
 @router.message(Command("display_bullet", ignore_case=True))
 async def cmd_display_bullet(message: Message, telegram_queue: TelegramQueue):
     """Toggle bullet point prefix in tool messages."""
+    from ...core.session_manager import get_thread_setting
+    from ...config import get_global_defaults
+
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
@@ -279,14 +284,14 @@ async def cmd_display_bullet(message: Message, telegram_queue: TelegramQueue):
         thread = project.threads.get(thread_id)
 
     if thread:
-        thread.display_bullet = not thread.display_bullet
+        global_defaults = get_global_defaults()
+        current = get_thread_setting(thread, "display_bullet", global_defaults)
+        thread.display_bullet = not current
         status = "● on" if thread.display_bullet else "○ off"
+        project_manager._save()
+        await telegram_queue.reply(message, f"Bullet prefix: {status}")
     else:
-        project.display_bullet = not project.display_bullet
-        status = "● on" if project.display_bullet else "○ off"
-
-    project_manager._save()
-    await telegram_queue.reply(message, f"Bullet prefix: {status}")
+        await telegram_queue.reply(message, "Thread not found. Use /start first.")
 
 
 @router.message(Command("response_mode", ignore_case=True))
@@ -304,15 +309,20 @@ async def cmd_response_mode(message: Message, telegram_queue: TelegramQueue):
     if project.threads:
         thread = project.threads.get(thread_id)
 
-    new_mode, explanation = _cycle_response_mode(project, thread)
-    project_manager._save()
-
-    await telegram_queue.reply(message, f"response mode: {new_mode}\n_{explanation}_")
+    if thread:
+        new_mode, explanation = _cycle_response_mode(project, thread)
+        project_manager._save()
+        await telegram_queue.reply(message, f"response mode: {new_mode}\n_{explanation}_")
+    else:
+        await telegram_queue.reply(message, "Thread not found. Use /start first.")
 
 
 @router.message(Command("display_thinking_text", ignore_case=True))
 async def cmd_display_thinking_text(message: Message, telegram_queue: TelegramQueue):
     """Toggle display of <thinking> blocks in Claude's responses."""
+    from ...core.session_manager import get_thread_setting
+    from ...config import get_global_defaults
+
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
@@ -326,19 +336,22 @@ async def cmd_display_thinking_text(message: Message, telegram_queue: TelegramQu
         thread = project.threads.get(thread_id)
 
     if thread:
-        thread.display_thinking_text = not thread.display_thinking_text
+        global_defaults = get_global_defaults()
+        current = get_thread_setting(thread, "display_thinking_text", global_defaults)
+        thread.display_thinking_text = not current
         status = "● on" if thread.display_thinking_text else "○ off"
+        project_manager._save()
+        await telegram_queue.reply(message, f"Show thinking blocks: {status}")
     else:
-        project.display_thinking_text = not project.display_thinking_text
-        status = "● on" if project.display_thinking_text else "○ off"
-
-    project_manager._save()
-    await telegram_queue.reply(message, f"Show thinking blocks: {status}")
+        await telegram_queue.reply(message, "Thread not found. Use /start first.")
 
 
 @router.message(Command("working_status", ignore_case=True))
 async def cmd_working_status(message: Message, telegram_queue: TelegramQueue):
     """Toggle working status indicator (Claude's activity)."""
+    from ...core.session_manager import get_thread_setting
+    from ...config import get_global_defaults
+
     chat_id = message.chat.id
     thread_id = message.message_thread_id
 
@@ -352,14 +365,14 @@ async def cmd_working_status(message: Message, telegram_queue: TelegramQueue):
         thread = project.threads.get(thread_id)
 
     if thread:
-        thread.working_status = not thread.working_status
+        global_defaults = get_global_defaults()
+        current = get_thread_setting(thread, "working_status", global_defaults)
+        thread.working_status = not current
         status = "● on" if thread.working_status else "○ off"
+        project_manager._save()
+        await telegram_queue.reply(message, f"Working status indicator: {status}")
     else:
-        project.working_status = not project.working_status
-        status = "● on" if project.working_status else "○ off"
-
-    project_manager._save()
-    await telegram_queue.reply(message, f"Working status indicator: {status}")
+        await telegram_queue.reply(message, "Thread not found. Use /start first.")
 
 
 # Keep old command as alias for backward compat
@@ -371,32 +384,59 @@ async def cmd_exp_thinking_status_alias(message: Message, telegram_queue: Telegr
 
 @router.message(Command("exp_suggestions", ignore_case=True))
 async def cmd_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
-    """Toggle suggestions feature (chat-wide)."""
+    """Toggle suggestions feature."""
+    from ...core.session_manager import get_thread_setting
+    from ...config import get_global_defaults
+
     chat_id = message.chat.id
+    thread_id = message.message_thread_id
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
         await telegram_queue.reply(message, "No project. Use /start first.")
         return
 
-    project.feat_suggestions = not project.feat_suggestions
-    status = "● on" if project.feat_suggestions else "○ off"
+    thread = None
+    if project.threads:
+        thread = project.threads.get(thread_id)
 
-    project_manager._save()
-    await telegram_queue.reply(message, f"Suggestions (all topics): {status}")
+    if thread:
+        global_defaults = get_global_defaults()
+        current = get_thread_setting(thread, "feat_suggestions", global_defaults)
+        thread.feat_suggestions = not current
+        status = "● on" if thread.feat_suggestions else "○ off"
+        project_manager._save()
+        await telegram_queue.reply(message, f"Suggestions: {status}")
+    else:
+        await telegram_queue.reply(message, "Thread not found. Use /start first.")
 
 
 @router.message(Command("exp_avatar_pack", ignore_case=True))
 async def cmd_exp_avatar_pack(message: Message, telegram_queue: TelegramQueue):
     """Toggle avatar pack feature."""
+    from ...core.session_manager import get_thread_setting
+    from ...config import get_global_defaults
+
     chat_id = message.chat.id
+    thread_id = message.message_thread_id
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
         await telegram_queue.reply(message, strings.PROJECT_NOT_REGISTERED)
         return
 
-    if project.feat_avatar_pack:
+    thread = None
+    if project.threads:
+        thread = project.threads.get(thread_id)
+
+    if not thread:
+        await telegram_queue.reply(message, "Thread not found. Use /start first.")
+        return
+
+    global_defaults = get_global_defaults()
+    current = get_thread_setting(thread, "feat_avatar_pack", global_defaults)
+
+    if current:
         kb = avatar_pack_disable_keyboard()
         await telegram_queue.reply(message, strings.EMOJI_PACK_DISABLE_PROMPT, reply_markup=kb)
     else:
@@ -528,6 +568,8 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
     """Handle settings keyboard button presses."""
     from ...telegram.keyboards.settings import _short_id
     from ...telegram.keyboards import settings_keyboard
+    from ...core.session_manager import get_thread_setting
+    from ...config import get_global_defaults
 
     data = callback.data
     parts = data.split(":")
@@ -570,15 +612,18 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
         await callback.answer("Project not found")
         return
 
+    global_defaults = get_global_defaults()
+
     if action == "aa":
         if thread:
-            thread.auto_accept = not thread.auto_accept
+            current = get_thread_setting(thread, "auto_accept", global_defaults)
+            thread.auto_accept = not current
             status = "● on" if thread.auto_accept else "○ off"
+            project_manager._save()
+            await callback.answer(f"Auto-accept: {status}")
         else:
-            project.auto_accept = not project.auto_accept
-            status = "● on" if project.auto_accept else "○ off"
-        project_manager._save()
-        await callback.answer(f"Auto-accept: {status}")
+            await callback.answer("Thread not found")
+            return
 
     elif action == "v":
         # Open verbose mode menu
@@ -586,11 +631,11 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
         from .verbose_menu import _build_verbose_text
 
         if thread:
-            display_mode = thread.display_mode
-            line_limit = thread.line_limit
+            display_mode = get_thread_setting(thread, "display_mode", global_defaults)
+            line_limit = get_thread_setting(thread, "line_limit", global_defaults)
         else:
-            display_mode = project.display_mode
-            line_limit = project.line_limit
+            display_mode = global_defaults["display_mode"]
+            line_limit = global_defaults["line_limit"]
 
         text = _build_verbose_text(display_mode, line_limit)
         kb = verbose_menu_keyboard(display_mode, line_limit, short_id)
@@ -626,53 +671,68 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
             await callback.answer(f"Mode: {mode_text}")
 
     elif action == "rm":  # response_mode
-        new_mode, _ = _cycle_response_mode(project, thread)
-        project_manager._save()
-        await callback.answer(f"Response: {new_mode}")
+        if thread:
+            new_mode, _ = _cycle_response_mode(project, thread)
+            project_manager._save()
+            await callback.answer(f"Response: {new_mode}")
+        else:
+            await callback.answer("Thread not found")
+            return
 
     elif action == "db":  # display_bullet
         if thread:
-            thread.display_bullet = not thread.display_bullet
+            current = get_thread_setting(thread, "display_bullet", global_defaults)
+            thread.display_bullet = not current
             status = "● on" if thread.display_bullet else "○ off"
+            project_manager._save()
+            await callback.answer(f"Bullet prefix: {status}")
         else:
-            project.display_bullet = not project.display_bullet
-            status = "● on" if project.display_bullet else "○ off"
-        project_manager._save()
-        await callback.answer(f"Bullet prefix: {status}")
+            await callback.answer("Thread not found")
+            return
 
     elif action == "dt":  # display_thinking_text
         if thread:
-            thread.display_thinking_text = not thread.display_thinking_text
+            current = get_thread_setting(thread, "display_thinking_text", global_defaults)
+            thread.display_thinking_text = not current
             status = "● on" if thread.display_thinking_text else "○ off"
+            project_manager._save()
+            await callback.answer(f"Thinking text: {status}")
         else:
-            project.display_thinking_text = not project.display_thinking_text
-            status = "● on" if project.display_thinking_text else "○ off"
-        project_manager._save()
-        await callback.answer(f"Thinking text: {status}")
+            await callback.answer("Thread not found")
+            return
 
     elif action == "ws":  # working_status
         if thread:
-            thread.working_status = not thread.working_status
+            current = get_thread_setting(thread, "working_status", global_defaults)
+            thread.working_status = not current
             status = "● on" if thread.working_status else "○ off"
+            project_manager._save()
+            await callback.answer(f"Working status: {status}")
         else:
-            project.working_status = not project.working_status
-            status = "● on" if project.working_status else "○ off"
-        project_manager._save()
-        await callback.answer(f"Working status: {status}")
+            await callback.answer("Thread not found")
+            return
 
     elif action == "es":  # exp_suggestions
-        project.feat_suggestions = not project.feat_suggestions
-        status = "● on" if project.feat_suggestions else "○ off"
-        project_manager._save()
-        await callback.answer(f"Suggestions: {status}")
+        if thread:
+            current = get_thread_setting(thread, "feat_suggestions", global_defaults)
+            thread.feat_suggestions = not current
+            status = "● on" if thread.feat_suggestions else "○ off"
+            project_manager._save()
+            await callback.answer(f"Suggestions: {status}")
+        else:
+            await callback.answer("Thread not found")
+            return
 
     elif action == "ea":  # exp_avatar_pack
-        # Avatar pack needs special handling - show confirmation dialog
-        # For now, just toggle like other settings
-        project.feat_avatar_pack = not project.feat_avatar_pack
-        status = "● on" if project.feat_avatar_pack else "○ off"
-        project_manager._save()
-        await callback.answer(f"Avatar pack: {status}")
+        if thread:
+            current = get_thread_setting(thread, "feat_avatar_pack", global_defaults)
+            thread.feat_avatar_pack = not current
+            status = "● on" if thread.feat_avatar_pack else "○ off"
+            project_manager._save()
+            await callback.answer(f"Avatar pack: {status}")
+        else:
+            await callback.answer("Thread not found")
+            return
 
     # Determine current page from action code
     from ...telegram.keyboards.settings import SETTINGS_BUTTON_GROUPS, _COMMAND_TO_ACTION
