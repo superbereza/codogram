@@ -1,9 +1,16 @@
 """Audio message handler - transcribes voice/audio/video_note via Whisper."""
+import json
+from datetime import datetime
+from pathlib import Path
+
 from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.enums import ContentType
 
 from ..config import settings
+
+# Whisper usage log
+WHISPER_LOG_PATH = Path.home() / ".codogram" / "whisper-usage.jsonl"
 from ..services.file_input import FileInputService
 from ..services.message_router import MessageRouterService, RouteAction
 from ..services.whisper import WhisperService
@@ -17,6 +24,38 @@ router = Router(name="audio")
 # Service instances
 _file_input = FileInputService()
 _message_router = MessageRouterService()
+
+def _log_whisper_usage(
+    user_id: int,
+    chat_id: int,
+    duration_sec: int | None,
+    file_size: int,
+    success: bool,
+    error: str | None = None
+):
+    """Log Whisper API usage to JSONL file for cost tracking."""
+    try:
+        WHISPER_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+        # Whisper pricing: $0.006 per minute
+        cost_usd = (duration_sec / 60) * 0.006 if duration_sec else 0
+
+        entry = {
+            "ts": datetime.now().isoformat(),
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "duration_sec": duration_sec,
+            "file_size": file_size,
+            "cost_usd": round(cost_usd, 6),
+            "success": success,
+            "error": error,
+        }
+
+        with open(WHISPER_LOG_PATH, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception as e:
+        logger.warning(f"Failed to log Whisper usage: {e}")
+
 
 # Error code to string mapping
 _ERROR_MESSAGES = {
@@ -97,12 +136,29 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
         transcription = await whisper.transcribe(file_path)
 
         if not transcription.success:
+            _log_whisper_usage(
+                user_id=user_id,
+                chat_id=chat_id,
+                duration_sec=audio_info.duration,
+                file_size=audio_info.size,
+                success=False,
+                error=transcription.error,
+            )
             error_msg = _ERROR_MESSAGES.get(
                 transcription.error,
                 strings.AUDIO_ERR_GENERIC.format(error=transcription.error)
             )
             await telegram_queue.edit(status_msg, error_msg)
             return
+
+        # Log successful transcription
+        _log_whisper_usage(
+            user_id=user_id,
+            chat_id=chat_id,
+            duration_sec=audio_info.duration,
+            file_size=audio_info.size,
+            success=True,
+        )
 
         # Show transcription and send to Claude
         text = transcription.text
