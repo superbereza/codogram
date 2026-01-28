@@ -98,3 +98,73 @@ def settings_keyboard(tmux_session: str, page: int = 0) -> InlineKeyboardMarkup:
     buttons.append(nav_close_row)
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+# Button groups for DM (same as regular, no claude section to exclude)
+SETTINGS_BUTTON_GROUPS_DM = [
+    # Group 0: chat
+    ["auto_accept", "response_mode"],
+    # Group 1: ui
+    ["verbose_mode", "display_bullet", "display_thinking_text"],
+    # Group 2: experimental
+    ["working_status", "exp_suggestions", "exp_avatar_pack"],
+]
+
+
+def settings_keyboard_dm(page: int = 0) -> InlineKeyboardMarkup:
+    """Build paginated settings keyboard for DM (global defaults).
+
+    Args:
+        page: Current page (0-based)
+
+    Returns:
+        Inline keyboard with current group buttons + navigation
+    """
+    buttons = []
+
+    # Clamp page to valid range
+    page = max(0, min(page, len(SETTINGS_BUTTON_GROUPS_DM) - 1))
+
+    # Get current group
+    group = SETTINGS_BUTTON_GROUPS_DM[page]
+    for cmd in group:
+        action = _COMMAND_TO_ACTION.get(cmd, cmd)
+        buttons.append([InlineKeyboardButton(
+            text=f"/{cmd}",
+            callback_data=f"dmset:{action}"
+        )])
+
+    # Navigation + Close row
+    total_pages = len(SETTINGS_BUTTON_GROUPS_DM)
+    nav_close_row = []
+
+    if total_pages > 1 and page > 0:
+        nav_close_row.append(InlineKeyboardButton(
+            text="◀",
+            callback_data=f"dmset:page:{page - 1}"
+        ))
+    elif total_pages > 1:
+        nav_close_row.append(InlineKeyboardButton(
+            text="•",
+            callback_data="dmset:noop"
+        ))
+
+    nav_close_row.append(InlineKeyboardButton(
+        text=strings.BTN_CLOSE,
+        callback_data="dmset:close"
+    ))
+
+    if total_pages > 1 and page < total_pages - 1:
+        nav_close_row.append(InlineKeyboardButton(
+            text="▶",
+            callback_data=f"dmset:page:{page + 1}"
+        ))
+    elif total_pages > 1:
+        nav_close_row.append(InlineKeyboardButton(
+            text="•",
+            callback_data="dmset:noop"
+        ))
+
+    buttons.append(nav_close_row)
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)

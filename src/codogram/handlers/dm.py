@@ -6,7 +6,7 @@ from aiogram.filters import Command, ChatMemberUpdatedFilter, IS_NOT_MEMBER, ADM
 from aiogram.enums import ChatType
 
 from .. import strings
-from ..config import get_user_onboarded, set_user_onboarded, settings
+from ..config import get_user_onboarded, set_user_onboarded, settings, get_global_defaults
 from ..telegram.keyboards.dm_onboarding import (
     carousel_keyboard,
     validation_recheck_keyboard,
@@ -437,6 +437,59 @@ async def on_bot_added_to_chat(event: ChatMemberUpdated, bot: Bot):
         except Exception:
             # Admin might have blocked bot or never started DM
             pass
+
+
+# ===== /settings in DM =====
+
+def _build_dm_settings_text() -> str:
+    """Build settings message text for DM (global defaults)."""
+    defaults = get_global_defaults()
+
+    auto_status = "● on" if defaults["auto_accept"] else "○ off"
+    response_mode = defaults["response_mode"]
+
+    if defaults["display_mode"] == "lines":
+        verbose_status = f"lines ({defaults['line_limit']})"
+    else:
+        verbose_status = defaults["display_mode"]
+
+    bullet_status = "● on" if defaults["display_bullet"] else "○ off"
+    thinking_status = "● on" if defaults["display_thinking_text"] else "○ off"
+    working_stat = "● on" if defaults["working_status"] else "○ off"
+    suggestions_status = "● on" if defaults["feat_suggestions"] else "○ off"
+    avatar_pack_status = "● on" if defaults["feat_avatar_pack"] else "○ off"
+
+    lines = [strings.DM_SETTINGS_HEADER, ""]
+    lines.append("chat")
+    lines.append(f"• /auto\\_accept: {auto_status}")
+    lines.append(f"• /response\\_mode: {response_mode}")
+    lines.append("")
+    lines.append("ui")
+    lines.append(f"• /verbose\\_mode: {verbose_status}")
+    lines.append(f"• /display\\_bullet: {bullet_status}")
+    lines.append(f"• /display\\_thinking\\_text: {thinking_status}")
+    lines.append("")
+    lines.append("experimental features")
+    lines.append(f"• /working\\_status: {working_stat}")
+    lines.append(f"• /exp\\_suggestions: {suggestions_status}")
+    lines.append(f"• /exp\\_avatar\\_pack: {avatar_pack_status}")
+    lines.append("")
+    lines.append(strings.DM_SETTINGS_HINT)
+
+    return "\n".join(lines)
+
+
+@router.message(Command("settings"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_settings(message: Message, telegram_queue: TelegramQueue):
+    """Show global settings in DM."""
+    if not is_admin(message):
+        return
+
+    from ..telegram.keyboards.settings import settings_keyboard_dm
+
+    text = _build_dm_settings_text()
+    kb = settings_keyboard_dm(page=0)
+    await telegram_queue.send(message.chat.id, text, reply_markup=kb)
 
 
 # ===== Catch-all for other DM commands =====
