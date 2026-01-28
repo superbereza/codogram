@@ -35,7 +35,7 @@ _Пусто_
 
 ## Бэклог
 
-### 1. claude/screen.py (437 LOC)
+### 1. claude/screen.py (580 LOC)
 **Проблема:** 20+ regex паттернов, хрупкий парсинг tmux, ломается при изменении UI Claude, нет тестов.
 
 **Подход:**
@@ -51,7 +51,7 @@ _Пусто_
 - Мигрировать все flows на единую систему
 - Удалить `_flow_state`
 
-### 3. telegram/queue.py (510 LOC)
+### 3. telegram/queue.py (518 LOC)
 **Проблема:** Rate limiting, chunking, markdown escape, retry logic — много ответственностей в одном классе.
 
 **Подход:**
@@ -59,7 +59,7 @@ _Пусто_
 - Выделить MarkdownEscaper
 - Оставить в queue только очередь и rate limiting
 
-### 4. core/session_manager.py (502 LOC)
+### 4. core/session_manager.py (598 LOC)
 **Проблема:** ProjectState, ThreadInfo, ProjectManager в одном файле. Persistence + business logic смешаны.
 
 **Подход:**
@@ -67,14 +67,14 @@ _Пусто_
 - Вынести persistence в `core/storage.py`
 - Оставить в manager только бизнес-логику
 
-### 5. handlers/new_chat.py + handlers/finish_chat.py (~830 LOC)
+### 5. handlers/new_chat.py + handlers/finish_chat.py (835 LOC)
 **Проблема:** Дублирование логики создания/удаления threads и worktrees.
 
 **Подход:**
 - Вынести общую логику в `services/chat_lifecycle.py`
 - Handlers только роутинг
 
-### 6. claude/history_watcher.py (382 LOC)
+### 6. claude/history_watcher.py (327 LOC)
 **Проблема:** Parsing jsonl + formatting + sending в одном месте.
 
 **Подход:**
@@ -88,14 +88,14 @@ _Пусто_
 **Подход:**
 - Разбить по командам: `dm/onboarding.py`, `dm/dashboard.py`, `dm/check_env.py`
 
-### 8. handlers/migration.py (294 LOC)
+### 8. handlers/migration.py (372 LOC)
 **Проблема:** Group → supergroup migration, много Telegram API edge cases.
 
 **Подход:**
 - Добавить тесты на edge cases
 - Документировать поведение Telegram API
 
-### 9. handlers/setup/* (~1000 LOC)
+### 9. handlers/setup/* (1480 LOC)
 **Проблема:** FSM для setup flow (clone, connect, new project), много файлов но тесно связаны.
 
 **Подход:**
