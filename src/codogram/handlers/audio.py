@@ -29,7 +29,9 @@ _message_router = MessageRouterService()
 
 def _log_whisper_usage(
     user_id: int,
+    username: str | None,
     chat_id: int,
+    project: str | None,
     duration_sec: int | None,
     file_size: int,
     success: bool,
@@ -45,7 +47,9 @@ def _log_whisper_usage(
         entry = {
             "ts": datetime.now().isoformat(),
             "user_id": user_id,
+            "username": username,
             "chat_id": chat_id,
+            "project": project,
             "duration_sec": duration_sec,
             "file_size": file_size,
             "cost_usd": round(cost_usd, 6),
@@ -113,6 +117,7 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
     """
     chat_id = message.chat.id
     user_id = message.from_user.id if message.from_user else 0
+    username = message.from_user.username if message.from_user else None
 
     # Normalize thread_id - ignore in non-forum chats
     thread_id = normalize_thread_id(message.chat, message.message_thread_id)
@@ -185,7 +190,9 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
         if not transcription.success:
             _log_whisper_usage(
                 user_id=user_id,
+                username=username,
                 chat_id=chat_id,
+                project=result.project.name if result.project else None,
                 duration_sec=audio_info.duration,
                 file_size=audio_info.size,
                 success=False,
@@ -201,7 +208,9 @@ async def _handle_audio_message(message: Message, telegram_queue: TelegramQueue)
         # Log successful transcription
         _log_whisper_usage(
             user_id=user_id,
+            username=username,
             chat_id=chat_id,
+            project=result.project.name if result.project else None,
             duration_sec=audio_info.duration,
             file_size=audio_info.size,
             success=True,

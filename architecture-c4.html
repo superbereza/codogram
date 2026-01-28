@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codogram - C4 Architecture Diagram</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #1a1a2e;
+            min-height: 100vh;
+            color: #e4e4e4;
+            padding: 20px;
+        }
+        h1 { text-align: center; margin-bottom: 5px; color: #00d4ff; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        .level { margin-bottom: 50px; }
+        .level-title {
+            font-size: 1.4em; color: #a29bfe; margin-bottom: 20px;
+            padding: 10px 20px; background: rgba(162, 155, 254, 0.1);
+            border-radius: 8px; display: inline-block;
+        }
+
+        /* C4 Diagram styles */
+        .diagram { position: relative; padding: 30px; }
+
+        /* Level 1: Context */
+        .context-diagram {
+            display: flex; justify-content: center; align-items: center;
+            gap: 60px; flex-wrap: wrap;
+        }
+        .actor {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            border-radius: 50%; width: 120px; height: 120px;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; text-align: center; padding: 10px;
+        }
+        .actor-icon { font-size: 2em; margin-bottom: 5px; }
+        .actor-name { font-size: 0.85em; font-weight: 600; }
+
+        .system {
+            background: linear-gradient(135deg, #00d4ff, #0984e3);
+            border-radius: 12px; padding: 25px 40px;
+            text-align: center; min-width: 200px;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        }
+        .system-name { font-size: 1.3em; font-weight: bold; margin-bottom: 8px; }
+        .system-desc { font-size: 0.85em; opacity: 0.9; }
+
+        .external {
+            background: linear-gradient(135deg, #636e72, #2d3436);
+            border-radius: 12px; padding: 20px 30px;
+            text-align: center; min-width: 150px;
+            border: 2px dashed #636e72;
+        }
+        .external-name { font-size: 1em; font-weight: 600; margin-bottom: 5px; }
+        .external-desc { font-size: 0.75em; opacity: 0.8; }
+
+        .arrow {
+            color: #feca57; font-size: 0.8em; text-align: center;
+            padding: 5px 10px;
+        }
+        .arrow-line { color: #feca57; font-size: 1.5em; }
+
+        /* Level 2: Containers */
+        .containers-diagram {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 30px; align-items: start;
+        }
+        .container-box {
+            background: rgba(0, 212, 255, 0.1);
+            border: 2px solid #00d4ff;
+            border-radius: 12px; padding: 20px;
+            text-align: center;
+        }
+        .container-name { font-size: 1.1em; font-weight: 600; color: #00d4ff; margin-bottom: 8px; }
+        .container-tech { font-size: 0.75em; color: #74b9ff; margin-bottom: 8px; }
+        .container-desc { font-size: 0.8em; color: #aaa; }
+
+        .db-box {
+            background: rgba(162, 155, 254, 0.1);
+            border: 2px solid #a29bfe;
+            border-radius: 12px; padding: 20px;
+            text-align: center;
+        }
+        .db-name { font-size: 1.1em; font-weight: 600; color: #a29bfe; margin-bottom: 8px; }
+
+        .external-box {
+            background: rgba(99, 110, 114, 0.2);
+            border: 2px dashed #636e72;
+            border-radius: 12px; padding: 15px;
+            text-align: center; margin-bottom: 15px;
+        }
+
+        /* Level 3: Components */
+        .components-diagram {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+        .component {
+            background: rgba(29, 209, 161, 0.1);
+            border: 2px solid #1dd1a1;
+            border-radius: 10px; padding: 15px;
+        }
+        .component.high-risk {
+            border-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+        }
+        .component.medium-risk {
+            border-color: #feca57;
+            background: rgba(254, 202, 87, 0.1);
+        }
+        .component-name { font-size: 0.95em; font-weight: 600; color: #1dd1a1; margin-bottom: 5px; }
+        .component.high-risk .component-name { color: #ff6b6b; }
+        .component.medium-risk .component-name { color: #feca57; }
+        .component-desc { font-size: 0.75em; color: #aaa; }
+
+        /* Data flow */
+        .flow-section { margin-top: 40px; }
+        .flow-title { font-size: 1.2em; color: #feca57; margin-bottom: 20px; }
+        .flow {
+            display: flex; align-items: center; gap: 15px;
+            padding: 15px; background: rgba(0,0,0,0.2);
+            border-radius: 8px; margin-bottom: 10px; flex-wrap: wrap;
+        }
+        .flow-step {
+            background: rgba(0, 212, 255, 0.15);
+            padding: 8px 15px; border-radius: 6px;
+            font-size: 0.85em;
+        }
+        .flow-arrow { color: #feca57; font-size: 1.2em; }
+        .flow-label { font-size: 0.75em; color: #888; margin-left: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Codogram C4 Architecture</h1>
+        <p class="subtitle">System Context, Containers, and Components | 2026-01-28</p>
+
+        <!-- Level 1: System Context -->
+        <div class="level">
+            <div class="level-title">Level 1: System Context</div>
+            <div class="diagram">
+                <div class="context-diagram">
+                    <div class="actor">
+                        <div class="actor-icon">👤</div>
+                        <div class="actor-name">Developer</div>
+                    </div>
+
+                    <div class="arrow">
+                        <div class="arrow-line">→</div>
+                        <div>Telegram messages</div>
+                    </div>
+
+                    <div class="system">
+                        <div class="system-name">Codogram</div>
+                        <div class="system-desc">Telegram bot for managing<br>Claude Code sessions</div>
+                    </div>
+
+                    <div class="arrow">
+                        <div class="arrow-line">→</div>
+                        <div>tmux commands</div>
+                    </div>
+
+                    <div class="external">
+                        <div class="external-name">Claude CLI</div>
+                        <div class="external-desc">AI coding assistant<br>running in tmux</div>
+                    </div>
+                </div>
+
+                <div class="context-diagram" style="margin-top: 30px;">
+                    <div class="external">
+                        <div class="external-name">Telegram API</div>
+                        <div class="external-desc">Bot API for messaging</div>
+                    </div>
+                    <div class="arrow">
+                        <div class="arrow-line">↔</div>
+                        <div>aiogram</div>
+                    </div>
+                    <div style="width: 200px; text-align: center; color: #00d4ff;">Codogram</div>
+                    <div class="arrow">
+                        <div class="arrow-line">↔</div>
+                        <div>subprocess</div>
+                    </div>
+                    <div class="external">
+                        <div class="external-name">tmux</div>
+                        <div class="external-desc">Terminal multiplexer</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Level 2: Containers -->
+        <div class="level">
+            <div class="level-title">Level 2: Container Diagram</div>
+            <div class="diagram">
+                <div class="containers-diagram">
+                    <!-- Left: External systems -->
+                    <div>
+                        <div class="external-box">
+                            <div class="external-name">Telegram</div>
+                            <div class="external-desc">Bot API</div>
+                        </div>
+                        <div class="external-box">
+                            <div class="external-name">OpenAI</div>
+                            <div class="external-desc">Whisper API</div>
+                        </div>
+                        <div class="external-box">
+                            <div class="external-name">GitHub</div>
+                            <div class="external-desc">gh CLI</div>
+                        </div>
+                    </div>
+
+                    <!-- Center: Main application -->
+                    <div>
+                        <div class="container-box" style="margin-bottom: 20px;">
+                            <div class="container-name">Telegram Bot</div>
+                            <div class="container-tech">[Python / aiogram]</div>
+                            <div class="container-desc">
+                                Handles commands, callbacks, messages.<br>
+                                Routes user input to Claude sessions.<br>
+                                Shows permission prompts with keyboards.
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="container-box">
+                                <div class="container-name">Permission Poller</div>
+                                <div class="container-tech">[asyncio task]</div>
+                                <div class="container-desc">
+                                    Polls tmux every 0.5s.<br>
+                                    Detects prompts, thinking, stuck messages.
+                                </div>
+                            </div>
+                            <div class="container-box">
+                                <div class="container-name">History Watcher</div>
+                                <div class="container-tech">[asyncio task]</div>
+                                <div class="container-desc">
+                                    Watches history.jsonl.<br>
+                                    Sends tool calls to Telegram.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="container-box" style="margin-top: 20px;">
+                            <div class="container-name">Coordinator</div>
+                            <div class="container-tech">[asyncio task]</div>
+                            <div class="container-desc">
+                                Polls history.jsonl every 15s for session changes.<br>
+                                Binds threads to new Claude sessions.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Local systems -->
+                    <div>
+                        <div class="external-box">
+                            <div class="external-name">tmux</div>
+                            <div class="external-desc">Session management</div>
+                        </div>
+                        <div class="external-box">
+                            <div class="external-name">Claude CLI</div>
+                            <div class="external-desc">AI assistant</div>
+                        </div>
+                        <div class="external-box">
+                            <div class="external-name">Git</div>
+                            <div class="external-desc">Worktrees, branches</div>
+                        </div>
+                        <div class="db-box" style="margin-top: 15px;">
+                            <div class="db-name">~/.codogram/config.json</div>
+                            <div class="container-desc">Project state persistence</div>
+                        </div>
+                        <div class="db-box" style="margin-top: 15px;">
+                            <div class="db-name">~/.claude/history.jsonl</div>
+                            <div class="container-desc">Claude session history</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Level 3: Components -->
+        <div class="level">
+            <div class="level-title">Level 3: Component Diagram (Bot internals)</div>
+            <div class="diagram">
+                <div class="components-diagram">
+                    <!-- Row 1: Entry points -->
+                    <div class="component">
+                        <div class="component-name">handlers/</div>
+                        <div class="component-desc">Command routers: /start, /new_chat, /finish, /settings. Thin layer, delegates to services.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">middleware/</div>
+                        <div class="component-desc">Auth (AdminMiddleware), admin rights check, setup blocker.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">services/</div>
+                        <div class="component-desc">Business logic: StartFlowService, LaunchService, BranchService, etc.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">domain/</div>
+                        <div class="component-desc">Models, FSM states, validators. Pure data, no deps.</div>
+                    </div>
+
+                    <!-- Row 2: Core -->
+                    <div class="component high-risk">
+                        <div class="component-name">core/session_manager</div>
+                        <div class="component-desc">ProjectState, ThreadInfo. 40+ fields. File locking persistence.</div>
+                    </div>
+                    <div class="component high-risk">
+                        <div class="component-name">core/coordinator</div>
+                        <div class="component-desc">HistoryWatcher. Polls jsonl, binds sessions, detects changes.</div>
+                    </div>
+                    <div class="component medium-risk">
+                        <div class="component-name">telegram/queue</div>
+                        <div class="component-desc">Rate-limited FIFO queue. Chunking, markdown, retries.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">telegram/keyboards</div>
+                        <div class="component-desc">Pure keyboard builders. 16 files, stateless.</div>
+                    </div>
+
+                    <!-- Row 3: Claude integration -->
+                    <div class="component high-risk">
+                        <div class="component-name">claude/screen</div>
+                        <div class="component-desc">20+ regex patterns. Parses tmux output for prompts, status.</div>
+                    </div>
+                    <div class="component high-risk">
+                        <div class="component-name">claude/poller</div>
+                        <div class="component-desc">6 processors: permissions, ask_user, thinking, suggestions, stuck, compact.</div>
+                    </div>
+                    <div class="component medium-risk">
+                        <div class="component-name">claude/history_watcher</div>
+                        <div class="component-desc">Async jsonl watcher. 5 display modes.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">claude/session_finder</div>
+                        <div class="component-desc">Incremental jsonl reader with caching.</div>
+                    </div>
+
+                    <!-- Row 4: System interfaces -->
+                    <div class="component high-risk">
+                        <div class="component-name">tmux/session</div>
+                        <div class="component-desc">TmuxSession. Send keys, capture pane. Timing-sensitive.</div>
+                    </div>
+                    <div class="component medium-risk">
+                        <div class="component-name">tmux/launcher</div>
+                        <div class="component-desc">Project init, git ops, tmux creation.</div>
+                    </div>
+                    <div class="component medium-risk">
+                        <div class="component-name">git/worktree</div>
+                        <div class="component-desc">Worktree CRUD, merge, push. Subprocess.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">git/utils</div>
+                        <div class="component-desc">Branch validation, sanitization.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Flows -->
+        <div class="level">
+            <div class="level-title">Key Data Flows</div>
+
+            <div class="flow-section">
+                <div class="flow-title">1. User sends message to Claude</div>
+                <div class="flow">
+                    <div class="flow-step">Telegram message</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">handlers/messages</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">MessageRouterService</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">TmuxSession.send()</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">Claude CLI</div>
+                    <div class="flow-label">~50ms</div>
+                </div>
+
+                <div class="flow-title">2. Permission prompt detection</div>
+                <div class="flow">
+                    <div class="flow-step">Poller (every 0.5s)</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">TmuxSession.capture_pane()</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">screen.parse_screen()</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">PermissionProcessor</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">TelegramQueue</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">Keyboard in chat</div>
+                </div>
+
+                <div class="flow-title">3. Tool call display</div>
+                <div class="flow">
+                    <div class="flow-step">Claude writes jsonl</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">JsonlWatcher</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">parse_jsonl_entry()</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">format_tool_use()</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">TelegramQueue</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">Message in chat</div>
+                </div>
+
+                <div class="flow-title">4. Session binding (/start)</div>
+                <div class="flow">
+                    <div class="flow-step">/start command</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">StartFlowService</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">find_tmux_by_cwd()</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">launch_with_animation()</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">Coordinator binds session</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">Poller + Watcher start</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
