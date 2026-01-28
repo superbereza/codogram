@@ -39,8 +39,8 @@ def _log_whisper_usage(
     try:
         WHISPER_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-        # Whisper pricing: $0.006 per minute
-        cost_usd = (duration_sec / 60) * 0.006 if duration_sec else 0
+        # Cost from config (default $0.006/min for whisper-1)
+        cost_usd = (duration_sec / 60) * settings.whisper_cost_per_minute if duration_sec else 0
 
         entry = {
             "ts": datetime.now().isoformat(),

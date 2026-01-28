@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
     whisper_timeout: int = 60  # seconds
+    whisper_cost_per_minute: float = 0.006  # USD, whisper-1 pricing (Jan 2026)
 
     def get_admin_ids(self) -> set[int]:
         """Parse admin_ids string into set of ints."""
