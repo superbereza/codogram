@@ -421,6 +421,15 @@ Ongoing architecture improvements and technical debt reduction.
 
 ## Backlog
 
+### Manual group approval tracking
+Track manually approved groups separately from auto-approved:
+- Store approving admin ID per group
+- Invalidate only if approving admin leaves the group (not if they lose admin role)
+- 24h grace period when approver leaves, with notification
+- Monthly review reminders with [Keep]/[Revoke] buttons
+- `/allowed_groups` command to view and revoke manual approvals
+- See [docs/designs/2026-01-28-manual-group-approvals.md](designs/2026-01-28-manual-group-approvals.md)
+
 ### Secure key-value storage
 Encrypted storage for sensitive data (API keys, tokens, secrets):
 - Claude can store and retrieve secrets without exposing them in chat
