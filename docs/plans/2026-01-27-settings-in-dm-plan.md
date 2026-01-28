@@ -297,6 +297,8 @@ def test_threadinfo_settings_default_to_none():
     assert thread.display_bullet is None
     assert thread.display_thinking_text is None
     assert thread.working_status is None
+    assert thread.feat_suggestions is None
+    assert thread.feat_avatar_pack is None
 
 
 def test_threadinfo_accepts_explicit_values():
@@ -359,6 +361,8 @@ class ThreadInfo:
     display_thinking_text: bool | None = None
     working_status: bool | None = None
     response_mode: str | None = None
+    feat_suggestions: bool | None = None
+    feat_avatar_pack: bool | None = None
 
     # Persisted message IDs (for cleanup after restart):
     last_suggestion_msg_id: int | None = None
@@ -587,19 +591,62 @@ def settings_keyboard_dm(page: int = 0) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 ```
 
-**Step 2: Export from __init__.py**
+**Step 2: Add verbose_menu_keyboard_dm to verbose_menu.py**
+
+Add to `src/codogram/telegram/keyboards/verbose_menu.py`:
+
+```python
+def verbose_menu_keyboard_dm(display_mode: str, line_limit: int) -> InlineKeyboardMarkup:
+    """Build verbose mode menu keyboard for DM (global defaults).
+
+    Same as verbose_menu_keyboard but with dmvm: prefix for callbacks.
+    """
+    buttons = []
+
+    # Mode buttons row
+    mode_row = []
+    for mode in ["show_all", "lines", "headers", "current", "silence"]:
+        label = mode.replace("_", " ")
+        if mode == display_mode:
+            label = f"[{label}]"
+        mode_row.append(InlineKeyboardButton(
+            text=label,
+            callback_data=f"dmvm:mode:{mode}"
+        ))
+    # Split into two rows for better UX
+    buttons.append(mode_row[:3])
+    buttons.append(mode_row[3:])
+
+    # Line limit row (only shown when in lines mode)
+    if display_mode == "lines":
+        buttons.append([
+            InlineKeyboardButton(text="-5", callback_data="dmvm:lines:-5"),
+            InlineKeyboardButton(text=f"lines: {line_limit}", callback_data="dmvm:noop"),
+            InlineKeyboardButton(text="+5", callback_data="dmvm:lines:5"),
+        ])
+
+    # Back button
+    buttons.append([
+        InlineKeyboardButton(text="← Back to settings", callback_data="dmvm:back")
+    ])
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+```
+
+**Step 3: Export from __init__.py**
 
 Add to `src/codogram/telegram/keyboards/__init__.py`:
 
 ```python
 from .settings import settings_keyboard, settings_keyboard_dm
+from .verbose_menu import verbose_menu_keyboard, verbose_menu_keyboard_dm
 ```
 
-**Step 3: Commit**
+**Step 4: Commit**
 
 ```bash
-git add src/codogram/telegram/keyboards/settings.py src/codogram/telegram/keyboards/__init__.py
-git commit -m "feat(keyboards): add settings_keyboard_dm for DM"
+git add src/codogram/telegram/keyboards/settings.py src/codogram/telegram/keyboards/verbose_menu.py src/codogram/telegram/keyboards/__init__.py
+git commit -m "feat(keyboards): add settings_keyboard_dm and verbose_menu_keyboard_dm"
 ```
 
 ---
@@ -669,16 +716,15 @@ async def callback_dm_settings(callback: CallbackQuery, telegram_queue: Telegram
     }
 
     if action == "v":
-        # Verbose mode needs special handling - open menu
-        # For now, cycle through modes
-        modes = ["lines", "show_all", "headers", "current", "silence"]
-        current = defaults["display_mode"]
-        try:
-            next_idx = (modes.index(current) + 1) % len(modes)
-        except ValueError:
-            next_idx = 0
-        set_global_default("display_mode", modes[next_idx])
-        await callback.answer(f"Mode: {modes[next_idx]}")
+        # Open verbose mode menu (reuse existing verbose_menu)
+        from ..handlers.settings.verbose_menu import _build_verbose_text
+        from ..telegram.keyboards.verbose_menu import verbose_menu_keyboard_dm
+
+        text = _build_verbose_text(defaults["display_mode"], defaults["line_limit"])
+        kb = verbose_menu_keyboard_dm(defaults["display_mode"], defaults["line_limit"])
+        await telegram_queue.edit(callback.message, text, reply_markup=kb)
+        await callback.answer()
+        return  # Don't update settings message
     elif action == "rm":
         # Cycle response mode
         modes = ["all", "polite", "mentions"]
@@ -725,11 +771,65 @@ async def callback_dm_settings(callback: CallbackQuery, telegram_queue: Telegram
     await telegram_queue.edit(callback.message, text, reply_markup=kb)
 ```
 
-**Step 2: Commit**
+**Step 2: Add verbose menu callbacks for DM**
+
+Add to `src/codogram/handlers/dm.py`:
+
+```python
+from ..telegram.keyboards.verbose_menu import verbose_menu_keyboard_dm
+from ..handlers.settings.verbose_menu import _build_verbose_text
+
+
+@router.callback_query(F.data == "dmvm:noop")
+async def callback_dm_verbose_noop(callback: CallbackQuery):
+    """Handle placeholder button press."""
+    await callback.answer()
+
+
+@router.callback_query(F.data == "dmvm:back")
+async def callback_dm_verbose_back(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Return to DM settings from verbose menu."""
+    text = _build_dm_settings_text()
+    kb = settings_keyboard_dm(page=1)  # Page 1 has verbose_mode
+    await telegram_queue.edit(callback.message, text, reply_markup=kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("dmvm:mode:"))
+async def callback_dm_verbose_mode(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Handle verbose mode change in DM."""
+    new_mode = callback.data.split(":")[-1]
+    defaults = get_global_defaults()
+
+    set_global_default("display_mode", new_mode)
+
+    text = _build_verbose_text(new_mode, defaults["line_limit"])
+    kb = verbose_menu_keyboard_dm(new_mode, defaults["line_limit"])
+    await telegram_queue.edit(callback.message, text, reply_markup=kb)
+    await callback.answer(f"Mode: {new_mode}")
+
+
+@router.callback_query(F.data.startswith("dmvm:lines:"))
+async def callback_dm_verbose_lines(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Handle line limit change in DM."""
+    delta = int(callback.data.split(":")[-1])
+    defaults = get_global_defaults()
+
+    new_limit = max(1, defaults["line_limit"] + delta)
+    set_global_default("line_limit", new_limit)
+    set_global_default("display_mode", "lines")  # Switch to lines mode
+
+    text = _build_verbose_text("lines", new_limit)
+    kb = verbose_menu_keyboard_dm("lines", new_limit)
+    await telegram_queue.edit(callback.message, text, reply_markup=kb)
+    await callback.answer(f"Lines: {new_limit}")
+```
+
+**Step 3: Commit**
 
 ```bash
 git add src/codogram/handlers/dm.py
-git commit -m "feat(dm): add settings callback handlers"
+git commit -m "feat(dm): add settings and verbose menu callback handlers"
 ```
 
 ---
@@ -773,6 +873,8 @@ def _reset_thread_to_defaults(thread) -> None:
     thread.display_bullet = None
     thread.display_thinking_text = None
     thread.working_status = None
+    thread.feat_suggestions = None
+    thread.feat_avatar_pack = None
 
 
 def _reset_all_threads() -> int:
