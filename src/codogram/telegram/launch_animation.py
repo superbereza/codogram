@@ -152,7 +152,7 @@ async def launch_with_animation(
                     except Exception:
                         pass
                 await queue.send(
-                    chat_id, strings.LAUNCH_TIMEOUT,
+                    chat_id, strings.LAUNCH_TIMEOUT.format(timeout_sec=settings.claude_launch_timeout),
                     thread_id=thread_id,
                     parse_mode="MarkdownV2"
                 )
