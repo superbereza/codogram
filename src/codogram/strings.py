@@ -435,8 +435,18 @@ ERR_NOT_ADMIN_POPUP = "[x] Not admin. Your ID: {user_id}"
 
 # --- Group Authorization ---
 
-ERR_GROUP_NOT_ALLOWED = f"{STATUS_ERR} Bot not active in this group"
-ERR_GROUP_NOT_ALLOWED_POPUP = "[x] Bot not active in this group"  # Plain text for callback popup
+ERR_GROUP_NOT_ALLOWED = f"{STATUS_ERR} Bot not active in this group\\. Ask group admin to set it up"
+ERR_GROUP_NOT_ALLOWED_POPUP = "[x] Bot not active. Ask admin to set up"  # Plain text for callback popup
+ADMIN_ALERT_GROUP_ACCESS = """`[!]` Unauthorized group access
+
+Group: {chat_title}
+Chat ID: `{chat_id}`
+User: {user_name} \\(`{user_id}`\\)"""
+
+BTN_APPROVE_GROUP = "✓ Approve"
+BTN_REJECT_GROUP = "✗ Dismiss"
+ADMIN_GROUP_APPROVED = "`[v]` Group approved: {chat_title}"
+ADMIN_GROUP_REJECTED = "`[x]` Dismissed"
 GROUP_REGISTERED = f"{STATUS_OK} Group registered"
 GROUP_DEACTIVATED = f"{STATUS_WARN} Admin left\\. Bot deactivated"
 

@@ -2,7 +2,7 @@
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
-from aiogram.types import CallbackQuery, Message, TelegramObject, User
+from aiogram.types import CallbackQuery, Message, TelegramObject, User, InlineKeyboardMarkup, InlineKeyboardButton
 
 from .. import strings
 from ..config import settings
@@ -39,6 +39,7 @@ class AdminMiddleware(BaseMiddleware):
 
     def __init__(self, group_auth: "GroupAuthService | None" = None):
         self.group_auth = group_auth
+        self._notified_groups: set[int] = set()  # Track notified groups to avoid spam
 
     async def __call__(
         self,
@@ -101,10 +102,9 @@ class AdminMiddleware(BaseMiddleware):
                 logger.info(f"group_registered: chat_id={chat.id}")
                 return await handler(event, data)
 
-            # No admin from ADMIN_IDS in group - silently ignore.
-            # The rejection message is sent once by on_bot_added when bot is first added.
-            # We don't want to spam on every subsequent message.
+            # No admin from ADMIN_IDS in group - notify admin once, then ignore.
             logger.debug(f"group_rejected_silent: chat_id={chat.id}")
+            await self._notify_admin_group_access(event, data)
             return None
 
         # Fallback for groups without group_auth - use old behavior (admin only)
@@ -142,3 +142,63 @@ class AdminMiddleware(BaseMiddleware):
                 strings.ERR_GROUP_NOT_ALLOWED_POPUP,
                 show_alert=True
             )
+
+    async def _notify_admin_group_access(
+        self, event: TelegramObject, data: dict[str, Any]
+    ):
+        """Notify admin about unauthorized group access (once per group)."""
+        chat = data.get("event_chat")
+        user: User | None = data.get("event_from_user")
+
+        if not chat or not user:
+            return
+
+        # Only notify once per group per bot run
+        if chat.id in self._notified_groups:
+            return
+        self._notified_groups.add(chat.id)
+
+        # Escape MarkdownV2 special chars
+        def escape_md(text: str) -> str:
+            for ch in r"_*[]()~`>#+-=|{}.!":
+                text = text.replace(ch, f"\\{ch}")
+            return text
+
+        chat_title = escape_md(chat.title or "Unknown")
+        user_name = escape_md(user.full_name or "Unknown")
+
+        alert_text = strings.ADMIN_ALERT_GROUP_ACCESS.format(
+            chat_title=chat_title,
+            chat_id=chat.id,
+            user_name=user_name,
+            user_id=user.id,
+        )
+
+        # Send to first admin with approve/reject buttons
+        bot = data.get("bot")
+        if not bot:
+            return
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=strings.BTN_APPROVE_GROUP,
+                    callback_data=f"grp:approve:{chat.id}"
+                ),
+                InlineKeyboardButton(
+                    text=strings.BTN_REJECT_GROUP,
+                    callback_data=f"grp:reject:{chat.id}"
+                ),
+            ]
+        ])
+
+        admin_id = settings.get_bot_owner_id()
+        try:
+            await bot.send_message(
+                admin_id, alert_text,
+                parse_mode="MarkdownV2",
+                reply_markup=keyboard
+            )
+            logger.info(f"admin_notified_group_access: chat_id={chat.id} user_id={user.id}")
+        except Exception as e:
+            logger.warning(f"failed_to_notify_admin: {e}")
