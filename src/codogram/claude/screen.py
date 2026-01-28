@@ -255,6 +255,30 @@ def _parse_ask_user_question(lines: list[str]) -> AskUserQuestion | None:
     )
 
 
+def _is_trust_prompt(body: str, options: list[str]) -> bool:
+    """Check if this is a trust folder/workspace prompt that should NOT be auto-accepted.
+
+    Detects:
+    - "do you trust the files in this folder?" in body
+    - "accessing workspace" in body
+    - "I trust this folder" in any option
+    """
+    body_lower = body.lower()
+    options_lower = " ".join(options).lower()
+
+    # Check body for trust-related phrases
+    if "do you trust the files in this folder?" in body_lower:
+        return True
+    if "accessing workspace" in body_lower:
+        return True
+
+    # Check options for trust-related phrases
+    if "i trust this folder" in options_lower:
+        return True
+
+    return False
+
+
 def parse_screen(output: str) -> ScreenState:
     """Parse tmux capture-pane output to detect state.
 
@@ -314,8 +338,7 @@ def parse_screen(output: str) -> ScreenState:
     body = body.strip()
 
     # Detect trust folder prompt (should not be auto-accepted)
-    # Specific phrase from Claude's trust folder dialog
-    if "do you trust the files in this folder?" in body.lower():
+    if _is_trust_prompt(body, options):
         logger.debug(f"parse_screen: trust folder prompt detected. body={body[:100]!r}")
         return PermissionPrompt(options=options, body=body, prompt_type=PromptType.TRUST_PROMPT)
 
@@ -336,8 +359,7 @@ def _parse_options_without_separator(lines: list[str]) -> PermissionPrompt | Non
     body = "\n".join(body_lines).strip()
 
     # Detect trust folder prompt (should not be auto-accepted)
-    # Specific phrase from Claude's trust folder dialog
-    if "do you trust the files in this folder?" in body.lower():
+    if _is_trust_prompt(body, options):
         logger.debug(f"_parse_options_without_separator: trust folder prompt detected. body={body[:100]!r}")
         return PermissionPrompt(options=options, body=body, prompt_type=PromptType.TRUST_PROMPT)
 
