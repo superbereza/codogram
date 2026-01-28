@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     session_binding_timeout: int = 300
     session_binding_interval: float = 0.5
     jsonl_watcher_interval: float = 0.5
-    claude_launch_timeout: int = 120
+    claude_launch_timeout: int = 60
     project_cleanup_days: int = 30
 
     # OpenAI / Whisper
