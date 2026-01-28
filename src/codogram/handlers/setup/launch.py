@@ -184,7 +184,9 @@ async def _execute_launch(message: Message, state: FSMContext):
 
     # Create emoji pack in background if feature enabled AND forum
     # (emoji pack is for topic icons, only makes sense in forums)
-    if project.feat_avatar_pack and is_forum:
+    from ...core.session_manager import get_project_setting
+    from ...config import get_global_defaults
+    if get_project_setting(project, "feat_avatar_pack", get_global_defaults()) and is_forum:
         asyncio.create_task(
             _create_emoji_pack_background(message.bot, chat_id, telegram_queue)
         )

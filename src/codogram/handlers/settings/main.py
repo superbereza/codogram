@@ -82,10 +82,13 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
     """Build settings message text. Used by cmd_settings and callback handler."""
     from ...tmux.session import TmuxSession
     from ...services.session_state import SessionStateService
-    from ...core.session_manager import get_thread_setting
+    from ...core.session_manager import get_thread_setting, get_project_setting
     from ...config import get_global_defaults
 
     global_defaults = get_global_defaults()
+
+    # feat_avatar_pack is per-project (not per-thread)
+    feat_avatar_pack = get_project_setting(project, "feat_avatar_pack", global_defaults)
 
     # Get settings from thread with fallback to global defaults
     if thread:
@@ -97,7 +100,6 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
         working_status = get_thread_setting(thread, "working_status", global_defaults)
         response_mode = get_thread_setting(thread, "response_mode", global_defaults)
         feat_suggestions = get_thread_setting(thread, "feat_suggestions", global_defaults)
-        feat_avatar_pack = get_thread_setting(thread, "feat_avatar_pack", global_defaults)
         context_name = thread.name
         cwd = thread.worktree_path or project.cwd
     else:
@@ -110,7 +112,6 @@ def _build_settings_text(project, thread, tmux_name: str) -> str:
         working_status = global_defaults["working_status"]
         response_mode = global_defaults["response_mode"]
         feat_suggestions = global_defaults["feat_suggestions"]
-        feat_avatar_pack = global_defaults["feat_avatar_pack"]
         context_name = project.project_name
         cwd = project.cwd
 
@@ -413,28 +414,19 @@ async def cmd_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
 
 @router.message(Command("exp_avatar_pack", ignore_case=True))
 async def cmd_exp_avatar_pack(message: Message, telegram_queue: TelegramQueue):
-    """Toggle avatar pack feature."""
-    from ...core.session_manager import get_thread_setting
+    """Toggle avatar pack feature (per-project setting)."""
+    from ...core.session_manager import get_project_setting
     from ...config import get_global_defaults
 
     chat_id = message.chat.id
-    thread_id = message.message_thread_id
 
     project = project_manager.get_by_chat(chat_id)
     if not project:
         await telegram_queue.reply(message, strings.PROJECT_NOT_REGISTERED)
         return
 
-    thread = None
-    if project.threads:
-        thread = project.threads.get(thread_id)
-
-    if not thread:
-        await telegram_queue.reply(message, "Thread not found. Use /start first.")
-        return
-
     global_defaults = get_global_defaults()
-    current = get_thread_setting(thread, "feat_avatar_pack", global_defaults)
+    current = get_project_setting(project, "feat_avatar_pack", global_defaults)
 
     if current:
         kb = avatar_pack_disable_keyboard()
@@ -568,7 +560,7 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
     """Handle settings keyboard button presses."""
     from ...telegram.keyboards.settings import _short_id
     from ...telegram.keyboards import settings_keyboard
-    from ...core.session_manager import get_thread_setting
+    from ...core.session_manager import get_thread_setting, get_project_setting
     from ...config import get_global_defaults
 
     data = callback.data
@@ -723,16 +715,12 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
             await callback.answer("Thread not found")
             return
 
-    elif action == "ea":  # exp_avatar_pack
-        if thread:
-            current = get_thread_setting(thread, "feat_avatar_pack", global_defaults)
-            thread.feat_avatar_pack = not current
-            status = "● on" if thread.feat_avatar_pack else "○ off"
-            project_manager._save()
-            await callback.answer(f"Avatar pack: {status}")
-        else:
-            await callback.answer("Thread not found")
-            return
+    elif action == "ea":  # exp_avatar_pack (per-project setting)
+        current = get_project_setting(project, "feat_avatar_pack", global_defaults)
+        project.feat_avatar_pack = not current
+        status = "● on" if project.feat_avatar_pack else "○ off"
+        project_manager._save()
+        await callback.answer(f"Avatar pack: {status}")
 
     # Determine current page from action code
     from ...telegram.keyboards.settings import SETTINGS_BUTTON_GROUPS, _COMMAND_TO_ACTION

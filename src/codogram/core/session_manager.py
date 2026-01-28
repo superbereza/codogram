@@ -41,6 +41,23 @@ def get_thread_setting(thread: 'ThreadInfo', key: str, global_defaults: dict[str
     return global_defaults.get(key)
 
 
+def get_project_setting(project: 'ProjectState', key: str, global_defaults: dict[str, Any]) -> Any:
+    """Get effective setting: project override or global default.
+
+    Args:
+        project: ProjectState instance
+        key: Setting key (e.g. "feat_avatar_pack")
+        global_defaults: Dict of global defaults
+
+    Returns:
+        Project value if not None, otherwise global default
+    """
+    project_value = getattr(project, key, None)
+    if project_value is not None:
+        return project_value
+    return global_defaults.get(key)
+
+
 def should_cleanup_project(project: 'ProjectState') -> bool:
     """Check if project should be cleaned up (inactive > 30 days).
 
@@ -151,7 +168,7 @@ class ThreadInfo:
     working_status: bool | None = None
     response_mode: str | None = None
     feat_suggestions: bool | None = None
-    feat_avatar_pack: bool | None = None
+    # Note: feat_avatar_pack is per-project (not per-thread) - see ProjectState
 
     # Persisted message IDs (for cleanup after restart):
     last_suggestion_msg_id: int | None = None  # Last 💡 message ID
@@ -223,7 +240,7 @@ class ProjectState:
     response_mode: str = "all"
 
     # Avatar emoji pack:
-    feat_avatar_pack: bool = True
+    feat_avatar_pack: bool | None = None  # None = inherit from global defaults
     emoji_pack_name: str | None = None
     emoji_map: dict[int, str] = field(default_factory=dict)  # {user_id: custom_emoji_id}
 
@@ -344,7 +361,6 @@ class ProjectManager:
                         working_status=thread_working_status,
                         response_mode=thread_data.get("response_mode"),
                         feat_suggestions=thread_data.get("feat_suggestions"),
-                        feat_avatar_pack=thread_data.get("feat_avatar_pack"),
                         last_suggestion_msg_id=thread_data.get("last_suggestion_msg_id"),
                         last_ask_msg_id=thread_data.get("last_ask_msg_id"),
                         last_permission_msg_id=thread_data.get("last_permission_msg_id"),
@@ -448,8 +464,6 @@ class ProjectManager:
                                 thread_data["response_mode"] = t.response_mode
                             if t.feat_suggestions is not None:
                                 thread_data["feat_suggestions"] = t.feat_suggestions
-                            if t.feat_avatar_pack is not None:
-                                thread_data["feat_avatar_pack"] = t.feat_avatar_pack
                             if t.last_suggestion_msg_id:
                                 thread_data["last_suggestion_msg_id"] = t.last_suggestion_msg_id
                             if t.last_ask_msg_id:
