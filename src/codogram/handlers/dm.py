@@ -492,6 +492,176 @@ async def cmd_dm_settings(message: Message, telegram_queue: TelegramQueue):
     await telegram_queue.send(message.chat.id, text, reply_markup=kb)
 
 
+# ===== DM settings callbacks =====
+
+@router.callback_query(F.data == "dmset:noop")
+async def callback_dm_settings_noop(callback: CallbackQuery):
+    """Handle placeholder button press."""
+    await callback.answer()
+
+
+@router.callback_query(F.data == "dmset:close")
+async def callback_dm_settings_close(callback: CallbackQuery):
+    """Close DM settings message."""
+    if callback.message:
+        await callback.message.delete()
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("dmset:page:"))
+async def callback_dm_settings_page(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Handle DM settings page navigation."""
+    from ..telegram.keyboards.settings import settings_keyboard_dm
+
+    try:
+        new_page = int(callback.data.split(":")[-1])
+    except ValueError:
+        await callback.answer("Invalid page")
+        return
+
+    text = _build_dm_settings_text()
+    kb = settings_keyboard_dm(page=new_page)
+    await telegram_queue.edit(callback.message, text, reply_markup=kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("dmset:"))
+async def callback_dm_settings(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Handle DM settings button presses."""
+    from ..telegram.keyboards.settings import settings_keyboard_dm, SETTINGS_BUTTON_GROUPS_DM, _COMMAND_TO_ACTION
+    from ..telegram.keyboards.verbose_menu import verbose_menu_keyboard_dm
+    from ..handlers.settings.verbose_menu import _build_verbose_text
+    from ..config import set_global_default
+
+    parts = callback.data.split(":")
+    if len(parts) < 2:
+        await callback.answer("Invalid callback")
+        return
+
+    action = parts[1]
+    defaults = get_global_defaults()
+
+    # Map action to setting key
+    action_to_key = {
+        "aa": "auto_accept",
+        "rm": "response_mode",
+        "db": "display_bullet",
+        "dt": "display_thinking_text",
+        "ws": "working_status",
+        "es": "feat_suggestions",
+        "ea": "feat_avatar_pack",
+    }
+
+    if action == "v":
+        # Open verbose mode menu
+        text = _build_verbose_text(defaults["display_mode"], defaults["line_limit"])
+        kb = verbose_menu_keyboard_dm(defaults["display_mode"], defaults["line_limit"])
+        await telegram_queue.edit(callback.message, text, reply_markup=kb)
+        await callback.answer()
+        return
+    elif action == "rm":
+        # Cycle response mode
+        modes = ["all", "polite", "mentions"]
+        current = defaults["response_mode"]
+        try:
+            next_idx = (modes.index(current) + 1) % len(modes)
+        except ValueError:
+            next_idx = 0
+        set_global_default("response_mode", modes[next_idx])
+        await callback.answer(f"Response: {modes[next_idx]}")
+    elif action in action_to_key:
+        key = action_to_key[action]
+        new_value = not defaults[key]
+        set_global_default(key, new_value)
+        status = "● on" if new_value else "○ off"
+
+        labels = {
+            "auto_accept": "Auto-accept",
+            "display_bullet": "Bullet prefix",
+            "display_thinking_text": "Thinking text",
+            "working_status": "Working status",
+            "feat_suggestions": "Suggestions",
+            "feat_avatar_pack": "Avatar pack",
+        }
+        label = labels.get(key, key)
+        await callback.answer(f"{label}: {status}")
+    else:
+        await callback.answer("Unknown action")
+        return
+
+    # Determine current page
+    current_page = 0
+    action_to_cmd = {v: k for k, v in _COMMAND_TO_ACTION.items()}
+    if action in action_to_cmd:
+        cmd = action_to_cmd[action]
+        for i, group in enumerate(SETTINGS_BUTTON_GROUPS_DM):
+            if cmd in group:
+                current_page = i
+                break
+
+    # Update message
+    text = _build_dm_settings_text()
+    kb = settings_keyboard_dm(page=current_page)
+    await telegram_queue.edit(callback.message, text, reply_markup=kb)
+
+
+# ===== DM verbose menu callbacks =====
+
+@router.callback_query(F.data == "dmvm:noop")
+async def callback_dm_verbose_noop(callback: CallbackQuery):
+    """Handle placeholder button press."""
+    await callback.answer()
+
+
+@router.callback_query(F.data == "dmvm:back")
+async def callback_dm_verbose_back(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Return to DM settings from verbose menu."""
+    from ..telegram.keyboards.settings import settings_keyboard_dm
+
+    text = _build_dm_settings_text()
+    kb = settings_keyboard_dm(page=1)  # Page 1 has verbose_mode
+    await telegram_queue.edit(callback.message, text, reply_markup=kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("dmvm:mode:"))
+async def callback_dm_verbose_mode(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Handle verbose mode change in DM."""
+    from ..telegram.keyboards.verbose_menu import verbose_menu_keyboard_dm
+    from ..handlers.settings.verbose_menu import _build_verbose_text
+    from ..config import set_global_default
+
+    new_mode = callback.data.split(":")[-1]
+    defaults = get_global_defaults()
+
+    set_global_default("display_mode", new_mode)
+
+    text = _build_verbose_text(new_mode, defaults["line_limit"])
+    kb = verbose_menu_keyboard_dm(new_mode, defaults["line_limit"])
+    await telegram_queue.edit(callback.message, text, reply_markup=kb)
+    await callback.answer(f"Mode: {new_mode}")
+
+
+@router.callback_query(F.data.startswith("dmvm:lines:"))
+async def callback_dm_verbose_lines(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Handle line limit change in DM."""
+    from ..telegram.keyboards.verbose_menu import verbose_menu_keyboard_dm
+    from ..handlers.settings.verbose_menu import _build_verbose_text
+    from ..config import set_global_default
+
+    delta = int(callback.data.split(":")[-1])
+    defaults = get_global_defaults()
+
+    new_limit = max(1, defaults["line_limit"] + delta)
+    set_global_default("line_limit", new_limit)
+    set_global_default("display_mode", "lines")  # Switch to lines mode
+
+    text = _build_verbose_text("lines", new_limit)
+    kb = verbose_menu_keyboard_dm("lines", new_limit)
+    await telegram_queue.edit(callback.message, text, reply_markup=kb)
+    await callback.answer(f"Lines: {new_limit}")
+
+
 # ===== Catch-all for other DM commands =====
 
 @router.message(F.chat.type == ChatType.PRIVATE, F.text.startswith("/"))
