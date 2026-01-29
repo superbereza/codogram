@@ -409,7 +409,7 @@ Show auto-accept as edit to previous tool message instead of new message:
 - Edit last tool message to add "🤖 auto accepted" suffix
 - Reduces chat noise, provides better context
 - Hint every 10th: `/auto_accept to disable`
-- See [docs/plans/2025-01-29-inline-auto-accept-design.md](plans/2025-01-29-inline-auto-accept-design.md)
+- See [docs/designs/2025-01-29-inline-auto-accept-design.md](designs/2025-01-29-inline-auto-accept-design.md)
 
 ### Auto-suspend & auto-resume
 Save RAM by killing idle sessions, auto-resume on user message:
@@ -434,6 +434,26 @@ Ongoing architecture improvements and technical debt reduction.
 - New chats/threads inherit these defaults
 - Per-chat settings override global defaults
 - Configure once — works everywhere
+
+## Active Bugs (External)
+
+### Claude Code: --resume ignores conversation context
+Resume command uses correct session ID but Claude says "this is the beginning of our conversation":
+- `claude --resume <session_id>` executes successfully
+- Session file exists with full history (675 lines)
+- sessions-index.json has correct entry
+- But model doesn't receive conversation context
+- Related: anthropics/claude-code#15837, #3138, #10161
+- **Status:** Waiting for Claude Code fix, no workaround found
+
+### Claude Code: sessions-index.json randomly empties
+Session index file becomes empty, breaking resume picker:
+- Caught on cook-guy and multiple other projects
+- jsonl files exist but sessions-index.json has `"entries": []`
+- Claude Code v2.1.23
+- Root cause unknown — not Codogram's fault (we don't touch this file)
+- Workaround: manually restore index entry from jsonl data
+- Related: anthropics/claude-code#18311
 
 ## Backlog
 
