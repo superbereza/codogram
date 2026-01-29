@@ -354,10 +354,18 @@ async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "Telegra
                         logger.info(f"message_edited: msg_id={msg_id:06x} thread={thread.name}")
                 else:
                     # Normal mode or non-tool content - send as usual
+                    # Use replace_key for tool messages to enable inline auto-accept edit
+                    replace_key = None
+                    if entry.content_type == ContentType.TOOL_USE:
+                        replace_key = f"tool:{project.chat_id}:{thread.thread_id}"
+                        # Save original text for later edit
+                        thread.last_tool_msg_text = messages[0].get("text")
+
                     batch = OutgoingBatch(
                         chat_id=project.chat_id,
                         thread_id=thread.thread_id,
                         messages=messages,
+                        replace_key=replace_key,
                     )
                     telegram_ids = await telegram_queue.enqueue(batch)
                     logger.info(f"message_sent: msg_id={msg_id:06x} thread={thread.name} telegram_ids={telegram_ids}")
@@ -366,6 +374,7 @@ async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "Telegra
                     # This starts fresh for the next sequence of tool calls
                     if entry.content_type == ContentType.TEXT:
                         current_mode_active = False
+                        thread.last_tool_msg_text = None  # Reset on text response
 
                 # Signal poller to resend thinking status (so it appears at bottom)
                 thread.thinking_needs_resend = True
