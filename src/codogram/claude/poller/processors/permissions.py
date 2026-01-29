@@ -111,9 +111,9 @@ class PermissionProcessor(BaseProcessor):
         if auto_accept:
             accepted = await try_auto_accept(
                 parsed.options, parsed.body, self.ctx.tmux,
-                self.ctx.queue, self.ctx.chat_id, self.ctx.thread_id,
+                self.ctx.queue, self.ctx.chat_id,
                 self.ctx.context_name, prompt_type=parsed.prompt_type,
-                display_mode=display_mode, line_limit=line_limit,
+                thread=self.ctx.thread,
             )
             if accepted:
                 self.log_info("DEBOUNCING->SHOWING: auto-accepted successfully")
@@ -145,9 +145,9 @@ class PermissionProcessor(BaseProcessor):
             if auto_accept:
                 accepted = await try_auto_accept(
                     parsed.options, parsed.body, self.ctx.tmux,
-                    self.ctx.queue, self.ctx.chat_id, self.ctx.thread_id,
+                    self.ctx.queue, self.ctx.chat_id,
                     self.ctx.context_name, prompt_type=parsed.prompt_type,
-                    display_mode=display_mode, line_limit=line_limit,
+                    thread=self.ctx.thread,
                 )
                 if accepted:
                     self.log_info("SHOWING: options/body changed, auto-accepted again")

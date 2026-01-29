@@ -4,6 +4,21 @@ from codogram.auto_accept import select_option, try_auto_accept, AUTO_ACCEPT_TYP
 from codogram.claude.screen import PromptType
 from codogram.strings import SNIP
 
+
+def _make_mock_thread(thread_id=None, last_tool_msg_text=None):
+    """Create mock thread for testing."""
+    mock = MagicMock()
+    mock.thread_id = thread_id
+    mock.last_tool_msg_text = last_tool_msg_text
+    mock.auto_accept_count = 0
+    mock.settings = {}
+    # Set thread-level settings to None so get_thread_setting falls back to global defaults
+    # (MagicMock returns MagicMock for any attribute, not None)
+    mock.display_mode = None
+    mock.line_limit = None
+    return mock
+
+
 # Tests for select_option
 def test_select_option_picks_yes():
     assert select_option(["1. Yes", "2. Allow all"]) == "1"
@@ -28,6 +43,7 @@ def test_select_option_empty():
 async def test_try_auto_accept_success():
     tmux = MagicMock()
     queue = AsyncMock()
+    thread = _make_mock_thread()
 
     result = await try_auto_accept(
         options=["1. Yes", "2. No"],
@@ -35,8 +51,8 @@ async def test_try_auto_accept_success():
         tmux=tmux,
         telegram_queue=queue,
         chat_id=123,
-        thread_id=None,
         context_name="test-project",
+        thread=thread,
     )
 
     assert result is True
@@ -47,6 +63,7 @@ async def test_try_auto_accept_success():
 async def test_try_auto_accept_no_safe_option():
     tmux = MagicMock()
     queue = AsyncMock()
+    thread = _make_mock_thread()
 
     result = await try_auto_accept(
         options=["1. Allow for session", "2. No"],
@@ -54,8 +71,8 @@ async def test_try_auto_accept_no_safe_option():
         tmux=tmux,
         telegram_queue=queue,
         chat_id=123,
-        thread_id=None,
         context_name="test-project",
+        thread=thread,
     )
 
     assert result is False
@@ -66,6 +83,7 @@ async def test_try_auto_accept_no_safe_option():
 async def test_try_auto_accept_empty_body():
     tmux = MagicMock()
     queue = AsyncMock()
+    thread = _make_mock_thread(thread_id=456)
 
     result = await try_auto_accept(
         options=["1. Yes"],
@@ -73,8 +91,8 @@ async def test_try_auto_accept_empty_body():
         tmux=tmux,
         telegram_queue=queue,
         chat_id=123,
-        thread_id=456,
         context_name="test-thread",
+        thread=thread,
     )
 
     assert result is True
@@ -94,6 +112,7 @@ async def test_try_auto_accept_skips_mcp_trust():
     """MCP trust prompts should not be auto-accepted."""
     tmux = MagicMock()
     queue = AsyncMock()
+    thread = _make_mock_thread()
 
     result = await try_auto_accept(
         options=["1. Yes", "2. No"],  # Would normally be accepted
@@ -101,9 +120,9 @@ async def test_try_auto_accept_skips_mcp_trust():
         tmux=tmux,
         telegram_queue=queue,
         chat_id=123,
-        thread_id=None,
         context_name="test-project",
         prompt_type=PromptType.TRUST_PROMPT,
+        thread=thread,
     )
 
     assert result is False
@@ -113,9 +132,13 @@ async def test_try_auto_accept_skips_mcp_trust():
 
 @pytest.mark.asyncio
 async def test_try_auto_accept_truncates_in_short_mode():
-    """Body should be truncated when verbose=False."""
+    """Body should be truncated with default line_limit."""
     tmux = MagicMock()
     queue = AsyncMock()
+    thread = _make_mock_thread()
+    # Explicitly set display_mode to "lines" to test truncation
+    # (global config may have different display_mode)
+    thread.display_mode = "lines"
 
     long_body = "\n".join([f"line{i}" for i in range(10)])
 
@@ -125,12 +148,36 @@ async def test_try_auto_accept_truncates_in_short_mode():
         tmux=tmux,
         telegram_queue=queue,
         chat_id=123,
-        thread_id=None,
         context_name="test",
-        verbose=False,
+        thread=thread,
     )
 
     assert result is True
     call_args = queue.enqueue_nowait.call_args[0][0]
     sent_text = call_args.messages[0]["text"]
     assert SNIP in sent_text
+
+
+@pytest.mark.asyncio
+async def test_try_auto_accept_inline_edit():
+    """When last_tool_msg_text exists, should edit message instead of sending new."""
+    tmux = MagicMock()
+    queue = AsyncMock()
+    thread = _make_mock_thread(last_tool_msg_text="○ Read: file.py")
+
+    result = await try_auto_accept(
+        options=["1. Yes"],
+        body="Read file",
+        tmux=tmux,
+        telegram_queue=queue,
+        chat_id=123,
+        context_name="test",
+        thread=thread,
+    )
+
+    assert result is True
+    # Should call enqueue (for edit), not enqueue_nowait (for new message)
+    queue.enqueue.assert_called_once()
+    queue.enqueue_nowait.assert_not_called()
+    # Check suffix was added
+    assert thread.auto_accept_count == 1

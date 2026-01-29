@@ -179,6 +179,10 @@ class ThreadInfo:
     notified_closed: bool = False      # True = already sent "session closed" notification
     thinking_needs_resend: bool = False  # True = watcher sent message, thinking needs delete+send
 
+    # For inline auto-accept:
+    last_tool_msg_text: str | None = None  # Original text for edit
+    auto_accept_count: int = 0             # Counter for hint frequency
+
     def get_tmux_session(self, project_name: str) -> str:
         """Get tmux session name for this thread."""
         if self.name == "main":

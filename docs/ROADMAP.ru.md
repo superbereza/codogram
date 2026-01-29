@@ -420,7 +420,7 @@ Permission prompts по умолчанию показывают только з�
 - Редактируем последний tool message, добавляя "🤖 auto accepted"
 - Меньше шума в чате, лучший контекст
 - Хинт каждый 10-й раз: `/auto_accept to disable`
-- См. [docs/plans/2025-01-29-inline-auto-accept-design.md](plans/2025-01-29-inline-auto-accept-design.md)
+- См. [docs/designs/2025-01-29-inline-auto-accept-design.md](designs/2025-01-29-inline-auto-accept-design.md)
 
 ### Auto-suspend & auto-resume
 Экономия RAM за счёт убийства idle сессий, auto-resume при сообщении:
@@ -445,6 +445,26 @@ Permission prompts по умолчанию показывают только з�
 - Новые чаты/треды наследуют эти дефолты
 - Per-chat настройки переопределяют глобальные
 - Настроил один раз — работает везде
+
+## Active Bugs (External)
+
+### Claude Code: --resume игнорирует контекст разговора
+Resume команда использует правильный session ID, но Claude говорит "это начало нашего разговора":
+- `claude --resume <session_id>` выполняется успешно
+- Файл сессии существует с полной историей (675 строк)
+- sessions-index.json содержит корректную запись
+- Но модель не получает контекст разговора
+- Связанные issues: anthropics/claude-code#15837, #3138, #10161
+- **Статус:** Ждём фикс от Claude Code, workaround не найден
+
+### Claude Code: sessions-index.json случайно очищается
+Индекс сессий становится пустым, ломая resume picker:
+- Поймано на cook-guy и нескольких других проектах
+- jsonl файлы существуют, но sessions-index.json содержит `"entries": []`
+- Claude Code v2.1.23
+- Причина неизвестна — не баг Codogram (мы не трогаем этот файл)
+- Workaround: вручную восстановить запись индекса из данных jsonl
+- Связано: anthropics/claude-code#18311
 
 ## Backlog
 

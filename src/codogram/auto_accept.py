@@ -3,10 +3,13 @@ import re
 from typing import TYPE_CHECKING
 
 from .claude.screen import PromptType
-from .telegram.queue import OutgoingBatch
+from .telegram.queue import OutgoingBatch, EditBatch
 from .tmux.session import TmuxSession
 from .logging_config import logger
 from .utils.truncate import truncate_body
+from .core.session_manager import ThreadInfo, get_thread_setting
+from .config import get_global_defaults
+from . import strings
 
 if TYPE_CHECKING:
     from .telegram.queue import TelegramQueue
@@ -55,23 +58,23 @@ async def try_auto_accept(
     tmux: TmuxSession,
     telegram_queue: "TelegramQueue",
     chat_id: int,
-    thread_id: int | None,
     context_name: str,
     prompt_type: PromptType = PromptType.REGULAR,
-    display_mode: str = "lines",
-    line_limit: int = 5,
+    thread: "ThreadInfo | None" = None,
 ) -> bool:
     """Try to auto-accept a permission prompt.
 
     Returns True if auto-accepted, False if manual mode needed.
 
     Args:
-        display_mode: How to show auto-accept notification:
-            - silence/current: no notification
-            - headers: only first line
-            - lines: truncated body
-            - show_all: full body
+        thread: Thread info containing settings for display_mode/line_limit
     """
+    # Extract settings from thread
+    global_defaults = get_global_defaults()
+    thread_id = thread.thread_id if thread else None
+    display_mode = get_thread_setting(thread, "display_mode", global_defaults) if thread else "lines"
+    line_limit = get_thread_setting(thread, "line_limit", global_defaults) if thread else 5
+
     logger.debug(
         f"try_auto_accept ENTER: context={context_name} type={prompt_type.value} "
         f"options={options!r} body_len={len(body) if body else 0} display_mode={display_mode}"
@@ -94,23 +97,65 @@ async def try_auto_accept(
         # No notification in silence/current mode
         pass
     else:
-        # Build body text based on display_mode
-        if display_mode == "headers":
-            # Only first line
-            body_text = body.split("\n")[0][:60] if body else "[no details]"
-        elif display_mode == "show_all":
-            # Full body
-            body_text = body if body else "[no details]"
-        else:
-            # lines mode - truncated
-            body_text = truncate_body(body, verbose=False, max_lines=line_limit) if body else "[no details]"
+        # Try to edit last tool message (inline auto-accept)
+        edited = False
+        if thread and thread.last_tool_msg_text:
+            replace_key = f"tool:{chat_id}:{thread.thread_id}"
 
-        batch = OutgoingBatch(
-            chat_id=chat_id,
-            thread_id=thread_id,
-            messages=[{"text": f"🤖 Auto: {body_text}", "parse_mode": "MarkdownV2"}],
-        )
-        await telegram_queue.enqueue_nowait(batch)
+            # Build suffix with optional hint
+            thread.auto_accept_count += 1
+            # Prefix depends on display_mode:
+            # - lines/show_all: empty line (double newline)
+            # - headers: single newline
+            # - current: space
+            if display_mode in ("lines", "show_all"):
+                prefix = "\n\n"
+            elif display_mode == "headers":
+                prefix = "\n"
+            else:
+                prefix = " "
+            suffix = prefix + strings.AUTO_ACCEPT_SUFFIX
+            if thread.auto_accept_count % 10 == 0:
+                suffix += strings.AUTO_ACCEPT_HINT
+
+            new_text = thread.last_tool_msg_text + suffix
+
+            # Check length limit (Telegram max 4096)
+            if len(new_text) <= 4096:
+                try:
+                    batch = EditBatch(
+                        chat_id=chat_id,
+                        message_id=0,  # Lookup from sent_statuses via replace_key
+                        text=new_text,
+                        parse_mode="MarkdownV2",
+                        replace_key=replace_key,
+                    )
+                    await telegram_queue.enqueue(batch)
+                    # Update stored text for potential next edit
+                    thread.last_tool_msg_text = new_text
+                    edited = True
+                    logger.debug("try_auto_accept: edited tool message with suffix")
+                except Exception as e:
+                    logger.debug(f"try_auto_accept: edit failed, falling back: {e}")
+            else:
+                logger.debug(f"try_auto_accept: message too long ({len(new_text)} chars), sending new message")
+
+        # Fallback: send new message if edit failed
+        if not edited:
+            # Build body text based on display_mode
+            if display_mode == "headers":
+                body_text = body.split("\n")[0][:60] if body else "[no details]"
+            elif display_mode == "show_all":
+                body_text = body if body else "[no details]"
+            else:
+                body_text = truncate_body(body, verbose=False, max_lines=line_limit) if body else "[no details]"
+
+            batch = OutgoingBatch(
+                chat_id=chat_id,
+                thread_id=thread_id,
+                messages=[{"text": f"🤖 Auto: {body_text}", "parse_mode": "MarkdownV2"}],
+            )
+            await telegram_queue.enqueue_nowait(batch)
 
     try:
         tmux.send_key(selected)
