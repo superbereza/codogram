@@ -2,7 +2,7 @@
 import json
 import tempfile
 from pathlib import Path
-from codogram.history_reader import find_session_for_project, reset_history_cache, compute_jsonl_path, get_session_creation_time
+from codogram.claude.session_finder import find_session_for_project, reset_history_cache, compute_jsonl_path, get_session_creation_time
 
 def test_find_session_for_project():
     reset_history_cache()  # Clean state
@@ -192,7 +192,7 @@ def test_get_session_creation_time_malformed_json():
 def test_find_session_by_user_message_filters_by_created_after(tmp_path, monkeypatch):
     """Test that created_after filters out old sessions."""
     import os
-    from codogram.history_reader import find_session_by_user_message
+    from codogram.claude.session_finder import find_session_by_user_message
 
     # Create project directory structure
     project_dir = tmp_path / ".claude" / "projects" / "-test-cwd"

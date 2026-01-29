@@ -2,8 +2,8 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from ..session_manager import project_manager, ProjectState, ThreadInfo
-from ..tmux import TmuxSession
+from ..core.session_manager import project_manager, ProjectState, ThreadInfo
+from ..tmux.session import TmuxSession
 from ..logging_config import logger
 
 

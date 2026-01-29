@@ -9,7 +9,7 @@ from aiogram.types import CallbackQuery, Message
 
 from ...config import settings
 from ...domain.states import SetupFlow
-from ...keyboards.setup import (
+from ...telegram.keyboards.setup import (
     setup_type_keyboard,
     folder_select_keyboard,
     connected_projects_keyboard,
@@ -57,6 +57,7 @@ async def show_folder_selection(message: Message, state: FSMContext, page: int =
         strings.SETUP_FOLDER_SELECT,
         reply_markup=folder_select_keyboard(page_folders, page, total_pages),
     )
+    await state.update_data(bot_message_id=message.message_id)
 
 
 @router.callback_query(
@@ -98,21 +99,8 @@ async def on_folder_selected(callback: CallbackQuery, state: FSMContext):
         target_dir=str(target_dir),
     )
 
-    # Check if rename needed
-    chat_title = callback.message.chat.title or ""
-
-    if chat_title != folder_name:
-        await state.set_state(SetupFlow.awaiting_rename_confirm)
-        await state.update_data(rename_to=folder_name)
-
-        from ...keyboards.setup.confirm import rename_confirm_keyboard
-        await callback.message.edit_text(
-            strings.SETUP_RENAME_PROMPT.format(name=folder_name),
-            reply_markup=rename_confirm_keyboard(),
-        )
-    else:
-        # Check git status
-        await _check_git_and_proceed(callback.message, state, target_dir)
+    # Check git status (rename offered after migration when admin rights available)
+    await _check_git_and_proceed(callback.message, state, target_dir)
 
 
 async def _check_git_and_proceed(message: Message, state: FSMContext, target_dir: Path):
@@ -127,7 +115,7 @@ async def _check_git_and_proceed(message: Message, state: FSMContext, target_dir
         # Ask about git
         await state.set_state(SetupFlow.awaiting_git_choice)
 
-        from ...keyboards.setup.git_choice import git_choice_keyboard
+        from ...telegram.keyboards.setup.git_choice import git_choice_keyboard
         data = await state.get_data()
         folder_name = data["project_name"]
 
@@ -154,7 +142,7 @@ async def on_view_connected(callback: CallbackQuery, state: FSMContext):
     else:
         lines = [strings.SETUP_CONNECTED_HEADER, ""]
 
-        from ...session_manager import ProjectManager
+        from ...core.session_manager import ProjectManager
         pm = ProjectManager()
 
         for folder_name, chat_id in connected.items():

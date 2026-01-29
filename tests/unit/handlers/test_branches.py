@@ -6,7 +6,7 @@ from pathlib import Path
 
 from aiogram.types import Message, Chat
 
-from codogram.session_manager import ThreadInfo
+from codogram.core.session_manager import ThreadInfo
 from codogram.domain.worktree_state import WorktreeState
 
 

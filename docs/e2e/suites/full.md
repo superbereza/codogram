@@ -10,7 +10,7 @@
 ### Start Edge Cases
 | ID | Название | Файл |
 |----|----------|------|
-| TC-START-008 | /restart перезапуск | commands/start.md |
+| TC-START-008 | /start in forum shows extended menu | commands/start.md |
 | TC-START-009 | /start no directory | commands/start.md |
 | TC-START-010 | /start git clone flow | commands/start.md |
 | TC-START-011 | /start multiple tmux choice | commands/start.md |
@@ -18,8 +18,8 @@
 ### Sessions Extended
 | ID | Название | Файл |
 |----|----------|------|
-| TC-SESSIONS-003 | /clear resets session | commands/sessions.md |
-| TC-SESSIONS-004 | /resume explicit resume | commands/sessions.md |
+| TC-SESSIONS-003 | /new alias works | commands/sessions.md |
+| TC-SESSIONS-004 | /reset_chat restarts Claude | commands/sessions.md |
 
 ### Settings
 | ID | Название | Файл |
@@ -64,10 +64,20 @@
 | TC-PERMISSIONS-013 | Auto-accept truncated (verbose=off) | commands/permissions.md |
 | TC-PERMISSIONS-014 | Auto-accept full (verbose=on) | commands/permissions.md |
 
+### Avatar Pack Extended
+| ID | Название | Файл |
+|----|----------|------|
+| TC-AVATAR-004 | Cancel keeps pack enabled | commands/avatar_pack.md |
+| TC-AVATAR-008 | Topic launch NO hint when disabled | commands/avatar_pack.md |
+| TC-AVATAR-009 | Member join adds to pack (ASK USER) | commands/avatar_pack.md |
+| TC-AVATAR-010 | Member leave removes from pack (ASK USER) | commands/avatar_pack.md |
+| TC-AVATAR-011 | "Not now" cancels create | commands/avatar_pack.md |
+| TC-AVATAR-012 | Pack link is valid (ASK USER) | commands/avatar_pack.md |
+
 ## Включённые тесты из Critical
 
-Все 26 тестов из critical.md
+Все 44 теста из critical.md (включая 6 avatar pack тестов)
 
 ## Критерий успеха
 
-Все ~50 тестов PASS = готов к релизу.
+Все ~56 тестов PASS = готов к релизу.

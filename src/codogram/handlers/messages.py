@@ -6,11 +6,14 @@ from aiogram.types import Message
 
 from ..services.message_router import MessageRouterService, RouteAction
 from ..services.file_input import FileInputService
-from ..session_manager import project_manager, ThreadInfo
-from ..telegram_queue import TelegramQueue
+from ..services.response_mode import ResponseModeService
+from ..core.session_manager import project_manager, ThreadInfo, get_thread_setting
+from ..config import get_global_defaults
+from ..telegram.queue import TelegramQueue
+from ..state import active_ask_prompts, permission_messages, ask_options_state, ask_other_pending
 from ..logging_config import logger
 from .. import strings
-from .create_flow import handle_name_input
+from .new_chat import handle_name_input
 from .common import normalize_thread_id
 
 router = Router(name="messages")
@@ -27,20 +30,185 @@ _FILE_ERROR_MESSAGES = {
 }
 
 
+def _should_skip_by_response_mode(
+    message: Message,
+    response_mode_service: ResponseModeService,
+) -> bool:
+    """Check if message should be skipped based on response mode.
+
+    Returns True if message should be skipped, False if should process.
+    """
+    # Skip filter for private chats
+    if message.chat.type == "private":
+        return False
+
+    # Forwarded messages - always respond (user forwarded intentionally)
+    if message.forward_date or message.forward_from or message.forward_from_chat:
+        return False
+
+    chat_id = message.chat.id
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        return False  # No project = no filter
+
+    thread = project.threads.get(thread_id) if thread_id is not None else project.threads.get(None)
+    global_defaults = get_global_defaults()
+    mode = get_thread_setting(thread, "response_mode", global_defaults)
+
+    reply_to_user_id = None
+    if message.reply_to_message and message.reply_to_message.from_user:
+        reply_to_user_id = message.reply_to_message.from_user.id
+
+    text = message.text or message.caption
+    entities = message.entities or message.caption_entities or []
+
+    result = response_mode_service.should_respond(
+        mode=mode,
+        text=text,
+        entities=entities,
+        reply_to_user_id=reply_to_user_id,
+    )
+
+    if not result.should_respond:
+        logger.info(f"Skipping message in {mode} mode: {result.reason}")
+        return True
+
+    return False
+
+
 @router.message(F.text.startswith("/"))
-async def on_unknown_command(message: Message, telegram_queue: TelegramQueue):
+async def on_unknown_command(
+    message: Message,
+    telegram_queue: TelegramQueue,
+    response_mode_service: ResponseModeService | None = None,
+):
     """Forward unregistered commands to Claude as text."""
+    if response_mode_service and _should_skip_by_response_mode(message, response_mode_service):
+        return
+
     await _route_message(message, telegram_queue)
 
 
 @router.message()
-async def on_message(message: Message, telegram_queue: TelegramQueue):
+async def on_message(
+    message: Message,
+    telegram_queue: TelegramQueue,
+    response_mode_service: ResponseModeService | None = None,
+):
     """Route regular messages to tmux sessions.
 
     This is the catch-all handler - registered last so commands
     and FSM states are handled first by other routers.
     """
+    if response_mode_service and _should_skip_by_response_mode(message, response_mode_service):
+        return
+
     await _route_message(message, telegram_queue)
+
+
+async def _delete_active_ask_prompt(message: Message):
+    """Delete active AskUserQuestion messages if any."""
+    chat_id = message.chat.id
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
+    key = (chat_id, thread_id)
+
+    kb_msg_id = active_ask_prompts.get(key)
+    if not kb_msg_id:
+        return
+
+    # Get related message IDs
+    related_ids = permission_messages.get(kb_msg_id, [])
+
+    # Delete all messages
+    for msg_id in related_ids:
+        try:
+            await message.bot.delete_message(chat_id, msg_id)
+        except Exception:
+            pass  # Message may already be deleted
+
+    try:
+        await message.bot.delete_message(chat_id, kb_msg_id)
+    except Exception:
+        pass
+
+    # Cleanup state
+    permission_messages.pop(kb_msg_id, None)
+    ask_options_state.pop(kb_msg_id, None)
+    active_ask_prompts.pop(key, None)
+
+    logger.debug(f"Deleted active AskUserQuestion for {key}")
+
+
+async def _handle_ask_other_pending(message: Message) -> bool:
+    """Handle pending 'Type something' input for AskUserQuestion.
+
+    When user pressed 'Type something' button, we're waiting for their custom text.
+    This text should be typed directly into the AskUserQuestion option field.
+
+    Returns True if handled, False if no pending input.
+    """
+    chat_id = message.chat.id
+    thread_id = normalize_thread_id(message.chat, message.message_thread_id)
+    key = (chat_id, thread_id)
+
+    logger.debug(f"ask_other_pending check: key={key}, pending_keys={list(ask_other_pending.keys())}")
+
+    pending = ask_other_pending.get(key)
+    if not pending:
+        return False
+
+    text = message.text
+    if not text:
+        return False  # Files not supported for custom input
+
+    tmux_name = pending["tmux"]
+    kb_msg_id = pending.get("kb_msg_id")
+
+    logger.info(f"ask: sending custom input '{text[:50]}' → {tmux_name}")
+
+    # Get tmux session
+    project = project_manager.get_by_tmux(tmux_name)
+    if not project or not project.cwd:
+        logger.warning(f"ask: project not found for tmux {tmux_name}")
+        ask_other_pending.pop(key, None)
+        return True
+
+    from ..tmux.session import TmuxSession
+    tmux = TmuxSession(tmux_name, project.cwd)
+
+    # Send text directly (replaces "Type something." in the option field)
+    # Use -l for literal text to handle special characters
+    import subprocess
+    subprocess.run(
+        ["tmux", "send-keys", "-t", tmux_name, "-l", "--", text],
+        check=True
+    )
+
+    # Send Enter to submit
+    import time
+    time.sleep(0.1)
+    tmux.send_key("Enter")
+
+    # Clean up state
+    ask_other_pending.pop(key, None)
+    permission_messages.pop(kb_msg_id, None)
+    ask_options_state.pop(kb_msg_id, None)
+    active_ask_prompts.pop(key, None)
+
+    # Edit keyboard message to show result (like regular selection)
+    if kb_msg_id:
+        try:
+            await message.bot.edit_message_text(
+                f"✓ {text}",
+                chat_id=chat_id,
+                message_id=kb_msg_id,
+            )
+        except Exception as e:
+            logger.warning(f"ask: edit failed: {e}")
+
+    return True
 
 
 async def _route_message(message: Message, telegram_queue: TelegramQueue):
@@ -65,6 +233,10 @@ async def _route_message(message: Message, telegram_queue: TelegramQueue):
     )
 
     chat_id = message.chat.id
+
+    # Check for pending "Type something" input first
+    if await _handle_ask_other_pending(message):
+        return
 
     # Check if awaiting name input for create flow
     if await handle_name_input(message, telegram_queue):
@@ -102,6 +274,9 @@ async def _route_message(message: Message, telegram_queue: TelegramQueue):
             return
 
         case RouteAction.SEND_TO_TMUX:
+            # Delete active AskUserQuestion if user is sending a message
+            await _delete_active_ask_prompt(message)
+
             success = await _send_content(message, result, telegram_queue)
             if not success and message.chat.id < 0:
                 await telegram_queue.reply(message, "No active Claude session. Use /start to launch.")
@@ -161,7 +336,7 @@ async def _send_content(message: Message, result, telegram_queue: TelegramQueue)
 def _try_send_to_tmux(result, text: str) -> bool:
     """Try to send message to tmux if session exists."""
     if result.tmux_name and result.cwd:
-        from ..tmux import TmuxSession
+        from ..tmux.session import TmuxSession
         tmux = TmuxSession(result.tmux_name, result.cwd)
         if tmux.exists():
             tmux.send(text)
@@ -171,7 +346,7 @@ def _try_send_to_tmux(result, text: str) -> bool:
 
 async def _start_binding(message: Message, result, telegram_queue: TelegramQueue):
     """Start session binding for unbound thread."""
-    from ..history_watcher import poll_for_session_thread
+    from ..core.coordinator import poll_for_session_thread
 
     thread = result.thread
     project = result.project
@@ -182,11 +357,11 @@ async def _start_binding(message: Message, result, telegram_queue: TelegramQueue
         logger.debug(f"Starting binding task for thread {thread.name}")
 
         async def start_poller(p):
-            from ..permission_poller import create_poller_task
+            from ..claude.poller import create_poller_task
             return await create_poller_task(message.bot, p, telegram_queue)
 
         async def start_watcher(p, send_missed=False):
-            from ..watcher import create_watcher_task
+            from ..claude.history_watcher import create_watcher_task
             return await create_watcher_task(message.bot, p, telegram_queue, send_missed)
 
         thread.binding_task = asyncio.create_task(

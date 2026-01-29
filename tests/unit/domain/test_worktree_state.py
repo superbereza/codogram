@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from codogram.domain.worktree_state import WorktreeState, get_worktree_state
-from codogram.session_manager import ThreadInfo
+from codogram.core.session_manager import ThreadInfo
 
 
 class TestGetWorktreeState:
@@ -22,7 +22,7 @@ class TestGetWorktreeState:
         result = get_worktree_state(thread, Path("/repo"))
         assert result == WorktreeState.OK
 
-    @patch("codogram.git_utils.branch_exists")
+    @patch("codogram.git.utils.branch_exists")
     def test_missing_worktree_with_branch_returns_missing_with_branch(self, mock_branch_exists, tmp_path):
         """Missing worktree but branch exists returns MISSING_WITH_BRANCH."""
         mock_branch_exists.return_value = True
@@ -31,7 +31,7 @@ class TestGetWorktreeState:
         assert result == WorktreeState.MISSING_WITH_BRANCH
         mock_branch_exists.assert_called_once_with(tmp_path, "my-feature")
 
-    @patch("codogram.git_utils.branch_exists")
+    @patch("codogram.git.utils.branch_exists")
     def test_missing_worktree_no_branch_returns_missing_no_branch(self, mock_branch_exists, tmp_path):
         """Missing worktree and no branch returns MISSING_NO_BRANCH."""
         mock_branch_exists.return_value = False

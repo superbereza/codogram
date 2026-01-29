@@ -1,0 +1,245 @@
+"""Read session info from Claude's history.jsonl with incremental reading."""
+import json
+from pathlib import Path
+
+from ..logging_config import logger
+
+HISTORY_PATH = Path.home() / ".claude" / "history.jsonl"
+
+# State for incremental reading.
+#
+# Caching strategy:
+# - _last_size: File size at last read. Used to seek and read only new content.
+# - _last_mtime: File modification time. Quick check for "no changes" case.
+# - _session_cache: Maps cwd -> session_id. Updated incrementally as new entries appear.
+#
+# Truncation detection:
+# When current_size < _last_size, file was truncated/recreated. We reset _last_size to 0
+# and clear the cache. On the next check, current_size > _last_size (0) will be true,
+# so we read from the beginning and rebuild the cache from scratch.
+_last_size = 0
+_last_mtime = 0
+_session_cache: dict[str, str] = {}  # cwd -> session_id
+
+
+def find_session_for_project(cwd: str, history_path: Path = HISTORY_PATH) -> str | None:
+    """Find the most recent session_id for a project by cwd.
+
+    Uses incremental reading - only reads new lines since last check.
+    Detects file truncation and resets cache when needed.
+    """
+    global _last_size, _last_mtime, _session_cache
+
+    if not history_path.exists():
+        return _session_cache.get(cwd)
+
+    try:
+        stat = history_path.stat()
+        current_size = stat.st_size
+        current_mtime = stat.st_mtime
+
+        # Quick mtime check - no changes
+        if current_mtime == _last_mtime and current_size == _last_size:
+            return _session_cache.get(cwd)
+
+        # File truncated/recreated - reset cache and re-read from start
+        if current_size < _last_size:
+            _last_size = 0
+            _session_cache.clear()
+
+        # Read only new content
+        if current_size > _last_size:
+            with open(history_path, 'r') as f:
+                f.seek(_last_size)
+                new_content = f.read()
+            _last_size = current_size
+
+            # Parse new lines and update cache
+            new_lines = [line for line in new_content.splitlines() if line.strip()]
+            for line in new_lines:
+                try:
+                    entry = json.loads(line)
+                    project = entry.get("project")
+                    session_id = entry.get("sessionId")
+                    if project and session_id:
+                        _session_cache[project] = session_id
+                except json.JSONDecodeError:
+                    logger.warning("json_decode_error", extra={"line": line[:50]})
+                    continue  # Skip malformed lines
+
+            logger.debug(
+                "history_read",
+                extra={
+                    "new_lines": len(new_lines),
+                    "cache_size": len(_session_cache)
+                }
+            )
+
+        _last_mtime = current_mtime
+        return _session_cache.get(cwd)
+
+    except PermissionError as e:
+        logger.error("permission_denied", extra={"error": str(e)})
+        return _session_cache.get(cwd)
+    except OSError as e:
+        logger.warning("os_error", extra={"error": str(e)})
+        return _session_cache.get(cwd)
+    except Exception as e:
+        logger.warning("history_read_error", extra={"error": str(e)})
+        return _session_cache.get(cwd)
+
+
+def reset_history_cache() -> None:
+    """Reset cache (for testing)."""
+    global _last_size, _last_mtime, _session_cache
+    _last_size = 0
+    _last_mtime = 0
+    _session_cache = {}
+
+
+def _parse_timestamp(ts: str | float | None) -> float:
+    """Parse timestamp from jsonl entry (ISO string or Unix float)."""
+    if ts is None:
+        return 0
+    if isinstance(ts, (int, float)):
+        return float(ts)
+    if isinstance(ts, str):
+        # ISO format: "2025-12-29T23:27:59.407Z"
+        from datetime import datetime
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            return dt.timestamp()
+        except ValueError:
+            return 0
+    return 0
+
+
+def get_session_creation_time(jsonl_path: Path) -> float:
+    """Get timestamp of first user/assistant entry in session jsonl.
+
+    This is more reliable than st_mtime/st_ctime because:
+    - st_mtime updates on every write
+    - st_ctime is inode change time, not creation time (Linux)
+    - First entry timestamp IS the session creation time
+
+    Skips file-history-snapshot entries (no top-level timestamp).
+    Parses ISO timestamps like "2025-12-29T23:27:59.407Z".
+
+    Returns 0 if file doesn't exist, is empty, or can't be read.
+    """
+    if not jsonl_path.exists():
+        return 0
+
+    try:
+        with open(jsonl_path, 'r') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                entry = json.loads(line)
+                ts = entry.get("timestamp")
+                if ts:
+                    return _parse_timestamp(ts)
+        return 0
+    except (json.JSONDecodeError, OSError):
+        return 0
+
+
+def get_last_user_message_from_jsonl(jsonl_path: Path) -> str | None:
+    """Read the last user message from a session jsonl file."""
+    if not jsonl_path.exists():
+        return None
+
+    try:
+        last_user_msg = None
+        with open(jsonl_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("type") == "user":
+                        # Extract text from user message
+                        content = entry.get("message", {}).get("content")
+                        if isinstance(content, str):
+                            # External messages (from Telegram) have plain string content
+                            last_user_msg = content
+                        elif isinstance(content, list):
+                            # Internal Claude messages have array of content blocks
+                            for item in content:
+                                if isinstance(item, dict) and item.get("type") == "text":
+                                    last_user_msg = item.get("text")
+                                    break
+                except json.JSONDecodeError:
+                    continue
+        return last_user_msg
+    except Exception:
+        return None
+
+
+def compute_jsonl_path(cwd: str, session_id: str) -> Path:
+    """Compute jsonl path from cwd and session_id.
+
+    Formula: ~/.claude/projects/{normalized_cwd.replace("/", "-")}/{session_id}.jsonl
+
+    Normalization:
+    - Remove trailing slashes (except for root "/")
+    - Collapse double slashes
+    - Do NOT resolve symlinks (match Claude behavior)
+    """
+    # Normalize path
+    normalized = cwd.rstrip("/") or "/"  # Preserve "/" for root
+    while "//" in normalized:
+        normalized = normalized.replace("//", "/")
+
+    # Claude replaces both "/" and "." with "-"
+    project_hash = normalized.replace("/", "-").replace(".", "-")
+    return Path.home() / ".claude" / "projects" / project_hash / f"{session_id}.jsonl"
+
+
+def find_session_by_user_message(
+    cwd: str,
+    user_message: str,
+    created_after: float | None = None,
+) -> tuple[str, Path] | None:
+    """Find session that contains the given user message.
+
+    Scans ALL session jsonl files for a cwd (not just the latest).
+
+    Args:
+        cwd: Project working directory
+        user_message: Last user message to match
+        created_after: Only consider sessions MODIFIED after this timestamp.
+                       Supports both new sessions and resumed sessions.
+
+    Returns (session_id, jsonl_path) or None if not found.
+    """
+    # Compute project directory
+    normalized = cwd.rstrip("/") or "/"
+    while "//" in normalized:
+        normalized = normalized.replace("//", "/")
+    # Claude replaces both "/" and "." with "-"
+    project_hash = normalized.replace("/", "-").replace(".", "-")
+    project_dir = Path.home() / ".claude" / "projects" / project_hash
+
+    if not project_dir.exists():
+        return None
+
+    # Scan all jsonl files, sorted by mtime (newest first)
+    jsonl_files = list(project_dir.glob("*.jsonl"))
+    jsonl_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+    for jsonl_path in jsonl_files:
+        # Filter by modification time if specified
+        # Uses mtime (not creation time) to support resumed sessions
+        if created_after is not None:
+            session_mtime = jsonl_path.stat().st_mtime
+            if session_mtime < created_after:
+                continue  # Session not modified since /start - skip
+
+        last_msg = get_last_user_message_from_jsonl(jsonl_path)
+        if last_msg == user_message:
+            session_id = jsonl_path.stem
+            return (session_id, jsonl_path)
+
+    return None

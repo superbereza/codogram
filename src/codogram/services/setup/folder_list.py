@@ -53,7 +53,7 @@ def get_connected_folders() -> dict[str, int]:
     Returns:
         Dict mapping folder names to their chat IDs
     """
-    from ...session_manager import ProjectManager
+    from ...core.session_manager import ProjectManager
 
     pm = ProjectManager()
     result = {}

@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from codogram.services.branch import archive_thread
-from codogram.session_manager import ProjectState, ThreadInfo
+from codogram.core.session_manager import ProjectState, ThreadInfo
 
 
 @pytest.fixture

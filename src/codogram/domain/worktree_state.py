@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.session_manager import ThreadInfo
 
 
 class WorktreeState(Enum):
@@ -17,7 +17,7 @@ class WorktreeState(Enum):
 
 def get_worktree_state(thread: ThreadInfo, project_cwd: Path) -> WorktreeState:
     """Check worktree state for a thread."""
-    from codogram.git_utils import branch_exists
+    from codogram.git.utils import branch_exists
 
     if not thread.worktree_path:
         return WorktreeState.OK

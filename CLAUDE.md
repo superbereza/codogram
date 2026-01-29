@@ -32,24 +32,39 @@ Telegram bot for managing Claude Code sessions through Telegram:
 src/codogram/
 ├── main.py                   # Bot entry point
 ├── config.py                 # Settings + config persistence
-├── session_manager.py        # ProjectManager - project state
-├── telegram_queue.py         # Rate-limited message queue
-├── handlers/                 # Telegram command handlers
-│   ├── start.py              # /start flow
-│   ├── sessions.py           # /new, /clear, /resume
-│   ├── threads.py            # /thread_create, /thread_delete
-│   ├── branches.py           # /branch_create, /branch_finish
-│   └── settings.py           # /settings, /auto_accept, /help
-├── services/                 # Business logic
-│   ├── start_flow.py         # StartFlowService
-│   └── branch.py             # Branch operations
-├── middleware/               # Global middleware
-│   └── admin.py              # AdminMiddleware
-├── history_reader.py         # Parse ~/.claude/history.jsonl
-├── permission_poller.py      # Poll tmux for permission prompts
-├── watcher.py                # Monitor jsonl for tool calls
-├── tmux.py                   # Tmux session interaction
-└── screen.py                 # Parse tmux screen content
+├── strings.py                # All UI texts
+│
+├── telegram/                 # Telegram: message queue, keyboards, launch animation
+│   ├── queue.py
+│   ├── adapters.py
+│   ├── sticker.py
+│   ├── launch_animation.py
+│   └── keyboards/
+│       └── tmux_selector.py  # Tmux selection keyboard
+│
+├── tmux/                     # Tmux: sessions, commands, window creation
+│   ├── session.py
+│   └── launcher.py
+│
+├── claude/                   # Claude CLI: screen parsing, permission prompts, history.jsonl
+│   ├── screen.py
+│   ├── session_finder.py
+│   ├── history_watcher.py
+│   └── poller.py
+│
+├── git/                      # Git: worktree, branches, utils
+│   ├── utils.py
+│   ├── worktree.py
+│   └── resolver.py           # Project name resolution
+│
+├── core/                     # Core: project state, background task coordinator
+│   ├── session_manager.py
+│   └── coordinator.py
+│
+├── domain/                   # Data models, FSM states, validators
+├── handlers/                 # Telegram commands (/start, /new_chat, etc.)
+├── services/                 # Business logic (start flow, message routing, launch)
+└── middleware/               # Authorization
 ```
 
 ## Usage
@@ -156,9 +171,11 @@ src/codogram/
 ├── services/          # Business logic — start_flow, branch, message_router, launch
 ├── domain/            # Models, validators, FSM states
 ├── middleware/        # Global middleware (AdminMiddleware)
-├── adapters/          # External integrations (telegram.py)
-├── keyboards/         # Inline keyboard builders
-└── *.py               # Core modules (tmux, watcher, poller, etc.)
+├── telegram/          # Telegram: queue, adapters, keyboards, launch animation
+├── tmux/              # Tmux: sessions, commands, window creation
+├── claude/            # Claude CLI: screen parsing, permission prompts, history.jsonl
+├── git/               # Git: worktree, branches, utils
+└── core/              # Core: project state, background task coordinator
 ```
 
 **Принципы:**

@@ -7,7 +7,7 @@ os.environ.setdefault("TELEGRAM_TOKEN", "test")
 os.environ.setdefault("ADMIN_IDS", "123")
 os.environ.setdefault("BASE_DIR", "/tmp")
 
-from codogram.session_manager import ProjectState, ProjectManager
+from codogram.core.session_manager import ProjectState, ProjectManager
 
 
 def test_project_state_defaults():

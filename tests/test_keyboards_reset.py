@@ -1,6 +1,6 @@
 """Tests for reset flow keyboards."""
 from codogram import strings
-from codogram.keyboards.reset import (
+from codogram.telegram.keyboards.reset import (
     reset_confirm_keyboard,
     reset_dir_choice_keyboard,
     reset_uncommitted_keyboard,

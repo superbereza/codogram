@@ -10,11 +10,13 @@ os.environ.setdefault("ADMIN_IDS", "123")
 os.environ.setdefault("BASE_DIR", "/tmp")
 
 from aiogram.types import Message, Chat
+from aiogram.enums import ChatType
 from aiogram.fsm.context import FSMContext
 
 from codogram.handlers.start import cmd_start
+from codogram.handlers.start.commands import cmd_start as cmd_start_func  # For patching
 from codogram.services.start_flow import FlowAction
-from codogram.telegram_queue import TelegramQueue
+from codogram.telegram.queue import TelegramQueue
 
 
 @pytest.fixture
@@ -24,6 +26,8 @@ def mock_message():
     message.chat = Mock(spec=Chat)
     message.chat.id = 123
     message.chat.title = "Test Chat"
+    message.chat.type = ChatType.GROUP  # Not PRIVATE - start.py skips DMs
+    message.chat.is_forum = False
     message.text = "/start"
     message.message_thread_id = None
     message.answer = AsyncMock()
@@ -59,7 +63,7 @@ class TestCmdStart:
         """No project and no chat title -> asks for project name."""
         mock_message.chat.title = None  # No chat title
 
-        with patch("codogram.handlers.start.project_manager") as mock_pm:
+        with patch("codogram.handlers.start.commands.project_manager") as mock_pm:
             mock_pm.get_by_chat.return_value = None
 
             await cmd_start(mock_message, mock_state, mock_telegram_queue)

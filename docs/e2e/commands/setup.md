@@ -779,15 +779,14 @@ mcp__telegram__list_messages(chat_id=TEST_CHAT_ID, limit=5)
 - UI: Success message "Project `{name}` ready"
 - UI: Commands list includes:
   - `/esc` - cancel operation
-  - `/clear` - clear context
+  - `/clear_context` - clear context
   - `/auto_accept` - toggle auto-accept
-  - `/thread` - new topic
-  - `/branch` - new branch + topic (forum only)
-  - `/finish` - merge and archive (forum only)
+  - `/new_chat` - new topic + Claude session (forum only)
+  - `/finish_chat` - archive and stop Claude (forum only)
 - UI: Terminal command `tmux attach -t claude-{project}`
 
 **Expected (in non-forum chat):**
-- UI: Same as above but WITHOUT `/branch` and `/finish` commands
+- UI: Same as above but WITHOUT `/new_chat` and `/finish_chat` commands
 
 ---
 

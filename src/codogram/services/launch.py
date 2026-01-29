@@ -1,18 +1,28 @@
 # src/codogram/services/launch.py
 """Launch service for creating threads with Claude sessions."""
 import asyncio
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest
 
 if TYPE_CHECKING:
-    from ..telegram_queue import TelegramQueue
+    from ..telegram.queue import TelegramQueue
 
 from .. import strings
-from ..session_manager import ProjectState, ThreadInfo, project_manager
-from ..launch_animation import launch_with_animation
+from ..core.session_manager import ProjectState, ThreadInfo, project_manager
+from ..telegram.launch_animation import launch_with_animation
 from ..logging_config import logger
+
+
+@dataclass
+class CreateThreadResult:
+    """Result of create_thread_with_session."""
+    success: bool
+    thread: ThreadInfo | None = None
+    error: str | None = None
 
 
 async def create_thread_with_session(
@@ -22,7 +32,7 @@ async def create_thread_with_session(
     name: str,
     create_worktree: bool = False,
     base_branch: str | None = None,
-) -> ThreadInfo | None:
+) -> CreateThreadResult:
     """
     Create Telegram topic + ThreadInfo + (optionally) worktree + launch Claude.
 
@@ -38,14 +48,19 @@ async def create_thread_with_session(
         base_branch: Base branch for worktree (required if create_worktree=True)
 
     Returns:
-        ThreadInfo if successful, None if failed
+        CreateThreadResult with success/thread or error
     """
     # 1. Create Telegram topic FIRST
     try:
         topic = await bot.create_forum_topic(chat_id, name.capitalize())
+    except TelegramBadRequest as e:
+        logger.error(f"Failed to create forum topic: {e}")
+        if "not enough rights" in str(e).lower():
+            return CreateThreadResult(success=False, error=strings.NEW_CHAT_NO_TOPIC_RIGHTS)
+        return CreateThreadResult(success=False, error=str(e))
     except Exception as e:
         logger.error(f"Failed to create forum topic: {e}")
-        return None
+        return CreateThreadResult(success=False, error=str(e))
 
     thread_id = topic.message_thread_id
 
@@ -62,19 +77,19 @@ async def create_thread_with_session(
     # 2. Create worktree if requested
     worktree_path: str | None = None
     if create_worktree:
-        worktree_path = await _create_worktree_with_status(
+        worktree_path, worktree_error = await _create_worktree_with_status(
             telegram_queue, chat_id, thread_id, project, name, base_branch
         )
         if worktree_path is None:
             # Failed - topic exists but no worktree/claude
-            return None
+            return CreateThreadResult(success=False, error=worktree_error or "Failed to create worktree")
         thread.worktree_path = worktree_path
         project_manager._save()
 
     # Race protection: check if launch already in progress
     if thread.launch_task and not thread.launch_task.done():
         logger.warning(f"Launch already in progress for thread {name}")
-        return thread
+        return CreateThreadResult(success=True, thread=thread)
 
     thread.launch_task = asyncio.create_task(
         launch_with_animation(
@@ -90,7 +105,7 @@ async def create_thread_with_session(
 
     project_manager._save()
 
-    return thread
+    return CreateThreadResult(success=True, thread=thread)
 
 
 async def _create_worktree_with_status(
@@ -100,13 +115,13 @@ async def _create_worktree_with_status(
     project: ProjectState,
     branch_name: str,
     base_branch: str | None,
-) -> str | None:
+) -> tuple[str | None, str | None]:
     """
     Create git worktree with status messages in the topic.
 
-    Returns worktree path on success, None on failure.
+    Returns (worktree_path, error) - path on success, error message on failure.
     """
-    from ..worktree import create_worktree
+    from ..git.worktree import create_worktree
 
     main_repo = Path(project.cwd)
     # Worktree inside .worktrees/ subdirectory
@@ -133,7 +148,7 @@ async def _create_worktree_with_status(
             thread_id=thread_id,
             parse_mode="MarkdownV2"
         )
-        return None
+        return None, result.error
 
     # Status: worktree created
     await telegram_queue.send(
@@ -143,4 +158,4 @@ async def _create_worktree_with_status(
         parse_mode="MarkdownV2"
     )
 
-    return str(worktree_path)
+    return str(worktree_path), None

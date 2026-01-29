@@ -14,10 +14,10 @@ def test_refresh_project_session_changes(tmp_path):
     jsonl_file = tmp_path / "test.jsonl"
     jsonl_file.touch()
 
-    with patch('codogram.session_manager.find_session_for_project', return_value="new-session-123"), \
-         patch('codogram.session_manager.compute_jsonl_path', return_value=jsonl_file):
+    with patch('codogram.core.session_manager.find_session_for_project', return_value="new-session-123"), \
+         patch('codogram.core.session_manager.compute_jsonl_path', return_value=jsonl_file):
 
-        from codogram.session_manager import ProjectManager, ProjectState
+        from codogram.core.session_manager import ProjectManager, ProjectState
         manager = ProjectManager()
         project = ProjectState(project_name="test", cwd="/test/path", chat_id=123)
         project.session_id = "old-session"
@@ -31,9 +31,9 @@ def test_refresh_project_session_changes(tmp_path):
 
 def test_refresh_project_session_no_change():
     """refresh_project_session should return False when session unchanged."""
-    with patch('codogram.session_manager.find_session_for_project', return_value="same-session"):
+    with patch('codogram.core.session_manager.find_session_for_project', return_value="same-session"):
 
-        from codogram.session_manager import ProjectManager, ProjectState
+        from codogram.core.session_manager import ProjectManager, ProjectState
         manager = ProjectManager()
         project = ProjectState(project_name="test", cwd="/test/path", chat_id=123)
         project.session_id = "same-session"
@@ -46,7 +46,7 @@ def test_refresh_project_session_no_change():
 
 def test_refresh_project_session_no_cwd():
     """refresh_project_session should handle missing cwd."""
-    from codogram.session_manager import ProjectManager, ProjectState
+    from codogram.core.session_manager import ProjectManager, ProjectState
     manager = ProjectManager()
     project = ProjectState(project_name="test", cwd=None, chat_id=123)
     manager.projects["test"] = project
@@ -57,10 +57,10 @@ def test_refresh_project_session_no_cwd():
 
 def test_refresh_project_session_jsonl_not_exists(tmp_path):
     """refresh_project_session should handle non-existent jsonl."""
-    with patch('codogram.session_manager.find_session_for_project', return_value="new-session"), \
-         patch('codogram.session_manager.compute_jsonl_path', return_value=tmp_path / "nonexistent.jsonl"):
+    with patch('codogram.core.session_manager.find_session_for_project', return_value="new-session"), \
+         patch('codogram.core.session_manager.compute_jsonl_path', return_value=tmp_path / "nonexistent.jsonl"):
 
-        from codogram.session_manager import ProjectManager, ProjectState
+        from codogram.core.session_manager import ProjectManager, ProjectState
         manager = ProjectManager()
         project = ProjectState(project_name="test", cwd="/test/path", chat_id=123)
         manager.projects["test"] = project
@@ -74,7 +74,7 @@ def test_refresh_project_session_jsonl_not_exists(tmp_path):
 
 # Tests for ThreadInfo
 def test_thread_info_creation():
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.session_manager import ThreadInfo
     thread = ThreadInfo(thread_id=12345, name="mystic")
     assert thread.thread_id == 12345
     assert thread.name == "mystic"
@@ -83,27 +83,27 @@ def test_thread_info_creation():
 
 
 def test_thread_info_get_tmux_session_main():
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.session_manager import ThreadInfo
     thread = ThreadInfo(thread_id=None, name="main")
     assert thread.get_tmux_session("codogram") == "claude-codogram"
 
 
 def test_thread_info_get_tmux_session_named():
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.session_manager import ThreadInfo
     thread = ThreadInfo(thread_id=12345, name="mystic")
     assert thread.get_tmux_session("codogram") == "claude-codogram-mystic"
 
 
 # Tests for ProjectState.threads
 def test_project_state_has_threads():
-    from codogram.session_manager import ProjectState, ThreadInfo
+    from codogram.core.session_manager import ProjectState, ThreadInfo
     project = ProjectState(project_name="test")
     assert hasattr(project, 'threads')
     assert project.threads == {}
 
 
 def test_project_state_get_thread():
-    from codogram.session_manager import ProjectState, ThreadInfo
+    from codogram.core.session_manager import ProjectState, ThreadInfo
     project = ProjectState(project_name="test")
     thread = ThreadInfo(thread_id=None, name="main")
     project.threads[None] = thread
@@ -112,7 +112,7 @@ def test_project_state_get_thread():
 
 
 def test_project_state_get_or_create_thread():
-    from codogram.session_manager import ProjectState
+    from codogram.core.session_manager import ProjectState
     project = ProjectState(project_name="test")
     thread = project.get_or_create_thread(None, "main")
     assert thread.name == "main"
@@ -124,7 +124,7 @@ def test_project_state_get_or_create_thread():
 
 # Tests for config save/load with threads
 def test_config_saves_threads(tmp_path, monkeypatch):
-    from codogram.session_manager import ProjectManager, ThreadInfo
+    from codogram.core.session_manager import ProjectManager, ThreadInfo
     from codogram import config
 
     config_file = tmp_path / ".config.json"
@@ -167,7 +167,7 @@ def test_config_loads_threads(tmp_path, monkeypatch):
     }))
     monkeypatch.setattr(config, "CONFIG_PATH", config_file)
 
-    from codogram.session_manager import ProjectManager
+    from codogram.core.session_manager import ProjectManager
     manager = ProjectManager()
     project = manager.projects.get("test-project")
     assert project is not None
@@ -180,7 +180,7 @@ def test_config_loads_threads(tmp_path, monkeypatch):
 # Tests for start_requested_at field
 def test_thread_info_start_requested_at_default():
     """Test start_requested_at defaults to None."""
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.session_manager import ThreadInfo
 
     thread = ThreadInfo(thread_id=123, name="test")
     assert thread.start_requested_at is None
@@ -188,7 +188,7 @@ def test_thread_info_start_requested_at_default():
 
 def test_thread_info_start_requested_at_assignment():
     """Test start_requested_at can be set."""
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.session_manager import ThreadInfo
 
     thread = ThreadInfo(thread_id=123, name="test")
     thread.start_requested_at = 1703847600.123
@@ -197,7 +197,7 @@ def test_thread_info_start_requested_at_assignment():
 
 def test_start_requested_at_persistence(tmp_path, monkeypatch):
     """Test start_requested_at survives save/load cycle."""
-    from codogram.session_manager import ProjectManager, ThreadInfo
+    from codogram.core.session_manager import ProjectManager, ThreadInfo
     from codogram import config
 
     # Use temp config file
@@ -227,7 +227,7 @@ def test_start_requested_at_persistence(tmp_path, monkeypatch):
 
 # Tests for worktree fields
 def test_thread_info_has_worktree_fields():
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.session_manager import ThreadInfo
 
     thread = ThreadInfo(thread_id=123, name="auth")
     assert thread.worktree_path is None
@@ -250,7 +250,7 @@ def test_worktree_fields_persist_to_config(tmp_path, monkeypatch):
     """Test worktree fields are saved to config file."""
     import json
     from codogram import config
-    from codogram.session_manager import ProjectManager, ThreadInfo
+    from codogram.core.session_manager import ProjectManager, ThreadInfo
 
     config_file = tmp_path / ".config.json"
     monkeypatch.setattr(config, "CONFIG_PATH", config_file)
@@ -300,7 +300,7 @@ def test_worktree_fields_load_from_config(tmp_path, monkeypatch):
     config_file.write_text(json.dumps(config_data))
     monkeypatch.setattr(config, "CONFIG_PATH", config_file)
 
-    from codogram.session_manager import ProjectManager
+    from codogram.core.session_manager import ProjectManager
     pm = ProjectManager()
     project = pm.projects.get("test-project")
     thread = project.get_thread(456)
@@ -312,7 +312,7 @@ def test_worktree_fields_load_from_config(tmp_path, monkeypatch):
 
 def test_thread_has_valid_session():
     """ThreadInfo.has_valid_session checks jsonl exists."""
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.session_manager import ThreadInfo
     from pathlib import Path
     import tempfile
     import os
@@ -340,7 +340,7 @@ def test_thread_has_valid_session():
 
 def test_thread_has_valid_worktree():
     """ThreadInfo.has_valid_worktree checks worktree exists."""
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.session_manager import ThreadInfo
     import tempfile
     import os
 
@@ -360,14 +360,14 @@ def test_thread_has_valid_worktree():
 
 def test_thread_info_verbose_default():
     """ThreadInfo.verbose defaults to False (short mode)."""
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.session_manager import ThreadInfo
     thread = ThreadInfo(thread_id=None, name="main")
     assert thread.verbose is False
 
 
 def test_project_state_verbose_default():
     """ProjectState.verbose defaults to False (short mode)."""
-    from codogram.session_manager import ProjectState
+    from codogram.core.session_manager import ProjectState
     project = ProjectState(project_name="test")
     assert project.verbose is False
 
@@ -375,7 +375,7 @@ def test_project_state_verbose_default():
 def test_verbose_persisted_in_config(tmp_path, monkeypatch):
     """verbose field should be saved and loaded from config."""
     import json
-    from codogram.session_manager import ProjectManager
+    from codogram.core.session_manager import ProjectManager
     from codogram import config
 
     # Use temp config
@@ -407,6 +407,41 @@ def test_verbose_persisted_in_config(tmp_path, monkeypatch):
     assert thread2.verbose is True
 
 
+def test_response_mode_persisted_in_config(tmp_path, monkeypatch):
+    """response_mode field should be saved and loaded from config."""
+    import json
+    from codogram.core.session_manager import ProjectManager
+    from codogram import config
+
+    # Use temp config
+    test_config = tmp_path / "config.json"
+    monkeypatch.setattr(config, "CONFIG_PATH", test_config)
+    monkeypatch.setattr(config, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(config, "get_config_path", lambda: test_config)
+
+    # Create manager and set response_mode
+    manager = ProjectManager()
+    project = manager.get_or_create("test-project")
+    project.chat_id = 123
+    project.cwd = "/tmp/test"
+    thread = project.get_or_create_thread(None, "main")
+    thread.response_mode = "polite"
+    project.response_mode = "polite"
+    manager._save()
+
+    # Reload and check saved data
+    saved = json.loads(test_config.read_text())
+    assert saved["projects"]["test-project"]["response_mode"] == "polite"
+    assert saved["projects"]["test-project"]["threads"]["null"]["response_mode"] == "polite"
+
+    # Create new manager (simulates restart) and check loaded values
+    manager2 = ProjectManager()
+    project2 = manager2.projects.get("test-project")
+    assert project2.response_mode == "polite"
+    thread2 = project2.get_thread(None)
+    assert thread2.response_mode == "polite"
+
+
 def test_save_is_thread_safe(tmp_path, monkeypatch):
     """Multiple saves should not corrupt config."""
     import threading
@@ -420,7 +455,7 @@ def test_save_is_thread_safe(tmp_path, monkeypatch):
     # Patch get_config_path in config module (session_manager imports it from there)
     monkeypatch.setattr(config, "get_config_path", lambda: config_file)
 
-    from codogram.session_manager import ProjectManager
+    from codogram.core.session_manager import ProjectManager
 
     pm = ProjectManager()
 

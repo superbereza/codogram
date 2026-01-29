@@ -3,10 +3,11 @@ from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
 
-from ..session_manager import project_manager
-from ..telegram_queue import TelegramQueue
-from ..tmux import TmuxSession
+from ..core.session_manager import project_manager
+from ..telegram.queue import TelegramQueue
+from ..tmux.session import TmuxSession
 from ..services.session_state import SessionStateService
+from .common import CommandStrict
 
 router = Router(name="shift_tab")
 service = SessionStateService()
@@ -42,7 +43,7 @@ def _format_mode(mode: str | None) -> str:
         return "default mode on"
 
 
-@router.message(Command("shift_tab", ignore_case=True))
+@router.message(Command("shift_tab", ignore_case=True), CommandStrict())
 async def cmd_shift_tab(message: Message, telegram_queue: TelegramQueue):
     """Send Shift+Tab to cycle Claude approval mode."""
     chat_id = message.chat.id

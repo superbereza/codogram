@@ -4,7 +4,7 @@ from pathlib import Path
 
 from aiogram import Bot
 
-from ..session_manager import project_manager, ProjectState, ThreadInfo
+from ..core.session_manager import project_manager, ProjectState, ThreadInfo
 from ..logging_config import logger
 
 
@@ -49,6 +49,8 @@ async def archive_thread(
     # Update thread state (keep worktree_path and session_id for resume!)
     thread.archived = True
     thread.notified_closed = True  # Prevent duplicate "session closed" from history_watcher
+    thread.awaiting_new_session = False  # Clear so archived thread doesn't participate in binding
+    thread.start_requested_at = None
     project_manager._save()
 
 
@@ -58,15 +60,15 @@ async def do_branch_create(
     project: ProjectState,
     branch_name: str,
     base_branch: str,
-) -> ThreadInfo | None:
+):
     """Create topic + worktree + launch Claude.
 
     Returns:
-        ThreadInfo if successful, None otherwise
+        CreateThreadResult with success/thread or error
     """
     from .launch import create_thread_with_session
 
-    thread = await create_thread_with_session(
+    return await create_thread_with_session(
         bot=bot,
         chat_id=chat_id,
         project=project,
@@ -74,8 +76,6 @@ async def do_branch_create(
         create_worktree=True,
         base_branch=base_branch,
     )
-
-    return thread
 
 
 def create_worktree(project_cwd: Path, branch_name: str) -> tuple[bool, str]:

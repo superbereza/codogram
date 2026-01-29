@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 @pytest.mark.asyncio
 async def test_history_watcher_checks_tmux_and_sessions():
     """Test that HistoryWatcher checks tmux health for threads."""
-    from codogram.history_watcher import HistoryWatcher
-    from codogram.session_manager import ThreadInfo
+    from codogram.core.coordinator import HistoryWatcher
+    from codogram.core.session_manager import ThreadInfo
 
     bot = MagicMock()
     bot.send_message = AsyncMock()
@@ -48,8 +48,8 @@ async def test_history_watcher_checks_tmux_and_sessions():
     mock_pm.projects = {"test": mock_project}
     watcher.project_manager = mock_pm
 
-    with patch('codogram.session_manager.should_cleanup_project', return_value=False):
-        with patch('codogram.history_watcher.TmuxSession') as mock_tmux:
+    with patch('codogram.core.session_manager.should_cleanup_project', return_value=False):
+        with patch('codogram.core.coordinator.TmuxSession') as mock_tmux:
             mock_tmux.return_value.exists.return_value = True
 
             await watcher._check_for_changes()

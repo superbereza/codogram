@@ -1,5 +1,5 @@
 # tests/keyboards/test_setup_type.py
-from codogram.keyboards.setup.setup_type import (
+from codogram.telegram.keyboards.setup.setup_type import (
     setup_type_keyboard,
     admin_check_keyboard,
 )

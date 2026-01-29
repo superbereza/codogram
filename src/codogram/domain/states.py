@@ -15,6 +15,7 @@ class StartFlow(StatesGroup):
     awaiting_clone_url = State()
     awaiting_custom_path = State()
     awaiting_launch_confirm = State()
+    awaiting_tmux_select = State()
 
 
 class RestartFlow(StatesGroup):
@@ -43,5 +44,6 @@ class SetupFlow(StatesGroup):
     viewing_connected_projects = State()
     awaiting_project_name = State()
     awaiting_git_choice = State()
-    awaiting_rename_confirm = State()
+    awaiting_gh_visibility = State()     # Private/Public repo choice
+    awaiting_rename_confirm = State()    # Offer to rename chat
     launching = State()                   # Blocking state during launch

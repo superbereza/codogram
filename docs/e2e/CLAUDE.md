@@ -138,14 +138,14 @@ docs/e2e/
 │   └── full.md         # [~40 мин] Полное покрытие
 └── commands/
     ├── setup.md        # Setup flow v2 (onboarding)
-    ├── start.md        # /start, /restart (existing project)
-    ├── sessions.md     # /new, /clear, /esc, /resume
-    ├── threads.md      # /thread
-    ├── branches.md     # /branch
-    ├── finish.md       # /finish
+    ├── start.md        # /start, /reset_chat, /hard_reset
+    ├── sessions.md     # /clear_context, /esc
+    ├── new_chat.md     # /new_chat (unified /thread + /branch)
+    ├── finish_chat.md  # /finish_chat
     ├── settings.md     # /help, /settings, /auto_accept
     ├── permissions.md  # Permission buttons
     ├── watcher.md      # Tool call output
     ├── messages.md     # Message forwarding
-    └── activity.md     # Thinking status, suggestions (ASK USER)
+    ├── activity.md     # Thinking status, suggestions (ASK USER)
+    └── avatar_pack.md  # /exp_avatar_pack, emoji pack (ASK USER)
 ```

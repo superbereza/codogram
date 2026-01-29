@@ -2,46 +2,54 @@
 from .config import TELEGRAM_MESSAGE_MAX_LENGTH
 
 
-def chunk_message(text: str, max_len: int = TELEGRAM_MESSAGE_MAX_LENGTH) -> list[str]:
-    """Split text into chunks, preferring natural breakpoints."""
+def _split_text(text: str, max_len: int) -> list[str]:
+    """Split text at natural breakpoints (paragraphs -> lines -> sentences).
+
+    Returns raw chunks without prefixes.
+    """
     if len(text) <= max_len:
         return [text]
-
-    # Reserve space for chunk prefix "[N/M]\n" (max ~10 chars for reasonable chunk counts)
-    prefix_reserve = 10
-    effective_max = max_len - prefix_reserve
 
     chunks = []
     remaining = text
 
     while remaining:
-        if len(remaining) <= effective_max:
+        if len(remaining) <= max_len:
             chunks.append(remaining)
             break
 
         # Find best split point
-        chunk = remaining[:effective_max]
-        split_at = effective_max
+        chunk = remaining[:max_len]
+        split_at = max_len
 
         # Try paragraph break
         para = chunk.rfind("\n\n")
-        if para > effective_max // 2:
+        if para > max_len // 2:
             split_at = para + 2
         else:
             # Try line break
             line = chunk.rfind("\n")
-            if line > effective_max // 2:
+            if line > max_len // 2:
                 split_at = line + 1
             else:
                 # Try sentence
                 for sep in (". ", "! ", "? "):
                     pos = chunk.rfind(sep)
-                    if pos > effective_max // 2:
+                    if pos > max_len // 2:
                         split_at = pos + len(sep)
                         break
 
         chunks.append(remaining[:split_at].rstrip())
         remaining = remaining[split_at:].lstrip()
+
+    return chunks
+
+
+def chunk_message(text: str, max_len: int = TELEGRAM_MESSAGE_MAX_LENGTH) -> list[str]:
+    """Split text into chunks with [N/M] prefixes for multi-message sending."""
+    # Reserve space for prefix "[N/M]\n" (max ~10 chars)
+    prefix_reserve = 10
+    chunks = _split_text(text, max_len - prefix_reserve)
 
     # Add prefixes if multiple chunks
     if len(chunks) > 1:

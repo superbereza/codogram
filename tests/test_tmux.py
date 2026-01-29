@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from codogram.tmux import TmuxSession, find_all_tmux_by_cwd, find_tmux_by_convention
+from codogram.tmux.session import TmuxSession, find_all_tmux_by_cwd, find_tmux_by_convention
 
 def test_find_all_tmux_by_cwd_single():
     # Mock subprocess to return one matching session
@@ -48,19 +48,19 @@ def test_find_all_tmux_by_cwd_with_spaces():
 
 def test_find_tmux_by_convention_found():
     # Mock TmuxSession.exists() to return True
-    with patch('codogram.tmux.TmuxSession.exists', return_value=True):
+    with patch('codogram.tmux.session.TmuxSession.exists', return_value=True):
         result = find_tmux_by_convention("my-project")
         assert result == "claude-my-project"
 
 def test_find_tmux_by_convention_fallback():
     # Mock first pattern not found, second found
-    with patch('codogram.tmux.TmuxSession.exists') as mock_exists:
+    with patch('codogram.tmux.session.TmuxSession.exists') as mock_exists:
         mock_exists.side_effect = [False, True]
 
         result = find_tmux_by_convention("my-project")
         assert result == "my-project"
 
 def test_find_tmux_by_convention_not_found():
-    with patch('codogram.tmux.TmuxSession.exists', return_value=False):
+    with patch('codogram.tmux.session.TmuxSession.exists', return_value=False):
         result = find_tmux_by_convention("my-project")
         assert result is None

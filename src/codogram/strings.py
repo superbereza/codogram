@@ -11,9 +11,16 @@ STATUS_PENDING = "`[~]`"
 STATUS_QUESTION = "`[?]`"
 STATUS_INFO = "`[i]`"
 
+# Topic icon emoji IDs (Telegram custom emoji)
+ICON_BALLOT_BOX = "5350387571649076022"  # active topic
+ICON_FOLDER = "5357315181649076022"       # archived topic
+
 # Toggle states
 STATUS_ON = "`● on`"
 STATUS_OFF = "`○ off`"
+
+# Truncation marker
+SNIP = "..."
 
 
 # --- Launch animation ---
@@ -22,10 +29,10 @@ LAUNCH_CREATING_TMUX = f"{STATUS_PENDING} Creating tmux session..."
 LAUNCH_STARTING = f"{STATUS_PENDING} Starting Claude..."
 LAUNCH_RESUMING = f"{STATUS_PENDING} Resuming session..."
 LAUNCH_WAITING = f"{STATUS_PENDING} Waiting for Claude..."
-LAUNCH_TIMEOUT = f"{STATUS_ERR} Timeout: Claude didn't start in 2 minutes"
+LAUNCH_TIMEOUT = f"{STATUS_ERR} Timeout: Claude didn't start in {{timeout_min}} min\\. Try /reset\\_chat"
 LAUNCH_ERROR = f"{STATUS_ERR} Launch error: {{error}}"
-LAUNCH_READY = f"{STATUS_OK} Claude ready"
-LAUNCH_READY_WITH_ATTACH = f"{STATUS_OK} Claude ready\n\nTo see Claude UI: `tmux attach -t {{tmux_name}}`"
+LAUNCH_READY = f"{STATUS_PENDING} Claude ready, binding session..."
+LAUNCH_READY_WITH_ATTACH = f"{STATUS_PENDING} Claude ready, binding session...\n\nTo see Claude UI: `tmux attach -t {{tmux_name}}`"
 LAUNCH_PROJECT_CWD_NOT_SET = f"{STATUS_ERR} Project cwd not set. Re-register with /start"
 
 # Launch service (worktree creation)
@@ -36,7 +43,7 @@ LAUNCH_WORKTREE_CREATED = f"{STATUS_OK} Worktree: `{{path}}`"
 
 # --- Session management ---
 
-SESSION_BOUND = f"{STATUS_OK} New session bound"
+SESSION_BOUND = f"{STATUS_OK} New session bound. Ready to go"
 SESSION_CLOSED = f"{STATUS_WARN} Claude session closed: {{name}}"
 SESSION_NOT_FOUND = f"{STATUS_WARN} Session not found. Try /start"
 SESSION_EXPIRED = "Session expired"
@@ -88,7 +95,7 @@ GIT_SETUP_PROMPT = """{dir_created}
 • `git init` — local repository
 • `git init + gh repo create` — create on GitHub
 • `git clone` — clone existing
-• No git — empty folder"""
+• no git — empty folder"""
 
 GIT_INIT_OK = "Git initialized. Launching Claude..."
 GIT_INIT_ERROR = "Error git init: {error}"
@@ -239,6 +246,13 @@ FLAVOR_RANDOM = [
 ]
 
 
+# --- Response Mode ---
+
+RESPONSE_MODE_ALL = "responds to all messages"
+RESPONSE_MODE_POLITE = "doesn't reply others' mentions"
+RESPONSE_MODE_MENTIONS = "only when mentioned"
+
+
 # --- Buttons ---
 
 BTN_YES_LAUNCH = "Yes, launch"
@@ -249,12 +263,13 @@ BTN_CANCEL = "Cancel"
 BTN_CANCEL_X = "[x] Cancel"
 BTN_CREATE = "Create"
 BTN_DIFFERENT_PATH = "Different path"
-BTN_NO_GIT = "No git"
+BTN_NO_GIT = "no git"
 BTN_CONTINUE = "Continue"
 BTN_KEEP_DIR = "Keep directory"
 BTN_DELETE_DIR = "Delete"
 BTN_DELETE_ANYWAY = "Delete anyway"
 BTN_GO_BACK = "[<<] Go back"
+BTN_MY_NAME = "🙋 My first name"
 BTN_MAGIC_NAME = "🔮 Magic name"
 BTN_RECREATE_WORKTREE = "Recreate worktree"
 BTN_CREATE_NEW = "Create new"
@@ -289,7 +304,7 @@ Use General or /thread for new session."""
 
 # --- Finish/Archive ---
 
-FINISH_NOTHING_IN_GENERAL = f"{STATUS_INFO} Nothing to finish in General. Use /clear to reset session"
+FINISH_NOTHING_IN_GENERAL = f"{STATUS_INFO} Nothing to finish in General. Use /clear_context to reset session"
 FINISH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first"
 FINISH_THREAD_NOT_FOUND = f"{STATUS_WARN} Thread not found"
 
@@ -336,9 +351,9 @@ FINISH_ARCHIVED_KEPT = f"""{STATUS_OK} Branch `{{branch}}` archived
 Worktree kept for potential resume
 Use /start to resume"""
 
-FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
+FINISH_COMMIT_SENT = f"""{STATUS_PENDING} Asked Claude to commit\\. One moment\\.\\.\\.
 
-Run /finish again after commit"""
+Then run /finish"""
 
 
 # --- Start Flow ---
@@ -418,6 +433,28 @@ Add your ID to ADMIN_IDS in .env"""
 ERR_NOT_ADMIN_POPUP = "[x] Not admin. Your ID: {user_id}"
 
 
+# --- Group Authorization ---
+
+ERR_GROUP_NOT_ALLOWED = f"{STATUS_ERR} Bot not active in this group\\. Ask group admin to set it up"
+ERR_GROUP_NOT_ALLOWED_POPUP = "[x] Bot not active. Ask admin to set up"  # Plain text for callback popup
+ADMIN_ALERT_GROUP_ACCESS = """`[!]` Unauthorized group access
+
+Group: {chat_title}
+Chat ID: `{chat_id}`
+User: {user_name}
+Group admins: {admins_list}"""
+
+BTN_APPROVE_GROUP = "✓ Approve"
+BTN_REJECT_GROUP = "✗ Dismiss"
+ADMIN_GROUP_APPROVED = "`[v]` Group approved: {chat_title}"
+ADMIN_GROUP_REJECTED = "`[x]` Dismissed"
+
+GROUP_REQUEST_SENT = "`[i]` Approval request sent to bot admin"
+GROUP_REQUEST_DENIED = "`[x]` Access denied"
+GROUP_REGISTERED = f"{STATUS_OK} Group registered"
+GROUP_DEACTIVATED = f"{STATUS_WARN} Admin left\\. Bot deactivated"
+
+
 # --- Branch Operations ---
 
 BRANCH_PROJECT_NOT_REGISTERED = f"{STATUS_WARN} Project not registered. Use /start first"
@@ -436,9 +473,9 @@ BRANCH_DIR_EXISTS = f"{STATUS_ERR} Directory already exists: `{{path}}`"
 BRANCH_UNCOMMITTED_CHANGES = f"{STATUS_WARN} Uncommitted changes detected"
 BRANCH_UNCOMMITTED_IN_BASE = f"{STATUS_WARN} Uncommitted changes in {{base_branch}}"
 
-BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Sent: "Commit current changes in logical chunks with descriptive messages"
+BRANCH_COMMIT_SENT = f"""{STATUS_PENDING} Asked Claude to commit\\. One moment\\.\\.\\.
 
-Run `/branch_create {{branch_name}}` again after commit"""
+Then run `/branch_create {{branch_name}}`"""
 
 BRANCH_CREATING = f"{STATUS_PENDING} Creating branch `{{name}}`..."
 BRANCH_CREATED = f"{STATUS_OK} Branch `{{name}}` created"
@@ -456,22 +493,48 @@ Set BASE_DIR in \\.env file:
 
 Then restart the bot\\."""
 
-# Admin rights
-SETUP_ADMIN_REQUIRED = f"""{STATUS_WARN} Grant admin rights to continue
+# Admin rights (used for migration and check button)
+SETUP_ADMIN_REQUIRED = f"""{STATUS_WARN} Admin rights required
+
+Bot needs admin rights to manage topics\\.
+
+Open chat settings → Administrators → Add bot"""
+
+SETUP_ADMIN_CHECK_FAILED = "Still missing admin rights"  # Plain text for callback popup
+
+# Migration messages
+MIGRATION_SUCCESS = f"""`[v]` Topics enabled
+
+Multi\\-session mode unlocked:
+/thread \\- new topic, same directory
+/branch \\- isolated feature branch \\+ topic
+/finish \\- merge and archive"""
+
+MIGRATION_ADMIN_REQUIRED = f"""{STATUS_WARN} Grant admin rights to continue
 
 Bot needs admin rights to:
 • Rename chat to match project
 • Manage topics for branches
 
-Open chat settings → Administrators → Add bot as admin"""
+Open chat settings → Edit → Administrators → Add bot as admin"""
 
-SETUP_ADMIN_CHECK_FAILED = f"{STATUS_WARN} Still missing admin rights"
+ADMIN_RIGHTS_GRANTED = f"{STATUS_OK} Admin rights granted"
+
+# Bot blocked while awaiting admin rights
+BOT_ADMIN_RIGHTS_BLOCKED = f"""{STATUS_WARN} Bot needs admin rights
+
+Grant admin rights to continue using the bot\\.
+
+Open chat settings → Edit → Administrators → Add bot as admin"""
+
+BOT_ADMIN_RIGHTS_BLOCKED_POPUP = "Grant admin rights first"
 
 # Chat type errors
 SETUP_PRIVATE_CHAT = f"{STATUS_ERR} Add bot to a group chat"
 SETUP_CHANNEL_NOT_SUPPORTED = f"{STATUS_ERR} Channels not supported"
 SETUP_CANCELLED = f"{STATUS_INFO} Setup cancelled\\. Use /start to begin again\\."
 SETUP_ALREADY_IN_PROGRESS = f"{STATUS_INFO} Setup already in progress"
+SETUP_BOT_RESTARTED = f"{STATUS_INFO} Bot was restarted\\. Use /start to continue setup\\."
 
 # Command blocking during setup
 SETUP_COMMAND_BLOCKED = f"""{STATUS_WARN} Complete project setup first
@@ -523,12 +586,13 @@ What to do\\?"""
 
 # Git choice
 SETUP_GIT_CHOICE = "Git setup for `{folder}`\\?"
+SETUP_GH_VISIBILITY = "Repository visibility\\?"
 SETUP_GIT_GH_NOT_INSTALLED = f"{STATUS_ERR} `gh` CLI not installed\\. Install from https://cli\\.github\\.com"
 SETUP_GIT_GH_NOT_AUTH = f"{STATUS_ERR} `gh` not authenticated\\. Run `gh auth login` first"
 
 # Rename
-SETUP_RENAME_PROMPT = "Rename chat to `{name}`\\?"
-SETUP_RENAME_FAILED = f"{STATUS_WARN} Couldn't rename chat \\(missing permissions?\\)\\nContinuing with project setup\\.\\.\\."
+SETUP_RENAME_PROMPT = "Wow\\! You are setting up super chat\\!\n\nRename chat to `{name}` to align with project name\\?"
+SETUP_RENAME_FAILED = f"{STATUS_WARN} Couldn't rename chat \\(missing permissions?\\)\nContinuing with project setup\\.\\.\\."
 
 # Launch
 SETUP_LAUNCH_PROGRESS = f"{STATUS_PENDING} Setting up project\\.\\.\\."
@@ -537,7 +601,7 @@ SETUP_LAUNCH_SUCCESS = f"""{STATUS_OK} Project `{{project}}` ready
 
 Commands available:
 • /esc — cancel operation
-• /clear — clear context
+• /clear\\_context — clear context
 • /auto_accept — toggle auto\\-accept
 • /thread — new topic
 
@@ -559,7 +623,9 @@ BTN_RENAME_NO = "No"
 BTN_GIT_INIT = "git init"
 BTN_GIT_GH = "git init + gh repo create"
 BTN_GIT_CLONE = "git clone"
-BTN_GIT_NONE = "No git"
+BTN_GIT_NONE = "no git"
+BTN_VISIBILITY_PRIVATE = "🔒 Private"
+BTN_VISIBILITY_PUBLIC = "🌍 Public"
 BTN_RETRY = "Retry"
 BTN_CHANGE_URL = "Change URL"
 BTN_USE_EXISTING = "Use existing"
@@ -567,3 +633,225 @@ BTN_DIFFERENT_NAME = "Different name"
 
 # Stale button debounce (5 minutes per design)
 STALE_BUTTON_SECONDS = 300
+
+
+# --- DM Onboarding ---
+
+DM_WELCOME = """Hey there
+
+I'm Codogram — your Claude Code companion on Telegram"""
+
+DM_SLIDE_1 = """📱 *Mobile*
+
+Fire off tasks from your phone, work from anywhere
+
+Claude runs on your server — all you need is Telegram"""
+
+DM_SLIDE_2 = """⏰ *Async*
+
+Start a task → do your thing → get notified when done
+
+No more staring at terminal output"""
+
+DM_SLIDE_3 = """👥 *Team*
+
+Set up once — collaborate with teammates
+
+Everyone sees what Claude does, can approve actions"""
+
+# Validation - first message (will be edited)
+DM_VALIDATION_CHECKING = f"{STATUS_PENDING} Checking environment..."
+
+# Validation - results with checkmarks
+DM_VALIDATION_OK = f"""{STATUS_OK} Environment ready
+
+*Required:*
+{{critical_checks}}
+
+*Optional:*
+{{optional_checks}}"""
+
+DM_VALIDATION_ERROR = f"""{STATUS_ERR} Issues found
+
+{{checks}}
+
+Fix and hit "Recheck\""""
+
+# Warnings shown after checks if any
+DM_VALIDATION_WARNINGS = """
+{warnings}"""
+
+# Manual check hint - shown after validation passes
+DM_MANUAL_CHECK = """`[!]` One more thing
+
+Disable privacy mode in [@BotFather](https://t.me/BotFather):
+/setprivacy → your bot → Disable
+
+Otherwise bot won't see your messages in groups"""
+
+# CTA - separate message after validation passes
+DM_CTA = """`[>>]` Next step
+
+1. Create a group
+2. Add bot with admin rights
+
+Or add to existing one ↓
+Bot will guide you from there
+
+/dashboard — your projects"""
+
+DM_MINI_STATUS = """Welcome back
+
+Active projects: {projects}
+Claude sessions: {sessions}
+
+/dashboard — your projects
+/intro — see intro again"""
+
+DM_BOT_ADDED = """Added to "{chat_name}"
+By: @{creator}"""
+
+DM_BOT_ADDED_WITH_LINK = """Added to "{chat_name}"
+Chat: {link}
+By: @{creator}"""
+
+# --- Dashboard ---
+
+DASH_HEADER = "Projects"
+
+DASH_PROJECT = """{num}. {chat_name}
+   📁 {directory}
+   👤 Owner: @{creator}
+   👥 {members} members
+   {status}"""
+
+DASH_STATUS_ACTIVE = "🤖 {count} Claude sessions"
+DASH_STATUS_INACTIVE = "💤 inactive"
+
+DASH_FOOTER = "Total: {total} projects, {active} active sessions"
+
+DASH_EMPTY = """Projects
+
+No projects connected yet
+
+Create a group and add me — I'll pick it up automatically"""
+
+# --- DM Buttons ---
+
+BTN_NEXT = "Next →"
+BTN_PREV = "← Back"
+BTN_HOW_TO_USE = "How to use?"
+BTN_RECHECK = "Recheck"
+BTN_REFRESH = "Refresh"
+BTN_DONE = "Done ✓"
+BTN_ADD_TO_GROUP = "Add to group"
+
+# DM fallback for unknown commands
+DM_UNKNOWN_COMMAND = "`[◉_◉]` Can't wait to try? Add me to a group chat"
+
+# --- Emoji Pack ---
+
+EMOJI_PACK_CREATED = """`[v]` Gift unlocked
+
+✨ [Avatar pack]({pack_link}) ✨
+
+Personalize topics with participant photos → [get pack]({pack_link})
+
+New members will be added automatically\\."""
+
+EMOJI_PACK_DISABLE_PROMPT = """`[?]` Disable avatar pack?
+
+Pack will be deleted."""
+EMOJI_PACK_BTN_DISABLE = "Yes, disable"
+EMOJI_PACK_BTN_KEEP = "Keep it"
+
+EMOJI_PACK_CREATE_PROMPT = """`[?]` Create avatar pack?
+
+Will generate emoji from member avatars."""
+EMOJI_PACK_BTN_CREATE = "Yes, create"
+EMOJI_PACK_BTN_NOT_NOW = "Not now"
+
+EMOJI_PACK_DELETED = "`[v]` Avatar pack disabled"
+EMOJI_PACK_CREATING = "`[~]` Creating avatar pack..."
+EMOJI_PACK_ERROR = "`[x]` Failed to create avatar pack: {error}"
+
+# Hint in topic launch message (if feat_avatar_pack ON)
+EMOJI_PACK_TOPIC_HINT = "→ Check this [pack]({pack_link}) to personalize your topic"
+
+
+# --- New Chat Flow ---
+
+NEW_CHAT_CONTEXT = f"""{STATUS_QUESTION} Creating chat from:
+
+📁 `{{directory}}`
+🌿 `{{branch}}`
+
+To branch from main, run /new\\_chat in General"""
+
+NEW_CHAT_CONTEXT_MAIN = f"""{STATUS_QUESTION} Creating chat from:
+
+📁 `{{directory}}`
+🌿 `{{branch}}`"""
+
+NEW_CHAT_CHOOSE = "Where to create?"
+NEW_CHAT_NAME_PROMPT = "Chat name?\n\nChoose a button or type your own"
+NEW_CHAT_NAME_NO_NAME = "Couldn't get your name automatically — enter one or use magic name"
+NEW_CHAT_CREATING = f"{STATUS_PENDING} Creating chat `{{name}}`..."
+NEW_CHAT_CREATED = f"{STATUS_OK} Chat `{{name}}` created"
+NEW_CHAT_ERROR = f"{STATUS_ERR} Error creating chat"
+NEW_CHAT_NO_TOPIC_RIGHTS = f"{STATUS_ERR} Bot needs *Manage Topics* admin right to create chats"
+
+BTN_CREATE_HERE = "Create here"
+BTN_CREATE_ISOLATED = "🪴 Create isolated"
+
+# Uncommitted changes (reuse existing or add)
+NC_UNCOMMITTED = f"{STATUS_WARN} Uncommitted changes detected"
+NC_UNCOMMITTED_CLEAN = "Create from last commit"
+NC_UNCOMMITTED_COMMIT = "Commit first"
+
+# --- Help ---
+
+HELP_TEXT = """Troubleshoot
+
+If bot ignores messages \\(but commands work\\):
+[@BotFather](https://t.me/BotFather) → /setprivacy → Disable
+
+If bot isn't responding, try /reset\\_chat — it's safe for context\\.
+
+To wipe project and start fresh: /hard\\_reset\\. 🚨 Dangerous zone\\!
+
+Looking to turn on/off extra features — /settings
+
+─────────────────
+
+Chats
+/new\\_chat — create new chat: topic \\& Claude session
+/finish\\_chat — archive chat and stop Claude
+/start — connect or resume
+/reset\\_chat — restart Claude process
+
+Context
+/clear\\_context — clear current Claude context
+
+Operations
+/esc — send Esc, stop current operation
+/shift\\_tab — cycle Claude approval mode
+/auto\\_accept — accept every Claude permission 🚧
+
+Settings
+/settings — show settings
+/get\\_debug\\_ids — debug info"""
+
+# --- DM Settings ---
+
+DM_SETTINGS_HEADER = "**Global defaults**"
+DM_SETTINGS_HINT = "/reset\\_to\\_default — reset to factory defaults"
+
+# Reset confirmation
+RESET_THREAD_CONFIRM = "Reset this thread to global defaults?"
+RESET_ALL_CONFIRM = "Reset ALL threads in ALL projects to global defaults?"
+RESET_THREAD_DONE = "Thread reset to global defaults"
+RESET_ALL_DONE = "All threads reset to global defaults"
+
+# Settings footer in group
+SETTINGS_RESET_HINT = "/reset\\_to\\_default — reset to global defaults"

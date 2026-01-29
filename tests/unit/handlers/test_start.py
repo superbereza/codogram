@@ -39,7 +39,7 @@ class TestStartStaleWorktree:
     async def test_start_with_stale_worktree_and_branch_shows_recovery(self, mock_message, mock_queue, mock_state):
         """Start in topic with stale worktree but branch exists shows recovery options."""
         from codogram.handlers.start import cmd_start
-        from codogram.session_manager import ThreadInfo
+        from codogram.core.session_manager import ThreadInfo
         from codogram.domain.worktree_state import WorktreeState
 
         mock_message.message_thread_id = 123
@@ -55,10 +55,10 @@ class TestStartStaleWorktree:
         mock_project.threads = {123: thread}
         mock_project.get_thread = MagicMock(return_value=thread)
 
-        with patch("codogram.handlers.start.project_manager") as mock_pm:
+        with patch("codogram.handlers.start.commands.project_manager") as mock_pm:
             mock_pm.get_by_chat.return_value = mock_project
-            with patch("codogram.handlers.start.get_worktree_state", return_value=WorktreeState.MISSING_WITH_BRANCH):
-                with patch("codogram.handlers.start.worktree_recovery_keyboard") as mock_kb:
+            with patch("codogram.handlers.start.commands.get_worktree_state", return_value=WorktreeState.MISSING_WITH_BRANCH):
+                with patch("codogram.handlers.start.commands.worktree_recovery_keyboard") as mock_kb:
                     mock_kb.return_value = MagicMock()
                     await cmd_start(mock_message, mock_state, mock_queue)
 
@@ -71,7 +71,7 @@ class TestStartStaleWorktree:
     async def test_start_with_stale_worktree_no_branch_shows_create_new(self, mock_message, mock_queue, mock_state):
         """Start in topic with stale worktree and no branch shows create new option."""
         from codogram.handlers.start import cmd_start
-        from codogram.session_manager import ThreadInfo
+        from codogram.core.session_manager import ThreadInfo
         from codogram.domain.worktree_state import WorktreeState
 
         mock_message.message_thread_id = 123
@@ -87,10 +87,10 @@ class TestStartStaleWorktree:
         mock_project.threads = {123: thread}
         mock_project.get_thread = MagicMock(return_value=thread)
 
-        with patch("codogram.handlers.start.project_manager") as mock_pm:
+        with patch("codogram.handlers.start.commands.project_manager") as mock_pm:
             mock_pm.get_by_chat.return_value = mock_project
-            with patch("codogram.handlers.start.get_worktree_state", return_value=WorktreeState.MISSING_NO_BRANCH):
-                with patch("codogram.handlers.start.worktree_recovery_keyboard") as mock_kb:
+            with patch("codogram.handlers.start.commands.get_worktree_state", return_value=WorktreeState.MISSING_NO_BRANCH):
+                with patch("codogram.handlers.start.commands.worktree_recovery_keyboard") as mock_kb:
                     mock_kb.return_value = MagicMock()
                     await cmd_start(mock_message, mock_state, mock_queue)
 

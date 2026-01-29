@@ -1,5 +1,5 @@
 import pytest
-from codogram.screen import parse_screen, PermissionPrompt, ToolProgress, Idle, PromptType, _extract_options, StatusBar, parse_status_bar, extract_input_text, PASTED_PATTERN
+from codogram.claude.screen import parse_screen, PermissionPrompt, ToolProgress, Idle, PromptType, _extract_options, StatusBar, parse_status_bar, extract_input_text, PASTED_PATTERN
 
 PERMISSION_SCREEN = """
 ● Write(test.txt)
@@ -108,7 +108,7 @@ MCP_TRUST_SCREEN = """
 
 def test_parse_mcp_trust_prompt_basic():
     """MCP trust prompt should be detected."""
-    from codogram.screen import _parse_mcp_trust_prompt
+    from codogram.claude.screen import _parse_mcp_trust_prompt
     lines = MCP_TRUST_SCREEN.split("\n")
     result = _parse_mcp_trust_prompt(lines)
     assert result is not None
@@ -117,22 +117,22 @@ def test_parse_mcp_trust_prompt_basic():
     assert "Use this and all future" in result.options[0]
 
 def test_parse_mcp_trust_prompt_type():
-    """MCP prompt should have MCP_TRUST type."""
-    from codogram.screen import _parse_mcp_trust_prompt
+    """MCP prompt should have TRUST_PROMPT type."""
+    from codogram.claude.screen import _parse_mcp_trust_prompt
     lines = MCP_TRUST_SCREEN.split("\n")
     result = _parse_mcp_trust_prompt(lines)
-    assert result.prompt_type == PromptType.MCP_TRUST
+    assert result.prompt_type == PromptType.TRUST_PROMPT
 
 def test_parse_mcp_trust_prompt_body():
     """MCP prompt body should contain server name."""
-    from codogram.screen import _parse_mcp_trust_prompt
+    from codogram.claude.screen import _parse_mcp_trust_prompt
     lines = MCP_TRUST_SCREEN.split("\n")
     result = _parse_mcp_trust_prompt(lines)
     assert "telegram" in result.body or "MCP server" in result.body
 
 def test_parse_mcp_trust_prompt_incomplete():
     """Incomplete box (no bottom corner) should return None."""
-    from codogram.screen import _parse_mcp_trust_prompt
+    from codogram.claude.screen import _parse_mcp_trust_prompt
     incomplete = """
 ╭─────────────────────────╮
 │ Some content            │
@@ -143,7 +143,7 @@ def test_parse_mcp_trust_prompt_incomplete():
 
 def test_parse_mcp_trust_prompt_no_options():
     """Box without numbered options should return None."""
-    from codogram.screen import _parse_mcp_trust_prompt
+    from codogram.claude.screen import _parse_mcp_trust_prompt
     no_options = """
 ╭─────────────────────────╮
 │ Just a box              │
@@ -155,7 +155,7 @@ def test_parse_mcp_trust_prompt_no_options():
 
 def test_parse_mcp_trust_prompt_last_box():
     """Multiple boxes on screen - should parse the LAST complete box."""
-    from codogram.screen import _parse_mcp_trust_prompt
+    from codogram.claude.screen import _parse_mcp_trust_prompt
     multiple_boxes = """
 Some scrollback text
 
@@ -180,7 +180,7 @@ More text between boxes
 
 def test_parse_mcp_trust_prompt_false_positive():
     """Box with arrow but not in numbered format should return None."""
-    from codogram.screen import _parse_mcp_trust_prompt
+    from codogram.claude.screen import _parse_mcp_trust_prompt
     false_positive = """
 ╭─────────────────────────╮
 │ Some code output:       │
@@ -198,7 +198,7 @@ def test_parse_screen_detects_mcp_prompt():
     """parse_screen should detect MCP trust prompt."""
     result = parse_screen(MCP_TRUST_SCREEN)
     assert isinstance(result, PermissionPrompt)
-    assert result.prompt_type == PromptType.MCP_TRUST
+    assert result.prompt_type == PromptType.TRUST_PROMPT
     assert len(result.options) == 3
 
 def test_parse_screen_regular_still_works():
@@ -223,7 +223,7 @@ Some text after separator
 """
     result = parse_screen(mixed_screen)
     assert isinstance(result, PermissionPrompt)
-    assert result.prompt_type == PromptType.MCP_TRUST
+    assert result.prompt_type == PromptType.TRUST_PROMPT
 
 
 # StatusBar Tests
@@ -314,7 +314,7 @@ class TestParseStatusBar:
 
 # Thinking Status Tests
 
-from codogram.screen import parse_thinking_status
+from codogram.claude.screen import parse_thinking_status
 
 
 def test_parse_thinking_status_basic():
@@ -407,7 +407,7 @@ Some other text
 
 # Input Suggestion Tests
 
-from codogram.screen import parse_input_suggestion
+from codogram.claude.screen import parse_input_suggestion
 
 
 def test_parse_input_suggestion_basic():

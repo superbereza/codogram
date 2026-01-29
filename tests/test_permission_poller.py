@@ -1,6 +1,6 @@
 # tests/test_permission_poller.py
 import inspect
-from codogram.permission_poller import (
+from codogram.claude.poller import (
     PollerState,
     permission_poller,
     create_poller_task,

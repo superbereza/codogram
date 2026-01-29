@@ -1,4 +1,4 @@
-"""Session management: /new, /clear, /esc, /resume."""
+"""Session management: /clear_context, /esc."""
 import asyncio
 import time
 
@@ -7,12 +7,13 @@ from aiogram.types import Message
 from aiogram.filters import Command
 
 from .. import strings
-from ..session_manager import project_manager
-from ..project_launcher import is_tmux_session_exists
-from ..tmux import TmuxSession
+from ..core.session_manager import project_manager
+from ..tmux.launcher import is_tmux_session_exists
+from ..tmux.session import TmuxSession
+from ..state import active_ask_prompts, permission_messages, ask_options_state
 from ..logging_config import logger
-from ..telegram_queue import TelegramQueue
-from .common import require_tmux_exists, require_claude_ready
+from ..telegram.queue import TelegramQueue
+from .common import require_tmux_exists, require_claude_ready, normalize_thread_id, CommandStrict
 
 router = Router(name="sessions")
 
@@ -53,6 +54,7 @@ async def _send_session_command(
     # Mark thread as awaiting new session
     thread.awaiting_new_session = True
     thread.start_requested_at = time.time()
+    logger.debug(f"awaiting_set_true: thread={thread.name}, cmd={command}")
     thread.last_sent_message = None
     thread.session_id = None  # Clear so next message triggers rebinding
     project_manager._save()
@@ -84,19 +86,9 @@ async def _wait_for_claude_ready(
     # Timeout - don't send anything, user will see when they interact
 
 
-@router.message(Command("new", ignore_case=True))
-async def cmd_new(message: Message, telegram_queue: TelegramQueue):
-    """Start new Claude session in current thread."""
-    if not await require_claude_ready(message, telegram_queue):
-        return
-    tmux = await _send_session_command(message, telegram_queue, "/new", strings.NEW_SESSION)
-    if tmux:
-        await _wait_for_claude_ready(tmux, telegram_queue, message.chat.id, message.message_thread_id)
-
-
-@router.message(Command("clear", ignore_case=True))
-async def cmd_clear(message: Message, telegram_queue: TelegramQueue):
-    """Clear Claude session and start fresh."""
+@router.message(Command("clear_context", "clear", "new", ignore_case=True), CommandStrict())
+async def cmd_clear_context(message: Message, telegram_queue: TelegramQueue):
+    """Clear Claude context and start fresh."""
     if not await require_tmux_exists(message, telegram_queue):
         return
     tmux = await _send_session_command(message, telegram_queue, "/clear", strings.CLEAR_SESSION)
@@ -104,7 +96,7 @@ async def cmd_clear(message: Message, telegram_queue: TelegramQueue):
         await _wait_for_claude_ready(tmux, telegram_queue, message.chat.id, message.message_thread_id)
 
 
-@router.message(Command("esc", ignore_case=True))
+@router.message(Command("esc", ignore_case=True), CommandStrict())
 async def cmd_esc(message: Message, telegram_queue: TelegramQueue):
     """Send Escape to current thread's tmux."""
     if not await require_tmux_exists(message, telegram_queue):
@@ -129,8 +121,27 @@ async def cmd_esc(message: Message, telegram_queue: TelegramQueue):
     tmux = TmuxSession(tmux_name, project.cwd)
     tmux.send_key("Escape")
 
+    # Delete active AskUserQuestion messages if any
+    normalized_thread_id = normalize_thread_id(message.chat, thread_id)
+    key = (chat_id, normalized_thread_id)
+    kb_msg_id = active_ask_prompts.get(key)
+    if kb_msg_id:
+        related_ids = permission_messages.get(kb_msg_id, [])
+        for msg_id in related_ids:
+            try:
+                await message.bot.delete_message(chat_id, msg_id)
+            except Exception:
+                pass
+        try:
+            await message.bot.delete_message(chat_id, kb_msg_id)
+        except Exception:
+            pass
+        permission_messages.pop(kb_msg_id, None)
+        ask_options_state.pop(kb_msg_id, None)
+        active_ask_prompts.pop(key, None)
 
-@router.message(Command("resume", ignore_case=True))
+
+@router.message(Command("resume", ignore_case=True), CommandStrict())
 async def cmd_resume(message: Message, telegram_queue: TelegramQueue):
     """Handle /resume command - not supported in multi-session mode."""
     thread_id = message.message_thread_id

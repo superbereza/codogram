@@ -31,6 +31,17 @@
 ### Interactive prompts
 - Claude's clarifying questions with option buttons (plan mode → AskUserQuestion)
 
+### AskUserQuestion support
+Full support for Claude's AskUserQuestion tool prompts:
+- Parse question text and options from tmux screen
+- Single-select: tap button → send number to tmux
+- Multi-select: toggle checkboxes in Telegram, send diff on Submit
+- "Type something" option detection with special "✏️ Type your answer" message
+- Question progress header: "☐ Title (N/M)" for multi-question flows
+- Auto-delete messages when user sends text or /esc (like permission poller)
+- Refactored with dataclasses and helper functions
+- See [docs/designs/done/2026-01-21-askuserquestion-support.md](designs/done/2026-01-21-askuserquestion-support.md)
+
 ### Multi-admin support
 - ADMIN_IDS comma-separated in .env
 - /my_chat_id command for everyone
@@ -239,7 +250,7 @@ Send images and files from Telegram to Claude:
 - Photos saved to `tmp/input-files/{thread}/` with timestamped names
 - Documents (PDF, txt, md, etc.) supported with extension whitelist
 - Format: `See file: ./path/to/file` for Claude to read
-- Video/audio/voice rejected with "Coming soon with Whisper" message
+- Video files rejected (audio/voice handled by Whisper transcription)
 - Path traversal protection and 20MB size limit
 - See [docs/designs/done/2026-01-17-image-file-input.md](designs/done/2026-01-17-image-file-input.md)
 
@@ -253,7 +264,60 @@ Per-thread/per-project verbose output toggle and /settings UX:
 - Close button deletes settings message
 - See [docs/plans/done/2026-01-17-verbose-toggle-plan.md](plans/done/2026-01-17-verbose-toggle-plan.md)
 
-## Beta Test
+### DM onboarding
+Interactive onboarding in direct messages with bot:
+- Welcome carousel with bot features overview
+- Environment validation (BASE_DIR, tmux, claude, git, gh, whisper)
+- Critical checks block progress, optional checks show warnings
+- `/check_env` command to rerun validation anytime
+- `/dashboard` shows all projects with active sessions count
+- `/intro` to replay onboarding
+- Push notification when bot is added to a group
+- DM-specific command menu
+- See [docs/designs/done/2025-01-18-dm-onboarding.md](designs/done/2025-01-18-dm-onboarding.md)
+
+### Group authorization
+Allow bot usage in groups where at least one group admin is in ADMIN_IDS:
+- Private chat: only ADMIN_IDS users allowed
+- Group with admin from ADMIN_IDS: any group member can use bot
+- Group without admin from ADMIN_IDS: blocked
+- Event-driven: bot added/removed events, admin left/demoted events
+- Persistence: allowed_groups stored in config.json
+- Re-validation after bot restart
+- Regular groups: skip admin rights check (topics not supported)
+- Supergroups: check admin rights for topics/rename features
+- See [docs/plans/done/2026-01-18-group-authorization-design.md](plans/done/2026-01-18-group-authorization-design.md)
+
+### Project restructure
+Reorganized codebase into logical modules:
+- `telegram/` — queue, adapters, keyboards, launch animation
+- `tmux/` — sessions, commands, window creation
+- `claude/` — screen parsing, permission prompts, history.jsonl
+- `git/` — worktree, branches, utils
+- `core/` — project state, background task coordinator
+- See [docs/designs/done/2026-01-21-project-restructure.md](designs/done/2026-01-21-project-restructure.md)
+
+### Thread/branch command merge and menu simplification
+Unified commands instead of separate thread/branch/finish:
+- `/new_chat` — create new chat (thread or branch with worktree)
+- `/finish_chat` — finish chat (archive topic)
+- `/clear_context` — reset Claude context (new session)
+- `/hard_reset` — full project reset
+- Intuitive names without technical terminology
+- Context-aware behavior: from main → thread, from branch → nested branch
+- Relative paths in UI (`./project` instead of full path)
+- See [docs/designs/done/2026-01-19-command-merge-design.md](designs/done/2026-01-19-command-merge-design.md)
+
+### Avatar emoji pack
+Custom emoji pack from group members' avatars:
+- `/exp_avatar_pack` — toggle on/off, create or delete pack
+- Create pack on group → supergroup migration (async)
+- Add avatar when member joins, remove when leaves
+- Generate placeholder (letter + color) for users without avatar
+- Fun random names: "Cosmic Dolphins", "Epic Titans", etc.
+- Topic launch hint with pack link when feature enabled
+- Limitation: Premium required to set custom emoji as topic icon
+- See [docs/designs/done/2026-01-18-emoji-pack-design.md](designs/done/2026-01-18-emoji-pack-design.md)
 
 ### Set up flow redesign + robust start
 Full redesign of /start flow with robust error handling and intuitive setup UX:
@@ -263,6 +327,45 @@ Full redesign of /start flow with robust error handling and intuitive setup UX:
 - Cancel button and /reset_all to abort setup
 - Proper navigation with Go back buttons
 - See [docs/designs/done/2026-01-18-start-flow-v2.md](designs/done/2026-01-18-start-flow-v2.md)
+
+### Message response mode
+Per-chat setting for when bot should respond:
+- **All messages** — respond to everything (default)
+- **Polite** — skip messages with @mentions to others
+- **Mentions only** — respond only when bot is @mentioned or replied to
+- Toggle via `/response_mode` or `/settings` button
+
+### Voice → Whisper transcription
+Voice messages and audio files transcribed via OpenAI Whisper:
+- Voice messages (.ogg), audio files (.mp3, etc.), and video notes (круглые видео)
+- "Transcribing..." status, then "«text» → Claude" on success
+- Friendly error messages for API errors (too large, timeout, no speech, etc.)
+- Configurable via OPENAI_API_KEY, OPENAI_BASE_URL, WHISPER_TIMEOUT
+- See [docs/designs/done/2026-01-18-whisper-transcription-design.md](designs/done/2026-01-18-whisper-transcription-design.md)
+
+### Verbose mode detailed menu
+Granular control over bot output via `/verbose` submenu:
+- `[full]` — show everything (tool calls, auto-accept notifications)
+- `[-5 strings] [+5 strings]` — adjust line limit
+- `[just headers]` — tool names only, no content
+- `[only current header]` — single updating message with latest tool
+- `[total silence]` — only final user-facing messages
+
+### Toggle bullet point (•)
+Separate setting to enable/disable bullet point `•` prefix on bot messages.
+
+### Hide/show thinking
+Per-chat toggle for `<thinking>` block visibility:
+- Hidden by default for cleaner output
+- Enable for debugging or learning
+
+### Collapsible permission prompts
+Permission prompts show only header by default:
+- Action type shown (Bash, Read, Edit, etc.)
+- `[Show more]` button expands full context
+- Message edits in place to reveal details
+
+## Beta Test
 
 ### Compacting detection
 Detect when Claude compacts conversation and notify user:
@@ -292,100 +395,137 @@ Auto-detect and resend messages stuck in Claude's input:
 
 ## In Progress
 
-### Code cleanup
-Technical debt reduction in phases:
-- **Phase 1 (done):** Circular dependency fix, magic numbers → constants
-- **Phase 2 (backlog):** @require_state() decorator for handlers
-- **Phase 3 (backlog):** LaunchService extraction, DEPRECATED fields, ThreadInfo refactoring
-- See [docs/plans/2026-01-18-code-cleanup-design.md](plans/2026-01-18-code-cleanup-design.md)
+### Inline auto-accept notification
+Show auto-accept as edit to previous tool message instead of new message:
+- Edit last tool message to add "🤖 auto accepted" suffix
+- Reduces chat noise, provides better context
+- Hint every 10th: `/auto_accept to disable`
+- See [docs/plans/2025-01-29-inline-auto-accept-design.md](plans/2025-01-29-inline-auto-accept-design.md)
 
-### Bot onboarding
-Interactive onboarding in direct messages with bot:
-- Welcome flow explaining bot features
-- Step-by-step guidance for first-time users
+### Auto-suspend & auto-resume
+Save RAM by killing idle sessions, auto-resume on user message:
+- **Auto-suspend:** Kill tmux after 12h inactivity (silent, no notification)
+- **Auto-resume:** Relaunch Claude when user writes to dead session:
+  - Suspended session → "Session was suspended. Resuming..."
+  - Tmux missing → "Tmux not found. Launching..."
+  - Claude crashed → "Claude not responding. Relaunching..."
+- Track activity via `last_activity_at` + jsonl mtime
+- Hold user message during resume, send after Claude ready
+- See [docs/plans/2026-01-24-auto-suspend-design.md](plans/2026-01-24-auto-suspend-design.md)
 
-### Avatar emoji pack
-Custom emoji pack from group members' avatars:
-- Create pack on group → supergroup migration (async)
-- Add avatar when member joins, remove when leaves
-- Generate placeholder (letter + color) for users without avatar
-- Notification: "`[v]` Gift unlocked — avatar pack for topic icons"
-- Limitation: Premium required to set custom emoji as topic icon
-- See [docs/designs/2026-01-18-emoji-pack-design.md](designs/2026-01-18-emoji-pack-design.md)
+### Architecture review and clean up
+Ongoing architecture improvements and technical debt reduction.
+- Phase 1: project restructure ✅
+- Phase 2: permission poller refactoring ✅
+- See [docs/plans/2026-01-22-architecture-refactoring-roadmap.md](plans/2026-01-22-architecture-refactoring-roadmap.md) for full backlog
 
-### Voice → Whisper
-Voice messages via Whisper transcription:
-- Use existing code from bz-merch-assistant
-- `ai_bot_core/services/whisper.py`
+### Global settings in DM
+`/settings` command in DM with bot to set defaults for all projects:
+- Default verbose mode, response mode, auto-accept, etc.
+- New chats/threads inherit these defaults
+- Per-chat settings override global defaults
+- Configure once — works everywhere
 
 ## Backlog
 
-### Merge thread and branch commands
-Simplify by removing separate /thread command:
-- Thread is essentially a branch for main
-- Single `/branch` command for all cases
-- No argument = branch from main (current /thread behavior)
-- With argument = branch from current branch
-- Reduces cognitive load for users
+### Manual group approval tracking
+Track manually approved groups separately from auto-approved:
+- Store approving admin ID per group
+- Invalidate only if approving admin leaves the group (not if they lose admin role)
+- 24h grace period when approver leaves, with notification
+- Monthly review reminders with [Keep]/[Revoke] buttons
+- `/allowed_groups` command to view and revoke manual approvals
+- See [docs/designs/2026-01-28-manual-group-approvals.md](designs/2026-01-28-manual-group-approvals.md)
 
-### Menu naming simplification
-Make command names more intuitive:
-- Clarify thread/branch/topic terminology
-- User-friendly labels in menu
-- Consistent naming across all commands
+### Secure key-value storage
+Encrypted storage for sensitive data (API keys, tokens, secrets):
+- Claude can store and retrieve secrets without exposing them in chat
+- Encrypted at rest
+- Per-project or global scope
+- Commands or MCP tool for access
+
+### Claude file sending
+Allow Claude to send files to Telegram:
+- Send generated files (code, images, documents) directly to chat
+- MCP tool or special output format
+- Useful for exports, reports, generated assets
+
+### Fork command
+`/fork` command to create a copy of current branch:
+- Fork current worktree to new branch
+- Useful when conversation goes in wrong direction
+- Preserve context but start fresh direction
+
+### Companion / personal account integration
+Connect a Telegram user account to the bot:
+- **Service account** — read chat history, join groups, bypass bot limitations
+- **Personal account** — receive your messages, reply with Claude's help from your own account
+- MTProto client (Telethon) alongside Bot API
+- Research needed: auth flow, session storage, bot↔userbot architecture
+
+### Voice messages from bot
+Text-to-speech for Claude's responses:
+- Convert Claude's text responses to voice messages
+- OpenAI TTS or similar API
+- Toggle per-chat or per-message
+- Useful for listening while multitasking
+
+### Project-less chat mode
+Connect bot to chat without creating a project:
+- Starter worktrees in codogram folder
+- Quick access without full project setup
+- Option to "promote" to real project later
+- Useful for quick questions or experiments
+
+### Pass user names in multi-user chats
+When multiple people use same chat, identify who's talking:
+- Inject sender name before message: `[Username]: message`
+- Helps Claude understand conversation context
+- Toggle setting per chat
+
+### Team mode: user avatar and name for topics
+In team mode, personalize topics with user identity:
+- Topic icon = user's avatar (from emoji pack)
+- Topic name includes user's name
+- Easy to see who's working on what branch
+- Requires avatar emoji pack feature
+
+### Chat context for response modes
+Pass recent chat messages to Claude in polite/mention modes:
+- Save last N messages from chat
+- Inject context when bot responds to mention/reply
+- Helps Claude understand conversation flow
+
+### Chat context exploration tool
+MCP tool for Claude to read Telegram chat history:
+- Query recent messages from current chat
+- Search by user, date, keywords
+- Useful for assistant-style interactions
+
+### Tool spam reduction
+Reduce noise from internal tool calls in assistant mode:
+- Hide TodoWrite, Read, Glob etc. from output
+- Show only user-relevant results
+- Related: Hidden tool calls (silent mode)
+- May need architecture changes for comfortable assistant UX
+
+### Persistent setup state
+Save FSM state to config file to survive bot restarts:
+- Save state and data on each `state.set_state()` / `state.update_data()`
+- Restore FSM state from config on bot startup
+- Clear saved state when setup completes
+- Prevents "restart during setup = start over" problem
 
 ### Reply support
 When replying to message, send context to tmux:
 - Quote piece of message being replied to
 - Format: `> quote\n\nresponse text`
 
-### Role model & chat registration
-Minimal permission system for multi-user access:
-- `/register_chat` — allow everyone in chat to message the bot (not just admins)
-- Admin-only settings commands
-- Roles: admin (full control) vs user (can send messages)
-- Per-chat configuration
-
-### Interface simplification settings
-Admin commands to enable/disable features:
-- Toggle `/thread` command visibility
-- Toggle `/branch` command visibility
-- Simplify menu for non-power-users
-- Store in per-project settings
-
-### Auto-resume on message
-Auto-launch Claude when user sends message but tmux doesn't exist:
-- Show: `` `[~]` Tmux session not found, launching... ``
-- If `session_id` exists → `claude --resume`, else `claude`
-- Queue all messages (text + files) while launching
-- Send queued messages after Claude ready
-
-### Telegram safety context
-Inject safety guidelines when starting thread/branch/project:
-- Tell Claude what's safe to do in Telegram environment
-- Warn about dangerous operations (don't kill tmux, etc.)
-- Project-specific constraints
-- Need to design the exact guidelines
-
-### Protected environment for non-devs
-Allow product managers to use Claude without breaking environment:
-- Rollback mechanism after session
-- Or sandboxed/isolated execution
-- Easy recovery if something breaks
-- Need R&D on best approach
-
-### Permission poller refactoring
-Refactor god-function into handler classes:
-- Split 500-line `permission_poller()` into separate handlers
-- CompactHandler, ThinkingHandler, SuggestionsHandler, StuckHandler, PermissionHandler
-- Each handler 20-150 lines, unit-testable
-- See [docs/designs/2026-01-18-permission-poller-refactoring.md](designs/2026-01-18-permission-poller-refactoring.md)
-
-### Hidden tool calls
-Hide internal tool calls by default:
-- Hide tool calls (TodoWrite, Read, etc.) from output
-- `/silent` command to toggle tools visibility
-- Filter TOOL_USE, TOOL_RESULT, show only TEXT
+### Tables and diagrams rendering
+Render tables and diagrams from text to images:
+- Convert ASCII/markdown tables to images
+- Convert mermaid/plantuml diagrams to images
+- Better readability in Telegram
 
 ### Tool visibility R&D
 Research and implement tool display improvements:
@@ -407,6 +547,20 @@ Detect when Claude Code exits with error (API errors, network issues, etc.):
 - Parse tmux capture-pane for error patterns
 - Send error text to user: "⚠️ Claude error: <error text>. Figure it out and /start"
 - Detect shell prompt appearing after Claude was active
+
+### Telegram safety context
+Inject safety guidelines when starting thread/branch/project:
+- Tell Claude what's safe to do in Telegram environment
+- Warn about dangerous operations (don't kill tmux, etc.)
+- Project-specific constraints
+- Need to design the exact guidelines
+
+### Protected environment for non-devs
+Allow product managers to use Claude without breaking environment:
+- Rollback mechanism after session
+- Or sandboxed/isolated execution
+- Easy recovery if something breaks
+- Need R&D on best approach
 
 ### Message queue until session ready
 Cache user messages while session is binding, send when ready:
@@ -450,12 +604,6 @@ Explicit deletion of archived branches when disk space or git cleanup needed:
 - Workflow for running tests on PR
 - pytest + type checking
 
-### Pin startup message
-Pin message on session start:
-- `Claude started in claude-codogram-sublime`
-- `Connect: tmux attach -t claude-codogram-sublime`
-- Unpin previous on restart
-
 ### Hardware stats
 Display CPU/RAM usage:
 - Graph or text indicator in /settings
@@ -467,21 +615,6 @@ Beautiful tool results formatting:
 - Syntax highlighting for code
 - Collapsible for long outputs
 - File previews
-
-### Self-hosting: default chat = bot project
-Default private chat with bot linked to codogram folder:
-- Allows managing bot through itself
-- No need to create separate group for bot development
-
-### Forward unhandled commands
-`/commands` without handler forward to Claude as-is:
-- Currently added to tmux with double slashes, not sent
-- Need fallback in `on_message` or separate handler
-
-### Ultrathink mode
-`/ultrathink_mode` toggle, adds " ultrathink" to each message:
-- Store in per-project settings
-- Show status on /start
 
 ### Background process command
 `/ctrl_b` sends Ctrl+B twice to background running processes:
@@ -507,8 +640,22 @@ Replace large dot `•` with dot in code block:
 
 ## PoC / Research
 
+### Attach to existing Claude session
+Connect Telegram to a Claude session started from terminal:
+- User starts `claude` in tmux on laptop
+- Sends `/connect` or `/attach` in Telegram
+- Bot discovers existing tmux sessions with Claude
+- Shows list to pick from (or auto-connect if only one)
+- Starts monitoring the session for prompts/tool calls
+
 ### codogram-tmux-only
 Experiment: use only tmux capture-pane without jsonl.
 - See `docs/designs/2025-12-23-telegram-bridge-tmux-only.md`
 - Pros: simpler, doesn't depend on Claude's internal format
 - Cons: ANSI parsing, unstable
+
+### Ollama launch
+Run Claude Code CLI with other models via Ollama:
+- Launch codogram with local LLMs instead of Claude API
+- Useful for testing, development, or cost savings
+- Research: how Claude Code handles different model backends

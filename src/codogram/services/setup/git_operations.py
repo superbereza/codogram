@@ -18,7 +18,7 @@ class GitResult:
 
 
 async def git_init(target_dir: Path) -> GitResult:
-    """Initialize git repository.
+    """Initialize git repository with initial empty commit.
 
     Args:
         target_dir: Directory to initialize
@@ -39,6 +39,21 @@ async def git_init(target_dir: Path) -> GitResult:
             return GitResult(
                 success=False,
                 error=stderr.decode().strip() or "git init failed",
+            )
+
+        # Create initial empty commit (required for worktrees)
+        process = await asyncio.create_subprocess_exec(
+            "git", "commit", "--allow-empty", "-m", "Initial commit",
+            cwd=str(target_dir),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            return GitResult(
+                success=False,
+                error=stderr.decode().strip() or "initial commit failed",
             )
 
         return GitResult(success=True, output=stdout.decode().strip())

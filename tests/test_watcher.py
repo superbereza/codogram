@@ -4,7 +4,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from codogram.watcher import parse_jsonl_entry, ContentType
+from codogram.claude.history_watcher import parse_jsonl_entry, ContentType
+from codogram.strings import SNIP
 
 def test_parse_text_entry():
     entry = {
@@ -54,15 +55,15 @@ def test_parse_jsonl_entry_handles_string_in_assistant_content():
     assert result.content_type == ContentType.TEXT
 
 
-from codogram.watcher import format_tool_use
+from codogram.claude.history_watcher import format_tool_use
 
 
 def test_format_tool_use_bash_truncates_in_short_mode():
     """Bash command should be truncated when verbose=False."""
     long_cmd = "\n".join([f"echo line{i}" for i in range(10)])
     result = format_tool_use("Bash", {"command": long_cmd}, verbose=False)
-    # Should truncate the command to 5 lines + [truncated]
-    assert "[truncated]" in result
+    # Should truncate the command to 5 lines + SNIP
+    assert SNIP in result
     # Original 10 lines should NOT be fully present
     assert "echo line9" not in result
 
@@ -73,4 +74,4 @@ def test_format_tool_use_bash_full_in_verbose_mode():
     result = format_tool_use("Bash", {"command": long_cmd}, verbose=True)
     # All 10 lines should be present
     assert "echo line9" in result
-    assert "[truncated]" not in result
+    assert SNIP not in result

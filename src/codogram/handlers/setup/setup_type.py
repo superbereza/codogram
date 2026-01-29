@@ -26,12 +26,15 @@ async def on_clone_selected(callback: CallbackQuery, state: FSMContext):
     await state.update_data(setup_type="clone")
 
     # Import here to avoid circular imports
-    from ...keyboards.setup.common import go_back_keyboard
+    from ...telegram.keyboards.setup.common import go_back_keyboard
 
     await callback.message.edit_text(
         strings.SETUP_CLONE_URL_PROMPT,
         reply_markup=go_back_keyboard("clone:back"),
+        parse_mode=None,
     )
+    # Track prompt message for keyboard removal
+    await state.update_data(url_prompt_msg_id=callback.message.message_id)
 
 
 @router.callback_query(

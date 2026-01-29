@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message
 from ...config import settings
 from ...domain.states import SetupFlow
 from ...domain.validators import validate_git_url, extract_project_name_from_url
-from ...keyboards.setup import go_back_keyboard, setup_type_keyboard, folder_exists_keyboard, clone_error_keyboard
+from ...telegram.keyboards.setup import go_back_keyboard, setup_type_keyboard, folder_exists_keyboard, clone_error_keyboard
 from ... import strings
 
 logger = logging.getLogger(__name__)
@@ -53,11 +53,13 @@ async def on_clone_change_url(callback: CallbackQuery, state: FSMContext):
     """Handle Change URL button after clone failure."""
     await callback.answer()
 
-    # Go back to URL prompt
+    # Go back to URL prompt (no parse_mode - special chars in URLs)
     await callback.message.edit_text(
         strings.SETUP_CLONE_URL_PROMPT,
         reply_markup=go_back_keyboard("clone:back"),
+        parse_mode=None,
     )
+    await state.update_data(url_prompt_msg_id=callback.message.message_id)
 
 
 @router.callback_query(
@@ -68,23 +70,8 @@ async def on_exists_use(callback: CallbackQuery, state: FSMContext):
     """Handle Use existing folder button."""
     await callback.answer()
 
-    # Use existing folder - proceed to rename check or launch
-    data = await state.get_data()
-    project_name = data["project_name"]
-    chat_title = callback.message.chat.title or ""
-
-    if chat_title != project_name:
-        await state.set_state(SetupFlow.awaiting_rename_confirm)
-        await state.update_data(rename_to=project_name)
-
-        from ...keyboards.setup.confirm import rename_confirm_keyboard
-        await callback.message.edit_text(
-            strings.SETUP_RENAME_PROMPT.format(name=project_name),
-            reply_markup=rename_confirm_keyboard(),
-        )
-    else:
-        # Proceed to launch
-        await _proceed_to_launch(callback.message, state)
+    # Proceed to launch (rename offered after migration when admin rights available)
+    await _proceed_to_launch(callback.message, state)
 
 
 @router.callback_query(
@@ -100,13 +87,27 @@ async def on_exists_rename(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         strings.SETUP_CLONE_URL_PROMPT,
         reply_markup=go_back_keyboard("clone:back"),
+        parse_mode=None,
     )
+    await state.update_data(url_prompt_msg_id=callback.message.message_id)
 
 
 @router.message(SetupFlow.awaiting_clone_url, F.text, ~F.text.startswith("/"))
 async def on_clone_url(message: Message, state: FSMContext):
     """Handle clone URL input."""
     url = message.text.strip()
+
+    # Remove keyboard from prompt message
+    data = await state.get_data()
+    if prompt_msg_id := data.get("url_prompt_msg_id"):
+        try:
+            await message.bot.edit_message_reply_markup(
+                chat_id=message.chat.id,
+                message_id=prompt_msg_id,
+                reply_markup=None,
+            )
+        except Exception:
+            pass  # Message might be deleted or already edited
 
     # Validate URL
     is_valid, error = validate_git_url(url)
@@ -160,13 +161,13 @@ async def _do_clone(message: Message, state: FSMContext):
     target_dir = data["target_dir"]
     project_name = data["project_name"]
 
-    # Show progress
+    # Show progress (don't track as bot_message_id - we pass this message forward)
     progress_msg = await message.answer(strings.SETUP_CLONE_PROGRESS, parse_mode="MarkdownV2")
 
-    # Import git_clone from existing service
-    from ...services.start_flow import git_clone
+    # Import git_clone from tmux launcher
+    from ...tmux.launcher import git_clone
 
-    result = await git_clone(url, target_dir)
+    result = git_clone(target_dir, url)
 
     if not result.success:
         error_msg = result.error or "Unknown error"
@@ -186,21 +187,8 @@ async def _do_clone(message: Message, state: FSMContext):
         )
         return
 
-    # Clone successful - check if rename needed
-    chat_title = message.chat.title or ""
-
-    if chat_title != project_name:
-        await state.set_state(SetupFlow.awaiting_rename_confirm)
-        await state.update_data(rename_to=project_name)
-
-        from ...keyboards.setup.confirm import rename_confirm_keyboard
-        await progress_msg.edit_text(
-            strings.SETUP_RENAME_PROMPT.format(name=project_name),
-            reply_markup=rename_confirm_keyboard(),
-        )
-    else:
-        # No rename needed - proceed to launch
-        await _proceed_to_launch(progress_msg, state)
+    # Clone successful - proceed to launch (rename offered after migration)
+    await _proceed_to_launch(progress_msg, state)
 
 
 async def _proceed_to_launch(message: Message, state: FSMContext):
