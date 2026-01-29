@@ -341,6 +341,8 @@ Per-chat настройка когда бот должен отвечать:
 - Статус "Transcribing...", затем "«текст» → Claude" при успехе
 - Дружелюбные ошибки (файл слишком большой, таймаут, нет речи и т.д.)
 - Настройка через OPENAI_API_KEY, OPENAI_BASE_URL, WHISPER_TIMEOUT
+- `/whisper_stats` в DM — отчёты по использованию (по юзерам/проектам) с фильтрами периода (7d/30d/all)
+- Логирование использования в `~/.codogram/whisper-usage.jsonl` для отслеживания расходов
 - См. [docs/designs/done/2026-01-18-whisper-transcription-design.md](designs/done/2026-01-18-whisper-transcription-design.md)
 
 ### Детальное меню verbose mode
@@ -373,6 +375,15 @@ Permission prompts по умолчанию показывают только з�
 - Решение: JsonlWatcher теперь проверяет `subagents/` папку на новые `agent-aprompt_suggestion-*.jsonl` файлы
 - Извлекает текст из line 1 и возвращает как TEXT entry
 - Связано: anthropics/claude-code#13326, anthropics/claude-code#20660
+
+### Настройки в DM / Глобальные дефолты
+Управление глобальными настройками из ЛС с ботом:
+- `/settings` в DM — просмотр и переключение глобальных дефолтов
+- Все команды настроек работают в DM (auto_accept, response_mode, verbose_mode и т.д.)
+- `/reset_to_default` — сброс настроек треда/проекта к наследованию от глобальных
+- Двухуровневое наследование: Thread → Global defaults → Hardcoded defaults
+- `feat_avatar_pack` per-project (не per-thread) с override через глобальный дефолт
+- См. [docs/designs/done/2026-01-27-settings-in-dm-design.md](designs/done/2026-01-27-settings-in-dm-design.md)
 
 ## Beta Test
 

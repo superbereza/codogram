@@ -341,6 +341,8 @@ Voice messages and audio files transcribed via OpenAI Whisper:
 - "Transcribing..." status, then "«text» → Claude" on success
 - Friendly error messages for API errors (too large, timeout, no speech, etc.)
 - Configurable via OPENAI_API_KEY, OPENAI_BASE_URL, WHISPER_TIMEOUT
+- `/whisper_stats` in DM — usage reports by users/projects with period filters (7d/30d/all)
+- Usage logging to `~/.codogram/whisper-usage.jsonl` for cost tracking
 - See [docs/designs/done/2026-01-18-whisper-transcription-design.md](designs/done/2026-01-18-whisper-transcription-design.md)
 
 ### Verbose mode detailed menu
@@ -373,6 +375,15 @@ Fix missing Claude responses due to Claude Code sidechain behavior:
 - Fix: JsonlWatcher now also checks `subagents/` folder for new `agent-aprompt_suggestion-*.jsonl` files
 - Extracts text from line 1 and yields as TEXT entry
 - Related: anthropics/claude-code#13326, anthropics/claude-code#20660
+
+### Settings in DM / Global defaults
+Manage global default settings from DM with the bot:
+- `/settings` in DM — view and toggle global defaults
+- All settings commands work in DM (auto_accept, response_mode, verbose_mode, etc.)
+- `/reset_to_default` — reset thread/project settings to inherit from global defaults
+- Two-level inheritance: Thread → Global defaults → Hardcoded defaults
+- `feat_avatar_pack` is per-project (not per-thread) with global default override
+- See [docs/designs/done/2026-01-27-settings-in-dm-design.md](designs/done/2026-01-27-settings-in-dm-design.md)
 
 ## Beta Test
 
