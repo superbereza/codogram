@@ -9,7 +9,8 @@ from ....telegram.queue import OutgoingBatch
 from ....telegram.keyboards import permission_keyboard
 from ....state import permission_states, PermissionPromptState
 from ....auto_accept import try_auto_accept
-from ....config import settings
+from ....config import settings, get_global_defaults
+from ....core.session_manager import get_thread_setting
 from ....chunker import _split_text
 from .ask_user import _parse_review_answers
 
@@ -100,9 +101,10 @@ class PermissionProcessor(BaseProcessor):
             return
 
         # Debounce complete - check auto-accept or show prompt
-        auto_accept = self.ctx.thread.auto_accept if self.ctx.thread else self.ctx.project.auto_accept
-        display_mode = self.ctx.thread.display_mode if self.ctx.thread else self.ctx.project.display_mode
-        line_limit = self.ctx.thread.line_limit if self.ctx.thread else self.ctx.project.line_limit
+        global_defaults = get_global_defaults()
+        auto_accept = get_thread_setting(self.ctx.thread, "auto_accept", global_defaults)
+        display_mode = get_thread_setting(self.ctx.thread, "display_mode", global_defaults)
+        line_limit = get_thread_setting(self.ctx.thread, "line_limit", global_defaults)
 
         self.log_debug(f"DEBOUNCING: auto_accept={auto_accept} prompt_type={parsed.prompt_type.value}")
 
@@ -133,9 +135,10 @@ class PermissionProcessor(BaseProcessor):
 
         if parsed.options != self.last_options or parsed.body != self.last_body:
             # Options/body changed - check auto-accept or resend
-            auto_accept = self.ctx.thread.auto_accept if self.ctx.thread else self.ctx.project.auto_accept
-            display_mode = self.ctx.thread.display_mode if self.ctx.thread else self.ctx.project.display_mode
-            line_limit = self.ctx.thread.line_limit if self.ctx.thread else self.ctx.project.line_limit
+            global_defaults = get_global_defaults()
+            auto_accept = get_thread_setting(self.ctx.thread, "auto_accept", global_defaults)
+            display_mode = get_thread_setting(self.ctx.thread, "display_mode", global_defaults)
+            line_limit = get_thread_setting(self.ctx.thread, "line_limit", global_defaults)
 
             self.log_debug(f"SHOWING: options/body changed! auto_accept={auto_accept}")
 

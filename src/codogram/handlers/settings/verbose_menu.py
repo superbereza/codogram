@@ -4,7 +4,8 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
-from ...core.session_manager import project_manager
+from ...core.session_manager import project_manager, get_thread_setting
+from ...config import get_global_defaults
 from ..common import CommandStrict
 from ...telegram.queue import TelegramQueue
 from ...telegram.keyboards.verbose_menu import verbose_menu_keyboard
@@ -45,13 +46,14 @@ async def cmd_verbose_mode(message: Message, telegram_queue: TelegramQueue):
         thread = project.threads.get(thread_id)
 
     # Get current settings
+    global_defaults = get_global_defaults()
     if thread:
-        display_mode = thread.display_mode
-        line_limit = thread.line_limit
+        display_mode = get_thread_setting(thread, "display_mode", global_defaults)
+        line_limit = get_thread_setting(thread, "line_limit", global_defaults)
         tmux_name = thread.get_tmux_session(project.project_name)
     else:
-        display_mode = project.display_mode
-        line_limit = project.line_limit
+        display_mode = global_defaults["display_mode"]
+        line_limit = global_defaults["line_limit"]
         tmux_name = f"claude-{project.project_name}"
 
     text = _build_verbose_text(display_mode, line_limit)
@@ -130,8 +132,9 @@ async def callback_verbose_menu(callback: CallbackQuery, telegram_queue: Telegra
         await callback.answer(f"Lines: {line_limit}")
 
     # Update message
-    display_mode = thread.display_mode if thread else project.display_mode
-    line_limit = thread.line_limit if thread else project.line_limit
+    global_defaults = get_global_defaults()
+    display_mode = get_thread_setting(thread, "display_mode", global_defaults) if thread else global_defaults["display_mode"]
+    line_limit = get_thread_setting(thread, "line_limit", global_defaults) if thread else global_defaults["line_limit"]
 
     text = _build_verbose_text(display_mode, line_limit)
     kb = verbose_menu_keyboard(display_mode, line_limit, short_id)

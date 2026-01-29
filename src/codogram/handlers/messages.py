@@ -7,7 +7,8 @@ from aiogram.types import Message
 from ..services.message_router import MessageRouterService, RouteAction
 from ..services.file_input import FileInputService
 from ..services.response_mode import ResponseModeService
-from ..core.session_manager import project_manager, ThreadInfo
+from ..core.session_manager import project_manager, ThreadInfo, get_thread_setting
+from ..config import get_global_defaults
 from ..telegram.queue import TelegramQueue
 from ..state import active_ask_prompts, permission_messages, ask_options_state, ask_other_pending
 from ..logging_config import logger
@@ -53,7 +54,8 @@ def _should_skip_by_response_mode(
         return False  # No project = no filter
 
     thread = project.threads.get(thread_id) if thread_id is not None else project.threads.get(None)
-    mode = thread.response_mode if thread else project.response_mode
+    global_defaults = get_global_defaults()
+    mode = get_thread_setting(thread, "response_mode", global_defaults)
 
     reply_to_user_id = None
     if message.reply_to_message and message.reply_to_message.from_user:

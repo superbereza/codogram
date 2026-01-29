@@ -10,7 +10,8 @@ from typing import AsyncIterator, TYPE_CHECKING
 if TYPE_CHECKING:
     from ..telegram.queue import TelegramQueue
 from aiogram import Bot
-from ..config import settings
+from ..config import settings, get_global_defaults
+from ..core.session_manager import get_thread_setting
 from ..logging_config import logger
 from .. import strings
 from .tool_formatter import format_tool_use
@@ -215,11 +216,12 @@ async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "Telegra
     try:
         async for entry in watcher.watch():
             try:
-                # Get display settings from thread (with fallback to project)
-                display_mode = getattr(thread, 'display_mode', getattr(project, 'display_mode', 'lines'))
-                line_limit = getattr(thread, 'line_limit', getattr(project, 'line_limit', 5))
-                display_bullet = getattr(thread, 'display_bullet', getattr(project, 'display_bullet', True))
-                display_thinking_text = getattr(thread, 'display_thinking_text', getattr(project, 'display_thinking_text', True))
+                # Get display settings from thread (with fallback to global defaults)
+                global_defaults = get_global_defaults()
+                display_mode = get_thread_setting(thread, 'display_mode', global_defaults)
+                line_limit = get_thread_setting(thread, 'line_limit', global_defaults)
+                display_bullet = get_thread_setting(thread, 'display_bullet', global_defaults)
+                display_thinking_text = get_thread_setting(thread, 'display_thinking_text', global_defaults)
 
                 messages = _entry_to_messages(
                     entry,

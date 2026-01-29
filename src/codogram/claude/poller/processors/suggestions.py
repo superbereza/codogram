@@ -4,7 +4,8 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 from ..base import BaseProcessor
 from ...screen import parse_input_suggestion, parse_thinking_status
-from ....core.session_manager import project_manager
+from ....core.session_manager import project_manager, get_thread_setting
+from ....config import get_global_defaults
 from ....telegram.queue import OutgoingBatch
 
 # Track last suggestion per thread to avoid duplicates
@@ -19,8 +20,10 @@ class SuggestionsProcessor(BaseProcessor):
         self.msg_key: str | None = None
 
     async def process(self, screen: str) -> None:
-        # Check if feature enabled (chat-wide, not per-thread)
-        if not self.ctx.project.feat_suggestions:
+        # Check if feature enabled
+        global_defaults = get_global_defaults()
+        feat_suggestions = get_thread_setting(self.ctx.thread, "feat_suggestions", global_defaults)
+        if not feat_suggestions:
             if self.msg_key:
                 # Feature disabled but message exists - cleanup
                 self.log_debug("suggestion DELETE (feature disabled)")

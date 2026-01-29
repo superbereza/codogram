@@ -3,6 +3,8 @@
 import asyncio
 from ..base import BaseProcessor
 from ...screen import parse_thinking_status
+from ....config import get_global_defaults
+from ....core.session_manager import get_thread_setting
 
 
 class ThinkingProcessor(BaseProcessor):
@@ -16,11 +18,8 @@ class ThinkingProcessor(BaseProcessor):
 
     async def process(self, screen: str) -> None:
         # Check if feature enabled
-        working_status = (
-            self.ctx.thread.working_status
-            if self.ctx.thread
-            else self.ctx.project.working_status
-        )
+        global_defaults = get_global_defaults()
+        working_status = get_thread_setting(self.ctx.thread, "working_status", global_defaults)
         if not working_status:
             return
 

@@ -564,8 +564,8 @@ async def cmd_dm_working_status(message: Message, telegram_queue: TelegramQueue)
     await telegram_queue.send(message.chat.id, f"Global working status: {status}")
 
 
-@router.message(Command("exp_suggestions"), F.chat.type == ChatType.PRIVATE)
-async def cmd_dm_exp_suggestions(message: Message, telegram_queue: TelegramQueue):
+@router.message(Command("suggestions"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_suggestions(message: Message, telegram_queue: TelegramQueue):
     """Toggle feat_suggestions global default."""
     if not is_admin(message):
         return
@@ -577,8 +577,8 @@ async def cmd_dm_exp_suggestions(message: Message, telegram_queue: TelegramQueue
     await telegram_queue.send(message.chat.id, f"Global suggestions: {status}")
 
 
-@router.message(Command("exp_avatar_pack"), F.chat.type == ChatType.PRIVATE)
-async def cmd_dm_exp_avatar_pack(message: Message, telegram_queue: TelegramQueue):
+@router.message(Command("avatar_pack"), F.chat.type == ChatType.PRIVATE)
+async def cmd_dm_avatar_pack(message: Message, telegram_queue: TelegramQueue):
     """Toggle feat_avatar_pack global default."""
     if not is_admin(message):
         return
