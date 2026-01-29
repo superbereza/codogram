@@ -79,3 +79,4 @@ Rules:
 - Mark changes since last review in this conversation:
   - Make changed item **bold**
   - Add comment after `—`: `**Item name** — was In Progress` or `**Item name** — new`
+- **Duplicate check:** After generating the list, verify no item appears in multiple sections (e.g., both Done and In Progress). If found, report: `⚠️ Duplicate found: "Item name" in Done AND In Progress — needs cleanup`
