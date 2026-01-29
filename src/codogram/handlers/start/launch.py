@@ -128,7 +128,8 @@ async def launch_claude_in_thread(msg: Message, result: FlowResult, queue: Teleg
             # BUG FIX: Log instead of bare pass
             logger.debug(f"reopen_forum_topic failed (may be already open): {e}")
 
-        if was_reopened:
+        # Reset icon if topic was reopened OR was archived (icon may be 📁)
+        if was_reopened or thread.archived:
             # Use user's custom emoji if available, otherwise default
             user_id = msg.from_user.id if msg.from_user else None
             icon_id = project.emoji_map.get(user_id) if user_id else None
