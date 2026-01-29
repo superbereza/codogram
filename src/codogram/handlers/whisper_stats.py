@@ -42,6 +42,7 @@ def _build_keyboard(view: str, period: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=toggle_text, callback_data=f"ws:{toggle_view}:{period}")],
         period_buttons,
+        [InlineKeyboardButton(text="Close", callback_data="ws:close")],
     ])
 
 
@@ -85,6 +86,14 @@ async def cmd_whisper_stats(message: Message, telegram_queue: TelegramQueue):
     keyboard = _build_keyboard(view, period)
 
     await telegram_queue.reply(message, text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "ws:close")
+async def on_stats_close(callback: CallbackQuery):
+    """Handle close button."""
+    if callback.message:
+        await callback.message.delete()
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("ws:"))
