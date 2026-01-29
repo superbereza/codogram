@@ -1,7 +1,7 @@
 """Handlers layer - thin routers delegating to services."""
 from aiogram import Dispatcher
 
-from . import permissions, new_chat, threads, branches, sessions, settings, shift_tab, finish_chat, common, messages, migration, audio, dm, members, ask_user, group_admin
+from . import permissions, new_chat, threads, branches, sessions, settings, shift_tab, finish_chat, common, messages, migration, audio, dm, members, ask_user, group_admin, whisper_stats
 from . import start, restart, reset  # New modular handlers
 from .setup import setup_router
 
@@ -22,6 +22,7 @@ def register_handlers(dp: Dispatcher):
     dp.include_router(permissions.router)   # Permission callbacks
     dp.include_router(group_admin.router)   # Group approve/reject callbacks
     dp.include_router(ask_user.router)      # AskUserQuestion callbacks
+    dp.include_router(whisper_stats.router) # /whisper_stats (DM only, before dm catch-all)
     dp.include_router(dm.router)            # DM onboarding (BEFORE start!)
     dp.include_router(start.router)         # /start + FSM + callbacks
     dp.include_router(restart.router)       # /restart, /reset_chat

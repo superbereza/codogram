@@ -211,6 +211,21 @@ FILE_TOO_LARGE = "File too large. Max 20MB"
 FILE_DOWNLOAD_FAILED = "Download failed. Try again"
 
 
+# --- Whisper Stats ---
+
+WHISPER_STATS_TITLE = "📊 Whisper Usage ({period})"
+WHISPER_STATS_BY_USERS = "By Users:"
+WHISPER_STATS_BY_PROJECTS = "By Projects:"
+WHISPER_STATS_EMPTY = "No usage data for this period."
+WHISPER_STATS_TOTAL = "Total: ${cost:.4f} ({count} msgs)"
+WHISPER_STATS_ENTRY = "• {name} — ${cost:.4f} ({count} msgs)"
+WHISPER_STATS_BTN_USERS = "← By Users"
+WHISPER_STATS_BTN_PROJECTS = "By Projects →"
+WHISPER_STATS_PERIOD_7D = "7d"
+WHISPER_STATS_PERIOD_30D = "30d"
+WHISPER_STATS_PERIOD_ALL = "All"
+
+
 # --- Resume (deprecated) ---
 
 RESUME_NOT_SUPPORTED_MULTI = f"{STATUS_WARN} /resume not supported in multi-session mode\nUse /thread_create for a new thread"
