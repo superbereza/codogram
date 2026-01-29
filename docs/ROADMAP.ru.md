@@ -367,6 +367,15 @@ Permission prompts по умолчанию показывают только з�
 - Кнопка `[Show more]` раскрывает полный контекст
 - Сообщение редактируется на месте
 
+### Захват текста из sidechain агентов
+Исправление пропадающих ответов Claude из-за особенности Claude Code:
+- Claude Code иногда пишет текст в `aprompt_suggestion` sidechain агенты вместо основного jsonl
+- В основном jsonl только `thinking` блок с `stop_reason: null`
+- Текст виден на экране, но отсутствует в основном jsonl
+- Решение: JsonlWatcher теперь проверяет `subagents/` папку на новые `agent-aprompt_suggestion-*.jsonl` файлы
+- Извлекает текст из line 1 и возвращает как TEXT entry
+- Связано: anthropics/claude-code#13326, anthropics/claude-code#20660
+
 ## Beta Test
 
 ### Compacting detection

@@ -62,6 +62,8 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
     entry_type = entry.get("type")
 
     # Tool results come in "user" entries
+    # Only show subagent (Task) results - they have array content with agentId
+    # Skip regular tool results (string content) - already shown as TOOL_USE
     if entry_type == "user":
         message = entry.get("message", {})
         content = message.get("content", [])
@@ -69,12 +71,24 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
             if not isinstance(item, dict):
                 continue
             if item.get("type") == "tool_result":
-                content = str(item.get("content", ""))
-                if len(content) > 500:
-                    content = content[:500] + f"\n{strings.SNIP}"
+                raw_content = item.get("content", "")
+                # Only process array content (subagent responses)
+                # String content = regular tool output, skip it
+                if not isinstance(raw_content, list):
+                    return None
+                texts = [
+                    c.get("text", "")
+                    for c in raw_content
+                    if isinstance(c, dict) and c.get("type") == "text"
+                ]
+                # Filter out "agentId: xxx" lines
+                texts = [t for t in texts if not t.startswith("agentId:")]
+                text = "\n".join(texts)
+                if not text:
+                    return None
                 return ParsedEntry(
                     content_type=ContentType.TOOL_RESULT,
-                    text=content
+                    text=text
                 )
         return None
 
@@ -120,21 +134,36 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
     return None
 
 class JsonlWatcher:
-    """Watches a jsonl file and yields new entries."""
+    """Watches a jsonl file and subagents/ folder for new entries.
+
+    Claude Code sometimes writes text responses to sidechain agents
+    (aprompt_suggestion) instead of main jsonl. This watcher checks both.
+    """
 
     def __init__(self, path: Path, poll_interval: float | None = None):
         self.path = path
         self.poll_interval = poll_interval if poll_interval is not None else settings.jsonl_watcher_interval
         self.last_position = path.stat().st_size if path.exists() else 0
 
+        # Subagents tracking (for aprompt_suggestion workaround)
+        # Session dir is parent of jsonl file: /path/to/session-id.jsonl -> /path/to/session-id/
+        session_id = path.stem  # e.g. "a1d6f831-..."
+        self.subagents_dir = path.parent / session_id / "subagents"
+        self.seen_subagent_files: set[str] = set()
+
+        # Initialize with existing files to avoid showing old messages
+        if self.subagents_dir.exists():
+            for f in self.subagents_dir.glob("agent-aprompt_suggestion-*.jsonl"):
+                self.seen_subagent_files.add(f.name)
+
     async def watch(self) -> AsyncIterator[ParsedEntry]:
-        """Watch jsonl file and yield new parsed entries."""
+        """Watch jsonl file and subagents/ folder, yield new parsed entries."""
         while True:
+            # 1. Check main jsonl
             try:
                 current_size = self.path.stat().st_size
             except FileNotFoundError:
-                await asyncio.sleep(self.poll_interval)
-                continue
+                current_size = 0
 
             if current_size > self.last_position:
                 with open(self.path, "r") as f:
@@ -152,7 +181,63 @@ class JsonlWatcher:
                             pass
                     self.last_position = f.tell()
 
+            # 2. Check subagents/ for new aprompt_suggestion files
+            for entry in self._check_subagents():
+                yield entry
+
             await asyncio.sleep(self.poll_interval)
+
+    def _check_subagents(self) -> list[ParsedEntry]:
+        """Check for new aprompt_suggestion files and extract text."""
+        entries = []
+
+        if not self.subagents_dir.exists():
+            return entries
+
+        for filepath in self.subagents_dir.glob("agent-aprompt_suggestion-*.jsonl"):
+            if filepath.name in self.seen_subagent_files:
+                continue
+
+            self.seen_subagent_files.add(filepath.name)
+
+            text = self._extract_subagent_text(filepath)
+            if text:
+                logger.debug(f"subagent_text: file={filepath.name} len={len(text)}")
+                entries.append(ParsedEntry(
+                    content_type=ContentType.TEXT,
+                    text=text
+                ))
+
+        return entries
+
+    def _extract_subagent_text(self, filepath: Path) -> str | None:
+        """Extract assistant text from line 1 of aprompt_suggestion file."""
+        try:
+            with open(filepath, "r") as f:
+                first_line = f.readline().strip()
+                if not first_line:
+                    return None
+
+                entry = json.loads(first_line)
+                message = entry.get("message", {})
+
+                # Verify it's an assistant message
+                if message.get("role") != "assistant":
+                    return None
+
+                content = message.get("content", [])
+                if not content:
+                    return None
+
+                # Get text from first content item
+                first_item = content[0]
+                if isinstance(first_item, dict) and first_item.get("type") == "text":
+                    return first_item.get("text", "")
+
+                return None
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"subagent_extract_error: file={filepath.name} error={e}")
+            return None
 
 
 async def watch_jsonl(path: Path, poll_interval: float | None = None) -> AsyncIterator[ParsedEntry]:
@@ -325,5 +410,14 @@ def _entry_to_messages(
         )
         if text:  # None in silence mode
             messages.append({"text": text, "parse_mode": "MarkdownV2"})
+
+    elif entry.content_type == ContentType.TOOL_RESULT:
+        # Subagent (Task) responses - always show in full
+        # These are user-facing content, not internal tool output
+        if display_mode == "silence":
+            return []
+
+        bullet = "● " if display_bullet else ""
+        messages.append({"text": f"{bullet}{entry.text}", "parse_mode": "MarkdownV2"})
 
     return messages
