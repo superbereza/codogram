@@ -51,6 +51,39 @@ def settings_keyboard(tmux_session: str, page: int = 0) -> InlineKeyboardMarkup:
 
     # Clamp page to valid range
     page = max(0, min(page, len(SETTINGS_BUTTON_GROUPS) - 1))
+    total_pages = len(SETTINGS_BUTTON_GROUPS)
+
+    # Navigation row at top: [◀] [1/3] [▶]
+    if total_pages > 1:
+        nav_row = []
+        # Left button
+        if page > 0:
+            nav_row.append(InlineKeyboardButton(
+                text="◀",
+                callback_data=f"settings:{sid}:page:{page - 1}"
+            ))
+        else:
+            nav_row.append(InlineKeyboardButton(
+                text="•",
+                callback_data="settings:noop"
+            ))
+        # Page indicator
+        nav_row.append(InlineKeyboardButton(
+            text=f"{page + 1}/{total_pages}",
+            callback_data="settings:noop"
+        ))
+        # Right button
+        if page < total_pages - 1:
+            nav_row.append(InlineKeyboardButton(
+                text="▶",
+                callback_data=f"settings:{sid}:page:{page + 1}"
+            ))
+        else:
+            nav_row.append(InlineKeyboardButton(
+                text="•",
+                callback_data="settings:noop"
+            ))
+        buttons.append(nav_row)
 
     # Get current group
     group = SETTINGS_BUTTON_GROUPS[page]
@@ -61,41 +94,11 @@ def settings_keyboard(tmux_session: str, page: int = 0) -> InlineKeyboardMarkup:
             callback_data=f"set:{action}:{sid}"
         )])
 
-    # Navigation + Close row: [◀] [Close] [▶]
-    total_pages = len(SETTINGS_BUTTON_GROUPS)
-    nav_close_row = []
-
-    # Left button (placeholder if at start, or if single page)
-    if total_pages > 1 and page > 0:
-        nav_close_row.append(InlineKeyboardButton(
-            text="◀",
-            callback_data=f"settings:{sid}:page:{page - 1}"
-        ))
-    elif total_pages > 1:
-        nav_close_row.append(InlineKeyboardButton(
-            text="•",
-            callback_data="settings:noop"
-        ))
-
-    # Close button (always)
-    nav_close_row.append(InlineKeyboardButton(
+    # Close button at bottom
+    buttons.append([InlineKeyboardButton(
         text=strings.BTN_CLOSE,
         callback_data="set:close"
-    ))
-
-    # Right button (placeholder if at end, or if single page)
-    if total_pages > 1 and page < total_pages - 1:
-        nav_close_row.append(InlineKeyboardButton(
-            text="▶",
-            callback_data=f"settings:{sid}:page:{page + 1}"
-        ))
-    elif total_pages > 1:
-        nav_close_row.append(InlineKeyboardButton(
-            text="•",
-            callback_data="settings:noop"
-        ))
-
-    buttons.append(nav_close_row)
+    )])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

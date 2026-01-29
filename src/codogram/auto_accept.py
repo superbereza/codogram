@@ -104,7 +104,17 @@ async def try_auto_accept(
 
             # Build suffix with optional hint
             thread.auto_accept_count += 1
-            suffix = strings.AUTO_ACCEPT_SUFFIX
+            # Prefix depends on display_mode:
+            # - lines/show_all: empty line (double newline)
+            # - headers: single newline
+            # - current: space
+            if display_mode in ("lines", "show_all"):
+                prefix = "\n\n"
+            elif display_mode == "headers":
+                prefix = "\n"
+            else:
+                prefix = " "
+            suffix = prefix + strings.AUTO_ACCEPT_SUFFIX
             if thread.auto_accept_count % 10 == 0:
                 suffix += strings.AUTO_ACCEPT_HINT
 
