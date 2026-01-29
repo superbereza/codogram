@@ -84,7 +84,7 @@ HARDCODED_DEFAULTS: dict[str, Any] = {
     "display_thinking_text": False,
     "working_status": False,
     "feat_suggestions": False,
-    "feat_avatar_pack": False,
+    "feat_avatar_pack": True,
 }
 
 
