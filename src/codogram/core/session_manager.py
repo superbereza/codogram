@@ -310,8 +310,8 @@ class ProjectManager:
                 else:
                     project.working_status = data.get("working_status", False)
 
-                project.feat_suggestions = data.get("feat_suggestions", False)
-                project.feat_avatar_pack = data.get("feat_avatar_pack", True)
+                project.feat_suggestions = data.get("feat_suggestions")
+                project.feat_avatar_pack = data.get("feat_avatar_pack")
                 project.emoji_pack_name = data.get("emoji_pack_name")
                 # Convert string keys back to int (JSON serialization converts int keys to strings)
                 emoji_map_raw = data.get("emoji_map", {})
