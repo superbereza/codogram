@@ -365,6 +365,15 @@ Permission prompts show only header by default:
 - `[Show more]` button expands full context
 - Message edits in place to reveal details
 
+### Sidechain agent text capture
+Fix missing Claude responses due to Claude Code sidechain behavior:
+- Claude Code sometimes writes text to `aprompt_suggestion` sidechain agents instead of main jsonl
+- Main jsonl only gets `thinking` block with `stop_reason: null`
+- Text visible on screen but not in main jsonl
+- Fix: JsonlWatcher now also checks `subagents/` folder for new `agent-aprompt_suggestion-*.jsonl` files
+- Extracts text from line 1 and yields as TEXT entry
+- Related: anthropics/claude-code#13326, anthropics/claude-code#20660
+
 ## Beta Test
 
 ### Compacting detection
