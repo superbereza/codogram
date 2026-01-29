@@ -5,7 +5,7 @@ from .. import strings
 MAX_LINES = 5
 
 
-def truncate_body(text: str | None, verbose: bool, max_lines: int = MAX_LINES) -> str | None:
+def truncate_body(text: str | None, verbose: bool, max_lines: int | None = MAX_LINES) -> str | None:
     """Truncate body text based on verbose setting.
 
     Args:
@@ -18,6 +18,9 @@ def truncate_body(text: str | None, verbose: bool, max_lines: int = MAX_LINES) -
     """
     if text is None:
         return None
+
+    if max_lines is None:
+        max_lines = MAX_LINES
 
     if verbose:
         return text
