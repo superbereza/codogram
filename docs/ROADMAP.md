@@ -395,6 +395,13 @@ Auto-detect and resend messages stuck in Claude's input:
 
 ## In Progress
 
+### Inline auto-accept notification
+Show auto-accept as edit to previous tool message instead of new message:
+- Edit last tool message to add "🤖 auto accepted" suffix
+- Reduces chat noise, provides better context
+- Hint every 10th: `/auto_accept to disable`
+- See [docs/plans/2025-01-29-inline-auto-accept-design.md](plans/2025-01-29-inline-auto-accept-design.md)
+
 ### Auto-suspend & auto-resume
 Save RAM by killing idle sessions, auto-resume on user message:
 - **Auto-suspend:** Kill tmux after 12h inactivity (silent, no notification)

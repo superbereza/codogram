@@ -395,6 +395,13 @@ Permission prompts по умолчанию показывают только з�
 
 ## In Progress
 
+### Inline auto-accept notification
+Показывать auto-accept как редактирование предыдущего tool message вместо нового сообщения:
+- Редактируем последний tool message, добавляя "🤖 auto accepted"
+- Меньше шума в чате, лучший контекст
+- Хинт каждый 10-й раз: `/auto_accept to disable`
+- См. [docs/plans/2025-01-29-inline-auto-accept-design.md](plans/2025-01-29-inline-auto-accept-design.md)
+
 ### Auto-suspend & auto-resume
 Экономия RAM за счёт убийства idle сессий, auto-resume при сообщении:
 - **Auto-suspend:** Убить tmux после 12ч неактивности (тихо, без уведомления)
