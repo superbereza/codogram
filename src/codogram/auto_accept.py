@@ -7,6 +7,8 @@ from .telegram.queue import OutgoingBatch
 from .tmux.session import TmuxSession
 from .logging_config import logger
 from .utils.truncate import truncate_body
+from .core.session_manager import ThreadInfo, get_thread_setting
+from .config import get_global_defaults
 
 if TYPE_CHECKING:
     from .telegram.queue import TelegramQueue
@@ -55,23 +57,23 @@ async def try_auto_accept(
     tmux: TmuxSession,
     telegram_queue: "TelegramQueue",
     chat_id: int,
-    thread_id: int | None,
     context_name: str,
     prompt_type: PromptType = PromptType.REGULAR,
-    display_mode: str = "lines",
-    line_limit: int = 5,
+    thread: "ThreadInfo | None" = None,
 ) -> bool:
     """Try to auto-accept a permission prompt.
 
     Returns True if auto-accepted, False if manual mode needed.
 
     Args:
-        display_mode: How to show auto-accept notification:
-            - silence/current: no notification
-            - headers: only first line
-            - lines: truncated body
-            - show_all: full body
+        thread: Thread info containing settings for display_mode/line_limit
     """
+    # Extract settings from thread
+    global_defaults = get_global_defaults()
+    thread_id = thread.thread_id if thread else None
+    display_mode = get_thread_setting(thread, "display_mode", global_defaults) if thread else "lines"
+    line_limit = get_thread_setting(thread, "line_limit", global_defaults) if thread else 5
+
     logger.debug(
         f"try_auto_accept ENTER: context={context_name} type={prompt_type.value} "
         f"options={options!r} body_len={len(body) if body else 0} display_mode={display_mode}"
