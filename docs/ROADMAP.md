@@ -341,6 +341,8 @@ Voice messages and audio files transcribed via OpenAI Whisper:
 - "Transcribing..." status, then "«text» → Claude" on success
 - Friendly error messages for API errors (too large, timeout, no speech, etc.)
 - Configurable via OPENAI_API_KEY, OPENAI_BASE_URL, WHISPER_TIMEOUT
+- `/whisper_stats` in DM — usage reports by users/projects with period filters (7d/30d/all)
+- Usage logging to `~/.codogram/whisper-usage.jsonl` for cost tracking
 - See [docs/designs/done/2026-01-18-whisper-transcription-design.md](designs/done/2026-01-18-whisper-transcription-design.md)
 
 ### Verbose mode detailed menu

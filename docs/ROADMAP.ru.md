@@ -341,6 +341,8 @@ Per-chat настройка когда бот должен отвечать:
 - Статус "Transcribing...", затем "«текст» → Claude" при успехе
 - Дружелюбные ошибки (файл слишком большой, таймаут, нет речи и т.д.)
 - Настройка через OPENAI_API_KEY, OPENAI_BASE_URL, WHISPER_TIMEOUT
+- `/whisper_stats` в DM — отчёты по использованию (по юзерам/проектам) с фильтрами периода (7d/30d/all)
+- Логирование использования в `~/.codogram/whisper-usage.jsonl` для отслеживания расходов
 - См. [docs/designs/done/2026-01-18-whisper-transcription-design.md](designs/done/2026-01-18-whisper-transcription-design.md)
 
 ### Детальное меню verbose mode
