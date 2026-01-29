@@ -439,13 +439,6 @@ Permission prompts по умолчанию показывают только з�
 - Phase 2: рефакторинг permission poller ✅
 - См. [docs/plans/2026-01-22-architecture-refactoring-roadmap.md](plans/2026-01-22-architecture-refactoring-roadmap.md) — полный бэклог
 
-### Глобальные настройки в личке
-Команда `/settings` в личке с ботом для дефолтов всех проектов:
-- Verbose mode, response mode, auto-accept и другие настройки
-- Новые чаты/треды наследуют эти дефолты
-- Per-chat настройки переопределяют глобальные
-- Настроил один раз — работает везде
-
 ## Active Bugs (External)
 
 ### Claude Code: --resume игнорирует контекст разговора

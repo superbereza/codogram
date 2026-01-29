@@ -439,13 +439,6 @@ Ongoing architecture improvements and technical debt reduction.
 - Phase 2: permission poller refactoring ✅
 - See [docs/plans/2026-01-22-architecture-refactoring-roadmap.md](plans/2026-01-22-architecture-refactoring-roadmap.md) for full backlog
 
-### Global settings in DM
-`/settings` command in DM with bot to set defaults for all projects:
-- Default verbose mode, response mode, auto-accept, etc.
-- New chats/threads inherit these defaults
-- Per-chat settings override global defaults
-- Configure once — works everywhere
-
 ## Active Bugs (External)
 
 ### Claude Code: --resume ignores conversation context
