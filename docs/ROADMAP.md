@@ -376,6 +376,15 @@ Fix missing Claude responses due to Claude Code sidechain behavior:
 - Extracts text from line 1 and yields as TEXT entry
 - Related: anthropics/claude-code#13326, anthropics/claude-code#20660
 
+### Settings in DM / Global defaults
+Manage global default settings from DM with the bot:
+- `/settings` in DM — view and toggle global defaults
+- All settings commands work in DM (auto_accept, response_mode, verbose_mode, etc.)
+- `/reset_to_default` — reset thread/project settings to inherit from global defaults
+- Two-level inheritance: Thread → Global defaults → Hardcoded defaults
+- `feat_avatar_pack` is per-project (not per-thread) with global default override
+- See [docs/designs/done/2026-01-27-settings-in-dm-design.md](designs/done/2026-01-27-settings-in-dm-design.md)
+
 ## Beta Test
 
 ### Compacting detection

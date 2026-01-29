@@ -376,6 +376,15 @@ Permission prompts по умолчанию показывают только з�
 - Извлекает текст из line 1 и возвращает как TEXT entry
 - Связано: anthropics/claude-code#13326, anthropics/claude-code#20660
 
+### Настройки в DM / Глобальные дефолты
+Управление глобальными настройками из ЛС с ботом:
+- `/settings` в DM — просмотр и переключение глобальных дефолтов
+- Все команды настроек работают в DM (auto_accept, response_mode, verbose_mode и т.д.)
+- `/reset_to_default` — сброс настроек треда/проекта к наследованию от глобальных
+- Двухуровневое наследование: Thread → Global defaults → Hardcoded defaults
+- `feat_avatar_pack` per-project (не per-thread) с override через глобальный дефолт
+- См. [docs/designs/done/2026-01-27-settings-in-dm-design.md](designs/done/2026-01-27-settings-in-dm-design.md)
+
 ## Beta Test
 
 ### Compacting detection
