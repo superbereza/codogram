@@ -24,7 +24,7 @@ SNIP = "..."
 
 # --- Auto-accept ---
 
-AUTO_ACCEPT_SUFFIX = "\n\nUPD: 🤖 auto accepted"
+AUTO_ACCEPT_SUFFIX = "\n\n🤖 auto accepted"
 AUTO_ACCEPT_HINT = " (/auto_accept to disable)"
 
 
