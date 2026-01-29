@@ -62,6 +62,8 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
     entry_type = entry.get("type")
 
     # Tool results come in "user" entries
+    # Only show subagent (Task) results - they have array content with agentId
+    # Skip regular tool results (string content) - already shown as TOOL_USE
     if entry_type == "user":
         message = entry.get("message", {})
         content = message.get("content", [])
@@ -69,12 +71,24 @@ def parse_jsonl_entry(entry: dict) -> ParsedEntry | None:
             if not isinstance(item, dict):
                 continue
             if item.get("type") == "tool_result":
-                content = str(item.get("content", ""))
-                if len(content) > 500:
-                    content = content[:500] + f"\n{strings.SNIP}"
+                raw_content = item.get("content", "")
+                # Only process array content (subagent responses)
+                # String content = regular tool output, skip it
+                if not isinstance(raw_content, list):
+                    return None
+                texts = [
+                    c.get("text", "")
+                    for c in raw_content
+                    if isinstance(c, dict) and c.get("type") == "text"
+                ]
+                # Filter out "agentId: xxx" lines
+                texts = [t for t in texts if not t.startswith("agentId:")]
+                text = "\n".join(texts)
+                if not text:
+                    return None
                 return ParsedEntry(
                     content_type=ContentType.TOOL_RESULT,
-                    text=content
+                    text=text
                 )
         return None
 
@@ -325,5 +339,14 @@ def _entry_to_messages(
         )
         if text:  # None in silence mode
             messages.append({"text": text, "parse_mode": "MarkdownV2"})
+
+    elif entry.content_type == ContentType.TOOL_RESULT:
+        # Subagent (Task) responses - always show in full
+        # These are user-facing content, not internal tool output
+        if display_mode == "silence":
+            return []
+
+        bullet = "● " if display_bullet else ""
+        messages.append({"text": f"{bullet}{entry.text}", "parse_mode": "MarkdownV2"})
 
     return messages
