@@ -3,7 +3,8 @@ from aiogram import Router
 from aiogram.types import ChatMemberUpdated
 
 from ..telegram.sticker import StickerAdapter
-from ..core.session_manager import project_manager
+from ..core.session_manager import project_manager, get_project_setting
+from ..config import get_global_defaults
 from ..services.emoji_pack import EmojiPackService
 from ..services.group_auth import GroupAuthService
 from ..telegram.queue import TelegramQueue
@@ -90,7 +91,7 @@ async def on_member_update(
 
     # --- Emoji pack: update stickers ---
     project = project_manager.get_by_chat(event.chat.id)
-    if not project or not project.feat_avatar_pack:
+    if not project or not get_project_setting(project, "feat_avatar_pack", get_global_defaults()):
         return
 
     # Create service with adapter (layered architecture)

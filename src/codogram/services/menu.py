@@ -46,6 +46,7 @@ SETUP_COMMANDS = [
 # Private chat (DM) commands
 DM_COMMANDS = [
     BotCommand(command="start", description="Start or show status"),
+    BotCommand(command="settings", description="Global defaults"),
     BotCommand(command="dashboard", description="View all projects"),
     BotCommand(command="check_env", description="Check environment"),
     BotCommand(command="intro", description="Show intro again"),

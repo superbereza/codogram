@@ -11,7 +11,8 @@ from ..config import settings
 from ..logging_config import logger
 from ..claude.screen import parse_screen, PermissionPrompt
 from ..services.start_flow import build_announcement, build_thread_announcement
-from ..core.session_manager import ProjectState, ThreadInfo, project_manager
+from ..core.session_manager import ProjectState, ThreadInfo, project_manager, get_project_setting
+from ..config import get_global_defaults
 from .queue import TelegramQueue, EditBatch
 from ..tmux.session import TmuxSession
 
@@ -205,7 +206,7 @@ async def launch_with_animation(
             # Topic - short announcement
             announcement = build_thread_announcement(thread.name, tmux_name)
             # Add emoji pack hint if feature enabled
-            if project.feat_avatar_pack and project.emoji_pack_name:
+            if get_project_setting(project, "feat_avatar_pack", get_global_defaults()) and project.emoji_pack_name:
                 pack_link = f"https://t.me/addemoji/{project.emoji_pack_name}"
                 announcement += f"\n\n{strings.EMOJI_PACK_TOPIC_HINT.format(pack_link=pack_link)}"
         logger.info(f"launch_sending_announcement: project={project.project_name}")

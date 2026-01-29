@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from ..config import settings, load_config, get_config_path
 
@@ -21,6 +22,41 @@ from ..git.resolver import get_project_name
 from ..tmux.session import TmuxSession
 from ..claude.session_finder import find_session_for_project, compute_jsonl_path
 from ..logging_config import logger
+
+
+def get_thread_setting(thread: 'ThreadInfo', key: str, global_defaults: dict[str, Any]) -> Any:
+    """Get effective setting: thread override or global default.
+
+    Args:
+        thread: ThreadInfo instance
+        key: Setting key (e.g. "auto_accept")
+        global_defaults: Dict of global defaults
+
+    Returns:
+        Thread value if not None, otherwise global default
+    """
+    thread_value = getattr(thread, key, None)
+    if thread_value is not None:
+        return thread_value
+    return global_defaults.get(key)
+
+
+def get_project_setting(project: 'ProjectState', key: str, global_defaults: dict[str, Any]) -> Any:
+    """Get effective setting: project override or global default.
+
+    Args:
+        project: ProjectState instance
+        key: Setting key (e.g. "feat_avatar_pack")
+        global_defaults: Dict of global defaults
+
+    Returns:
+        Project value if not None, otherwise global default
+    """
+    project_value = getattr(project, key, None)
+    if project_value is not None:
+        return project_value
+    return global_defaults.get(key)
+
 
 def should_cleanup_project(project: 'ProjectState') -> bool:
     """Check if project should be cleaned up (inactive > 30 days).
@@ -123,21 +159,16 @@ class ThreadInfo:
     base_branch: str | None = None     # Branch this worktree was created from
     archived: bool = False             # True = topic closed after /branch_finish
 
-    # Auto-accept permissions:
-    auto_accept: bool = False          # True = auto-accept permission prompts
-
-    # Display mode (replaces verbose):
-    display_mode: str = "lines"        # show_all, lines, headers, current, silence
-    line_limit: int = 5                # Used in 'lines' mode
-    display_bullet: bool = True        # Show ● prefix
-    display_thinking_text: bool = True # Show <thinking> blocks
-
-    # Working status indicator (renamed from feat_thinking_status):
-    working_status: bool = False       # Show Claude's working status indicator
-    # Note: feat_suggestions is project-level only (in ProjectState)
-
-    # Response mode: "all", "polite", "mentions"
-    response_mode: str = "all"
+    # Settings - None means inherit from global defaults
+    auto_accept: bool | None = None
+    display_mode: str | None = None
+    line_limit: int | None = None
+    display_bullet: bool | None = None
+    display_thinking_text: bool | None = None
+    working_status: bool | None = None
+    response_mode: str | None = None
+    feat_suggestions: bool | None = None
+    # Note: feat_avatar_pack is per-project (not per-thread) - see ProjectState
 
     # Persisted message IDs (for cleanup after restart):
     last_suggestion_msg_id: int | None = None  # Last 💡 message ID
@@ -209,7 +240,7 @@ class ProjectState:
     response_mode: str = "all"
 
     # Avatar emoji pack:
-    feat_avatar_pack: bool = True
+    feat_avatar_pack: bool | None = None  # None = inherit from global defaults
     emoji_pack_name: str | None = None
     emoji_map: dict[int, str] = field(default_factory=dict)  # {user_id: custom_emoji_id}
 
@@ -279,8 +310,8 @@ class ProjectManager:
                 else:
                     project.working_status = data.get("working_status", False)
 
-                project.feat_suggestions = data.get("feat_suggestions", False)
-                project.feat_avatar_pack = data.get("feat_avatar_pack", True)
+                project.feat_suggestions = data.get("feat_suggestions")
+                project.feat_avatar_pack = data.get("feat_avatar_pack")
                 project.emoji_pack_name = data.get("emoji_pack_name")
                 # Convert string keys back to int (JSON serialization converts int keys to strings)
                 emoji_map_raw = data.get("emoji_map", {})
@@ -299,14 +330,16 @@ class ProjectManager:
                         thread_display_mode = "show_all" if thread_data["verbose"] else "lines"
                         thread_line_limit = 5
                     else:
-                        thread_display_mode = thread_data.get("display_mode", "lines")
-                        thread_line_limit = thread_data.get("line_limit", 5)
+                        # None = inherit from global (new behavior)
+                        thread_display_mode = thread_data.get("display_mode")
+                        thread_line_limit = thread_data.get("line_limit")
 
                     # Migration: feat_thinking_status -> working_status for thread
                     if "feat_thinking_status" in thread_data:
                         thread_working_status = thread_data["feat_thinking_status"]
                     else:
-                        thread_working_status = thread_data.get("working_status", False)
+                        # None = inherit from global (new behavior)
+                        thread_working_status = thread_data.get("working_status")
 
                     project.threads[tid] = ThreadInfo(
                         thread_id=tid,
@@ -319,13 +352,15 @@ class ProjectManager:
                         worktree_path=thread_data.get("worktree_path"),
                         base_branch=thread_data.get("base_branch"),
                         archived=thread_data.get("archived", False),
-                        auto_accept=thread_data.get("auto_accept", False),
+                        # Settings - None = inherit from global
+                        auto_accept=thread_data.get("auto_accept"),
                         display_mode=thread_display_mode,
                         line_limit=thread_line_limit,
-                        display_bullet=thread_data.get("display_bullet", True),
-                        display_thinking_text=thread_data.get("display_thinking_text", True),
+                        display_bullet=thread_data.get("display_bullet"),
+                        display_thinking_text=thread_data.get("display_thinking_text"),
                         working_status=thread_working_status,
-                        response_mode=thread_data.get("response_mode", "all"),
+                        response_mode=thread_data.get("response_mode"),
+                        feat_suggestions=thread_data.get("feat_suggestions"),
                         last_suggestion_msg_id=thread_data.get("last_suggestion_msg_id"),
                         last_ask_msg_id=thread_data.get("last_ask_msg_id"),
                         last_permission_msg_id=thread_data.get("last_permission_msg_id"),
@@ -412,21 +447,23 @@ class ProjectManager:
                                 thread_data["base_branch"] = t.base_branch
                             if t.archived:
                                 thread_data["archived"] = t.archived
-                            if t.auto_accept:
+                            # Settings - only save if not None (explicit override)
+                            if t.auto_accept is not None:
                                 thread_data["auto_accept"] = t.auto_accept
-                            # Display settings (only save if non-default)
-                            if t.display_mode != "lines":
+                            if t.display_mode is not None:
                                 thread_data["display_mode"] = t.display_mode
-                            if t.line_limit != 5:
+                            if t.line_limit is not None:
                                 thread_data["line_limit"] = t.line_limit
-                            if not t.display_bullet:
+                            if t.display_bullet is not None:
                                 thread_data["display_bullet"] = t.display_bullet
-                            if not t.display_thinking_text:
+                            if t.display_thinking_text is not None:
                                 thread_data["display_thinking_text"] = t.display_thinking_text
-                            if t.working_status:
+                            if t.working_status is not None:
                                 thread_data["working_status"] = t.working_status
-                            if t.response_mode != "all":
+                            if t.response_mode is not None:
                                 thread_data["response_mode"] = t.response_mode
+                            if t.feat_suggestions is not None:
+                                thread_data["feat_suggestions"] = t.feat_suggestions
                             if t.last_suggestion_msg_id:
                                 thread_data["last_suggestion_msg_id"] = t.last_suggestion_msg_id
                             if t.last_ask_msg_id:
