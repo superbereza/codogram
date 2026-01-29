@@ -22,6 +22,11 @@ STATUS_OFF = "`○ off`"
 # Truncation marker
 SNIP = "..."
 
+# --- Auto-accept ---
+
+AUTO_ACCEPT_SUFFIX = "🤖 auto accepted"
+AUTO_ACCEPT_HINT = " (/auto_accept to disable)"
+
 
 # --- Launch animation ---
 

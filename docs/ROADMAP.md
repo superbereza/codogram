@@ -4,6 +4,13 @@
 
 ## Done
 
+### Inline auto-accept notification
+Show auto-accept as edit to previous tool message instead of new message:
+- Edit last tool message to add "🤖 auto accepted" suffix
+- Reduces chat noise, provides better context
+- Hint every 10th: `/auto_accept to disable`
+- See [docs/designs/done/2025-01-29-inline-auto-accept-design.md](designs/done/2025-01-29-inline-auto-accept-design.md)
+
 ### Codogram extraction
 - Extracted from personal-agent to standalone repo
 - Renamed package telegram_bridge → codogram
@@ -415,13 +422,6 @@ Auto-detect and resend messages stuck in Claude's input:
 
 ## In Progress
 
-### Inline auto-accept notification
-Show auto-accept as edit to previous tool message instead of new message:
-- Edit last tool message to add "🤖 auto accepted" suffix
-- Reduces chat noise, provides better context
-- Hint every 10th: `/auto_accept to disable`
-- See [docs/plans/2025-01-29-inline-auto-accept-design.md](plans/2025-01-29-inline-auto-accept-design.md)
-
 ### Auto-suspend & auto-resume
 Save RAM by killing idle sessions, auto-resume on user message:
 - **Auto-suspend:** Kill tmux after 12h inactivity (silent, no notification)
@@ -438,13 +438,6 @@ Ongoing architecture improvements and technical debt reduction.
 - Phase 1: project restructure ✅
 - Phase 2: permission poller refactoring ✅
 - See [docs/plans/2026-01-22-architecture-refactoring-roadmap.md](plans/2026-01-22-architecture-refactoring-roadmap.md) for full backlog
-
-### Global settings in DM
-`/settings` command in DM with bot to set defaults for all projects:
-- Default verbose mode, response mode, auto-accept, etc.
-- New chats/threads inherit these defaults
-- Per-chat settings override global defaults
-- Configure once — works everywhere
 
 ## Backlog
 
@@ -489,6 +482,28 @@ Text-to-speech for Claude's responses:
 - OpenAI TTS or similar API
 - Toggle per-chat or per-message
 - Useful for listening while multitasking
+
+### Claude error detection
+Detect when Claude Code exits with error (API errors, network issues, etc.):
+- Research how errors are displayed in tmux (API error, connection issues)
+- Parse tmux capture-pane for error patterns
+- Send error text to user: "⚠️ Claude error: <error text>. Figure it out and /start"
+- Detect shell prompt appearing after Claude was active
+
+### Claude exit detection
+Detect when Claude exits normally (not crash):
+- Show `[~] Claude exited. Use /start to restart.` notification
+- Detect shell prompt after Claude UI disappears
+- Must track `claude_was_active` to avoid false positives on startup
+- Must distinguish shell prompt `❯` from Claude selector `❯ 1. Yes`
+- See reverted attempt: 8b6baf8 (had issues with false positives)
+
+### Proactive mode
+Cron-based proactive behavior — bot returns to work and answers questions on its own:
+- Background scheduler checks for pending work
+- Can proactively continue tasks without user prompting
+- Auto-respond to questions when context is clear
+- Abstract idea — needs design
 
 ### Project-less chat mode
 Connect bot to chat without creating a project:
@@ -561,13 +576,6 @@ Research and implement tool display improvements:
 - First line from jsonl can be used as anchor
 - Need to research which tools are hidden in CLI
 
-### Claude error detection
-Detect when Claude Code exits with error (API errors, network issues, etc.):
-- Research how errors are displayed in tmux (API error, connection issues)
-- Parse tmux capture-pane for error patterns
-- Send error text to user: "⚠️ Claude error: <error text>. Figure it out and /start"
-- Detect shell prompt appearing after Claude was active
-
 ### Telegram safety context
 Inject safety guidelines when starting thread/branch/project:
 - Tell Claude what's safe to do in Telegram environment
@@ -604,14 +612,6 @@ Improve TelegramQueue resilience:
 - **Retry on network errors** — `ServerDisconnectedError` currently not retried, message lost
 - **1 rps rate limiting** — proactive throttling to avoid hitting Telegram limits
 - **Exponential backoff** — for rate limit retries
-
-### Claude exit detection
-Detect when Claude exits normally (not crash):
-- Show `[~] Claude exited. Use /start to restart.` notification
-- Detect shell prompt after Claude UI disappears
-- Must track `claude_was_active` to avoid false positives on startup
-- Must distinguish shell prompt `❯` from Claude selector `❯ 1. Yes`
-- See reverted attempt: 8b6baf8 (had issues with false positives)
 
 ### Cleanup command
 Explicit deletion of archived branches when disk space or git cleanup needed:

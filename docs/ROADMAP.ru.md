@@ -4,6 +4,13 @@
 
 ## Done
 
+### Inline auto-accept notification
+Показывать auto-accept как редактирование предыдущего tool message вместо нового сообщения:
+- Редактируем последний tool message, добавляя "🤖 auto accepted"
+- Меньше шума в чате, лучший контекст
+- Хинт каждый 10-й раз: `/auto_accept to disable`
+- См. [docs/designs/done/2025-01-29-inline-auto-accept-design.md](designs/done/2025-01-29-inline-auto-accept-design.md)
+
 ### Codogram extraction
 - Extracted from personal-agent to standalone repo
 - Renamed package telegram_bridge → codogram
@@ -415,13 +422,6 @@ Permission prompts по умолчанию показывают только з�
 
 ## In Progress
 
-### Inline auto-accept notification
-Показывать auto-accept как редактирование предыдущего tool message вместо нового сообщения:
-- Редактируем последний tool message, добавляя "🤖 auto accepted"
-- Меньше шума в чате, лучший контекст
-- Хинт каждый 10-й раз: `/auto_accept to disable`
-- См. [docs/plans/2025-01-29-inline-auto-accept-design.md](plans/2025-01-29-inline-auto-accept-design.md)
-
 ### Auto-suspend & auto-resume
 Экономия RAM за счёт убийства idle сессий, auto-resume при сообщении:
 - **Auto-suspend:** Убить tmux после 12ч неактивности (тихо, без уведомления)
@@ -438,13 +438,6 @@ Permission prompts по умолчанию показывают только з�
 - Phase 1: реструктуризация проекта ✅
 - Phase 2: рефакторинг permission poller ✅
 - См. [docs/plans/2026-01-22-architecture-refactoring-roadmap.md](plans/2026-01-22-architecture-refactoring-roadmap.md) — полный бэклог
-
-### Глобальные настройки в личке
-Команда `/settings` в личке с ботом для дефолтов всех проектов:
-- Verbose mode, response mode, auto-accept и другие настройки
-- Новые чаты/треды наследуют эти дефолты
-- Per-chat настройки переопределяют глобальные
-- Настроил один раз — работает везде
 
 ## Backlog
 
@@ -482,6 +475,35 @@ Permission prompts по умолчанию показывают только з�
 - **Личный аккаунт** — получать свои сообщения, отвечать с помощью Claude от своего имени
 - MTProto клиент (Telethon) рядом с Bot API
 - Нужно исследовать: авторизация, хранение сессии, архитектура bot↔userbot
+
+### Голосовые сообщения от бота
+Text-to-speech для ответов Claude:
+- Конвертация текстовых ответов в голосовые сообщения
+- OpenAI TTS или аналог
+- Toggle per-chat или per-message
+- Удобно слушать на ходу
+
+### Детекция ошибок Claude
+Детектить когда Claude Code падает с ошибкой (API errors, сетевые проблемы):
+- Исследовать как ошибки отображаются в tmux
+- Парсить tmux capture-pane на паттерны ошибок
+- Отправлять юзеру "⚠️ Claude error: <текст>. Разберись и /start"
+- Детектить shell prompt после активного Claude
+
+### Детекция выхода Claude
+Детектить когда Claude выходит нормально (не краш):
+- Показать `[~] Claude exited. Use /start to restart.`
+- Детектить shell prompt после исчезновения Claude UI
+- Трекать `claude_was_active` чтобы избежать false positives
+- Отличать shell prompt `❯` от Claude selector `❯ 1. Yes`
+- См. откаченную попытку: 8b6baf8 (были false positives)
+
+### Проактивный режим
+Cron-based проактивное поведение — бот возвращается к работе и сам отвечает на вопросы:
+- Фоновый scheduler проверяет pending работу
+- Может проактивно продолжать задачи без prompting от юзера
+- Авто-ответы на вопросы когда контекст понятен
+- Абстрактная идея — нужен дизайн
 
 ### Режим чата без проекта
 Подключение бота к чату без создания проекта:
@@ -554,13 +576,6 @@ MCP tool для Claude чтобы читать историю Telegram чата:
 - Из jsonl приходит первая строка — на ней можно якориться
 - Нужно исследовать какие тулы скрыты в CLI
 
-### Детекция ошибок Claude
-Обнаружение падения Claude Code с ошибкой (API errors, проблемы сети и т.д.):
-- Исследовать как ошибки отображаются в tmux (API error, connection issues)
-- Парсить tmux capture-pane на паттерны ошибок
-- Отправить текст ошибки юзеру: "⚠️ Claude ошибка: <текст>. Разберись и /start"
-- Детектить появление shell prompt после активного Claude
-
 ### Контекст безопасности Telegram
 Подкидывать гайдлайны безопасности при старте треда/бранча/проекта:
 - Объяснить Claude что безопасно делать в Telegram окружении
@@ -597,14 +612,6 @@ MCP tool для Claude чтобы читать историю Telegram чата:
 - **Retry на network errors** — `ServerDisconnectedError` сейчас не ретраится, сообщение теряется
 - **1 rps rate limiting** — проактивный троттлинг чтобы не попадать в лимиты Telegram
 - **Exponential backoff** — для retry при rate limit
-
-### Детекция выхода Claude
-Обнаружение нормального выхода Claude (не краша):
-- Показывать `[~] Claude exited. Use /start to restart.`
-- Определять shell prompt после исчезновения Claude UI
-- Трекать `claude_was_active` чтобы избежать false positives на старте
-- Отличать shell prompt `❯` от Claude selector `❯ 1. Yes`
-- См. откаченную попытку: 8b6baf8 (были false positives)
 
 ### Cleanup command
 Явное удаление архивных веток когда нужно место или git cleanup:
