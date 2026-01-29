@@ -4,6 +4,13 @@
 
 ## Done
 
+### Inline auto-accept notification
+Show auto-accept as edit to previous tool message instead of new message:
+- Edit last tool message to add "🤖 auto accepted" suffix
+- Reduces chat noise, provides better context
+- Hint every 10th: `/auto_accept to disable`
+- See [docs/designs/done/2025-01-29-inline-auto-accept-design.md](designs/done/2025-01-29-inline-auto-accept-design.md)
+
 ### Codogram extraction
 - Extracted from personal-agent to standalone repo
 - Renamed package telegram_bridge → codogram
@@ -414,13 +421,6 @@ Auto-detect and resend messages stuck in Claude's input:
 - See [docs/designs/done/2026-01-17-stuck-message-recovery.md](designs/done/2026-01-17-stuck-message-recovery.md)
 
 ## In Progress
-
-### Inline auto-accept notification
-Show auto-accept as edit to previous tool message instead of new message:
-- Edit last tool message to add "🤖 auto accepted" suffix
-- Reduces chat noise, provides better context
-- Hint every 10th: `/auto_accept to disable`
-- See [docs/designs/2025-01-29-inline-auto-accept-design.md](designs/2025-01-29-inline-auto-accept-design.md)
 
 ### Auto-suspend & auto-resume
 Save RAM by killing idle sessions, auto-resume on user message:

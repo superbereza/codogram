@@ -4,6 +4,13 @@
 
 ## Done
 
+### Inline auto-accept notification
+Показывать auto-accept как редактирование предыдущего tool message вместо нового сообщения:
+- Редактируем последний tool message, добавляя "🤖 auto accepted"
+- Меньше шума в чате, лучший контекст
+- Хинт каждый 10-й раз: `/auto_accept to disable`
+- См. [docs/designs/done/2025-01-29-inline-auto-accept-design.md](designs/done/2025-01-29-inline-auto-accept-design.md)
+
 ### Codogram extraction
 - Extracted from personal-agent to standalone repo
 - Renamed package telegram_bridge → codogram
@@ -414,13 +421,6 @@ Permission prompts по умолчанию показывают только з�
 - См. [docs/designs/done/2026-01-17-stuck-message-recovery.md](designs/done/2026-01-17-stuck-message-recovery.md)
 
 ## In Progress
-
-### Inline auto-accept notification
-Показывать auto-accept как редактирование предыдущего tool message вместо нового сообщения:
-- Редактируем последний tool message, добавляя "🤖 auto accepted"
-- Меньше шума в чате, лучший контекст
-- Хинт каждый 10-й раз: `/auto_accept to disable`
-- См. [docs/designs/2025-01-29-inline-auto-accept-design.md](designs/2025-01-29-inline-auto-accept-design.md)
 
 ### Auto-suspend & auto-resume
 Экономия RAM за счёт убийства idle сессий, auto-resume при сообщении:
