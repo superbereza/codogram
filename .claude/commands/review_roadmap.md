@@ -9,6 +9,7 @@ Read the current state from:
 2. `docs/bugs/active/` - Active bugs
 3. `docs/bugs/testing/` - Testing bugs
 4. `docs/bugs/fixed/` - Fixed bugs (for today's date)
+5. `docs/bugs/external/` - External bugs (in dependencies like Claude Code)
 
 Generate a formatted list in this exact format:
 
@@ -55,6 +56,9 @@ MINOR:
 
 **Bugs — Testing** (count):
 - bug-name (date)
+
+**Bugs — External** (count):
+- bug-name — status
 ```
 
 Rules:

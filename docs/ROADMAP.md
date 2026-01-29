@@ -439,26 +439,6 @@ Ongoing architecture improvements and technical debt reduction.
 - Phase 2: permission poller refactoring ✅
 - See [docs/plans/2026-01-22-architecture-refactoring-roadmap.md](plans/2026-01-22-architecture-refactoring-roadmap.md) for full backlog
 
-## Active Bugs (External)
-
-### Claude Code: --resume ignores conversation context
-Resume command uses correct session ID but Claude says "this is the beginning of our conversation":
-- `claude --resume <session_id>` executes successfully
-- Session file exists with full history (675 lines)
-- sessions-index.json has correct entry
-- But model doesn't receive conversation context
-- Related: anthropics/claude-code#15837, #3138, #10161
-- **Status:** Waiting for Claude Code fix, no workaround found
-
-### Claude Code: sessions-index.json randomly empties
-Session index file becomes empty, breaking resume picker:
-- Caught on cook-guy and multiple other projects
-- jsonl files exist but sessions-index.json has `"entries": []`
-- Claude Code v2.1.23
-- Root cause unknown — not Codogram's fault (we don't touch this file)
-- Workaround: manually restore index entry from jsonl data
-- Related: anthropics/claude-code#18311
-
 ## Backlog
 
 ### Manual group approval tracking
