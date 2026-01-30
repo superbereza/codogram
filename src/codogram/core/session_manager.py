@@ -182,6 +182,7 @@ class ThreadInfo:
     # For inline auto-accept:
     last_tool_msg_text: str | None = None  # Original text for edit
     auto_accept_count: int = 0             # Counter for hint frequency
+    test_verbose_auto_accept: bool = False  # TEST: show what's being auto-accepted
 
     def get_tmux_session(self, project_name: str) -> str:
         """Get tmux session name for this thread."""

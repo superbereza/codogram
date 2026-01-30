@@ -738,3 +738,27 @@ async def callback_settings(callback: CallbackQuery, telegram_queue: TelegramQue
     text = _build_settings_text(project, thread, tmux_name)
     kb = settings_keyboard(tmux_name, page=current_page)
     await telegram_queue.edit(callback.message, text, reply_markup=kb)
+
+
+@router.message(Command("test_verbose_aa", ignore_case=True), CommandStrict())
+async def cmd_test_verbose_aa(message: Message, telegram_queue: TelegramQueue):
+    """TEST: Toggle verbose auto-accept (shows what's being auto-accepted)."""
+    chat_id = message.chat.id
+    thread_id = message.message_thread_id
+
+    project = project_manager.get_by_chat(chat_id)
+    if not project:
+        await telegram_queue.reply(message, "No project. Use /start first.")
+        return
+
+    thread = None
+    if project.threads:
+        thread = project.threads.get(thread_id)
+
+    if thread:
+        current = getattr(thread, 'test_verbose_auto_accept', False)
+        thread.test_verbose_auto_accept = not current
+        status = "● on" if thread.test_verbose_auto_accept else "○ off"
+        await telegram_queue.reply(message, f"TEST verbose auto-accept: {status}")
+    else:
+        await telegram_queue.reply(message, "Thread not found.")
