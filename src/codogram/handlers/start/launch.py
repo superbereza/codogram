@@ -119,28 +119,23 @@ async def launch_claude_in_thread(msg: Message, result: FlowResult, queue: Teleg
 
     # Reopen topic and reset icon
     if result.thread_id:
-        was_reopened = False
         try:
             await msg.bot.reopen_forum_topic(msg.chat.id, result.thread_id)
             logger.info(f"Topic {result.thread_id} reopened")
-            was_reopened = True
         except Exception as e:
-            # BUG FIX: Log instead of bare pass
             logger.debug(f"reopen_forum_topic failed (may be already open): {e}")
 
-        # Reset icon if topic was reopened OR was archived (icon may be 📁)
-        if was_reopened or thread.archived:
-            # Use user's custom emoji if available, otherwise default
-            user_id = msg.from_user.id if msg.from_user else None
-            icon_id = project.emoji_map.get(user_id) if user_id else None
-            icon_id = icon_id or strings.ICON_BALLOT_BOX
-            try:
-                await msg.bot.edit_forum_topic(
-                    msg.chat.id, result.thread_id,
-                    icon_custom_emoji_id=icon_id
-                )
-            except Exception as e:
-                logger.warning(f"Failed to set topic icon: {e}")
+        # Always reset icon on launch (may be 📁 from archive or stale)
+        user_id = msg.from_user.id if msg.from_user else None
+        icon_id = project.emoji_map.get(user_id) if user_id else None
+        icon_id = icon_id or strings.ICON_BALLOT_BOX
+        try:
+            await msg.bot.edit_forum_topic(
+                msg.chat.id, result.thread_id,
+                icon_custom_emoji_id=icon_id
+            )
+        except Exception as e:
+            logger.warning(f"Failed to set topic icon: {e}")
 
         if thread.archived:
             thread.archived = False
