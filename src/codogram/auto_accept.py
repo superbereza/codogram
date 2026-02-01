@@ -20,6 +20,34 @@ AUTO_ACCEPT_PHRASES = ["yes", "allow"]
 AUTO_ACCEPT_TYPES = {PromptType.REGULAR}
 
 
+def _extract_tool_name(body: str | None) -> str | None:
+    """Extract tool name from permission body.
+
+    Examples:
+        "Bash command..." -> "Bash"
+        "Edit file..." -> "Edit"
+        "Read /path/to/file" -> "Read"
+    """
+    if not body:
+        return None
+    first_word = body.split()[0] if body.split() else None
+    return first_word
+
+
+def _tool_matches(body: str | None, last_msg_text: str | None) -> bool:
+    """Check if permission body matches the last tool message.
+
+    Returns True if tool name from body appears in last_msg_text.
+    """
+    if not body or not last_msg_text:
+        return False
+    tool_name = _extract_tool_name(body)
+    if not tool_name:
+        return False
+    # Check if tool name appears in last message (e.g., "**Bash**" or "**Edit**")
+    return f"**{tool_name}**" in last_msg_text
+
+
 def select_option(options: list[str]) -> str | None:
     """Select safe option for auto-accept.
 
@@ -99,8 +127,12 @@ async def try_auto_accept(
     elif display_mode == "headers":
         # Headers mode: inline edit (append suffix to last tool message)
         edited = False
-        if thread and thread.last_tool_msg_text:
-            replace_key = f"tool:{chat_id}:{thread.thread_id}"
+        tool_name = _extract_tool_name(body)
+        tool_messages = getattr(thread, 'last_tool_messages', {}) if thread else {}
+        last_msg_text = tool_messages.get(tool_name) if tool_name else None
+
+        if last_msg_text:
+            replace_key = f"tool:{chat_id}:{thread.thread_id}:{tool_name}"
 
             # Build suffix with optional hint
             thread.auto_accept_count += 1
@@ -112,7 +144,7 @@ async def try_auto_accept(
                 body_preview = (body or "")[:60].replace('\n', ' ')
                 suffix += f" [{body_preview}]"
 
-            new_text = thread.last_tool_msg_text + suffix
+            new_text = last_msg_text + suffix
 
             # Check length limit (Telegram max 4096)
             if len(new_text) <= 4096:
@@ -126,9 +158,9 @@ async def try_auto_accept(
                     )
                     await telegram_queue.enqueue(batch)
                     # Update stored text for potential next edit
-                    thread.last_tool_msg_text = new_text
+                    thread.last_tool_messages[tool_name] = new_text
                     edited = True
-                    logger.debug("try_auto_accept: edited tool message with suffix")
+                    logger.debug(f"try_auto_accept: edited {tool_name} message with suffix")
                 except Exception as e:
                     logger.debug(f"try_auto_accept: edit failed, falling back: {e}")
             else:
