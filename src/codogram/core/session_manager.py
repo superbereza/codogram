@@ -271,6 +271,13 @@ class ProjectState:
             self.threads[thread_id] = ThreadInfo(thread_id=thread_id, name=name)
         return self.threads[thread_id]
 
+    def get_thread_by_name(self, name: str) -> ThreadInfo | None:
+        """Get thread by name. Returns first match or None."""
+        for thread in self.threads.values():
+            if thread.name == name:
+                return thread
+        return None
+
 class ProjectManager:
     """Manages ProjectState instances."""
 

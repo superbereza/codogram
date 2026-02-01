@@ -340,14 +340,19 @@ async def handle_wr_main(callback: CallbackQuery, queue: TelegramQueue):
     await archive_thread(callback.bot, callback.message.chat.id, project, thread)
     await queue.edit(callback.message, strings.WORKTREE_TOPIC_ARCHIVED)
 
-    # BUG FIX: Launch Claude in main thread
-    main_thread = project.get_or_create_thread(None, "main")
+    # Find main topic by name (not General Chat which has thread_id=None)
+    main_thread = project.get_thread_by_name("main")
+    if not main_thread:
+        # Fallback to General Chat if no main topic exists
+        main_thread = project.get_or_create_thread(None, "main")
+
+    main_thread_id = main_thread.thread_id
     session_id = main_thread.session_id if main_thread.has_valid_session() else None
 
     main_thread.launch_task = asyncio.create_task(
         launch_with_animation(
             bot=callback.bot, chat_id=callback.message.chat.id,
-            thread_id=None, project=project, thread=main_thread,
+            thread_id=main_thread_id, project=project, thread=main_thread,
             queue=queue, cwd=project.cwd, session_id=session_id,
         )
     )
