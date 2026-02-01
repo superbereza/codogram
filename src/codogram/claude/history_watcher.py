@@ -194,50 +194,76 @@ class JsonlWatcher:
         if not self.subagents_dir.exists():
             return entries
 
-        for filepath in self.subagents_dir.glob("agent-aprompt_suggestion-*.jsonl"):
+        files = list(self.subagents_dir.glob("agent-aprompt_suggestion-*.jsonl"))
+        if files:
+            logger.debug(f"subagent_glob: found={len(files)} seen={len(self.seen_subagent_files)}")
+
+        for filepath in files:
             if filepath.name in self.seen_subagent_files:
                 continue
 
+            logger.debug(f"subagent_new: file={filepath.name}")
+
+            is_ready, text = self._extract_subagent_text(filepath)
+
+            if not is_ready:
+                # File not ready (empty/invalid JSON), retry on next poll
+                continue
+
+            # File is ready, mark as seen
             self.seen_subagent_files.add(filepath.name)
 
-            text = self._extract_subagent_text(filepath)
             if text:
                 logger.debug(f"subagent_text: file={filepath.name} len={len(text)}")
                 entries.append(ParsedEntry(
                     content_type=ContentType.TEXT,
                     text=text
                 ))
+            else:
+                logger.debug(f"subagent_skip: file={filepath.name} (no text)")
 
         return entries
 
-    def _extract_subagent_text(self, filepath: Path) -> str | None:
-        """Extract assistant text from line 1 of aprompt_suggestion file."""
+    def _extract_subagent_text(self, filepath: Path) -> tuple[bool, str | None]:
+        """Extract assistant text from line 1 of aprompt_suggestion file.
+
+        Returns:
+            (is_ready, text): is_ready=False means file not ready yet (retry later)
+        """
         try:
             with open(filepath, "r") as f:
                 first_line = f.readline().strip()
                 if not first_line:
-                    return None
+                    logger.debug(f"subagent_empty: file={filepath.name}")
+                    return False, None  # Empty, retry later
 
                 entry = json.loads(first_line)
-                message = entry.get("message", {})
+        except json.JSONDecodeError as e:
+            logger.debug(f"subagent_incomplete: file={filepath.name} error={e}")
+            return False, None  # Invalid JSON, retry later
+        except IOError as e:
+            logger.warning(f"subagent_read_error: file={filepath.name} error={e}")
+            return False, None  # IO error, retry later
 
-                # Verify it's an assistant message
-                if message.get("role") != "assistant":
-                    return None
+        # File has valid JSON - it's ready, mark as seen regardless of content
+        message = entry.get("message", {})
 
-                content = message.get("content", [])
-                if not content:
-                    return None
+        # Verify it's an assistant message with text content
+        if message.get("role") != "assistant":
+            logger.debug(f"subagent_not_assistant: file={filepath.name} role={message.get('role')}")
+            return True, None  # Ready but wrong format
 
-                # Get text from first content item
-                first_item = content[0]
-                if isinstance(first_item, dict) and first_item.get("type") == "text":
-                    return first_item.get("text", "")
+        content = message.get("content", [])
+        if not content or not isinstance(content, list):
+            logger.debug(f"subagent_no_content: file={filepath.name}")
+            return True, None  # Ready but no content
 
-                return None
-        except (json.JSONDecodeError, IOError) as e:
-            logger.warning(f"subagent_extract_error: file={filepath.name} error={e}")
-            return None
+        first_item = content[0]
+        if isinstance(first_item, dict) and first_item.get("type") == "text":
+            return True, first_item.get("text", "")
+
+        logger.debug(f"subagent_not_text: file={filepath.name} type={first_item.get('type') if isinstance(first_item, dict) else 'not_dict'}")
+        return True, None  # Ready but not text type
 
 
 async def watch_jsonl(path: Path, poll_interval: float | None = None) -> AsyncIterator[ParsedEntry]:
@@ -357,9 +383,11 @@ async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "Telegra
                     # Use replace_key for tool messages to enable inline auto-accept edit
                     replace_key = None
                     if entry.content_type == ContentType.TOOL_USE:
-                        replace_key = f"tool:{project.chat_id}:{thread.thread_id}"
-                        # Save original text for later edit
-                        thread.last_tool_msg_text = messages[0].get("text")
+                        replace_key = f"tool:{project.chat_id}:{thread.thread_id}:{entry.tool_name}"
+                        # Save original text for later edit (by tool name)
+                        if not hasattr(thread, 'last_tool_messages'):
+                            thread.last_tool_messages = {}
+                        thread.last_tool_messages[entry.tool_name] = messages[0].get("text")
 
                     batch = OutgoingBatch(
                         chat_id=project.chat_id,
@@ -374,7 +402,7 @@ async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "Telegra
                     # This starts fresh for the next sequence of tool calls
                     if entry.content_type == ContentType.TEXT:
                         current_mode_active = False
-                        thread.last_tool_msg_text = None  # Reset on text response
+                        thread.last_tool_messages = {}  # Reset on text response
 
                 # Signal poller to resend thinking status (so it appears at bottom)
                 thread.thinking_needs_resend = True
