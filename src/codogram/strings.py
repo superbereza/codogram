@@ -526,9 +526,8 @@ SETUP_ADMIN_CHECK_FAILED = "Still missing admin rights"  # Plain text for callba
 MIGRATION_SUCCESS = f"""`[v]` Topics enabled
 
 Multi\\-session mode unlocked:
-/thread \\- new topic, same directory
-/branch \\- isolated feature branch \\+ topic
-/finish \\- merge and archive"""
+/new\\_chat \\- new topic \\+ Claude session
+/finish\\_chat \\- archive topic \\+ stop Claude"""
 
 MIGRATION_ADMIN_REQUIRED = f"""{STATUS_WARN} Grant admin rights to continue
 
