@@ -1,22 +1,8 @@
 import subprocess
 import time
 from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
 
 from ..logging_config import logger
-from ..config import TMUX_CAPTURE_LINES_DEFAULT
-
-# Debug log for tmux send operations
-TMUX_DEBUG_LOG = Path(__file__).parent.parent.parent / "logs/tmux-send-debug.log"
-TMUX_DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
-
-
-def _log_tmux_debug(msg: str) -> None:
-    """Append debug message to tmux send log."""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-    with open(TMUX_DEBUG_LOG, "a") as f:
-        f.write(f"{timestamp} {msg}\n")
 
 
 @dataclass
@@ -30,92 +16,30 @@ class TmuxSession:
             return  # Don't send empty messages
 
         logger.info(f"tmux_send: session={self.name} text={repr(text[:100])}")
-        _log_tmux_debug(f"{'='*60}")
-        _log_tmux_debug(f"SEND session={self.name} text={repr(text)}")
-
-        # Capture state BEFORE (compact: around input line)
-        before = self._capture_around_input()
-        _log_tmux_debug(f"BEFORE:\n{before}")
 
         # Step 0: Cancel permission prompt if active
         self._cancel_permission_if_active()
 
         # Step 1: Send C-c to interrupt any running operation
-        _log_tmux_debug("[1] Sending C-c...")
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, "C-c"],
             check=True
         )
-        time.sleep(0.15)  # Increased from 0.05 to give Claude TUI time to process
-
-        after_cc = self._capture_around_input()
-        _log_tmux_debug(f"AFTER C-c:\n{after_cc}")
+        time.sleep(0.15)
 
         # Step 2: Send text with -l (literal)
-        _log_tmux_debug(f"[2] Sending text with -l...")
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, "-l", "--", text],
             check=True
         )
         time.sleep(0.3)
 
-        after_text = self._capture_around_input()
-        _log_tmux_debug(f"AFTER text:\n{after_text}")
-
         # Step 3: Send Enter
-        _log_tmux_debug("[3] Sending Enter...")
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, "Enter"],
             check=True
         )
         time.sleep(0.2)
-
-        after_enter = self._capture_around_input()
-        _log_tmux_debug(f"AFTER Enter:\n{after_enter}")
-        _log_tmux_debug(f"DONE\n")
-
-    def _capture_last_lines(self, n: int = 20) -> str:
-        """Capture last N lines from pane."""
-        result = subprocess.run(
-            ["tmux", "capture-pane", "-t", self.name, "-p", "-S", f"-{n}"],
-            capture_output=True,
-            text=True
-        )
-        return result.stdout if result.returncode == 0 else f"<capture failed: {result.stderr}>"
-
-    def _capture_around_input(self, context_before: int = 3, context_after: int = 3) -> str:
-        """Capture lines around the input line (❯) for compact debugging.
-
-        Returns context_before lines above input, input line, context_after lines below.
-        """
-        result = subprocess.run(
-            ["tmux", "capture-pane", "-t", self.name, "-p", "-S", f"-{TMUX_CAPTURE_LINES_DEFAULT}"],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode != 0:
-            return f"<capture failed: {result.stderr}>"
-
-        lines = result.stdout.splitlines()
-
-        # Find input line (starts with ❯ or >)
-        input_idx = None
-        for i, line in enumerate(lines):
-            stripped = line.lstrip()
-            if stripped.startswith("❯") or stripped.startswith(">"):
-                input_idx = i
-                # Don't break - we want the LAST input line (most recent)
-
-        if input_idx is None:
-            # No input line found, return last few lines
-            return "\n".join(lines[-7:])
-
-        # Extract context around input
-        start = max(0, input_idx - context_before)
-        end = min(len(lines), input_idx + context_after + 1)
-
-        extracted = lines[start:end]
-        return "\n".join(extracted)
 
     def _cancel_permission_if_active(self, max_attempts: int = 3) -> bool:
         """Cancel permission prompt if active.
@@ -131,11 +55,8 @@ class TmuxSession:
             state = parse_screen(output)
 
             if not isinstance(state, PermissionPrompt):
-                if attempt > 0:
-                    _log_tmux_debug(f"[0] Permission prompt cleared after {attempt} Escape(s)")
                 return True
 
-            _log_tmux_debug(f"[0] Permission prompt detected, sending Escape (attempt {attempt + 1})")
             logger.info(f"tmux_send: cancelling permission prompt (attempt {attempt + 1})")
 
             subprocess.run(
@@ -148,7 +69,6 @@ class TmuxSession:
         output = self.capture_pane()
         state = parse_screen(output)
         if isinstance(state, PermissionPrompt):
-            _log_tmux_debug(f"[0] WARNING: Permission prompt still active after {max_attempts} attempts!")
             logger.warning(f"tmux_send: permission prompt still active after {max_attempts} Escape attempts")
             return False
 
@@ -157,21 +77,12 @@ class TmuxSession:
     def send_key(self, key: str) -> None:
         """Send a special key (Escape, Enter, C-c, etc.) to tmux session."""
         logger.info(f"tmux_send_key: session={self.name} key={key}")
-        _log_tmux_debug(f"{'='*60}")
-        _log_tmux_debug(f"SEND_KEY session={self.name} key={key}")
-
-        before = self._capture_last_lines(20)
-        _log_tmux_debug(f"BEFORE:\n{before}")
 
         subprocess.run(
             ["tmux", "send-keys", "-t", self.name, key],
             check=True
         )
-        time.sleep(0.15)  # Increased for Claude UI responsiveness
-
-        after = self._capture_last_lines(20)
-        _log_tmux_debug(f"AFTER:\n{after}")
-        _log_tmux_debug("DONE\n")
+        time.sleep(0.15)  # Wait for Claude UI responsiveness
 
     def exists(self) -> bool:
         """Check if tmux session exists.

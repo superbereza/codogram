@@ -7,8 +7,25 @@ if __name__ == '__main__':
     sys.modules['codogram.main'] = sys.modules['__main__']
 
 import asyncio
+import subprocess
 from pathlib import Path
 from aiogram import Bot, Dispatcher
+
+
+def get_git_revision() -> str:
+    """Get current git commit hash and branch."""
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5
+        ).stdout.strip()
+        branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, timeout=5
+        ).stdout.strip()
+        return f"{commit} ({branch})" if commit else "unknown"
+    except Exception:
+        return "unknown"
 
 from .config import settings
 from .middleware.admin import AdminMiddleware
@@ -28,6 +45,7 @@ telegram_queue: TelegramQueue | None = None
 async def main():
     setup_logging()
     logger.info("Starting Telegram Bridge (history.jsonl mode)")
+    logger.info(f"Git revision: {get_git_revision()}")
     logger.info(f"Admin IDs: {settings.get_admin_ids()}")
     logger.info(f"Base dir: {settings.base_dir}")
 

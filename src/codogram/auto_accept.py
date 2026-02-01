@@ -20,6 +20,34 @@ AUTO_ACCEPT_PHRASES = ["yes", "allow"]
 AUTO_ACCEPT_TYPES = {PromptType.REGULAR}
 
 
+def _extract_tool_name(body: str | None) -> str | None:
+    """Extract tool name from permission body.
+
+    Examples:
+        "Bash command..." -> "Bash"
+        "Edit file..." -> "Edit"
+        "Read /path/to/file" -> "Read"
+    """
+    if not body:
+        return None
+    first_word = body.split()[0] if body.split() else None
+    return first_word
+
+
+def _tool_matches(body: str | None, last_msg_text: str | None) -> bool:
+    """Check if permission body matches the last tool message.
+
+    Returns True if tool name from body appears in last_msg_text.
+    """
+    if not body or not last_msg_text:
+        return False
+    tool_name = _extract_tool_name(body)
+    if not tool_name:
+        return False
+    # Check if tool name appears in last message (e.g., "**Bash**" or "**Edit**")
+    return f"**{tool_name}**" in last_msg_text
+
+
 def select_option(options: list[str]) -> str | None:
     """Select safe option for auto-accept.
 
@@ -96,29 +124,27 @@ async def try_auto_accept(
     if display_mode in ("silence", "current"):
         # No notification in silence/current mode
         pass
-    else:
-        # Try to edit last tool message (inline auto-accept)
+    elif display_mode == "headers":
+        # Headers mode: inline edit (append suffix to last tool message)
         edited = False
-        if thread and thread.last_tool_msg_text:
-            replace_key = f"tool:{chat_id}:{thread.thread_id}"
+        tool_name = _extract_tool_name(body)
+        tool_messages = getattr(thread, 'last_tool_messages', {}) if thread else {}
+        last_msg_text = tool_messages.get(tool_name) if tool_name else None
+
+        if last_msg_text:
+            replace_key = f"tool:{chat_id}:{thread.thread_id}:{tool_name}"
 
             # Build suffix with optional hint
             thread.auto_accept_count += 1
-            # Prefix depends on display_mode:
-            # - lines/show_all: empty line (double newline)
-            # - headers: single newline
-            # - current: space
-            if display_mode in ("lines", "show_all"):
-                prefix = "\n\n"
-            elif display_mode == "headers":
-                prefix = "\n"
-            else:
-                prefix = " "
-            suffix = prefix + strings.AUTO_ACCEPT_SUFFIX
+            suffix = "\n" + strings.AUTO_ACCEPT_SUFFIX
             if thread.auto_accept_count % 10 == 0:
                 suffix += strings.AUTO_ACCEPT_HINT
+            # TEST: verbose mode - show what's being auto-accepted
+            if getattr(thread, 'test_verbose_auto_accept', False):
+                body_preview = (body or "")[:60].replace('\n', ' ')
+                suffix += f" [{body_preview}]"
 
-            new_text = thread.last_tool_msg_text + suffix
+            new_text = last_msg_text + suffix
 
             # Check length limit (Telegram max 4096)
             if len(new_text) <= 4096:
@@ -132,30 +158,36 @@ async def try_auto_accept(
                     )
                     await telegram_queue.enqueue(batch)
                     # Update stored text for potential next edit
-                    thread.last_tool_msg_text = new_text
+                    thread.last_tool_messages[tool_name] = new_text
                     edited = True
-                    logger.debug("try_auto_accept: edited tool message with suffix")
+                    logger.debug(f"try_auto_accept: edited {tool_name} message with suffix")
                 except Exception as e:
                     logger.debug(f"try_auto_accept: edit failed, falling back: {e}")
             else:
                 logger.debug(f"try_auto_accept: message too long ({len(new_text)} chars), sending new message")
 
-        # Fallback: send new message if edit failed
+        # Fallback for headers: send short message
         if not edited:
-            # Build body text based on display_mode
-            if display_mode == "headers":
-                body_text = body.split("\n")[0][:60] if body else "[no details]"
-            elif display_mode == "show_all":
-                body_text = body if body else "[no details]"
-            else:
-                body_text = truncate_body(body, verbose=False, max_lines=line_limit) if body else "[no details]"
-
+            body_text = body.split("\n")[0][:60] if body else "[no details]"
             batch = OutgoingBatch(
                 chat_id=chat_id,
                 thread_id=thread_id,
                 messages=[{"text": f"🤖 Auto: {body_text}", "parse_mode": "MarkdownV2"}],
             )
             await telegram_queue.enqueue_nowait(batch)
+    else:
+        # lines/show_all: send separate message with body
+        if display_mode == "show_all":
+            body_text = body if body else "[no details]"
+        else:
+            body_text = truncate_body(body, verbose=False, max_lines=line_limit) if body else "[no details]"
+
+        batch = OutgoingBatch(
+            chat_id=chat_id,
+            thread_id=thread_id,
+            messages=[{"text": f"🤖 Auto: {body_text}", "parse_mode": "MarkdownV2"}],
+        )
+        await telegram_queue.enqueue_nowait(batch)
 
     try:
         tmux.send_key(selected)
