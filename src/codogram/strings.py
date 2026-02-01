@@ -409,17 +409,17 @@ START_WORKTREE_NOT_FOUND_BRANCH_EXISTS = f"""{STATUS_WARN} Worktree not found: `
 
 Branch `{{branch}}` exists.
 
-* Recreate worktree - recreate folder and resume session
-* Resume in main - archive topic, continue in main
-* Cancel"""
+• Recreate worktree — recreate folder and resume session
+• Resume in main — continue in this topic with main branch
+• Cancel"""
 
 START_WORKTREE_NOT_FOUND_BRANCH_MISSING = f"""{STATUS_WARN} Worktree not found: `{{path}}`
 
 Branch `{{branch}}` not found (merged?).
 
-* Create new - create branch + worktree, resume session
-* Resume in main - archive topic, continue in main
-* Cancel"""
+• Create new — create branch + worktree, resume session
+• Resume in main — continue in this topic with main branch
+• Cancel"""
 
 START_NEW_SESSION = f"{STATUS_PENDING} Starting new session..."
 START_RECREATING_WORKTREE = f"{STATUS_PENDING} Recreating worktree..."

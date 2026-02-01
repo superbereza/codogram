@@ -313,11 +313,13 @@ async def handle_wr_create(callback: CallbackQuery, queue: TelegramQueue):
 
 
 async def handle_wr_main(callback: CallbackQuery, queue: TelegramQueue):
-    """Resume in main by archiving topic, then launch Claude in main.
+    """Resume in main: stay in current topic but use main directory.
 
-    BUG FIX: Original just archived topic without launching Claude!
+    - Reopen current topic (if archived)
+    - Reset topic icon
+    - Launch Claude with project.cwd (main directory, not worktree)
+    - Resume main session if available
     """
-    from ...services.branch import archive_thread
     from ...telegram.launch_animation import launch_with_animation
 
     await callback.answer()
@@ -336,23 +338,41 @@ async def handle_wr_main(callback: CallbackQuery, queue: TelegramQueue):
         await queue.edit(callback.message, strings.ERR_THREAD_NOT_FOUND)
         return
 
-    # Archive the topic
-    await archive_thread(callback.bot, callback.message.chat.id, project, thread)
-    await queue.edit(callback.message, strings.WORKTREE_TOPIC_ARCHIVED)
+    # Reopen topic if archived
+    try:
+        await callback.bot.reopen_forum_topic(callback.message.chat.id, thread_id)
+        logger.info(f"Topic {thread_id} reopened")
+    except Exception as e:
+        logger.debug(f"reopen_forum_topic failed (may be already open): {e}")
 
-    # Find main topic by name (not General Chat which has thread_id=None)
+    # Reset topic icon
+    user_id = callback.from_user.id if callback.from_user else None
+    icon_id = project.emoji_map.get(user_id) if user_id else None
+    icon_id = icon_id or strings.ICON_BALLOT_BOX
+    try:
+        await callback.bot.edit_forum_topic(
+            callback.message.chat.id, thread_id,
+            icon_custom_emoji_id=icon_id
+        )
+    except Exception as e:
+        logger.warning(f"Failed to set topic icon: {e}")
+
+    # Clear worktree association - now using main
+    thread.worktree_path = None
+    thread.branch_name = None
+    project_manager._save()
+
+    # Get main session (from main thread if exists)
     main_thread = project.get_thread_by_name("main")
-    if not main_thread:
-        # Fallback to General Chat if no main topic exists
-        main_thread = project.get_or_create_thread(None, "main")
+    session_id = main_thread.session_id if main_thread and main_thread.has_valid_session() else None
 
-    main_thread_id = main_thread.thread_id
-    session_id = main_thread.session_id if main_thread.has_valid_session() else None
+    await queue.edit(callback.message, strings.START_LAUNCHING)
 
-    main_thread.launch_task = asyncio.create_task(
+    # Launch in current topic with main directory
+    thread.launch_task = asyncio.create_task(
         launch_with_animation(
             bot=callback.bot, chat_id=callback.message.chat.id,
-            thread_id=main_thread_id, project=project, thread=main_thread,
+            thread_id=thread_id, project=project, thread=thread,
             queue=queue, cwd=project.cwd, session_id=session_id,
         )
     )
