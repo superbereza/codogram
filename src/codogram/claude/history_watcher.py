@@ -140,10 +140,14 @@ class JsonlWatcher:
     (aprompt_suggestion) instead of main jsonl. This watcher checks both.
     """
 
-    def __init__(self, path: Path, poll_interval: float | None = None):
+    def __init__(self, path: Path, poll_interval: float | None = None, initial_position: int | None = None):
         self.path = path
         self.poll_interval = poll_interval if poll_interval is not None else settings.jsonl_watcher_interval
-        self.last_position = path.stat().st_size if path.exists() else 0
+        # Use provided position or start from end of file (to avoid replaying old messages)
+        if initial_position is not None:
+            self.last_position = initial_position
+        else:
+            self.last_position = path.stat().st_size if path.exists() else 0
 
         # Subagents tracking (for aprompt_suggestion workaround)
         # Session dir is parent of jsonl file: /path/to/session-id.jsonl -> /path/to/session-id/
@@ -186,6 +190,10 @@ class JsonlWatcher:
                 yield entry
 
             await asyncio.sleep(self.poll_interval)
+
+    def get_position(self) -> int:
+        """Get current read position in jsonl file."""
+        return self.last_position
 
     def _check_subagents(self) -> list[ParsedEntry]:
         """Check for new aprompt_suggestion files and extract text."""
@@ -317,8 +325,8 @@ async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "Telegra
         logger.warning(f"watch_thread_jsonl: no jsonl_path for thread={thread.name}")
         return
 
-    logger.info(f"thread_watcher_started: thread={thread.name}, session={thread.session_id[:8] if thread.session_id else 'None'}")
-    watcher = JsonlWatcher(Path(thread.jsonl_path))
+    logger.info(f"thread_watcher_started: thread={thread.name}, session={thread.session_id[:8] if thread.session_id else 'None'}, position={thread.jsonl_position}")
+    watcher = JsonlWatcher(Path(thread.jsonl_path), initial_position=thread.jsonl_position)
 
     # State for "current" mode - tracks whether we've sent the first tool message
     current_mode_key = f"current:{project.chat_id}:{thread.thread_id}"
@@ -406,6 +414,14 @@ async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "Telegra
 
                 # Signal poller to resend thinking status (so it appears at bottom)
                 thread.thinking_needs_resend = True
+
+                # Update position after successful send (for restart recovery)
+                new_position = watcher.get_position()
+                if new_position != thread.jsonl_position:
+                    thread.jsonl_position = new_position
+                    # Save config periodically (not on every message to avoid IO overhead)
+                    from ..core.session_manager import project_manager
+                    project_manager._save()
 
             except Exception as e:
                 logger.error(f"watch_thread_error: {e}")
