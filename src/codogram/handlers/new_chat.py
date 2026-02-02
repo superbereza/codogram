@@ -70,7 +70,8 @@ def _name_keyboard(create_type: str) -> InlineKeyboardMarkup:
     """Build keyboard for name prompt."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=strings.BTN_MY_NAME, callback_data=f"nc_myname:{create_type}")],
-        [InlineKeyboardButton(text=strings.BTN_MAGIC_NAME, callback_data="nc_magic")],
+        [InlineKeyboardButton(text=strings.BTN_MAGIC_NAME, callback_data=f"nc_magic:{create_type}")],
+        [InlineKeyboardButton(text=strings.BTN_TYPE_OWN, callback_data=f"nc_typeown:{create_type}")],
         [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=f"nc_back:{create_type}")],
     ])
 
@@ -94,7 +95,14 @@ def _uncommitted_keyboard(name: str) -> InlineKeyboardMarkup:
             text=strings.NC_UNCOMMITTED_COMMIT,
             callback_data=f"nc_uncommitted_commit:{name}"
         )],
-        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data="nc_cancel")],
+        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data="nc_uncommitted_back")],
+    ])
+
+
+def _type_own_keyboard(create_type: str) -> InlineKeyboardMarkup:
+    """Build keyboard for type-your-own name prompt."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=strings.BTN_GO_BACK, callback_data=f"nc_typeown_back:{create_type}")],
     ])
 
 
@@ -319,18 +327,13 @@ async def on_nc_myname(callback: CallbackQuery, telegram_queue: TelegramQueue):
     await _do_create(callback.bot, chat_id, thread_id, project, name, create_type, telegram_queue)
 
 
-@router.callback_query(F.data == "nc_magic")
+@router.callback_query(F.data.startswith("nc_magic:"))
 async def on_nc_magic(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Generate magic name and create."""
     chat_id = callback.message.chat.id
     thread_id = callback.message.message_thread_id
-    state = get_flow_state(chat_id, thread_id)
 
-    if not state or state.get("type") != "nc_awaiting_name":
-        await callback.answer(strings.SESSION_EXPIRED)
-        return
-
-    create_type = state.get("create_type")
+    create_type = callback.data.split(":", 1)[1]
     clear_flow_state(chat_id, thread_id)
 
     project = project_manager.get_by_chat(chat_id)
@@ -356,6 +359,71 @@ async def on_nc_magic(callback: CallbackQuery, telegram_queue: TelegramQueue):
     await callback.answer()
 
     await _do_create(callback.bot, chat_id, thread_id, project, name, create_type, telegram_queue)
+
+
+@router.callback_query(F.data.startswith("nc_typeown:"))
+async def on_nc_typeown(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Show type-your-own name prompt."""
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+    create_type = callback.data.split(":", 1)[1]
+
+    await telegram_queue.edit(
+        callback.message,
+        strings.NEW_CHAT_TYPE_NAME_PROMPT,
+        reply_markup=_type_own_keyboard(create_type),
+    )
+    await callback.answer()
+
+    set_flow_state(chat_id, thread_id, {
+        "type": "nc_awaiting_name",
+        "create_type": create_type,
+        "prompt_message_id": callback.message.message_id,
+    })
+
+
+@router.callback_query(F.data.startswith("nc_typeown_back:"))
+async def on_nc_typeown_back(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Go back from type-own to name selection."""
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+    create_type = callback.data.split(":", 1)[1]
+    clear_flow_state(chat_id, thread_id)
+
+    await telegram_queue.edit(
+        callback.message,
+        strings.NEW_CHAT_NAME_PROMPT,
+        reply_markup=_name_keyboard(create_type),
+    )
+    await callback.answer()
+
+    set_flow_state(chat_id, thread_id, {
+        "type": "nc_awaiting_name",
+        "create_type": create_type,
+        "prompt_message_id": callback.message.message_id,
+    })
+
+
+@router.callback_query(F.data == "nc_uncommitted_back")
+async def on_nc_uncommitted_back(callback: CallbackQuery, telegram_queue: TelegramQueue):
+    """Go back from uncommitted to name selection."""
+    await callback.answer()
+
+    chat_id = callback.message.chat.id
+    thread_id = callback.message.message_thread_id
+    clear_flow_state(chat_id, thread_id)
+
+    await telegram_queue.edit(
+        callback.message,
+        strings.NEW_CHAT_NAME_PROMPT,
+        reply_markup=_name_keyboard("branch"),  # Uncommitted only happens for branch
+    )
+
+    set_flow_state(chat_id, thread_id, {
+        "type": "nc_awaiting_name",
+        "create_type": "branch",
+        "prompt_message_id": callback.message.message_id,
+    })
 
 
 async def handle_name_input(message: Message, telegram_queue: TelegramQueue) -> bool:
