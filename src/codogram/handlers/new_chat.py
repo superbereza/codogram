@@ -407,6 +407,8 @@ async def on_nc_typeown_back(callback: CallbackQuery, telegram_queue: TelegramQu
 @router.callback_query(F.data == "nc_uncommitted_back")
 async def on_nc_uncommitted_back(callback: CallbackQuery, telegram_queue: TelegramQueue):
     """Go back from uncommitted to name selection."""
+    await callback.answer()
+
     chat_id = callback.message.chat.id
     thread_id = callback.message.message_thread_id
     clear_flow_state(chat_id, thread_id)
@@ -416,7 +418,6 @@ async def on_nc_uncommitted_back(callback: CallbackQuery, telegram_queue: Telegr
         strings.NEW_CHAT_NAME_PROMPT,
         reply_markup=_name_keyboard("branch"),  # Uncommitted only happens for branch
     )
-    await callback.answer()
 
     set_flow_state(chat_id, thread_id, {
         "type": "nc_awaiting_name",

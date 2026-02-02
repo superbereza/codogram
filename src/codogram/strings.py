@@ -815,9 +815,9 @@ NEW_CHAT_CONTEXT_MAIN = f"""{STATUS_QUESTION} Creating chat from:
 
 NEW_CHAT_CHOOSE = """Where to create?
 
-🪴 *Isolated branch* — new worktree \\+ branch \\+ session
+🪴 *Isolated* — new worktree \\+ branch \\+ session
 📂 *Same directory* — new session, same branch"""
-NEW_CHAT_NAME_PROMPT = "Choose a name or type your own:"
+NEW_CHAT_NAME_PROMPT = "Choose a name or send your own:"
 NEW_CHAT_TYPE_NAME_PROMPT = "Enter topic name:"
 NEW_CHAT_NAME_NO_NAME = "Couldn't get your name automatically — enter one or use magic name"
 NEW_CHAT_CREATING = f"{STATUS_PENDING} Creating chat `{{name}}`..."
@@ -826,7 +826,7 @@ NEW_CHAT_ERROR = f"{STATUS_ERR} Error creating chat"
 NEW_CHAT_NO_TOPIC_RIGHTS = f"{STATUS_ERR} Bot needs *Manage Topics* admin right to create chats"
 
 BTN_CREATE_HERE = "📂 Same directory"
-BTN_CREATE_ISOLATED = "🪴 Isolated branch"
+BTN_CREATE_ISOLATED = "🪴 Isolated"
 
 # Uncommitted changes (reuse existing or add)
 NC_UNCOMMITTED = f"{STATUS_WARN} Uncommitted changes detected"
