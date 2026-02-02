@@ -217,6 +217,7 @@ class HistoryWatcher:
         # Update binding
         thread.session_id = new_session_id
         thread.jsonl_path = str(compute_jsonl_path(project.cwd, new_session_id))
+        thread.jsonl_position = None  # Reset for new session file
         thread.awaiting_new_session = False
         thread.start_requested_at = None
 
@@ -304,6 +305,7 @@ async def poll_for_session_thread(
 
                 thread.session_id = session_id
                 thread.jsonl_path = str(jsonl_path)
+                thread.jsonl_position = None  # Reset for new session file
                 thread.awaiting_new_session = False
                 thread.start_requested_at = None
 
