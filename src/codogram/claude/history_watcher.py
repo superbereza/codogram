@@ -17,6 +17,41 @@ from .. import strings
 from .tool_formatter import format_tool_use
 
 
+def get_tool_key(tool_name: str, tool_input: dict | None) -> str:
+    """Get unique key for a tool call from jsonl data.
+
+    Used to match tool messages with auto-accept edits.
+    Must produce same key as auto_accept._get_tool_key_from_body().
+
+    Returns: "ToolName:primary_arg" e.g. "Read:/path/to/file"
+    """
+    if not tool_input:
+        return tool_name
+
+    # Extract primary argument based on tool type
+    primary_arg = None
+    if tool_name == "Read":
+        primary_arg = tool_input.get("file_path", "")
+    elif tool_name == "Bash":
+        cmd = tool_input.get("command", "")
+        # Take first line only (to match auto_accept parsing)
+        first_line = cmd.split('\n')[0].strip() if cmd else ""
+        primary_arg = first_line[:100]
+        logger.debug(f"get_tool_key Bash: first_line={first_line[:60]!r}")
+    elif tool_name in ("Edit", "Write"):
+        primary_arg = tool_input.get("file_path", "")
+    elif tool_name == "Grep":
+        primary_arg = tool_input.get("pattern", "")
+    elif tool_name == "Glob":
+        primary_arg = tool_input.get("pattern", "")
+    elif tool_name == "Task":
+        primary_arg = tool_input.get("prompt", "")[:50]
+
+    if primary_arg:
+        return f"{tool_name}:{primary_arg}"
+    return tool_name
+
+
 def _process_thinking_text(text: str, display_thinking_text: bool) -> str:
     """Process <thinking> blocks in text response.
 
@@ -140,10 +175,15 @@ class JsonlWatcher:
     (aprompt_suggestion) instead of main jsonl. This watcher checks both.
     """
 
-    def __init__(self, path: Path, poll_interval: float | None = None):
+    def __init__(self, path: Path, poll_interval: float | None = None, initial_position: int | None = None):
         self.path = path
         self.poll_interval = poll_interval if poll_interval is not None else settings.jsonl_watcher_interval
-        self.last_position = path.stat().st_size if path.exists() else 0
+
+        # Use initial_position if provided (from saved state), otherwise start at end of file
+        if initial_position is not None:
+            self.last_position = initial_position
+        else:
+            self.last_position = path.stat().st_size if path.exists() else 0
 
         # Subagents tracking (for aprompt_suggestion workaround)
         # Session dir is parent of jsonl file: /path/to/session-id.jsonl -> /path/to/session-id/
@@ -155,6 +195,10 @@ class JsonlWatcher:
         if self.subagents_dir.exists():
             for f in self.subagents_dir.glob("agent-aprompt_suggestion-*.jsonl"):
                 self.seen_subagent_files.add(f.name)
+
+    def get_position(self) -> int:
+        """Return current read position."""
+        return self.last_position
 
     async def watch(self) -> AsyncIterator[ParsedEntry]:
         """Watch jsonl file and subagents/ folder, yield new parsed entries."""
@@ -311,14 +355,15 @@ async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "Telegra
     a single message instead of sending multiple.
     """
     from ..telegram.queue import OutgoingBatch, EditBatch
+    from ..core.session_manager import project_manager
     from pathlib import Path
 
     if not thread.jsonl_path:
         logger.warning(f"watch_thread_jsonl: no jsonl_path for thread={thread.name}")
         return
 
-    logger.info(f"thread_watcher_started: thread={thread.name}, session={thread.session_id[:8] if thread.session_id else 'None'}")
-    watcher = JsonlWatcher(Path(thread.jsonl_path))
+    logger.info(f"thread_watcher_started: thread={thread.name}, session={thread.session_id[:8] if thread.session_id else 'None'}, position={thread.jsonl_position}")
+    watcher = JsonlWatcher(Path(thread.jsonl_path), initial_position=thread.jsonl_position)
 
     # State for "current" mode - tracks whether we've sent the first tool message
     current_mode_key = f"current:{project.chat_id}:{thread.thread_id}"
@@ -378,16 +423,33 @@ async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "Telegra
                         )
                         await telegram_queue.enqueue(batch)
                         logger.info(f"message_edited: msg_id={msg_id:06x} thread={thread.name}")
+
+                    # Persist position after send/edit in current mode
+                    new_position = watcher.get_position()
+                    if new_position != thread.jsonl_position:
+                        thread.jsonl_position = new_position
+                        project_manager._save()
+                        logger.debug(f"watcher: saved position {new_position} for {thread.name}")
                 else:
                     # Normal mode or non-tool content - send as usual
                     # Use replace_key for tool messages to enable inline auto-accept edit
                     replace_key = None
+                    tool_key = None
                     if entry.content_type == ContentType.TOOL_USE:
-                        replace_key = f"tool:{project.chat_id}:{thread.thread_id}:{entry.tool_name}"
-                        # Save original text for later edit (by tool name)
+                        tool_key = get_tool_key(entry.tool_name, entry.tool_input)
+                        replace_key = f"tool:{project.chat_id}:{thread.thread_id}:{tool_key}"
+
+                        # Check for pending auto-accept suffix (rare: poller ran first)
+                        pending_suffixes = getattr(thread, 'pending_auto_accept_suffixes', {})
+                        if tool_key in pending_suffixes:
+                            suffix = pending_suffixes.pop(tool_key)
+                            messages[0]["text"] = messages[0].get("text", "") + suffix
+                            logger.debug(f"watcher: applied deferred suffix to {tool_key}")
+
+                        # Save original text for later edit (by tool key)
                         if not hasattr(thread, 'last_tool_messages'):
                             thread.last_tool_messages = {}
-                        thread.last_tool_messages[entry.tool_name] = messages[0].get("text")
+                        thread.last_tool_messages[tool_key] = messages[0].get("text")
 
                     batch = OutgoingBatch(
                         chat_id=project.chat_id,
@@ -397,6 +459,32 @@ async def watch_thread_jsonl(bot: Bot, project, thread, telegram_queue: "Telegra
                     )
                     telegram_ids = await telegram_queue.enqueue(batch)
                     logger.info(f"message_sent: msg_id={msg_id:06x} thread={thread.name} telegram_ids={telegram_ids}")
+
+                    # Persist position IMMEDIATELY after successful send (before post-send logic)
+                    new_position = watcher.get_position()
+                    if new_position != thread.jsonl_position:
+                        thread.jsonl_position = new_position
+                        project_manager._save()
+                        logger.debug(f"watcher: saved position {new_position} for {thread.name}")
+
+                    # Post-send check: if suffix arrived while we were sending, edit the message
+                    if tool_key:
+                        pending_suffixes = getattr(thread, 'pending_auto_accept_suffixes', {})
+                        if tool_key in pending_suffixes:
+                            suffix = pending_suffixes.pop(tool_key)
+                            current_text = thread.last_tool_messages.get(tool_key, "")
+                            new_text = current_text + suffix
+                            if len(new_text) <= 4096:
+                                edit_batch = EditBatch(
+                                    chat_id=project.chat_id,
+                                    message_id=0,
+                                    text=new_text,
+                                    parse_mode="MarkdownV2",
+                                    replace_key=replace_key,
+                                )
+                                await telegram_queue.enqueue(edit_batch)
+                                thread.last_tool_messages[tool_key] = new_text
+                                logger.debug(f"watcher: post-send edit with deferred suffix for {tool_key}")
 
                     # Reset current mode state on TEXT content (Claude's response)
                     # This starts fresh for the next sequence of tool calls

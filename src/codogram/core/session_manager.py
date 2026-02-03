@@ -141,6 +141,7 @@ class ThreadInfo:
     # Runtime state (from history.jsonl):
     session_id: str | None = None
     jsonl_path: str | None = None
+    jsonl_position: int | None = None  # Last read position in jsonl (for restart recovery)
 
     # Tasks:
     watcher_task: asyncio.Task | None = field(default=None, repr=False)
@@ -353,6 +354,7 @@ class ProjectManager:
                         topic_name=thread_data.get("topic_name"),
                         session_id=thread_data.get("session_id"),
                         jsonl_path=thread_data.get("jsonl_path"),
+                        jsonl_position=thread_data.get("jsonl_position"),
                         # NOTE: awaiting_new_session and start_requested_at are NOT loaded
                         # They always start as False/None - runtime-only state
                         worktree_path=thread_data.get("worktree_path"),
@@ -443,6 +445,7 @@ class ProjectManager:
                                 "topic_name": t.topic_name,
                                 "session_id": t.session_id,
                                 "jsonl_path": t.jsonl_path,
+                                "jsonl_position": t.jsonl_position,
                                 # NOTE: awaiting_new_session and start_requested_at are NOT persisted
                                 # They are runtime-only state that should reset on bot restart
                             }
