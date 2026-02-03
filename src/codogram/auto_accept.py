@@ -34,18 +34,103 @@ def _extract_tool_name(body: str | None) -> str | None:
     return first_word
 
 
-def _tool_matches(body: str | None, last_msg_text: str | None) -> bool:
-    """Check if permission body matches the last tool message.
+def _get_tool_key_from_body(body: str | None) -> str | None:
+    """Extract unique tool key from permission body text.
 
-    Returns True if tool name from body appears in last_msg_text.
+    Must produce same key as history_watcher.get_tool_key().
+
+    Body formats:
+        "Read /path/to/file"
+        "Bash command\\n\\n   ls -la"
+        "Edit file\\n /path/to/file"
+        "Grep pattern in path"
     """
-    if not body or not last_msg_text:
-        return False
+    if not body:
+        return None
+
     tool_name = _extract_tool_name(body)
     if not tool_name:
-        return False
-    # Check if tool name appears in last message (e.g., "**Bash**" or "**Edit**")
-    return f"**{tool_name}**" in last_msg_text
+        return None
+
+    # Get everything after tool name
+    rest = body[len(tool_name):].strip()
+
+    # Debug: log body parsing
+    logger.debug(f"_get_tool_key_from_body: tool={tool_name} rest={rest[:100]!r}")
+
+    primary_arg = None
+
+    if tool_name == "Read":
+        # Body formats:
+        #   "file\n\n  Read(/path/to/file)\n\n Do you want..."
+        #   "/path/to/file"
+        # Try to extract path from Read(...) or find bare path
+        import re
+        # Try Read(path) format first
+        match = re.search(r'Read\(([^)]+)\)', rest)
+        if match:
+            primary_arg = match.group(1)
+        else:
+            # Find first path-like string
+            for word in rest.split():
+                if word.startswith("/") or word.startswith("."):
+                    primary_arg = word
+                    break
+
+    elif tool_name == "Bash":
+        # Body format: "command\n\n   actual_command\n   Description\n\n Do you want..."
+        # Long commands are wrapped across multiple lines in Claude's display
+        # Skip "command" prefix
+        if rest.lower().startswith("command"):
+            rest = rest[7:]
+
+        # Collect command lines (stop at description or prompt)
+        command_parts = []
+        for line in rest.split('\n'):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.lower().startswith("do you want"):
+                break
+            # Description lines usually start with capital letter and are short sentences
+            # Command lines have special chars: / | & - " ' ( ) $ = < >
+            if len(command_parts) > 0:
+                has_cmd_chars = any(c in stripped for c in ['/', '|', '&', '"', "'", '(', ')', '$', '=', '<', '>', '*'])
+                is_short_sentence = len(stripped) < 40 and stripped[0].isupper()
+                if is_short_sentence and not has_cmd_chars:
+                    break  # Likely description
+            command_parts.append(stripped)
+
+        # Join parts and take first 100 chars (matching watcher's truncation)
+        if command_parts:
+            full_command = ' '.join(command_parts)
+            primary_arg = full_command[:100]
+
+    elif tool_name in ("Edit", "Write"):
+        # Body: "Edit file\n src/codogram/..." or "Edit file\n /path/to/file"
+        # Skip "file" prefix
+        if rest.lower().startswith("file"):
+            rest = rest[4:].strip()
+        # Find path - first word on first line (before separator line "- - - -")
+        first_line = rest.split('\n')[0].strip() if rest else ""
+        if first_line and not first_line.startswith("-"):
+            primary_arg = first_line.split()[0] if first_line.split() else None
+
+    elif tool_name == "Grep":
+        # Body: "Grep pattern..." - first word/quoted string is pattern
+        primary_arg = rest.split()[0] if rest.split() else None
+
+    elif tool_name == "Glob":
+        # Body: "Glob pattern..." - first word is pattern
+        primary_arg = rest.split()[0] if rest.split() else None
+
+    elif tool_name == "Task":
+        # Body: "Task prompt..." - first ~50 chars
+        primary_arg = rest[:50] if rest else None
+
+    if primary_arg:
+        return f"{tool_name}:{primary_arg}"
+    return tool_name
 
 
 def select_option(options: list[str]) -> str | None:
@@ -127,23 +212,37 @@ async def try_auto_accept(
     elif display_mode == "headers":
         # Headers mode: inline edit (append suffix to last tool message)
         edited = False
-        tool_name = _extract_tool_name(body)
+        tool_key = _get_tool_key_from_body(body)
         tool_messages = getattr(thread, 'last_tool_messages', {}) if thread else {}
-        last_msg_text = tool_messages.get(tool_name) if tool_name else None
+        last_msg_text = tool_messages.get(tool_key) if tool_key else None
+
+        logger.debug(f"try_auto_accept headers: tool_key={tool_key}, found={last_msg_text is not None}")
+
+        # Build suffix with optional hint
+        thread.auto_accept_count += 1
+        suffix = "\n" + strings.AUTO_ACCEPT_SUFFIX
+        if thread.auto_accept_count % 10 == 0:
+            suffix += strings.AUTO_ACCEPT_HINT
+        # TEST: verbose mode - show what's being auto-accepted
+        if getattr(thread, 'test_verbose_auto_accept', False):
+            body_preview = (body or "")[:60].replace('\n', ' ')
+            suffix += f" [{body_preview}]"
+
+        # If message not found, poll briefly (watcher might be about to send)
+        # Watcher interval is ~0.5s, so we poll for up to 1s to catch it
+        if not last_msg_text and tool_key:
+            import asyncio
+            for _ in range(10):  # Poll up to 1s
+                await asyncio.sleep(0.1)
+                tool_messages = getattr(thread, 'last_tool_messages', {})
+                last_msg_text = tool_messages.get(tool_key)
+                if last_msg_text:
+                    logger.debug(f"try_auto_accept: found message after polling for {tool_key}")
+                    break
 
         if last_msg_text:
-            replace_key = f"tool:{chat_id}:{thread.thread_id}:{tool_name}"
-
-            # Build suffix with optional hint
-            thread.auto_accept_count += 1
-            suffix = "\n" + strings.AUTO_ACCEPT_SUFFIX
-            if thread.auto_accept_count % 10 == 0:
-                suffix += strings.AUTO_ACCEPT_HINT
-            # TEST: verbose mode - show what's being auto-accepted
-            if getattr(thread, 'test_verbose_auto_accept', False):
-                body_preview = (body or "")[:60].replace('\n', ' ')
-                suffix += f" [{body_preview}]"
-
+            # Message already sent by watcher - edit it
+            replace_key = f"tool:{chat_id}:{thread.thread_id}:{tool_key}"
             new_text = last_msg_text + suffix
 
             # Check length limit (Telegram max 4096)
@@ -158,23 +257,21 @@ async def try_auto_accept(
                     )
                     await telegram_queue.enqueue(batch)
                     # Update stored text for potential next edit
-                    thread.last_tool_messages[tool_name] = new_text
+                    thread.last_tool_messages[tool_key] = new_text
                     edited = True
-                    logger.debug(f"try_auto_accept: edited {tool_name} message with suffix")
+                    logger.debug(f"try_auto_accept: edited {tool_key} message with suffix")
                 except Exception as e:
                     logger.debug(f"try_auto_accept: edit failed, falling back: {e}")
             else:
                 logger.debug(f"try_auto_accept: message too long ({len(new_text)} chars), sending new message")
 
-        # Fallback for headers: send short message
-        if not edited:
-            body_text = body.split("\n")[0][:60] if body else "[no details]"
-            batch = OutgoingBatch(
-                chat_id=chat_id,
-                thread_id=thread_id,
-                messages=[{"text": f"🤖 Auto: {body_text}", "parse_mode": "MarkdownV2"}],
-            )
-            await telegram_queue.enqueue_nowait(batch)
+        # Deferred suffix: watcher hasn't sent yet, store for later
+        if not edited and tool_key:
+            if not hasattr(thread, 'pending_auto_accept_suffixes'):
+                thread.pending_auto_accept_suffixes = {}
+            thread.pending_auto_accept_suffixes[tool_key] = suffix
+            logger.debug(f"try_auto_accept: deferred suffix for {tool_key}")
+            # Don't send fallback - watcher will add suffix when it sends
     else:
         # lines/show_all: send separate message with body
         if display_mode == "show_all":
