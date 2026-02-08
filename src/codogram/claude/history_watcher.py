@@ -210,20 +210,27 @@ class JsonlWatcher:
                 current_size = 0
 
             if current_size > self.last_position:
-                with open(self.path, "r") as f:
+                with open(self.path, "rb") as f:
                     f.seek(self.last_position)
-                    for line in f:
-                        line = line.strip()
+                    while True:
+                        line_bytes = f.readline()
+                        if not line_bytes:
+                            break
+                        line_pos = f.tell()
+                        line = line_bytes.decode("utf-8", errors="replace").strip()
                         if not line:
+                            self.last_position = line_pos
                             continue
                         try:
                             entry = json.loads(line)
                             parsed = parse_jsonl_entry(entry)
                             if parsed:
+                                self.last_position = line_pos
                                 yield parsed
+                            else:
+                                self.last_position = line_pos
                         except json.JSONDecodeError:
-                            pass
-                    self.last_position = f.tell()
+                            self.last_position = line_pos
 
             # 2. Check subagents/ for new aprompt_suggestion files
             for entry in self._check_subagents():
