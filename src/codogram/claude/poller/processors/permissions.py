@@ -1,6 +1,7 @@
 # src/codogram/claude/poller/processors/permissions.py
 """Permission prompt processor with state machine."""
 import asyncio
+import time
 from enum import Enum
 
 from ..base import BaseProcessor
@@ -117,6 +118,7 @@ class PermissionProcessor(BaseProcessor):
             )
             if accepted:
                 self.log_info("DEBOUNCING->SHOWING: auto-accepted successfully")
+                self._check_clear_context(parsed.options)
                 self.state = PermissionState.SHOWING
                 self.last_body = parsed.body
                 return
@@ -151,6 +153,7 @@ class PermissionProcessor(BaseProcessor):
                 )
                 if accepted:
                     self.log_info("SHOWING: options/body changed, auto-accepted again")
+                    self._check_clear_context(parsed.options)
                     self.last_options = parsed.options
                     self.last_body = parsed.body
                     return
@@ -295,6 +298,29 @@ class PermissionProcessor(BaseProcessor):
             if self.ctx.thread:
                 self.ctx.thread.last_permission_msg_id = None
             self.msg_id = None
+
+    def _check_clear_context(self, options: list[str]) -> None:
+        """Detect 'clear context' in accepted option → prepare for session rebind.
+
+        When Claude's ExitPlanMode offers 'clear context', accepting it creates
+        a new session file. Set awaiting_new_session so the coordinator rebinds.
+        """
+        from ....auto_accept import select_option
+
+        thread = self.ctx.thread
+        if not thread:
+            return
+
+        selected = select_option(options)
+        if not selected:
+            return
+
+        for opt in options:
+            if opt.startswith(f"{selected}.") and "clear context" in opt.lower():
+                self.log_info(f"clear_context detected in option: {opt!r}")
+                thread.awaiting_new_session = True
+                thread.start_requested_at = time.time()
+                break
 
     def _reset_state(self) -> None:
         self.state = PermissionState.IDLE

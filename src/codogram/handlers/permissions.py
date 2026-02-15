@@ -1,4 +1,6 @@
 """Permission handlers - Yes/No/Esc buttons for Claude prompts."""
+import time
+
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 
@@ -161,6 +163,19 @@ async def callback_permission(callback: CallbackQuery, telegram_queue: TelegramQ
                     # Send the option number as key
                     tmux.send_key(str(option_num))
                     logger.info(f"permission_callback: sent key={option_num} to tmux={tmux_name}")
+
+                # Detect "clear context" → prepare for session rebind
+                selected_option = next(
+                    (o for o in state.options if o.startswith(f"{option_num}.")),
+                    None,
+                )
+                if selected_option and "clear context" in selected_option.lower():
+                    for thread in project.threads.values():
+                        if thread.get_tmux_session(project.project_name) == tmux_name:
+                            thread.awaiting_new_session = True
+                            thread.start_requested_at = time.time()
+                            logger.info(f"permission_callback: clear_context detected, awaiting rebind for {thread.name}")
+                            break
 
             # Cleanup
             permission_states.pop(msg_id, None)
